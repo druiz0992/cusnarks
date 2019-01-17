@@ -50,7 +50,7 @@ class ZFieldTest(unittest.TestCase):
     TEST_ITER = 1000
     NROOTS_THR = 15
    
-    def find_primes(n)
+    def find_primes(n):
        # Initialize a list
        primes = []
        for possiblePrime in range(2, n):
@@ -64,7 +64,7 @@ class ZFieldTest(unittest.TestCase):
              
            if isPrime:
                primes.append(possiblePrime)
-        return primes
+       return primes
 
     def test_init(self):
 
@@ -147,14 +147,14 @@ class ZFieldTest(unittest.TestCase):
     def test_reduction_and_factorization(self):
         prime_list = find_primes(ZField.PRIME_THR)
 
-        for prime in prime_list
+        for prime in prime_list:
            # Check reduction is correctly initialized for multiple primes
            ZField(prime)
 
            r_data = ZField.get_reduce_data()
            f_data = ZField.get_factors()
 
-           rrp_nnp = r['R'] * r['Rp'] - r['Pp'] * ZField.get_extended_p().as_long()
+           rrp_nnp = r_data['R'] * r_data['Rp'] - r_data['Pp'] * ZField.get_extended_p().as_long()
 
            # R * Rp - P * Pp = 1
            self.assertTrue(rrp_nnp == 1)
@@ -170,14 +170,14 @@ class ZFieldTest(unittest.TestCase):
         # For a list of primes, check that generator can generate all the field
         prime_list = find_primes(ZField.PRIME_THR)
 
-        for prime in prime_list
+        for prime in prime_list:
            ZField(prime)
            gen = ZField.find_generator()
 
            el = []
 
-           for i in xrange(prime)
-              el.append(pow(gen,i,prime)
+           for i in xrange(prime):
+              el.append(pow(gen,i,prime))
 
            self.assertTrue(set(el) == prime-1)
 
@@ -198,7 +198,7 @@ class ZFieldTest(unittest.TestCase):
         # Check correct number of different roots are generated
         prime_list = find_primes(ZField.PRIME_THR)
 
-        for prime in prime_list
+        for prime in prime_list:
            ZField(prime)
            f_data = ZField.get_factors()
            idx = randint(0,length(f_data['factors'])-1)

@@ -222,7 +222,7 @@ class ZField:
               
            # alpha is random number between 0 and mod (inclusive)
            while beta == 1:
-             alpha = random.randint(0,prime))
+             alpha = random.randint(0,prime)
              beta = pow(alpha,(prime-1)/prime_factor,prime)
 
            gamma = gamma * pow(alpha,prime-1/(prime_factor**exponent),prime)
@@ -277,8 +277,7 @@ class ZField:
       """
       if not Zfield.is_init():
          assert True, "Finite field not initialized"
-      elif isinstance(factor_data,dict) and
-        'factors' in factor_data and 'exponents' in factor_data:
+      elif isinstance(factor_data,dict) and 'factors' in factor_data and 'exponents' in factor_data:
            ZField.factor_data = factor_data
       
       elif isinstance(factor_data,str):
@@ -289,14 +288,14 @@ class ZField:
         else:
           assert True, "Curve information not available"
           
-      elif ZField.get_extended_p() > ZField.PRIME_THR 
+      elif ZField.get_extended_p() > ZField.PRIME_THR :
         assert True,"Prime is too large to factorize"
 
       else:
         prime_1 = ZField.get_extended_p().as_long() - 1
         ZField.factor_data = ZField.prime_factors(prime_1)
  
-     return ZField.factor_data 
+      return ZField.factor_data
      
   @classmethod
   def get_factors(cls):
@@ -332,10 +331,10 @@ class ZField:
        rem_factor = np.prod(np.asarray(rem_factor))
        result['exponents'].append(math.log(n / rem_factor,f))
  
-    if len(result['factors']) == 0:
-      assert True, "Factorization could not find any prime factor"
+     if len(result['factors']) == 0:
+       assert True, "Factorization could not find any prime factor"
 
-    return result
+     return result
 
 class ZFieldEl(BigInt):
    def __init__(self, bignum):
