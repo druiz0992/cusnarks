@@ -161,7 +161,7 @@ class BigInt:
      """
       X ^ Y
      """
-     if isinstance(x,int) or isinstance(x,long) and <= BigInt.POW_THR:
+     if isinstance(x,int) or isinstance(x,long) and x <= BigInt.POW_THR:
        return BigInt(self.bignum ** x)
      elif isinstance(x,BigInt) and x <= BigInt.POW_THR :
        return BigInt(self.bignum ** x.bignum)
