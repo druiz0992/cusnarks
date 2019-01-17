@@ -1,38 +1,24 @@
 """
-// ------------------------------------------------------------------
-// (c) Copyright 2019, Toboso Networks                               
-// All Rights Reserved                                               
-//                                                                   
-//
-// This program is the proprietary software of Toboso Networks and/or
-// its licensors, and may only be used, duplicated, modified or distributed
-// pursuant to the terms and conditions of a separate, written license
-// agreement executed between you and Toboso Networks (an "Authorized License").
-// Except as set forth in an Authorized License, Toboso Networks grants no license
-// (express or implied), right to use, or waiver of any kind with respect to
-// the Software, and Toboso Networks expressly reserves all rights in and to the
-// Software and all intellectual property rights therein.  IF YOU HAVE NO
-// AUTHORIZED LICENSE, THEN YOU HAVE NO RIGHT TO USE THIS SOFTWARE IN ANY
-// WAY, AND SHOULD IMMEDIATELY NOTIFY TOBOSO NETWORKS AND DISCONTINUE ALL USE OF
-// THE SOFTWARE.
-//
-// ..................................................................
-// ... 000 ......... 000 ........ t ....... b .......................
-// ..... 000 ..... 000 ........ ttttt ooooo bbbbb ooooo sssss ooooo .
-// ....... 000 . 000 ............ t . o . o b . b o . o s ... o . o .
-// .......... 000||| ............ t . o . o b . b o . o sssss o . o .
-// ....... 000|||OOO|| .......... t . o . o b . b o . o ... s o . o .
-// ..... 000|||||||OOO|| ........ ttt ooooo bbbbb ooooo sssss ooooo .
-// ... 000|||||||||||OOO| .............. t ..........................
-// ...... ||||||||||||||| ..... nnn  eee ttt w  w oooo rrr k k ssss .
-// ...... ||||||||||||||| ..... n  n e . t . www  o  o r . kk . ss ..
-// ...... ||||||||||||||| ..... n  n eee ttt  w . oooo r . k k ssss .
-// ..... ||||||||||||||||| ..........................................
-// ..... ||||||||||||||||| ..........................................
-// ..... ||||||||||||||||| ..........................................
-// ..................................................................
-//  Toboso Networks ........................... Strictly Confidential
-// ..................................................................
+/*
+    Copyright 2018 0kims association.
+
+    This file is part of cusnarks.
+
+    cusnarks is a free software: you can redistribute it and/or
+    modify it under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your option)
+    any later version.
+
+    cusnarks is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.
+
+    You should have received a copy of the GNU General Public License along with
+    cusnarks. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+
 // Author     : David Ruiz
 //
 // File name  : BigInt
