@@ -56,7 +56,7 @@
 //   2) ZFieldEl implements finite field arithmetic. Assumes that ZField has been initialized. Extends BigInt class
 //
 //   TODO
-//    - ZField only makes sense if initialized with prime.
+//    - ZField only makes sense if initialized with prime.. Not checked
 //    
 // ------------------------------------------------------------------
 
@@ -66,91 +66,155 @@ import math
 import numpy as np
 
 class ZField:
-  MAXP = long(1e10)
+  PRIME_THR = long(1e10)
   BN128_DATA = {'curve' : "BN128",
                 'prime' : 21888242871839275222246405745257275088548364400416034343698204186575808495617L,
                 'factor_data' : { 'factors' : [2,3,13,29,983,11003,237073, 405928799L, 1670836401704629L, 13818364434197438864469338081L],
                                         'exponents' : [28,2,1,1,1,1,1,1,1,1] }
                }
+
   P1009_DATA = {'curve' : "P1009",
                 'prime' : 1009,
                 'factor_data' : { 'factors' : [2,3,7],
                                   'exponents' : [4,2,1] }
                }
   init_prime = False    # Flag : Is prime initialized
-  prime = 0             # Current prime
-  prime_ext = prime     # Extended prime
-  roots = []
-  inv_roots = []
+  ext_prime  = None     # Field prime
+  redc_prime = None     # Field Prime (montgomery reduced)
+  roots = []            # Field roots of unity
+  inv_roots = []        # Filed inverse roots of unity
 
   # Montgomery reduction data
-  redc_data = {'init': False, 'bits' : 0, 'reducer' : 0, 'mask' : 0, 'reciprocal' : 0, 'factor' : 0, 'convertedone' : 0}
+  redc_data = {'bitlen' : 0, 'R' : 0, 'Rmask' : 0, 'Rp' : 0, 'Pp' : 0, 'convertedone' : 0}
 
   # Factorization data
   factor_data = {'factors' :   [],  # prime factors of prime - 1
-                'exponents' : []   # prime factors exponents of prime  - 1
+                 'exponents' : []   # prime factors exponents of prime  - 1
                }
 
   def __init__(self,q,factor_data=None):
-      self.set(q)
-      ZField._factorize(factor_data)
+      """
+      Constructor
+
+      Parameters:
+      ----------
+        q :           BigInt, long, int, string integer that initializes 
+                          Field characteristic
+        factor_data : (Optional) String or Dictionary with factorization information 
+                         for the provided field characteristic. If characteristic
+                         is smaller than PRIME_THR, data can be computed. Else
+                         it needs to be provided.
+                         if String format, expected string is the name of the predefined data
+                            P1009 or BN128
+                         Contents of dictionary:
+           'factors'  : list of length N of int/long containing prime factors of prime-1
+           'exponents': list of length N of int/long containing exponents of prime factors of 
+                            prime-1 such that 
+                            prime - 1 = (factor[0] ** exponent[0]) * 
+                                             (factor[1] ** exponent[1]) * 
+                                             (factor[N-1] ** exponent[N-1]) 
+      """
+      ZField.init_prime = True
+      ZField.ext_prime = BigInt(q)
+      # Apply processing for future reduction
+      ZField.reduce()
+      # init factorization data
+      ZField.factorize(factor_data)
 
   @classmethod
-  def get(self):
-    return ZField.prime.bignum
+  def get_extended_p(cls):
+    """
+      Returns extended prime as BigNum
+    """
+    return ZField.ext_prime
 
   @classmethod
-  def get_extended(self):
-    return ZField.prime_ext.bignum
+  def get_reduced_p(cls):
+    """
+      Returns reduced prime as BigNum. 
+       If None, it means that Field has't undergone Montgomery reduction 
+    """
+    return ZField.redc_prime
 
   @classmethod
-  def set(self,q):
-    ZField.prime = BigInt(q)
-    ZField.prime_ext = ZField.prime
-    ZField.init_prime = True
-    ZField.redc_data['init'] = False
+  def get_reduce_data(cls):
+    """
+      Returns reduce data
+    """
+    return ZField.redc_data
 
   @classmethod
-  def is_init(self):
+  def is_init(cls):
+      """
+        True if ZField has been intialized.
+         False otherwise
+      """
       return ZField.init_prime
 
   @classmethod
-  def is_redc(self):
-      return ZField.redc_data['init']
-
-  @classmethod
-  def show(self):
-      ZField.prime.show()
-
-  @classmethod
-  def reduce(self):
-      if not ZField.redc_data['init']:
-          bitlen = int(math.ceil(math.log(ZField.get(),2)))
-          ZField.prime = BigInt(1 << bitlen | 1) # force it to be odd
-          ZField.redc_data['bits'] = (ZField.get().bit_length() // 8 +1 )* 8 # Multiple of 8
-          ZField.redc_data['reducer'] = 1 << ZField.redc_data['bits']
-          ZField.redc_data['mask'] = ZField.redc_data['reducer'] - 1
-          ZField.redc_data['reciprocal'] = ZFieldEl._inv(ZField.redc_data['reducer'] % ZField.get())
-          ZField.redc_data['factor'] = (ZField.redc_data['reducer'] * ZField.redc_data['reciprocal'] - 1) // ZField.get()
-          ZField.redc_data['convertedone'] = ZField.redc_data['reducer'] % ZField.get()
-
-      ZField.redc_data['init'] = True
-
-  @classmethod
-  def extend(self):
-      if ZField.redc_data['init']:
-         ZField.prime = ZField.prime_ext
-
-      ZField.redc_data['init'] = False
-
-  @classmethod
-  def _find_generator(cls):
+  def reduce(cls):
       """
-      Returns an arbitrary generator of the multiplicative group of integers module p
-        for ZField where gen  ^ (k*nroots) = 1 mod p. If p is prime, an answer must exist
+        Montgomery reduction. Find alternative version of modulus R to speed up multiplications instead of using P (prime)
+          if R * Rp = 1 (mod P) =>  R * Rp - P * Pp = 1.  R is a power of 2 larger than P
+            Rp and Pp are found using extended euclidian algo.
+
+          Assume that we want to multiple a * b = c (mod P)
+            _a = a * R (mod P)
+            _b = b * R (mod P)  
+               then, Montgomery product computes _c = a_ * _b * Rp (mod P) = a * b * R (mod P)  only dividing by R which is fast
+            c = a * b (mod P) = _c * Rp (mod P)
+
       """
+      bitlen = int(math.ceil(math.log(ZField.get_extended_p().as_long(),2)))
+      t = BigInt(1 << bitlen | 1) # force it to be odd
+      ZField.redc_data['bitlen'] = (t.bit_length() // 8 +1 )* 8 # Multiple of 8
+      ZField.redc_data['R'] = long(1 << ZField.redc_data['bitlen'])
+      ZField.redc_data['Rmask'] = long(ZField.redc_data['R'] - 1)
+      ZField.redc_data['Rp'] = ZField.inv(ZField.redc_data['R']).as_long()
+      ZField.redc_data['Pp'] = (ZField.redc_data['R'] * ZField.redc_data['Rp'] - 1) // ZField.get_extended_p().as_long()
+      ZField.redc_data['convertedone'] = ZField.redc_data['R'] % ZField.get_extended_p().as_long()
+      Zfield.redc_prime = BigInt(ZField.redc_data['R'])
+
+  @staticmethod
+  def inv(x):
+     """
+       returns X' such that X * X' = 1 (mod p)
+     """
+     if not Zfield.is_init():
+         assert True, "Finite field not initialized"
+     elif isinstance(x,BigInt) or isinstance(x,ZFieldEl):
+         x_l = x.bignum
+     elif isinstance(x,int)  or isinstance(x,long)   :
+         x_l = x
+     else :
+         assert True, "Invalid type"
+
+     p = ZField.get_extended_p().as_long()
+     # Based on a simplification of the extended Euclidean algorithm
+     assert p > 0 and 0 <= x_l < p 
+     y = x_l
+     x_l = p
+     a = 0
+     b = 1
+     while y != 0:
+        a, b = b, a - x_l // y * b
+        x_l, y = y, x_l % y
+     if x_l == 1:
+         return ZFieldEl(a % p)
+     else:
+        raise ValueError("Reciprocal does not exist")
+
+  @classmethod
+  def find_generator(cls):
+      """
+      Returns an arbitrary generator gen of the multiplicative group ZField with characteristic p
+        where gen  ^ (k*nroots) = 1 mod p. If p is prime, an answer must exist
+      """
+      if not Zfield.is_init():
+         assert True, "Finite field not initialized"
+
       gamma=long(1)
-      prime = ZField.get_extended()
+      prime = ZField.get_extended_p().as_long()
       for i in xrange(len(ZField.factor_data['factors'])):
            beta = long(1)
            prime_factor = ZField.factor_data['factors'][i]
@@ -159,36 +223,43 @@ class ZField:
            # alpha is random number between 0 and mod (inclusive)
            while beta == 1:
              alpha = random.randint(0,prime))
-             beta = pow(alpha,prime-1/prime_factor,prime)
+             beta = pow(alpha,(prime-1)/prime_factor,prime)
 
            gamma = gamma * pow(alpha,prime-1/(prime_factor**exponent),prime)
            gamma = gamma % (prime)
        
-      return gamma
+      return ZFieldEl(gamma)
 
   @classmethod
-  def _find_primitive_root(cls, nroots):
+  def find_primitive_root(cls, nroots):
       """
         Returns primitive root such that root = gen ^ nroots % prime,
       """
-      gen = ZField._find_generator()
-      prime = ZField.get_extended()
-      return = pow(gen, (prime - 1) // nroots, prime)
+      if not Zfield.is_init():
+         assert True, "Finite field not initialized"
+
+      gen = ZField.find_generator()
+      prime = ZField.get_extended_p()
+      return ZFieldEl(pow(gen, (prime - 1) // nroots, prime))
 
   @classmethod
   def get_roots(cls):
-    return ZField.roots, ZField.inv_roots
+      """
+        returns computed roots of unity
+      """
+      return ZField.roots, ZField.inv_roots
 
   @classmethod
-  def find_roots(cls, nroots, find_inv_roots=False):
+  def find_roots(cls, nroots, find_inv_roots=True):
       """
-        Returns nroots
+        Computes and returns nroots of unity. If find_inv_roots is True, inverse roots are
+          also computed
       """
       if not ZField.is_init():
         assert True, "Prime not initialized"
 
       # initialize roots
-      ZField.roots = [ 1, ZField._find_primitive_root(nroots) ]
+      ZField.roots = [ 1, ZField.find_primitive_root(nroots) ]
       ZField.inv_roots = []
       for i in xrange(nroots)-2:
          ZField.roots.append(ZField.roots[i] * ZField.roots[i+1])
@@ -200,11 +271,13 @@ class ZField:
       return ZField.roots, ZField.inv_roots
 
   @classmethod
-  def _factorize(cls, factor_data=None):
+  def factorize(cls, factor_data=None):
       """
-       Factorizes prime - 1. Only works for small primes less thanb MAXP.
+       Factorizes prime - 1. Only works for small primes less than PRIME_THR.
       """
-      if isinstance(factor_data,dict) and
+      if not Zfield.is_init():
+         assert True, "Finite field not initialized"
+      elif isinstance(factor_data,dict) and
         'factors' in factor_data and 'exponents' in factor_data:
            ZField.factor_data = factor_data
       
@@ -216,17 +289,23 @@ class ZField:
         else:
           assert True, "Curve information not available"
           
-      elif ZField.get_extended() > ZField.MAXP 
-        assert True,"Prime is too large to factorize"a
+      elif ZField.get_extended_p() > ZField.PRIME_THR 
+        assert True,"Prime is too large to factorize"
 
       else:
-        prime_1 = ZField.get_extended() - 1
-        ZField.factor_data = ZField._prime_factors(prime_1)
-            
+        prime_1 = ZField.get_extended_p().as_long() - 1
+        ZField.factor_data = ZField.prime_factors(prime_1)
+ 
+     return ZField.factor_data 
+     
   @classmethod
-  def __prime_factors(cls,n):
+  def get_factors(cls):
+      return ZField.factor_data
+
+  @classmethod
+  def prime_factors(cls,n):
      """
-      Factorizes p_1 into prime factors. Returns dictionary with following info:
+      Factorizes number into prime factors. Returns dictionary with following info:
        'factors' : array of prime factors
        'exponents' : array of prime factor exponent
      """
@@ -268,7 +347,7 @@ class ZFieldEl(BigInt):
        bignum 
      """
      if ZField.is_init():
-         self.bignum = BigInt(bignum) % ZField.get_extended()
+         self.bignum = BigInt(bignum) % ZField.get_extended_p()
          if ZField.is_redc():
            self.reduce()
            self.is_redc = True
@@ -279,12 +358,12 @@ class ZFieldEl(BigInt):
 
    def reduce(self):
        if not self.is_redc:
-           self.bignum = (self.bignum << ZField.redc_data['bits']) % ZField.get_extended()
+           self.bignum = (self.bignum << ZField.redc_data['bitlen']) % ZField.get_extended_p()
            self.is_redc = True
 
    def extend(self):
        if self.is_redc:
-           self.bignum = (self.bignum * ZField.redc_data['reciprocal']) % ZField.get()
+           self.bignum = (self.bignum * ZField.redc_data['Rp']) % ZField.get()
            self.is_redc = False
 
    # Arithmetic operators
@@ -410,19 +489,19 @@ class ZFieldEl(BigInt):
        assert True,"Invalid type"
 
    def inv(self):
-       y = ZFieldEl._inv(self.bignum)
+       y = ZFieldEl.inv(self.bignum)
        self = BigInt(y)
        return self
 
    @staticmethod
-   def _inv(x):
+   def inv(x):
      assert(ZField.is_init()==False, "Prime not initialized")
      if isinstance(x,BigInt):
          x = x.bignum
      elif not isinstance(x,int)  and not isinstance(x,long)   :
          assert True, "Invalid type"
 
-     mod = ZField.get_extended()
+     mod = ZField.get_extended_p()
      # Based on a simplification of the extended Euclidean algorithm
      assert mod > 0 and 0 <= x < mod
      y = x
@@ -537,8 +616,8 @@ class ZFieldEl(BigInt):
        mod = ZField.get()
        assert 0 <= x < mod and 0 <= y < mod
        product = x * y
-       temp = ((product & ZField.redc_data['mask']) * ZField.redc_data['factor']) & ZField.redc_data['mask']
-       reduced = (product + temp * mod) >> ZField.redc_data['bits']
+       temp = ((product & ZField.redc_data['Rmask']) * ZField.redc_data['Pp']) & ZField.redc_data['Rmask']
+       reduced = (product + temp * mod) >> ZField.redc_data['bitlen']
        result = reduced if (reduced < mod) else (reduced - mod)
        assert 0 <= result < mod
        return result

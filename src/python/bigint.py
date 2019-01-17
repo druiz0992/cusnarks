@@ -18,7 +18,7 @@
     cusnarks. If not, see <https://www.gnu.org/licenses/>.
 */
 
-
+// ------------------------------------------------------------------
 // Author     : David Ruiz
 //
 // File name  : BigInt
@@ -28,19 +28,23 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//   BigInt implements functionality to operate on multi precission numbers
+//   BigInt implements functionality to operate on multi precision numbers. Python
+//     provice type long with this same functionality. The purpose of the class is
+//     to encapsulate required functionality so that it can be later implemented in C++/CUDA
+//
 //  
 //   Operators:
-//     Arithmetic :  +, -, *, /, %, pow 
-//     Logical    : //  <<, >>, &, |
-//     Comparison : # <, <=, >, >=, ==, !=
-//   random
-//   show
+//     Arithmetic :  +, -, *, //, %, pow 
+//     Bitwise    :  <<, >>, <<=, >>=, &, |
+//     Comparison :  <, <=, >, >=, ==, !=
+//   show : print
+//
 //
 //  TODO
-//    - x ** y : Not working when y is bignum
+//    - x ** y : Only works if y < POW_THR (10000). Else, raises assert
 //    - x / y  : Not working
-//    - 
+//    - Substitute assert by exception
+//    
 // ------------------------------------------------------------------
 
 """
@@ -52,140 +56,255 @@ class BigInt:
    """
      BigInt class
    """
-   def __init__(self, bignum):
+   POW_THR = 10000   
+   def __init__(self, bignum, min_bignum=None):
      """
       Initialization
 
       Parameters
       -----------
-       bignum 
+       bignum  : type long, int, BigInt, string containing decimal of hex number (prececed by "0x")
+       min_bignum : (Optional) same format as bignum. If different to None, created BigInt is random between
+        [min_bignum and bignum]
+
+      Notes
+      -----
+       if argument type different from expected, an assertion is raised
+
      """
      self.bignum = None
+     lthr = None
 
+     # Check min_bignum format
+     # Check is min_bignum is string and convert to long format
+     if min_bignum is not None:
+         if isinstance(bignum,str):
+             if min_bignum[:2].upper() == "0X":
+               try:
+                 lthr = long(min_bignum,16)
+               except ValueError:
+                 assert True,"min_bignum string not a hexadecimal number"
+             else:
+               try:
+                 lthre = long(min_bignum,10)
+               except ValueError:
+                 assert True,"min_bignum string not a decimal number"
+            
+         elif isinstance(min_bignum,BigInt):
+            lthr = long(min_bignum.bignum)
+      
+         elif isinstance(min_bignum,long) or isinstance(min_bignum,int):
+            lthr = long(min_bignum)
+    
+         else :
+           assert True,"Invalid type min_bignum"
+
+     # Check if input is string and convert to long format
      if isinstance(bignum,str):
-       try:
-         self.bignum = long(bignum,16)
-       except ValueError:
-         assert True,"String not a hexadecimal number"
-        
+         if bignum[:2].upper() == "0X":
+           try:
+             self.bignum = long(bignum,16)
+           except ValueError:
+             assert True,"String not a hexadecimal number"
+         else:
+           try:
+             self.bignum = long(bignum,10)
+           except ValueError:
+             assert True,"String not a decimal number"
      
      elif isinstance(bignum,BigInt):
         self.bignum = bignum.bignum
   
      elif isinstance(bignum,long) or isinstance(bignum,int):
-        self.bignum = bignum
-
+        self.bignum = long(bignum)
+    
      else :
        assert True,"Invalid type"
 
+     if lthr is not None:
+        self.bignum = randint(lthr,self.bignum)
+
    # Arithmetic operators
-   # +, -, *, /, %, pow
+   # +, -, *, //, %, pow, +=, -=, neg
    def __add__(self,x):
     """
+      X + Y
     """
     if isinstance(x,BigInt):
-      return self.bignum + x.bignum
+      return BigInt(self.bignum + x.bignum)
+
     elif isinstance(x,int) or isinstance(x,long):
-      return self.bignum + x
+      return BigInt(self.bignum + x)
+
     else :
       assert True,"Invalid type"
 
    def __sub__(self,x):
+    """
+      X - Y
+    """
     if isinstance(x,BigInt):
-     return self.bignum - x.bignum
+     return BigInt(self.bignum - x.bignum)
     elif isinstance(x,int) or isinstance(x,long):
-      return self.bignum - x
+      return BigInt(self.bignum - x)
 
    def __mul__(self,x):
+    """
+      X * Y
+    """
     if isinstance(x,BigInt):
-      return self.bignum + x.bignum
+      return BigInt(self.bignum * x.bignum)
     elif isinstance(x,int) or isinstance(x,long):
-      return self.bignum * x
+      return BigInt(self.bignum * x)
 
    def __pow__ (self,x): 
-     if isinstance(x,int) or isinstance(x,long):
-       return self.bignum ** x
-     elif isinstance(x,BigInt):
-       assert True,"Invalid type"
+     """
+      X ^ Y
+     """
+     if isinstance(x,int) or isinstance(x,long) and <= BigInt.POW_THR:
+       return BigInt(self.bignum ** x)
+     elif isinstance(x,BigInt) and x <= BigInt.POW_THR :
+       return BigInt(self.bignum ** x.bignum)
      else :
        assert True,"Invalid type"
    
    def __floordiv__ (self,x):
+     """
+      X // Y
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum // x
+       return BigInt(self.bignum // x)
      elif isinstance(x,BigInt):
-       return self.bignum // x.bignum
+       return BigInt(self.bignum // x.bignum)
      else :
        assert True,"Invalid type"
 
    def __truediv__ (self,x):
+     """
+       X // Y
+       x / y  : Not working
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum // x
+       return BigInt(self.bignum // x)
      elif isinstance(x,BigInt):
-       return self.bignum // x.bignum
+       return BigInt(self.bignum // x.bignum)
      else :
        assert True,"Invalid type"
 
    def __mod__ (self,x):
+     """
+      X % Y
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum % x
+       return BigInt(self.bignum % x)
      elif isinstance(x,BigInt):
-       return self.bignum % x.bignum
+       return BigInt(self.bignum % x.bignum)
      else :
        assert True,"Invalid type"
 
+   def __neg__ (self):
+     """
+      -X 
+     """
+     return BigInt(-self.bignum)
+
    def __iadd__(self,x):
+     """
+      X += Y
+     """
      if isinstance(x,BigInt):
        self.bignum += x.bignum
        return BigInt(self.bignum)
      elif isinstance(x,int) or isinstance(x,long):
        self.bignum += x
-       return BigInt(self)
+       return BigInt(self.bignum)
      else :
        assert True,"Invalid type"
 
    def __isub__(self,x):
+     """
+      X -= Y
+     """
      if isinstance(x,BigInt):
        self.bignum -= x.bignum
        return BigInt(self.bignum)
      elif isinstance(x,int) or isinstance(x,long):
        self.bignum -= x
-       return BigInt(self)
+       return BigInt(self.bignum)
      else :
        assert True,"Invalid type"
 
-   # Logical operators
+   # Bitwise operators
    #  <<, >>, <<=, >>=, &, |
  
    def __lshift__(self,x):
+     """
+      X << Y
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum << x
+       return BigInt(self.bignum << x)
      elif isinstance(x,BigInt):
-       return self.bignum << x.bignum
+       return BigInt(self.bignum << x.bignum)
      else :
        assert True,"Invalid type"
   
    def __rshift__(self,x):
+     """
+      X >> Y
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum >> x
+       return BigInt(self.bignum >> x)
      elif isinstance(x,BigInt):
-       return self.bignum >> x.bignum
+       return BigInt(self.bignum >> x.bignum)
      else :
        assert True,"Invalid type"
 
-   def __and__(self,x):
+   def __ilshift__(self,x):
+     """
+      X <<= Y
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum & x
+       self.bignum <<= x
+       return BigInt(self.bignum)
      elif isinstance(x,BigInt):
-       return self.bignum & x.bignum
+       self.bignum <<= x.bignum
+       return BigInt(self.bignum)
+     else :
+       assert True,"Invalid type"
+  
+   def __rshift__(self,x):
+     """
+      X >>= Y
+     """
+     if isinstance(x,int) or isinstance(x,long):
+       self.bignum >>= x
+       return BigInt(self.bignum)
+     elif isinstance(x,BigInt):
+       self.bignum >>= x.bignum
+       return BigInt(self.bignum)
+     else :
+       assert True,"Invalid type"
+
+
+   def __and__(self,x):
+     """
+      X & Y
+     """
+     if isinstance(x,int) or isinstance(x,long):
+       return BigInt(self.bignum & x)
+     elif isinstance(x,BigInt):
+       return BigInt(self.bignum & x.bignum)
      else :
        assert True,"Invalid type"
    
    def __or__(self,x):
+     """
+      X | Y
+     """
      if isinstance(x,int) or isinstance(x,long):
-       return self.bignum | x
+       return BigInt(self.bignum | x)
      elif isinstance(x,BigInt):
-       return self.bignum | x.bignum
+       return BigInt(self.bignum | x.bignum)
      else :
        assert True,"Invalid type"
   
@@ -193,106 +312,81 @@ class BigInt:
    # Comparison operators
    # <, <=, >, >=, ==, !=
 
-   def __lt__(self,x):
-     if isinstance(x,BigInt):
-       return self.bignum < x.bignum
-     elif isinstance(x,int) or isinstance(x,long):
-       return self.bignum < x
+   def __lt__(self,y):
+     """
+      X < Y
+     """
+     if isinstance(y,BigInt):
+       return self.bignum < y.bignum
+     elif isinstance(y,int) or isinstance(y,long):
+       return self.bignum < y
      else :
        assert True,"Invalid type"
 
-   def __le__(self,x):
-     if isinstance(x,BigInt):
-       return self.bignum <= x.bignum
-     elif isinstance(x,int) or isinstance(x,long):
-       return self.bignum <= x
+   def __le__(self,y):
+     """
+      X <= Y
+     """
+     if isinstance(y,BigInt):
+       return self.bignum <= y.bignum
+     elif isinstance(y,int) or isinstance(y,long):
+       return self.bignum <= y
      else :
        assert True,"Invalid type"
 
-   def __eq__(self,x):
-     if isinstance(x,BigInt):
-       return self.bignum == x.bignum
-     elif isinstance(x,int) or isinstance(x,long):
-       return self.bignum == x
+   def __eq__(self,y):
+     """
+      X == Y
+     """
+     if isinstance(y,BigInt):
+       return self.bignum == y.bignum
+     elif isinstance(y,int) or isinstance(y,long):
+       return self.bignum == y
      else :
        assert True,"Invalid type"
 
-   def __ne__(self,x):
-     if isinstance(x,BigInt):
-       return self.bignum != x.bignum
-     elif isinstance(x,int) or isinstance(x,long):
-       return self.bignum != x
+   def __ne__(self,y):
+     """
+      X != Y
+     """
+     if isinstance(y,BigInt):
+       return self.bignum != y.bignum
+     elif isinstance(y,int) or isinstance(y,long):
+       return self.bignum != y
      else :
        assert True,"Invalid type"
 
-   def __gt__(self,x):
-     if isinstance(x,BigInt):
-       return self.bignum > x.bignum
-     elif isinstance(x,int) or isinstance(x,long):
-       return self.bignum > x
+   def __gt__(self,y):
+     """
+      X > Y
+     """
+     if isinstance(y,BigInt):
+       return self.bignum > y.bignum
+     elif isinstance(y,int) or isinstance(y,long):
+       return self.bignum > y
      else :
        assert True,"Invalid type"
 
-   def __ge__(self,x):
-     if isinstance(x,BigInt):
-       return self.bignum >= x.bignum
-     elif isinstance(x,int) or isinstance(x,long):
-       return self.bignum >= x
+   def __ge__(self,y):
+     """
+      X >= Y
+     """
+     if isinstance(y,BigInt):
+       return self.bignum >= y.bignum
+     elif isinstance(y,int) or isinstance(y,long):
+       return self.bignum >= y
      else :
        assert True,"Invalid type"
-
-   def random(self,maxn, minn=0):
-     if isinstance(maxn,BigInt):
-        bnmaxn = maxn.bignum
-     elif isinstance(maxn,int) or isinstance(maxn,long):
-        bnmaxn = maxn
-     else :
-       assert True,"Invalid type"
-    
-     if isinstance(minn,BigInt):
-        bnminn = minn.bignum
-     elif isinstance(minn,int) or isinstance(minn,long):
-        bnminn = minn
-     else :
-       assert True,"Invalid type"
-
-     return randint(minn,maxn)
 
    def show (self):
+       """
+         print bignum
+       """
        print self.bignum
 
-   def get(self):
-      return self.bignum
+   def as_long(self):
+      """
+         return bignum as long
+      """
+      return long(self.bignum)
 
-if __name__ == '__main__':
-    x = BigInt("0x12345a12345678902345")
-    y = BigInt("0x12345a145678902345")
-    z = 4
-
-    print "Sum"
-    print x+y
-    print "Sub"
-    print x-y
-    print "Mul"
-    print x*y
-    print "Pow"
-    print x**z
-    print "Div 2"
-    print x//y
-    #print "Div 1"
-    #print x/y
-    print "Mod"
-    print x % z
-
-    print "+="
-    x += y
-    x.show()
-    print "-="
-    x -= y
-    x.show()
-
-    print "Shift R"
-    print x >> z
-
-    print "Shft L"
-    print x << z
