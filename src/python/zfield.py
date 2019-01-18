@@ -64,6 +64,7 @@
 from bigint import BigInt
 import math
 import numpy as np
+from random import randint
 
 class ZField:
   PRIME_THR = long(1e10)
@@ -165,22 +166,23 @@ class ZField:
             c = a * b (mod P) = _c * Rp (mod P)
 
       """
-      bitlen = int(math.ceil(math.log(ZField.get_extended_p().as_long(),2)))
-      t = BigInt(1 << bitlen | 1) # force it to be odd
+      p = ZField.get_extended_p().as_long()
+      bitlen = int(math.ceil(math.log(p,2)))
+      t = 1 << bitlen | 1 # force it to be odd
       ZField.redc_data['bitlen'] = (t.bit_length() // 8 +1 )* 8 # Multiple of 8
       ZField.redc_data['R'] = long(1 << ZField.redc_data['bitlen'])
       ZField.redc_data['Rmask'] = long(ZField.redc_data['R'] - 1)
-      ZField.redc_data['Rp'] = ZField.inv(ZField.redc_data['R']).as_long()
-      ZField.redc_data['Pp'] = (ZField.redc_data['R'] * ZField.redc_data['Rp'] - 1) // ZField.get_extended_p().as_long()
-      ZField.redc_data['convertedone'] = ZField.redc_data['R'] % ZField.get_extended_p().as_long()
-      Zfield.redc_prime = BigInt(ZField.redc_data['R'])
+      ZField.redc_data['Rp'] = ZField.inv(ZField.redc_data['R'] % p).as_long()
+      ZField.redc_data['Pp'] = (ZField.redc_data['R'] * ZField.redc_data['Rp'] - 1) // p
+      ZField.redc_data['convertedone'] = ZField.redc_data['R'] % p
+      ZField.redc_prime = BigInt(ZField.redc_data['R'])
 
   @staticmethod
   def inv(x):
      """
        returns X' such that X * X' = 1 (mod p)
      """
-     if not Zfield.is_init():
+     if not ZField.is_init():
          assert True, "Finite field not initialized"
      elif isinstance(x,BigInt) or isinstance(x,ZFieldEl):
          x_l = x.bignum
@@ -210,7 +212,7 @@ class ZField:
       Returns an arbitrary generator gen of the multiplicative group ZField with characteristic p
         where gen  ^ (k*nroots) = 1 mod p. If p is prime, an answer must exist
       """
-      if not Zfield.is_init():
+      if not ZField.is_init():
          assert True, "Finite field not initialized"
 
       gamma=long(1)
@@ -222,10 +224,10 @@ class ZField:
               
            # alpha is random number between 0 and mod (inclusive)
            while beta == 1:
-             alpha = random.randint(0,prime)
+             alpha = randint(0,prime)
              beta = pow(alpha,(prime-1)/prime_factor,prime)
 
-           gamma = gamma * pow(alpha,prime-1/(prime_factor**exponent),prime)
+           gamma = gamma * pow(alpha,(prime-1)/(prime_factor**exponent),prime)
            gamma = gamma % (prime)
        
       return ZFieldEl(gamma)
@@ -235,11 +237,11 @@ class ZField:
       """
         Returns primitive root such that root = gen ^ nroots % prime,
       """
-      if not Zfield.is_init():
+      if not ZField.is_init():
          assert True, "Finite field not initialized"
 
-      gen = ZField.find_generator()
-      prime = ZField.get_extended_p()
+      gen = ZField.find_generator().as_long()
+      prime = ZField.get_extended_p().as_long()
       return ZFieldEl(pow(gen, (prime - 1) // nroots, prime))
 
   @classmethod
@@ -259,14 +261,16 @@ class ZField:
         assert True, "Prime not initialized"
 
       # initialize roots
-      ZField.roots = [ 1, ZField.find_primitive_root(nroots) ]
+      ZField.roots = [ ZFieldEl(1), ZField.find_primitive_root(nroots) ]
+
       ZField.inv_roots = []
-      for i in xrange(nroots)-2:
-         ZField.roots.append(ZField.roots[i] * ZField.roots[i+1])
+      root_1 = ZField.roots[1]
+      for i in xrange(nroots-2):
+         ZField.roots.append(root_1 * ZField.roots[-1])
 
       if find_inv_roots:
-         ZField.inv_roots = [1]
-         ZField.inv_roots[1:] =  map(ZFieldEl._inv, ZField.roots[1:] )
+         ZField.inv_roots = [ZFieldEl(1)]
+         ZField.inv_roots[1:] =  map(ZField.inv, ZField.roots[1:] )
 
       return ZField.roots, ZField.inv_roots
 
@@ -275,7 +279,7 @@ class ZField:
       """
        Factorizes prime - 1. Only works for small primes less than PRIME_THR.
       """
-      if not Zfield.is_init():
+      if not ZField.is_init():
          assert True, "Finite field not initialized"
       elif isinstance(factor_data,dict) and 'factors' in factor_data and 'exponents' in factor_data:
            ZField.factor_data = factor_data
@@ -312,27 +316,25 @@ class ZField:
          assert True,  "Number needs to be larger than 1"
      result = {'factors' :[], 'exponents' : [] }
      i = 2
+     number = n
      end = math.sqrt(n)
      while i <= end:
          if n % i == 0:
              n //= i
              result['factors'].append(i)
+             result['exponents'].append(1)
              while n % i == 0:
                  n //= i
+                 result['exponents'][-1]+=1
              end = math.sqrt(n)
          i += 1
      if n > 1:
          result['factors'].append(n)
-     
-     factor_set = set(resut['factors'])
-     for f in result['factors']:
-       el_set = set([f])
-       rem_factor_list = list(factor_set - el_set)
-       rem_factor = np.prod(np.asarray(rem_factor))
-       result['exponents'].append(math.log(n / rem_factor,f))
- 
-     if len(result['factors']) == 0:
-       assert True, "Factorization could not find any prime factor"
+         result['exponents'].append(1)
+         while n % i == 0 and n > 0:
+             n //= i
+             result['exponents'][-1]+=1
+     assert np.prod([r**e for r,e in zip(result['factors'],result['exponents'])]) == number
 
      return result
 
@@ -346,12 +348,12 @@ class ZFieldEl(BigInt):
        bignum 
      """
      if ZField.is_init():
-         self.bignum = BigInt(bignum) % ZField.get_extended_p()
-         if ZField.is_redc():
-           self.reduce()
-           self.is_redc = True
-         else:
-             self.is_redc = False
+         BigInt.__init__(self,bignum % ZField.get_extended_p().as_long())
+         #if ZField.is_redc():
+         #  self.reduce()
+         #  self.is_redc = True
+         #else:
+         #    self.is_redc = False
      else :
        assert True, "Prime not initialized"
 
@@ -387,7 +389,7 @@ class ZFieldEl(BigInt):
     if isinstance(x,BigInt):
      return (self.bignum - x.bignum) % ZField.get()
     elif isinstance(x,int) or isinstance(x,long):
-      return (self.bignum - x) % Zfield.get()
+      return (self.bignum - x) % ZField.get()
 
    def __mul__(self,x):
     """
@@ -395,15 +397,15 @@ class ZFieldEl(BigInt):
        check for this condition
     """
     if isinstance(x,BigInt):
-        if not self.is_redc:
-          return (self.bignum + x.bignum) % ZField.get()
-        else:
-          return ZFieldEl._mul_redc(self.get(),x.bignum)
+        #if not self.is_redc:
+          return ZFieldEl((self.bignum * x.bignum) % ZField.get_extended_p().as_long())
+        #else:
+        #  return ZFieldEl._mul_redc(self.get(),x.bignum)
     elif isinstance(x,int) or isinstance(x,long):
-        if not self.is_redc:
+        #if not self.is_redc:
           return (self.bignum * x) % ZField.get()
-        else:
-          return ZFieldEl._mul_redc(self.get(),x)
+        #else:
+        #  return ZFieldEl._mul_redc(self.get(),x)
 
    def __pow__ (self,x):
      """
@@ -494,7 +496,7 @@ class ZFieldEl(BigInt):
 
    @staticmethod
    def inv(x):
-     assert(ZField.is_init()==False, "Prime not initialized")
+     assert ZField.is_init()==False, "Prime not initialized"
      if isinstance(x,BigInt):
          x = x.bignum
      elif not isinstance(x,int)  and not isinstance(x,long)   :
@@ -633,60 +635,3 @@ class ZFieldEl(BigInt):
            x = ZFieldEl._mul_redc(x,x)
            y >>= 1
        return z
-
-if __name__ == '__main__':
-    ZField("0x12345a12345678902345")
-    ZField.show()
-    x = ZFieldEl("0x12345a123456789023452345")
-    x.show()
-    y = BigInt("0x12345a145678902345")
-    y.show()
-    z = 4
-
-    print "Sum"
-    print x+y
-    print "Sub"
-    print x-y
-    print "Mul"
-    print x*y
-    print "Pow"
-    print x**z
-    print "Div 2"
-    print x//y
-    #print "Div 1"
-    #print x/y
-    print "Mod"
-    print x % z
-
-    print "Inv 1"
-    print x.inv().get()
-    print x * x.inv().get()
-
-    print "+="
-    x += y
-    x.show()
-    print "-="
-    x -= y
-    x.show()
-
-    print "Shift R"
-    print x >> z
-
-    print "Shft L"
-    print x << z
-
-    # Reduce
-    x.show()
-    print ZField.get()
-    ZField.reduce()
-    x.reduce()
-    x.show()
-    x.extend()
-    x.show()
-    x.reduce()
-
-    print "Mul"
-    print x*y
-
-    print "Pow"
-    print x**z
