@@ -38,6 +38,7 @@
 """
 from random import randint
 import unittest
+import numpy as np
 
 import sys
 sys.path.append('../../src/python')
@@ -45,37 +46,36 @@ sys.path.append('../../src/python')
 from zfield import *
 
 
+def find_primes(start,end, cnt=0):
+    # Initialize a list
+    primes = []
+    for possiblePrime in xrange(start,end):
+        if all((possiblePrime % i != 0) for i in range(2, int(math.floor(math.sqrt(possiblePrime))) + 1)):
+            primes.append(possiblePrime)
+        if len(primes) >= cnt and cnt != 0:
+            break
+
+    return primes
+
 class ZFieldTest(unittest.TestCase):
 
     TEST_ITER = 1000
+    FIND_N_PRIMES = 20
     NROOTS_THR = 15
-   
-    def find_primes(n):
-       # Initialize a list
-       primes = []
-       for possiblePrime in range(2, n):
-           
-           # Assume number is prime until shown it is not. 
-           isPrime = True
-           for num in range(2, int(possiblePrime ** 0.5) + 1):
-               if possiblePrime % num == 0:
-                   isPrime = False
-                   break
-             
-           if isPrime:
-               primes.append(possiblePrime)
-       return primes
+    MAX_PRIME = int(1e4)
 
-    def test_init(self):
+    SMALL_PRIME_LIST = find_primes(randint(0,MAX_PRIME), MAX_PRIME, cnt=FIND_N_PRIMES)
+
+    def test0_init(self):
 
         ## Check ZField is not initialized 
         self.assertTrue(ZField.is_init() == False)
         self.assertTrue(ZField.get_extended_p() == None)
         self.assertTrue(ZField.get_reduced_p() == None)
-        self.assertTrue(length(ZField.get_roots()[0]) == 0)
-        self.assertTrue(length(ZField.get_roots()[1]) == 0)
-        self.assertTrue(length(ZField.get_factors()['factors']) == 0)
-        self.assertTrue(length(ZField.get_factors()['exponents']) == 0)
+        self.assertTrue(len(ZField.get_roots()[0]) == 0)
+        self.assertTrue(len(ZField.get_roots()[1]) == 0)
+        self.assertTrue(len(ZField.get_factors()['factors']) == 0)
+        self.assertTrue(len(ZField.get_factors()['exponents']) == 0)
 
         ## Init given number as dec string and check all values are init (results not important)
         a_str = "1009"
@@ -85,10 +85,8 @@ class ZFieldTest(unittest.TestCase):
         self.assertTrue(ZField.is_init() == True)
         self.assertTrue(isinstance(ZField.get_extended_p(), BigInt))
         self.assertTrue(isinstance(ZField.get_reduced_p(), BigInt))
-        self.assertTrue(length(ZField.get_roots()[0]) > 0)
-        self.assertTrue(length(ZField.get_roots()[1]) > 0)
-        self.assertTrue(length(ZField.get_factors()['factors']) > 0)
-        self.assertTrue(length(ZField.get_factors()['exponents']) > 0)
+        self.assertTrue(len(ZField.get_factors()['factors']) > 0)
+        self.assertTrue(len(ZField.get_factors()['exponents']) > 0)
 
         ## Init given number as hex string
         a_str = "1009"
@@ -103,7 +101,7 @@ class ZFieldTest(unittest.TestCase):
 
         r_data = ZField.get_reduce_data()
 
-        rrp_nnp = r['R'] * r['Rp'] - r['Pp'] * ZField.get_extended_p().as_long()
+        rrp_nnp = r_data['R'] * r_data['Rp'] - r_data['Pp'] * ZField.get_extended_p().as_long()
 
         self.assertTrue(isinstance(ZField.get_reduced_p(), BigInt))
         self.assertTrue(rrp_nnp == 1)
@@ -115,7 +113,7 @@ class ZFieldTest(unittest.TestCase):
 
         r_data = ZField.get_reduce_data()
 
-        rrp_nnp = r['R'] * r['Rp'] - r['Pp'] * ZField.get_extended_p().as_long()
+        rrp_nnp = r_data['R'] * r_data['Rp'] - r_data['Pp'] * ZField.get_extended_p().as_long()
 
         self.assertTrue(isinstance(ZField.get_reduced_p(), BigInt))
         self.assertTrue(rrp_nnp == 1)
@@ -144,10 +142,9 @@ class ZFieldTest(unittest.TestCase):
         self.assertTrue( factor_data['factors'] == ZField.BN128_DATA['factor_data']['factors'])
         self.assertTrue( factor_data['exponents'] == ZField.BN128_DATA['factor_data']['exponents'])
 
-    def test_reduction_and_factorization(self):
-        prime_list = find_primes(ZField.PRIME_THR)
+    def test1_reduction_and_factorization(self):
 
-        for prime in prime_list:
+        for prime in ZFieldTest.SMALL_PRIME_LIST:
            # Check reduction is correctly initialized for multiple primes
            ZField(prime)
 
@@ -159,72 +156,74 @@ class ZFieldTest(unittest.TestCase):
            # R * Rp - P * Pp = 1
            self.assertTrue(rrp_nnp == 1)
 
-           self.assertTrue(length(f_data['factors']) == length(f_data['exponents']))
-           factor_result = 0
+           self.assertTrue(len(f_data['factors']) == len(f_data['exponents']))
 
-           for f,e in zip(f_data['factors'],f_data['exponents']):
-               factor_result += f ** e
-           self.assertTrue(factor_result == ZField.get_reduced_p().as_long() - 1)
+           factor_result = np.prod([f**e for f,e in zip(f_data['factors'],f_data['exponents'])])
 
-    def test_generator_small_primes(self):
+           self.assertTrue(factor_result == ZField.get_extended_p().as_long() - 1)
+
+    def test2_generator_small_primes(self):
         # For a list of primes, check that generator can generate all the field
-        prime_list = find_primes(ZField.PRIME_THR)
 
-        for prime in prime_list:
+        for prime in ZFieldTest.SMALL_PRIME_LIST:
            ZField(prime)
-           gen = ZField.find_generator()
+           gen = ZField.find_generator().as_long()
 
            el = []
 
            for i in xrange(prime):
               el.append(pow(gen,i,prime))
 
-           self.assertTrue(set(el) == prime-1)
+           self.assertTrue(len(set(el)) == prime-1)
 
-    def test_generator_large_primes(self):
+    def test3_generator_large_primes(self):
         # For a list of primes, check that generator can generate all the field
 
         p = ZField.BN128_DATA['prime']
         ZField(p, ZField.BN128_DATA['curve'])
-        gen = ZField.find_generator()
+        gen = ZField.find_generator().as_long()
 
         for iter in xrange(ZFieldTest.TEST_ITER):
-           t = randint(1,ZField.p)
-           el = pow(gen, t, prime)
+           t = randint(1,p)
+           el = pow(gen, t, p)
 
            self.assertTrue(el != 1)
 
-    def test_roots_small_primes(self):
+    def test4_roots_small_primes(self):
         # Check correct number of different roots are generated
-        prime_list = find_primes(ZField.PRIME_THR)
 
-        for prime in prime_list:
+        for prime in ZFieldTest.SMALL_PRIME_LIST:
            ZField(prime)
            f_data = ZField.get_factors()
-           idx = randint(0,length(f_data['factors'])-1)
-           nroots = f_data['factors'][idx] ** randint(1,f_data['exponents'])
+           idx = randint(0,len(f_data['factors'])-1)
+           nroots = f_data['factors'][idx] ** randint(1,f_data['exponents'][idx])
            root, inv_root = ZField.find_roots(nroots)
 
            root_1 = root[1] * root[-1]
+           root = [r.as_long() for r in root]
+           inv_root = [r.as_long() for r in inv_root]
 
-           self.assertTrue(set(root) == nroots)
-           self.assertTrue(set(inv_root) == nroots)
-           self.assertTrue(root_1 in set(root))
+           self.assertTrue(len(set(root)) == nroots)
+           self.assertTrue(len(set(inv_root)) == nroots)
+           self.assertTrue(root_1.as_long() == 1)
+           self.assertTrue(len(ZField.get_roots()[0]) == nroots)
+           self.assertTrue(len(ZField.get_roots()[1]) == nroots)
 
-    def test_roots_large_prime(self):
+    def test5_roots_large_prime(self):
         p = ZField.BN128_DATA['prime']
         ZField(p, ZField.BN128_DATA['curve'])
-        f_data = ZField.get_factors()
 
-        for i in xrange(ZFieldTest.NROOTS_THR):
-           nroots = 2 ** i
+        for i in xrange(ZFieldTest.NROOTS_THR-1):
+           nroots = 2 ** (i+1)
            root, inv_root = ZField.find_roots(nroots)
 
            root_1 = root[1] * root[-1]
+           root = [r.as_long() for r in root]
+           inv_root = [r.as_long() for r in inv_root]
 
-           self.assertTrue(set(root) == nroots)
-           self.assertTrue(set(inv_root) == nroots)
-           self.assertTrue(root_1 in set(root))
+           self.assertTrue(len(set(root)) == nroots)
+           self.assertTrue(len(set(inv_root)) == nroots)
+           self.assertTrue(root_1.as_long() == 1)
 
 
 if __name__ == "__main__":
