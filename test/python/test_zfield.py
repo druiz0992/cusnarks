@@ -44,18 +44,7 @@ import sys
 sys.path.append('../../src/python')
 
 from zfield import *
-
-
-def find_primes(start,end, cnt=0):
-    # Initialize a list
-    primes = []
-    for possiblePrime in xrange(start,end):
-        if all((possiblePrime % i != 0) for i in range(2, int(math.floor(math.sqrt(possiblePrime))) + 1)):
-            primes.append(possiblePrime)
-        if len(primes) >= cnt and cnt != 0:
-            break
-
-    return primes
+from zutils import *
 
 class ZFieldTest(unittest.TestCase):
 
@@ -64,7 +53,7 @@ class ZFieldTest(unittest.TestCase):
     NROOTS_THR = 15
     MAX_PRIME = int(1e4)
 
-    SMALL_PRIME_LIST = find_primes(randint(0,MAX_PRIME), MAX_PRIME, cnt=FIND_N_PRIMES)
+    SMALL_PRIME_LIST = ZUtils.find_primes(randint(3,MAX_PRIME), MAX_PRIME, cnt=FIND_N_PRIMES)
 
     def test0_init(self):
 
@@ -99,7 +88,7 @@ class ZFieldTest(unittest.TestCase):
         a_str = "1009"
         ZField(hex(long(a_str)), ZField.P1009_DATA['curve'])
 
-        r_data = ZField.get_reduce_data()
+        r_data = ZField.get_reduction_data()
 
         rrp_nnp = r_data['R'] * r_data['Rp'] - r_data['Pp'] * ZField.get_extended_p().as_long()
 
@@ -111,7 +100,7 @@ class ZFieldTest(unittest.TestCase):
         a_str = ZField.BN128_DATA['prime']
         ZField(hex(long(a_str)), ZField.BN128_DATA['curve'])
 
-        r_data = ZField.get_reduce_data()
+        r_data = ZField.get_reduction_data()
 
         rrp_nnp = r_data['R'] * r_data['Rp'] - r_data['Pp'] * ZField.get_extended_p().as_long()
 
@@ -148,7 +137,7 @@ class ZFieldTest(unittest.TestCase):
            # Check reduction is correctly initialized for multiple primes
            ZField(prime)
 
-           r_data = ZField.get_reduce_data()
+           r_data = ZField.get_reduction_data()
            f_data = ZField.get_factors()
 
            rrp_nnp = r_data['R'] * r_data['Rp'] - r_data['Pp'] * ZField.get_extended_p().as_long()
@@ -225,6 +214,27 @@ class ZFieldTest(unittest.TestCase):
            self.assertTrue(len(set(inv_root)) == nroots)
            self.assertTrue(root_1.as_long() == 1)
 
+    def test6_inv_small_primes(self):
+        for prime in ZFieldTest.SMALL_PRIME_LIST:
+           ZField(prime)
+
+           for i in xrange(ZFieldTest.TEST_ITER):
+               x = ZFieldElExt(randint(1,prime-1))
+               x_inv = ZField.inv(x)
+               r = x * x_inv
+
+               self.assertTrue(r.as_long() == 1)
+
+    def test7_inv_large_prime(self):
+        prime = ZField.BN128_DATA['prime']
+        ZField(prime, ZField.BN128_DATA['curve'])
+
+        for i in xrange(ZFieldTest.TEST_ITER):
+           x = ZFieldElExt(randint(1,prime-1))
+           x_inv = ZField.inv(x)
+           r = x * x_inv
+
+           self.assertTrue(r.as_long() == 1)
 
 if __name__ == "__main__":
     unittest.main()
