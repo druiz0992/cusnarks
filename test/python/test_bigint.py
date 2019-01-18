@@ -52,7 +52,7 @@ class BigIntTest(unittest.TestCase):
     INT_THR  = 134
     BIT_THR  = randint(0,100)
 
-    def test_init(self):
+    def test_0init(self):
 
 
         ## Init given number as dec string
@@ -117,7 +117,7 @@ class BigIntTest(unittest.TestCase):
         self.assertTrue(bn.as_long() >= min_bn.as_long())
 
 
-    def test_arithmetic(self):
+    def test_1arithmetic(self):
         for i in xrange(BigIntTest.TEST_ITER):
             # +
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
@@ -211,7 +211,7 @@ class BigIntTest(unittest.TestCase):
 
 
 
-    def test_bitwise(self):
+    def test_2bitwise(self):
         for i in xrange(BigIntTest.TEST_ITER):
             # <<
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
@@ -283,7 +283,7 @@ class BigIntTest(unittest.TestCase):
 
             self.assertTrue(r_bn.as_long() == long(r_l))
 
-    def test_comparison(self):
+    def test_3comparison(self):
         for i in xrange(BigIntTest.TEST_ITER):
             # <
             x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)

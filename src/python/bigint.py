@@ -52,7 +52,7 @@
 from random import randint
 
 
-class BigInt:
+class BigInt(object):
    """
      BigInt class
    """
@@ -236,7 +236,6 @@ class BigInt:
 
    # Bitwise operators
    #  <<, >>, <<=, >>=, &, |
- 
    def __lshift__(self,x):
      """
       X << Y
