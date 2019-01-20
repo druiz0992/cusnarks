@@ -21,14 +21,14 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : test_zfield_element.py
+// File name  : test_ecc.py
 //
-// Date       : 18/01/2019
+// Date       : 20/01/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   ZField Element test
+//   ECC test
 //
 // TODO 
 //    incorrect format  -> once asserts substituted by exceptions,
@@ -44,9 +44,9 @@ sys.path.append('../../src/python')
 
 from bigint import *
 from zfield import *
-from zutils import *
+from ecc import *
 
-class ZFieldElTest(unittest.TestCase):
+class ECCTest(unittest.TestCase):
 
     TEST_ITER = 1000
     INT_THR  = 13423
@@ -59,7 +59,16 @@ class ZFieldElTest(unittest.TestCase):
         p = 1009
         ZField(p)
 
-        ## Init given number as bignum < prime
+        zel1_ext = [ZFieldElExt(randint(0,p) for x in range(2)]
+        zel2_ext = [ZFieldElExt(randint(0,p) for x in range(2)]
+        zel3_rdc = [ZFieldElRdc(randint(0,p) for x in range(2)]
+        zel4_rdc = [ZFieldElRdc(randint(0,p) for x in range(2)]
+    
+        c = {'a' : -3
+
+        ## Init ECC Affine
+        # F ext
+        p1_exta = ECCAffine(zel1_ext,
         a = p/2
         a_bn = BigInt(a)
         zf  = ZFieldElExt(a_bn)

@@ -38,9 +38,14 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//   Implementation of finite field functionality
+//   Implementation of finite field functionality and arithmetic. Includes three major classes:
+//    ZField(BigInt) : Defintion of Finite field with prime characteristic Z/pZ
+//    ZFieldEl(BigInt) : Class defining  Finite Field Elements. Defines general arithmetic
+//      functionality and comparison functons
+//    ZFieldElExt(ZFieldEl) : Class defining standard Finite field elements (non-reduced)
+//    ZFieldElRedc(ZFieldEl) : Class defining Montgomert reduced Finity field elements
 //   
-//   ZField must be initialized (only with a prime makes sense, although it is not 
+//   ZField is inherited from BigInt. It must be initialized (only with a prime makes sense, although it is not 
 //        verified) before finite field arithmetic can start. Field is initialized passing a prime number
 //        (hex string, dec string, BigInt, long, int) and some optional factorization data required
 //        if prime is beyond PRIME_THR. Upon initialization, Montgomery reduction is initialized automatically
@@ -68,10 +73,34 @@
 //                     is automatically done when Finite Field is initialized
 //          @classmethod get_factors(cls) : Returns factorization data of current Finite field
 //
+//   ZFieldEl is inherited from BigInt. Objects of this type can be isntantiated after ZField has been created.
+//      ZFieldEl defines general Finite Field Element functionality including arithmetic, comparison and
+//      bitwise operatos:
+//       
+//        Constructor : __init__(self,bignum)
+//        same_format(self,P1)  ;   True if self and X are same format if Finite Field represenation (both extended or both reduced)
+//        Arithmetic operators : +, -, neg (-x), +=, -=, % -> all aritmetic defined modulo p
+//        Comparison operators : <, <=, >, >=, ==, !=
+//        Bitwise operators    : <<, >>, <<=, >>=, &, |
+//
+//
+//   ZfieldElExt is inherited from ZFieldEl. It defines the following functions of Finite Field elements
+//      represented in normal (non Montgomery) format
+//        Constructor : __init__(self,bignum)
+//        reduce(self) : Returns ZFieldElRedc (Montgomery) representation of Finite Field element
+//        Arithmetic operators : *, /, //,  pow -> all aritmetic is defined modulo p
+//
+//
+//   ZfieldElRedc is inherited from ZFieldEl. It defines the following functions of Finite Field elements
+//      represent in Montgomery format
+//        Constructor : __init__(self,bignum)
+//        extend(self) : Returns ZFieldElExt ( non Montgomery) representation of Finite Field element
+//        Arithmetic operators : *, /, //,  pow -> all aritmetic is defined modulo p
+//
 //   TODO
 //    - ZField only makes sense if initialized with prime.. Not checked
-//    - prime_factors(n) : Since function doesn't depend on any element from ZField, we should move it to utils
-//    
+//    -  There is a multiplication of extended * reduced that i need to implement. For now, it is not alloed
+//    - Montgomery / and //
 // ------------------------------------------------------------------
 
 """
@@ -357,101 +386,172 @@ class ZFieldEl(BigInt):
 
       Parameters
       -----------
-       bignum 
+       bignum : BigInt/ZFieldElRedcd/ZFieldElExt -> Initializes element
      """
      if not ZField.is_init():
        assert True, "Finite Field not initialized"
 
      BigInt.__init__(self,bignum)
-
+   
+   def same_format(self, X):
+      """
+       True if self and X are same format if Finite Field represenation (both extended or both reduced)
+      """
+      return type(self) == type(X)
 
    # Arithmetic operators
-   # +, -, *, /, %, pow, neg, +=, -=
+   # +, -, *, %, pow, neg, +=, -=
    def __add__(self,x):
     """
-      X + Y : Add operation is the same for extended and reduced representations
+      X + Y (mod P) : Add operation is the same for extended and reduced representations. 
+       Result of addition is of type self. Note that ZFieldElExt and ZFieldElRedc
+       cannot be added toguether
     """
     if isinstance(x,BigInt):
-      newz =  (self.bignum + x.bignum) % ZField.as_long()
+        if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+           assert True,"Invalid type"
+        else:
+          newz =  (self.bignum + x.bignum) % ZField.get_extended_p().as_long()
     elif isinstance(x,int) or isinstance(x,long):
-      newz = (self.bignum + x) % ZField.as_long()
+      newz = (self.bignum + x) % ZField.get_extended_p().as_long()
     else :
       assert True,"Invalid type"
    
-    if isinstance(x,ZFieldElExt):
+    if isinstance(self,ZFieldElExt) or isinstance(self,BigInt):
        return ZFieldElExt(newz)
     else :
        return ZFieldElRedc(newz)
 
    def __sub__(self,x):
     """
-      X - Y : Sub operation is the same for extended and reduced representations
+      X - Y (mod P): Sub operation is the same for extended and reduced representations
+       Result of operation is of type self. Note that ZFieldElExt and ZFieldElRedc
+       cannot be substracted toguether
     """
     if isinstance(x,BigInt):
-      newz = (self.bignum - x.bignum) % ZField.as_long()
+        if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+           assert True,"Invalid type"
+        else:
+           newz = (self.bignum - x.bignum) % ZField.get_extended_p().as_long()
     elif isinstance(x,int) or isinstance(x,long):
-      newz = (self.bignum - x) % ZField.as_long()
+      newz = (self.bignum - x) % ZField.get_extended_p().as_long()
     else :
       assert True,"Invalid type"
 
-    if isinstance(x,ZFieldElExt):
+    if isinstance(self,ZFieldElExt):
        return ZFieldElExt(newz)
     else :
        return ZFieldElRedc(newz)
 
    def __neg__ (self):
      """
-      -X 
+      -X (mod P)
+       Result of negationaddition is of type self
      """
      newz = ZField.get_extended_p() - self.as_long()
-     if isinstance(x,ZFieldElExt):
+     if isinstance(self,ZFieldElExt):
        return ZFieldElExt(newz)
      else :
        return ZFieldElRedc(newz)
 
    def __iadd__(self,x):
+    """
+      X = X + Y (mod P) : Add operation is the same for extended and reduced representations. 
+       Result of addition is of type self. Note that ZFieldElExt and ZFieldElRedc
+       cannot be added toguether
+    """
     if isinstance(x,BigInt):
-      newz =  (self.bignum + x.bignum) % ZField.as_long()
+        if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+           assert True,"Invalid type"
+        else:
+           newz =  (self.bignum + x.bignum) % ZField.get_extended_p().as_long()
     elif isinstance(x,int) or isinstance(x,long):
-      newz = (self.bignum + x) % ZField.as_long()
+      newz = (self.bignum + x) % ZField.get_extended_p().as_long()
     else :
       assert True,"Invalid type"
      
-    self.bignum += newz
-
-    if isinstance(x,ZFieldElExt):
-       return ZFieldElExt(newz)
+    if isinstance(self,ZFieldElExt):
+       self = ZFieldElExt(newz)
     else :
-       return ZFieldElRedc(newz)
+       self =  ZFieldElRedc(newz)
+
+    return self
 
    def __isub__(self,x):
+    """
+      X = X - Y (mod P) : Add operation is the same for extended and reduced representations. 
+       Result of operation is of type self. Note that ZFieldElExt and ZFieldElRedc
+       cannot be substracted toguether
+    """
     if isinstance(x,BigInt):
-      newz =  (self.bignum - x.bignum) % ZField.as_long()
+        if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+           assert True,"Invalid type"
+        else:
+           newz =  (self.bignum - x.bignum) % ZField.get_extended_p().as_long()
     elif isinstance(x,int) or isinstance(x,long):
-      newz = (self.bignum - x) % ZField.as_long()
+      newz = (self.bignum - x) % ZField.get_extended_p().as_long()
     else :
       assert True,"Invalid type"
-     
-    self.bignum -= newz
 
-    if isinstance(x,ZFieldElExt):
+    if isinstance(self,ZFieldElExt):
+       self =  ZFieldElExt(newz)
+    else :
+       self =  ZFieldElRedc(newz)
+
+    return self
+
+   def __mod__(self,x):
+    """
+      X % Y (mod P) : Sub operation is the same for extended and reduced representations
+       Result of mod is of type self. Note that ZFieldElExt and ZFieldElRedc
+       cannot be mod toguether
+    """
+    if isinstance(x,BigInt):
+        if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+           assert True,"Invalid type"
+        else:
+            newz = (self.bignum % x.bignum) % ZField.get_extended_p().as_long()
+
+    elif isinstance(x,int) or isinstance(x,long):
+      newz = (self.bignum % x) % ZField.get_extended_p().as_long()
+    else :
+      assert True,"Invalid type"
+
+    if isinstance(self,ZFieldElExt):
        return ZFieldElExt(newz)
     else :
        return ZFieldElRedc(newz)
 
    @abstractmethod
+   """
+     X * Y (mod P) : Defined in child classes
+   """
    def __mul__(self,x):
     pass
 
    @abstractmethod
+   """
+     X ** Y (mod P) : Defined in child classes
+   """
    def __pow__ (self,x):
      pass
   
    @abstractmethod
+   """
+     X // Y (mod P) : Defined in child classes
+   """
    def __floordiv__ (self,x):
      pass
 
    @abstractmethod
+   """
+     X / Y (mod P) : Defined in child classes
+   """
    def __truediv__ (self,x):
      pass
 
@@ -459,6 +559,12 @@ class ZFieldEl(BigInt):
    # Comparison operators
    # <, <=, >, >=, ==, !=
    def __lt__(self,x):
+     """
+      True if X < y
+       
+      NOTE : if x is a BigInt/int/long, i am comparing finite field element to int.
+       if x is a FieldElement, it must be of the same type as self
+     """
      if isinstance(x,BigInt):
          if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
               (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
@@ -471,6 +577,12 @@ class ZFieldEl(BigInt):
        assert True,"Invalid type"
 
    def __le__(self,x):
+     """
+      True if X <= y
+       
+      NOTE : if x is a BigInt/int/long, i am comparing finite field element to int.
+       if x is a FieldElement, it must be of the same type as self
+     """
      if isinstance(x,BigInt):
          if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
               (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
@@ -483,6 +595,12 @@ class ZFieldEl(BigInt):
        assert True,"Invalid type"
 
    def __eq__(self,x):
+     """
+      True if X == y
+       
+      NOTE : if x is a BigInt/int/long, i am comparing finite field element to int.
+       if x is a FieldElement, it must be of the same type as self
+     """
      if isinstance(x,BigInt):
          if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
               (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
@@ -495,6 +613,12 @@ class ZFieldEl(BigInt):
        assert True,"Invalid type"
 
    def __ne__(self,x):
+     """
+      True if X != y
+       
+      NOTE : if x is a BigInt/int/long, i am comparing finite field element to int.
+       if x is a FieldElement, it must be of the same type as self
+     """
      if isinstance(x,BigInt):
          if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
               (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
@@ -507,6 +631,12 @@ class ZFieldEl(BigInt):
        assert True,"Invalid type"
 
    def __gt__(self,x):
+     """
+      True if X > y
+       
+      NOTE : if x is a BigInt/int/long, i am comparing finite field element to int.
+       if x is a FieldElement, it must be of the same type as self
+     """
      if isinstance(x,BigInt):
          if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
               (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
@@ -519,6 +649,12 @@ class ZFieldEl(BigInt):
        assert True,"Invalid type"
 
    def __ge__(self,x):
+     """
+      True if X >= y
+       
+      NOTE : if x is a BigInt/int/long, i am comparing finite field element to int.
+       if x is a FieldElement, it must be of the same type as self
+     """
      if isinstance(x,BigInt):
          if (isinstance(x,ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
              (isinstance(x,ZFieldElExt) and isinstance(self, ZFieldElRedc)):
@@ -534,7 +670,10 @@ class ZFieldEl(BigInt):
    #  <<, >>, <<=, >>=, &, |
    def __lshift__(self,x):
      """
-      X << Y
+      X << x . Returns a BigInt type
+        x : BigInt/int/long/ZFieldElExt
+
+      NOTE : x cannot be ZfieldElRedc
      """
      if isinstance(x,BigInt):
          if isinstance(x,ZFieldElRedc) :
@@ -549,7 +688,10 @@ class ZFieldEl(BigInt):
 
    def __rshift__(self,x):
      """
-      X >> Y
+      X >> x . Returns a BigInt type
+        x : BigInt/int/long/ZFieldElExt
+
+      NOTE : x cannot be ZfieldElRedc
      """
      if isinstance(x,BigInt):
          if isinstance(x,ZFieldElRedc): 
@@ -563,19 +705,26 @@ class ZFieldEl(BigInt):
 
    def __irshift__(self,x):
      """
-      X >>= Y
+      X = X << x 
+
+        Note Unsupported operation
      """
      assert True, "Unsupported operation"
 
    def __ilshift__(self,x):
      """
-      X <<= Y
+      X << x .
+
+      NOTE : Unsupported operation
      """
      assert True, "Unsupported operation"
   
    def __and__(self,x):
      """
-      X & Y
+      X & x . Returns a BigInt type
+        x : BigInt/int/long/ZFieldElExt
+
+      NOTE : x cannot be ZfieldElRedc
      """
      if isinstance(x,BigInt):
          if isinstance(x,ZFieldElRedc):
@@ -589,7 +738,10 @@ class ZFieldEl(BigInt):
    
    def __or__(self,x):
      """
-      X | Y
+      X | x . Returns a BigInt type
+        x : BigInt/int/long/ZFieldElExt
+
+      NOTE : x cannot be ZfieldElRedc
      """
      if isinstance(x,BigInt):
          if isinstance(x,ZFieldElRedc):
@@ -610,7 +762,7 @@ class ZFieldElExt(ZFieldEl):
 
       Parameters
       -----------
-       bignum 
+       bignum : BigInt/ZFieldElRedc/ZFieldElExt -> Initializes element
      """
      
      if not ZField.is_init():
@@ -621,22 +773,25 @@ class ZFieldElExt(ZFieldEl):
           not isinstance(bignum,long):
        assert True, "Incorrect Finite Field element format"
 
-     if bignum > ZField.get_extended_p().as_long():
-         ZFieldEl.__init__(self,bignum % ZField.get_extended_p().as_long())
-     else:
-         ZFieldEl.__init__(self,bignum)
+     ZFieldEl.__init__(self,bignum % ZField.get_extended_p().as_long())
 
    def reduce(self):
+     """
+      Performs Montgomery reduction operation. ZFieldElRedc object is returned
+     """
      reduction_data = ZField.get_reduction_data()
-     reduced_z =   ZFieldElRedc((self.as_long() << reduction_data['R']) % ZField.get_extended_p())
+     reduced_z =   ZFieldElRedc((self.as_long() << reduction_data['Rbitlen']) % ZField.get_extended_p().as_long())
 
      return reduced_z
 
    # Arithmetic operators
-   # *, /, %, pow, +=, -=
+   # *, /, pow
    def __mul__(self,x):
     """
-      TODO there is a multiplication of extended * reduced that i need to implement. For now, it is not alloed
+      X * Y (mod P) : returns ZFieldElExt
+        Y can be BigInt/Int/long or ZFieldElExt
+
+      TODO there is a multiplication of extended * reduced that i need to implement. For now, it is not allowed
     """
     if isinstance(x,BigInt):
         if isinstance(x,ZFieldElRedc):
@@ -650,6 +805,8 @@ class ZFieldElExt(ZFieldEl):
 
    def __pow__ (self,x):
      """
+      X ** Y (mod P) : returns ZFieldElExt
+        Y can be BigInt/Int/long or ZFieldElExt
      """
      if isinstance(x,int) or isinstance(x,long):
          return ZFieldElExt(pow(self.bignum,x,ZField.get_extended_p().as_long()))
@@ -661,21 +818,10 @@ class ZFieldElExt(ZFieldEl):
      else :
        assert True,"Invalid type"
   
-   def __mod__ (self,x):
-     """
-     """
-     if isinstance(x,int) or isinstance(x,long):
-         return ZFieldElExt(self.bignum % x)
-     elif isinstance(x,BigInt):
-         if isinstance(x,ZFieldElRedc):
-            assert True,"Invalid type"
-         else:
-            return ZFieldElExt(self.bignum % x)
-     else :
-       assert True,"Invalid type"
-
    def __floordiv__ (self,x):
      """
+      X // Y (mod P) : returns ZFieldElExt
+        Y can be BigInt/Int/long or ZFieldElExt
      """
      if isinstance(x,int) or isinstance(x,long):
        return ZFieldElExt((self.bignum // x) % ZField.get_extended_p().as_long())
@@ -689,6 +835,10 @@ class ZFieldElExt(ZFieldEl):
 
    def __truediv__ (self,x):
      """
+      X / Y (mod P) : returns ZFieldElExt
+        Y can be BigInt/Int/long or ZFieldElExt
+
+      NOTE : It doesn't work
      """
      if isinstance(x,int) or isinstance(x,long):
        return ZFieldElExt((self.bignum // x) % ZField.get_extended_p().as_long())
@@ -708,7 +858,7 @@ class ZFieldElRedc(ZFieldEl):
 
       Parameters
       -----------
-       bignum 
+       bignum : BigInt/ZFieldElRedc/ZFieldElExt -> Initializes element
      """
      if not ZField.is_init():
        assert True, "Finite Field not initialized"
@@ -718,21 +868,25 @@ class ZFieldElRedc(ZFieldEl):
           not isinstance(bignum,long):
        assert True, "Incorrect Finite Field element format"
 
-     if bignum > ZField.get_extended_p().as_long():
-         ZFieldEl.__init__(self,bignum % ZField.get_extended_p().as_long())
-     else:
-         ZFieldEl.__init__(self,bignum)
+     ZFieldEl.__init__(self,bignum % ZField.get_extended_p().as_long())
 
 
    def extend(self):
+     """
+      Converts Montgomery representation to default. ZFieldElExt object is returned
+     """
      reduction_data = ZField.get_reduction_data()
-     extended_z =   ZFieldElExt((self.as_long() * reduction_data['Rp']) % ZField.get_extended_p())
+     extended_z =   ZFieldElExt((self.as_long() * reduction_data['Rp']) % ZField.get_extended_p().as_long())
 
      return extended_z
 
    # Arithmetic operators
-   # +, -, *, /, %, pow, neg, +=, -=
+   # * pow
    def __mul__(self,x):
+    """
+      X * Y (mod P) : returns ZFieldElRedc
+        Y can be BigInt/Int/long or ZFieldElRedc
+    """
       if isinstance(x,BigInt):
         x_l = x.as_long()
         if isinstance(x,ZFieldElExt):
@@ -754,6 +908,8 @@ class ZFieldElRedc(ZFieldEl):
 
    def __pow__ (self,x):
      """
+      X ** Y (mod P) : returns ZFieldElRedc
+        Y can be BigInt/Int/long or ZFieldElExt
      """
      if isinstance(x,BigInt):
         x_l = x.as_long()
@@ -770,25 +926,19 @@ class ZFieldElRedc(ZFieldEl):
      z = ZField.get_reduction_data()['convertedone']
      while x_l != 0:
          if x_l & 1 != 0:
-             z = (self * z).as_long()
+             z = (tmpEl * z).as_long()
          tmpEl = tmpEl * tmpEl
          x_l >>= 1
-     return z
+     return ZFieldElRedc(z)
   
    def __floordiv__ (self,x):
      """
-       TODO
+       X // Y : TODO
      """
      assert True,"Operation not supported"
 
    def __truediv__ (self,x):
      """
-      TODO 
-     """
-     assert True,"Operation not supported"
-
-   def __mod__ (self,x):
-     """
-      TODO 
+      X / Y : TODO 
      """
      assert True,"Operation not supported"
