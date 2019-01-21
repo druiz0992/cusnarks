@@ -70,16 +70,70 @@ class ECC(Object):
    X = 0
    Y = 1
    Z = 2
+
+   EXT_IDX = 0
+   REDC_IDX = 1
   
-   one = None
-   two = None
-   three = None
-   four = None
-   eight = None
+   constants_init = False
+   one = 1
+   two = 2
+   three = 3
 
    a = None
    b = None
-   
+  
+   PREDEFINED_CURVES = ['Secp112r1', 'Secp128r1', 'Secp160k1', 'Secp224k1','Secp256k1']
+  
+   # y^2 = x^3 + a*x + b
+   CURVE_DATA = { 
+      'Secp112r1' :
+       { 'curve' : 'Sepc112r1',
+         'prime' : 4451685225093714772084598273548427L,
+         'curve_params' : {'a' : 4451685225093714772084598273548424L, 'b' : 2061118396808653202902996166388514L,
+                          'Gx' :188281465057972534892223778713752L , 'Gy':3419875491033170827167861896082688L }.
+         'factor_data':   {'factors' : [2,3,7,1453958119802281L,5207091687747401L],
+                           'exponents' : [2,1,2,1,1] }
+       },
+       'Secp128r1' :
+       { 'curve' : 'Sepc128r1',
+         'prime' : 340282366762482138434845932244680310783L,
+         'curve_params' : {'a' : '1329227995165945853261116922830782463L',
+                           'b' :1206995559461897101683291410318290526L,
+                          'Gx' : 29408993404948928992877151431649155974L,
+                          'Gy' : 275621562871047521857442314737465260675L},
+         'factor_data':   {'factors' : [2,2147483647L],
+                           'exponents' : [97,1] }
+       },
+       'Secp160k1':
+       { 'curve' : 'Sepc160k1',
+         'prime' : 1461501637330902918203684832716283019651637554291L,
+         'curve_params' : {'a' : 0, 'b' : 7,
+                          'Gx' : 338530205676502674729549372677647997389429898939L , 
+                          'Gy': 842365456698940303598009444920994870805149798382L },
+         'factor_data':   {'factors' : [2, 37, 44481592398149L, 222002193056774815430442568663621L],
+                           'exponents' : [2,1,1,1] }
+       },
+       'Secp224k1':
+       { 'curve' : 'Sep224k1',
+         'prime' : 26959946667150639794667015087019630673637144422540572481099315275117L,
+         'curve_params' : {'a' : 0, 'b' : 5,
+                           'Gx' : 16983810465656793445178183341822322175883642221536626637512293983324L ,
+                           'Gy' : 13272896753306862154536785447615077600479862871316829862783613755813L },
+         'factor_data':   {'factors' : [2, 50238476144222203L,268319709675859997416334102104367237320252177313653L],
+                           'exponents' : [1,2,2] }
+       },
+       'Sepc256k1' : 
+       { 'curve' : 'Sepc256k1',
+         'prime' : 115792089237316195423570985008687907853269984665640564039457584007908834671663L,
+         'curve_params' : {'a' : 0, 'b' : 7,
+                          'Gx' : 55066263022277343669578718895168534326250603453777594175500187360389116729240L ,
+                          'Gy' : 32670510020758816978083085130507043184471273380659243275938904335757337482424L},
+         'factor_data':   {'factors' : [2, 7322137L, 45422601869677L, 21759506893163426790183529804034058295931507131047955271L],
+                           'exponents' : [4, 1, 1, 1] }
+       }
+    }
+                            
+                            
    def __init__(self,p, c = None):
        """
          Constructor
@@ -88,7 +142,9 @@ class ECC(Object):
          ----------
            p           : list of None, int, long, BigInt or ZFieldEl 
                            of 2 (AFFINE) or 3(JACOBIAN/PROJECTIVE) elements
-           a,b         : int/long curve coefficients
+           c           : Dictionary with curve coefficiennts a,b that define curve y^2=x^3+a*x + b. Keys :
+             'a' : long/int
+             'b' : long/int 
        """
        if type(p) is not list or (length(p) < 2 and length(p) != 0) or length(p) > 3:
            assert True, "Invalid point format. Expected a list"
@@ -111,18 +167,8 @@ class ECC(Object):
            # p can be a list of int, long, BigInt
            if isinstance(p[ECC.X],int) or isinstance(p[ECC.X],long) or isinstance(p[ECC.X],ZFieldElExt):
                self.P = [ZFieldElExt(x) for x in p]
-               ECC.one = ZFieldElExt(1)
-               ECC.two = ZFieldElExt(2)
-               ECC.three = ZFieldElExt(3)
-               ECC.four = ZFieldElExt(4)
-               ECC.eight = ZFieldElExt(8)
            elif  isinstance(p[ECC.X],ZFieldElRedc):
                self.P = [ZFieldElRedc(x) for x in p]
-               ECC.one = ZFieldElRedc(1)
-               ECC.two = ZFieldElRedc(2)
-               ECC.three = ZFieldElRedc(3)
-               ECC.four = ZFieldElRedc(4)
-               ECC.eight = ZFieldElRedc(8)
            elif p[ECC.X] is None:
               self.P = [None for x in p]
            else :
@@ -142,8 +188,8 @@ class ECC(Object):
 
    @abstractmethod
    def init_curve(cls,a,b):
-        ECC.a = a 
-        ECC.b = b
+        ECC.a = ZFieldElExt(a).as_long()
+        ECC.b = ZFieldElExt(b).as_long()
 
    @abstractmethod
    def get_curve(cls):
@@ -354,7 +400,9 @@ class ECCAffine(ECC):
          False otherwise
        """
        return not self.is_inf() and
-            self.P[ECC.Y] * self.P[ECC.Y] == (self.P[ECC.X] * self.P[ECC.X] + ECC.a) * self.P[ECC.X] + ECC.b
+            (self.P[ECC.Y] * self.P[ECC.Y]).extend() == \
+                     (self.P[ECC.X] * self.P[ECC.X].extend()).extend() + \
+                            (ECC.a * self.P[ECC.X]).extend() + ECC.b.extend()
 
    # Arithmetic operators
    # +, - , neg, * 
@@ -402,7 +450,7 @@ class ECCAffine(ECC):
    def __mul__(self, alpha):
        """
          alpha * P1
-         TODO : pending += for ECC points and >>= for BigInt, SLINDING window
+         TODO : SLIDING window
        """
        if isinstance(alpha, int) or isinstance(alpha, long):
           scalar = alpha
@@ -432,11 +480,17 @@ class ECCAffine(ECC):
        if self.is_inf() or self.P[ECC.Y]==0:
            return self
 
-       s = self.P[ECC.X] * self.P[ECC.X] * ECC.three + ECC.a
-       s += (self.P[ECC.Y] * ECC.two).inv()
-       rx = s * s - self.P[ECC.X] * ECC.two
-       ry = s * (self.P[ECC.X] - rx) - self.P[ECC.Y]
+       s = self.P[ECC.X] * self.P[ECC.X]
+       s += self.P[ECC.X] * self.P[ECC.X] << ECC.one
+       if isinstance(self.P[ECC.X],ZFieldElExt):
+           s += ECC.a
+       else :
+           s += ECC.a.reduce()
 
+       s += (self.P[ECC.Y] << ECC.one).inv()
+       rx = s * s - (self.P[ECC.X] << ECC.one)
+       ry = s * (self.P[ECC.X] - rx) - self.P[ECC.Y]
+    
        return ECCAffine([rx, ry])
 
     # comparison operators
@@ -611,17 +665,19 @@ class ECCProjective(ECC):
            return self
 
        if ECC.a == ECC.three:          # W = a*Z^2 + 3*X^2
-          W = (self.P[ECC.X] + self.P[ECC.Z]) * (self.P[ECC.X] - self.P[ECC.Z]) * ECC.three 
+          W = (self.P[ECC.X] + self.P[ECC.Z]) * (self.P[ECC.X] - \
+                              self.P[ECC.Z]) * ECC.three
        else :                          # W = 3*(X+Z)*(X-Z)
-          W = self.P[ECC.X] * self.P[ECC.X] * ECC.three + self.a * self.P[ECC.Z] * self.P[ECC.Z]
+          W = self.P[ECC.X] * self.P[ECC.X] * ECC.three + \
+                           ECC.a * self.P[ECC.Z] * self.P[ECC.Z]
        S = self.P[ECC.Y] * self.P[ECC.Z]               # S = Y * Z
        S2 = S * S                                      #S2 = S*S
        B = self.P[ECC.X] * self.P[ECC.Y] * S           # B = X * Y * S
-       H = W * W - ECC.eight * B                       # H = W^2 - 8*B
-       rx = ECC.two * H * S                            # X' = 2 * H * S
-       ry = W * (ECC.four * B - H) - \                 # Y' = W*(4*B-H) - 8*Y^2*S^2
-               ECC.eight * self.P[Y] * self.P[Y] * S2   
-       rz = ECC.eight * S2 * S                         # Z' =8 * S^3
+       H = W * W -  B << ECC.three                     # H = W^2 - 8*B
+       rx = H * S << ECC.one                            # X' = 2 * H * S
+       ry = W * (B << ECC.two - H) - \                 # Y' = W*(4*B-H) - 8*Y^2*S^2
+               self.P[Y] * self.P[Y] * S2 << ECC.three  
+       rz = S2 * S << ECC.three             # Z' =8 * S^3 
 
        return ECCProjective([rx, ry, rz])
 
@@ -657,7 +713,7 @@ class ECCJacobian(ECC):
        ECC.__init__(self,p,c)
 
    def __init__(self,P1):
-       super().__init__(P1)
+       ECC.__init__(P1)
 
    def to_projective(self):
      """

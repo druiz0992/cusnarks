@@ -50,7 +50,7 @@ class ZFieldElTest(unittest.TestCase):
 
     TEST_ITER = 1000
     INT_THR  = 13423
-    LONG_THR = ZField.BN128_DATA['prime'] * 4
+    LONG_THR = ZField.FIELD_DATA['BN128']['prime'] * 4
     FIND_N_PRIMES = 20
     MAX_PRIME = int(1e4)
     SMALL_PRIME_LIST = ZUtils.find_primes(randint(3,MAX_PRIME), MAX_PRIME, cnt=FIND_N_PRIMES)
@@ -119,8 +119,8 @@ class ZFieldElTest(unittest.TestCase):
 
     def test_3conv_large_prime(self):
 
-       prime = ZField.BN128_DATA['prime']
-       ZField(prime, ZField.BN128_DATA['curve'])
+       prime = ZField.FIELD_DATA['BN128']['prime']
+       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
        reduction_data = ZField.get_reduction_data()
 
        for i in xrange(ZFieldElTest.TEST_ITER):
@@ -259,8 +259,8 @@ class ZFieldElTest(unittest.TestCase):
 
     def test_5arithmetic_large_prime(self):
 
-       prime = ZField.BN128_DATA['prime']
-       ZField(prime, ZField.BN128_DATA['curve'])
+       prime = ZField.FIELD_DATA['BN128']['prime']
+       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
 
        for i in xrange(ZFieldElTest.TEST_ITER):
           # init operands
@@ -406,8 +406,8 @@ class ZFieldElTest(unittest.TestCase):
 
     def test_7bitwise_large_prime(self):
 
-       prime = ZField.BN128_DATA['prime']
-       ZField(prime, ZField.BN128_DATA['curve'])
+       prime = ZField.FIELD_DATA['BN128']['prime']
+       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
 
        for i in xrange(ZFieldElTest.TEST_ITER):
          # init operands
@@ -547,8 +547,8 @@ class ZFieldElTest(unittest.TestCase):
             self.assertTrue(r_z == False)
 
     def test_9comparison_large_prime(self):
-       prime = ZField.BN128_DATA['prime']
-       ZField(prime, ZField.BN128_DATA['curve'])
+       prime = ZField.FIELD_DATA['BN128']['prime']
+       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
 
        for i in xrange(ZFieldElTest.TEST_ITER):
            # init operands
