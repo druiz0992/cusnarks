@@ -31,6 +31,16 @@
 //
 // ------------------------------------------------------------------
 //
+// NOTES:
+
+# 
+# Factorization and finding primes code based in Project Nayuki
+# 
+# Copyright (c) 2018 Project Nayuki
+# All rights reserved. Contact Nayuki for licensing.
+# https://www.nayuki.io/page/number-theoretic-transform-integer-dft
+
+
 // Description:
 //    Implementation of different utility functions and constants    
 //
@@ -49,6 +59,12 @@ class ZUtils(object):
 
     @staticmethod
     def find_primes(start,end, cnt=0):
+       """
+       Finds all prime numbers between start and end. If cnt is provided, funtion exists 
+        when number of primes found is equal to cnt
+
+       NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
+      """
       # Initialize a list
       primes = []
       for possiblePrime in xrange(start,end):
@@ -65,6 +81,8 @@ class ZUtils(object):
         Factorizes number into prime factors. Returns dictionary with following info:
          'factors' : array of prime factors
          'exponents' : array of prime factor exponent
+
+       NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
        """
        if n < 1:
            assert True,  "Number needs to be larger than 1"

@@ -68,7 +68,7 @@ class ZFieldTest(unittest.TestCase):
 
         ## Init given number as dec string and check all values are init (results not important)
         a_str = "1009"
-        ZField(a_str, ZField.P1009_DATA['curve'])
+        ZField(a_str, ZField.FIELD_DATA['P1009']['field'])
 
         self.assertTrue(ZField.get_extended_p().as_long() == long(a_str,10))
         self.assertTrue(ZField.is_init() == True)
@@ -79,14 +79,14 @@ class ZFieldTest(unittest.TestCase):
 
         ## Init given number as hex string
         a_str = "1009"
-        ZField(hex(long(a_str)), ZField.P1009_DATA['curve'])
+        ZField(hex(long(a_str)), ZField.FIELD_DATA['P1009']['field'])
 
         self.assertTrue(ZField.get_extended_p().as_long() == long(a_str,10))
 
         # Check reduction is correctly initialized 
         # R * Rp - P * Pp = 1
         a_str = "1009"
-        ZField(hex(long(a_str)), ZField.P1009_DATA['curve'])
+        ZField(hex(long(a_str)), ZField.FIELD_DATA['P1009']['field'])
 
         r_data = ZField.get_reduction_data()
 
@@ -97,8 +97,8 @@ class ZFieldTest(unittest.TestCase):
 
         # Check reduction is correctly initialized  - BN128
         # R * Rp - P * Pp = 1
-        a_str = ZField.BN128_DATA['prime']
-        ZField(hex(long(a_str)), ZField.BN128_DATA['curve'])
+        a_str = ZField.FIELD_DATA['BN128']['prime']
+        ZField(hex(long(a_str)), ZField.FIELD_DATA['BN128']['field'])
 
         r_data = ZField.get_reduction_data()
 
@@ -112,24 +112,24 @@ class ZFieldTest(unittest.TestCase):
         ZField(a_str)
 
         factor_data = ZField.get_factors()
-        self.assertTrue( factor_data['factors'] == ZField.P1009_DATA['factor_data']['factors'])
-        self.assertTrue( factor_data['exponents'] == ZField.P1009_DATA['factor_data']['exponents'])
+        self.assertTrue( factor_data['factors'] == ZField.FIELD_DATA['P1009']['factor_data']['factors'])
+        self.assertTrue( factor_data['exponents'] == ZField.FIELD_DATA['P1009']['factor_data']['exponents'])
 
         # Check factorization - P1009 with input data
         a_str = "1009"
-        ZField(a_str, ZField.P1009_DATA['factor_data'])
+        ZField(a_str, ZField.FIELD_DATA['P1009']['factor_data'])
 
         factor_data = ZField.get_factors()
-        self.assertTrue( factor_data['factors'] == ZField.P1009_DATA['factor_data']['factors'])
-        self.assertTrue( factor_data['exponents'] == ZField.P1009_DATA['factor_data']['exponents'])
+        self.assertTrue( factor_data['factors'] == ZField.FIELD_DATA['P1009']['factor_data']['factors'])
+        self.assertTrue( factor_data['exponents'] == ZField.FIELD_DATA['P1009']['factor_data']['exponents'])
 
         # Check factorization - BN128 with input data
-        a_str = ZField.BN128_DATA['prime']
-        ZField(a_str, ZField.BN128_DATA['factor_data'])
+        a_str = ZField.FIELD_DATA['BN128']['prime']
+        ZField(a_str, ZField.FIELD_DATA['BN128']['factor_data'])
 
         factor_data = ZField.get_factors()
-        self.assertTrue( factor_data['factors'] == ZField.BN128_DATA['factor_data']['factors'])
-        self.assertTrue( factor_data['exponents'] == ZField.BN128_DATA['factor_data']['exponents'])
+        self.assertTrue( factor_data['factors'] == ZField.FIELD_DATA['BN128']['factor_data']['factors'])
+        self.assertTrue( factor_data['exponents'] == ZField.FIELD_DATA['BN128']['factor_data']['exponents'])
 
     def test1_reduction_and_factorization(self):
 
@@ -168,8 +168,8 @@ class ZFieldTest(unittest.TestCase):
     def test3_generator_large_primes(self):
         # For a list of primes, check that generator can generate all the field
 
-        p = ZField.BN128_DATA['prime']
-        ZField(p, ZField.BN128_DATA['curve'])
+        p = ZField.FIELD_DATA['BN128']['prime']
+        ZField(p, ZField.FIELD_DATA['BN128']['field'])
         gen = ZField.find_generator().as_long()
 
         for iter in xrange(ZFieldTest.TEST_ITER):
@@ -199,8 +199,8 @@ class ZFieldTest(unittest.TestCase):
            self.assertTrue(len(ZField.get_roots()[1]) == nroots)
 
     def test5_roots_large_prime(self):
-        p = ZField.BN128_DATA['prime']
-        ZField(p, ZField.BN128_DATA['curve'])
+        p = ZField.FIELD_DATA['BN128']['prime']
+        ZField(p, ZField.FIELD_DATA['BN128']['field'])
 
         for i in xrange(ZFieldTest.NROOTS_THR-1):
            nroots = 2 ** (i+1)
@@ -226,8 +226,8 @@ class ZFieldTest(unittest.TestCase):
                self.assertTrue(r.as_long() == 1)
 
     def test7_inv_large_prime(self):
-        prime = ZField.BN128_DATA['prime']
-        ZField(prime, ZField.BN128_DATA['curve'])
+        prime = ZField.FIELD_DATA['BN128']['prime']
+        ZField(prime, ZField.FIELD_DATA['BN128']['field'])
 
         for i in xrange(ZFieldTest.TEST_ITER):
            x = ZFieldElExt(randint(1,prime-1))
