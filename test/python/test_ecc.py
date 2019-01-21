@@ -187,41 +187,50 @@ class ECCTest(unittest.TestCase):
            zel1_rdcj = [zel1_extj[0].reduce(), zel1_extj[1].reduce()]
            zel2_rdcj = [zel1_extj[0].reduce(), zel1_extj[1].reduce()]
 
-           zel3_exta = zel1_exta + zel2_exta
-           zel3_rdca = zel1_rdca + zel2_rdca
-           zel3_extj = zel1_extj + zel2_extj
-           zel3_rdcj = zel1_rdcj + zel2_rdcj
+           p1_exta = ECCAffine(zel1_exta,c['curve_params'])
+           p1_extp = ECCProjective(zel1_extp,c['curve_params'])
+           p1_rdca = ECCAffine(zel1_exta,c['curve_params'])
+           p1_rdcp = ECCProjective(zel1_extp,c['curve_params'])
+           p2_exta = ECCAffine(zel2_exta,c['curve_params'])
+           p2_extp = ECCProjective(zel2_extp,c['curve_params'])
+           p2_rdca = ECCAffine(zel2_exta,c['curve_params'])
+           p2_rdcp = ECCProjective(zel2_extp,c['curve_params'])
 
-           self.assertTrue(zel3_exta == zel3_rdca.extend())
-           self.assertTrue(zel3_rdca == zel3_exta.reduce())
+           p3_exta = p1_exta + p2_exta
+           p3_rdca = p1_rdca + p2_rdca
+           p3_extj = p1_extj + p2_extj
+           p3_rdcj = p1_rdcj + p2_rdcj
 
-           self.assertTrue(zel3_exta == zel3_extp.to_affine())
-           self.assertTrue(zel3_exta.to_projective() == zel3_extp)
-           self.assertTrue(zel1_exta == zel1_extj.to_affine())
-           self.assertTrue(zel1_exta.to_jacobian() == zel1_extj)
+           self.assertTrue(p3_exta == p3_rdca.extend())
+           self.assertTrue(p3_rdca == p3_exta.reduce())
 
-           self.assertTrue(zel3_exta == zel3_rdcp.to_affine().extend())
-           self.assertTrue(zel3_exta == zel3_rdcp.extend().to_affine())
-           self.assertTrue(zel3_exta.to_projective().reduce() == zel3_rdcp)
-           self.assertTrue(zel3_exta.reduce().to_projective() == zel3_rdcp)
+           self.assertTrue(p3_exta == p3_extp.to_affine())
+           self.assertTrue(p3_exta.to_projective() == p3_extp)
+           self.assertTrue(p1_exta == p1_extj.to_affine())
+           self.assertTrue(p1_exta.to_jacobian() == p1_extj)
 
-           self.assertTrue(zel1_exta == zel1_rdcj.to_affine().extend())
-           self.assertTrue(zel1_exta == zel1_rdcj.extend().to_affine())
-           self.assertTrue(zel1_exta.to_projective().reduce() == zel1_rdcj)
-           self.assertTrue(zel1_exta.reduce().to_projective() == zel1_rdck)
+           self.assertTrue(p3_exta == p3_rdcp.to_affine().extend())
+           self.assertTrue(p3_exta == p3_rdcp.extend().to_affine())
+           self.assertTrue(p3_exta.to_projective().reduce() == p3_rdcp)
+           self.assertTrue(p3_exta.reduce().to_projective() == p3_rdcp)
+
+           self.assertTrue(p1_exta == p1_rdcj.to_affine().extend())
+           self.assertTrue(p1_exta == p1_rdcj.extend().to_affine())
+           self.assertTrue(p1_exta.to_projective().reduce() == p1_rdcj)
+           self.assertTrue(p1_exta.reduce().to_projective() == p1_rdck)
 
 
            # Define affine point at infinity 
-           zel1_exta = [None, None]
-           zel1_extp = [None, None, None]
+           p1_exta = [None, None]
+           p1_extp = [None, None, None]
 
-           self.assertTrue(zel1_exta == zel1_extp)
-           self.assertTrue((zel1_exta != zel1_extp) == False)
-           self.assertTrue(zel1.exta.to_projective() == zel1_extp)
-           self.assertTrue(zel1.extp.to_affine() == zel1_exta)
+           self.assertTrue(p1_exta == p1_extp)
+           self.assertTrue((p1_exta != p1_extp) == False)
+           self.assertTrue(p1.exta.to_projective() == p1_extp)
+           self.assertTrue(p1.extp.to_affine() == p1_exta)
 
 
-  def test_2arithmetic(self):
+    def test_2operators(self):
         c = ECC.CURVE_DATA['Secp112r1']
         ZField(c['prime'], c['factor_data'])
 
@@ -252,12 +261,22 @@ class ECCTest(unittest.TestCase):
            zel1_rdcj = [zel1_extj[0].reduce(), zel1_extj[1].reduce()]
            zel2_rdcj = [zel1_extj[0].reduce(), zel1_extj[1].reduce()]
 
+           p1_exta = ECCAffine(zel1_exta,c['curve_params'])
+           p1_extp = ECCProjective(zel1_extp,c['curve_params'])
+           p1_rdca = ECCAffine(zel1_exta,c['curve_params'])
+           p1_rdcp = ECCProjective(zel1_extp,c['curve_params'])
+           p2_exta = ECCAffine(zel2_exta,c['curve_params'])
+           p2_extp = ECCProjective(zel2_extp,c['curve_params'])
+           p2_rdca = ECCAffine(zel2_exta,c['curve_params'])
+           p2_rdcp = ECCProjective(zel2_extp,c['curve_params'])
+
            # Operators: +. -. neg, mul. double
-           r_exta = zel1_exta + zel2_exta
-           r_rdca = zel1_rdca + zel2_rdca
-           r_extp = zel1_extp + zel2_extp
-           r_rdcp = zel1_rdcp + zel2_rdcp
+           r_exta = p1_exta + p2_exta
+           r_rdca = p1_rdca + p2_rdca
+           r_extp = p1_extp + p2_extp
+           r_rdcp = p1_rdcp + p2_rdcp
     
+           #test __eq__
            self.assertTrue(r_exta.reduce() == r_rdca)
            self.assertTrue(r_exta == r_rdca.extend())
            self.assertTrue(r_exta.to_projective() == r_extp)
@@ -266,26 +285,26 @@ class ECCTest(unittest.TestCase):
            self.assertTrue(r_exta.reduce().to_projective() == r_rdcp)
            self.assertTrue(r_exta == r_rdcp.to_affine().extend())
            self.assertTrue(r_exta == r_rdcp.extend().to_affine())
+
+           #test ne
+           self.assertTrue((r_exta.reduce() != r_rdca) == False)
+           self.assertTrue((r_exta != r_rdca.extend()) == False)
+           self.assertTrue((r_exta.to_projective() != r_extp) == False)
+           self.assertTrue((r_exta != r_extp.to_affine()) == False)
+           self.assertTrue((r_.exta.to_projective().reduce() != r_rdcp) == False)
+           self.assertTrue((r_exta.reduce().to_projective() != r_rdcp) == False)
+           self.assertTrue((r_exta != r_rdcp.to_affine().extend()) == False)
+           self.assertTrue((r_exta != r_rdcp.extend().to_affine()) == False)
+
+           self.assertTrue(r_exta.is_on_curve() == True)
+           self.assertTrue(r_rdca.is_on_curve() == True)
+           self.assertTrue(r_extp.is_on_curve() == True)
+           self.assertTrue(r_rdcp.is_on_curve() == True)
            
-
-           r_exta = zel1_exta - zel2_exta
-           r_rdca = zel1_rdca - zel2_rdca
-           r_extp = zel1_extp - zel2_extp
-           r_rdcp = zel1_rdcp - zel2_rdcp
-
-           self.assertTrue(r_exta.reduce() == r_rdca)
-           self.assertTrue(r_exta == r_rdca.extend())
-           self.assertTrue(r_exta.to_projective() == r_extp)
-           self.assertTrue(r_exta == r_extp.to_affine())
-           self.assertTrue(r_exta.to_projective().reduce() == r_rdcp)
-           self.assertTrue(r_exta.reduce().to_projective() == r_rdcp)
-           self.assertTrue(r_exta == r_rdcp.to_affine().extend())
-           self.assertTrue(r_exta == r_rdcp.extend().to_affine())
-
-           r_exta = -zel1_exta
-           r_rdca = -zel1_rdca
-           r_extp = -zel1_extp
-           r_rdcp = -zel1_rdcp
+           r_exta = p1_exta - p2_exta
+           r_rdca = p1_rdca - p2_rdca
+           r_extp = p1_extp - p2_extp
+           r_rdcp = p1_rdcp - p2_rdcp
 
            self.assertTrue(r_exta.reduce() == r_rdca)
            self.assertTrue(r_exta == r_rdca.extend())
@@ -296,14 +315,38 @@ class ECCTest(unittest.TestCase):
            self.assertTrue(r_exta == r_rdcp.to_affine().extend())
            self.assertTrue(r_exta == r_rdcp.extend().to_affine())
 
-           r1_exta = zel1_exta * alpha_ext
-           r2_rdca = zel1_exta * alpha_rdc
-           r3_exta = alpha_ext * zel1_exta
-           r4_rdca = alpha_rdc * zel1_exta
-           r1_extp = zel1_extp * alpha_ext
-           r2_rdcp = zel1_extp * alpha_rdc
-           r3_extp = alpha_ext * zel1_extp
-           r4_rdcp = alpha_rdc * zel1_extp
+           self.assertTrue(r_exta.is_on_curve() == True)
+           self.assertTrue(r_rdca.is_on_curve() == True)
+           self.assertTrue(r_extp.is_on_curve() == True)
+           self.assertTrue(r_rdcp.is_on_curve() == True)
+
+           r_exta = -p1_exta
+           r_rdca = -p1_rdca
+           r_extp = -p1_extp
+           r_rdcp = -p1_rdcp
+
+           self.assertTrue(r_exta.reduce() == r_rdca)
+           self.assertTrue(r_exta == r_rdca.extend())
+           self.assertTrue(r_exta.to_projective() == r_extp)
+           self.assertTrue(r_exta == r_extp.to_affine())
+           self.assertTrue(r_exta.to_projective().reduce() == r_rdcp)
+           self.assertTrue(r_exta.reduce().to_projective() == r_rdcp)
+           self.assertTrue(r_exta == r_rdcp.to_affine().extend())
+           self.assertTrue(r_exta == r_rdcp.extend().to_affine())
+
+           self.assertTrue(r_exta.is_on_curve() == True)
+           self.assertTrue(r_rdca.is_on_curve() == True)
+           self.assertTrue(r_extp.is_on_curve() == True)
+           self.assertTrue(r_rdcp.is_on_curve() == True)
+
+           r1_exta = p1_exta * alpha_ext
+           r2_rdca = p1_exta * alpha_rdc
+           r3_exta = alpha_ext * p1_exta
+           r4_rdca = alpha_rdc * p1_exta
+           r1_extp = p1_extp * alpha_ext
+           r2_rdcp = p1_extp * alpha_rdc
+           r3_extp = alpha_ext * p1_extp
+           r4_rdcp = alpha_rdc * p1_extp
 
            self.assertTrue(r1_exta == r2_rdca.extend() == r3_exta == r4_rdca.extend())
            self.assertTrue(r1_exta.reduce() == r2_rdca == r3_exta.reduce() == r4_rdca)
@@ -316,10 +359,19 @@ class ECCTest(unittest.TestCase):
            self.assertTrue(isinstance(r1_extp.get_P()[0],ZFieldElExt)
            self.assertTrue(isinstance(r1_rdcp.get_P()[0],ZFieldElRedc)
 
-           r_exta = zel1_exta.double()
-           r_rdca = zel1_rdca.double()
-           r_extp = zel1_extp.double()
-           r_rdcp = zel1_rdcp.double()
+           self.assertTrue(r1_exta.is_on_curve() == True)
+           self.assertTrue(r2_rdca.is_on_curve() == True)
+           self.assertTrue(r3_exta.is_on_curve() == True)
+           self.assertTrue(r4_rdca.is_on_curve() == True)
+           self.assertTrue(r1_extp.is_on_curve() == True)
+           self.assertTrue(r2_rdcp.is_on_curve() == True)
+           self.assertTrue(r3_extp.is_on_curve() == True)
+           self.assertTrue(r4_rdcp.is_on_curve() == True)
+
+           r_exta = p1_exta.double()
+           r_rdca = p1_rdca.double()
+           r_extp = p1_extp.double()
+           r_rdcp = p1_rdcp.double()
      
            self.assertTrue(r_exta.reduce() == r_rdca)
            self.assertTrue(r_exta == r_rdca.extend())
@@ -329,6 +381,46 @@ class ECCTest(unittest.TestCase):
            self.assertTrue(r_exta.reduce().to_projective() == r_rdcp)
            self.assertTrue(r_exta == r_rdcp.to_affine().extend())
            self.assertTrue(r_exta == r_rdcp.extend().to_affine())
+
+           self.assertTrue(r_exta.is_on_curve() == True)
+           self.assertTrue(r_rdca.is_on_curve() == True)
+           self.assertTrue(r_extp.is_on_curve() == True)
+           self.assertTrue(r_rdcp.is_on_curve() == True)
+
+    def test_3is_on_curve(self):
+        c = ECC.CURVE_DATA['Secp112r1']
+        ZField(c['prime'], c['factor_data'])
+
+        for test in xrange(ECCTest:TEST_ITER):
+           zel1 = [ZFieldElExt(randint(0,p) for x in range(2)]
+           zel2 = [ZFieldElExt(randint(0,p) for x in range(2)]
+           alpha_ext = ZFieldElExt(randint(0,p)
+           alpha_rdc = ZFieldElRedc(randint(0,p)
+
+           # Affine
+           zel1_exta = [zel1[0] * c['curve_params']['Gy'], zel1[1]['curve_params']['Gy']]
+   
+           zel1_rdca = [zel1_exta[0].reduce(), zel1_exta[1].reduce()] 
+
+           #Affine -> Projective
+           zel1_extp = [zel1_exta[0].to_projective(). zel1_exta[1].to_projective()]
+
+           zel1_rdcp = [zel1_extp[0].reduce(), zel1_extp[1].reduce()]
+   
+           #Affine -> JAcobian 
+           zel1_extj = [zel1_exta[0].to_jacobian(). zel1_exta[1].to_jacobian()]
+
+           zel1_rdcj = [zel1_extj[0].reduce(), zel1_extj[1].reduce()]
+
+           r_exta = ECCAffine(zel1_exta,c['curve_params'])
+           r_extp = ECCProjective(zel1_extp,c['curve_params'])
+           r_rdca = ECCAffine(zel1_exta,c['curve_params'])
+           r_rdcp = ECCProjective(zel1_extp,c['curve_params'])
+
+           self.assertTrue(r_exta.is_on_curve() == False)
+           self.assertTrue(r_rdca.is_on_curve() == False)
+           self.assertTrue(r_extp.is_on_curve() == False)
+           self.assertTrue(r_rdcp.is_on_curve() == False)
 
 
 if __name__ == "__main__":
