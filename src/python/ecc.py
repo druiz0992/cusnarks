@@ -71,9 +71,6 @@ class ECC(Object):
    Y = 1
    Z = 2
 
-   EXT_IDX = 0
-   REDC_IDX = 1
-  
    constants_init = False
    one = 1
    two = 2
