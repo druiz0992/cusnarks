@@ -1,4 +1,3 @@
-
 """
 /*
     Copyright 2018 0kims association.
@@ -52,65 +51,132 @@
 
 """
 import math
-import numpy as np
 from random import randint
 
+import numpy as np
+
+
 class ZUtils(object):
+    PREDEFINED_CURVES = ['P1009', 'Secp112r1', 'Secp128r1', 'Secp160k1', 'Secp224k1', 'Secp256k1', 'BN128']
+
+    # y^2 = x^3 + a*x + b
+    CURVE_DATA = {
+        'P1009':
+            {'curve': 'P1009',
+             'prime': 1009,
+             'factor_data': {'factors': [2, 3, 7],
+                             'exponents': [4, 2, 1]}
+             },
+        'Secp112r1':
+            {'curve': 'Sepc112r1',
+             'prime': 4451685225093714772084598273548427L,
+             'curve_params': {'a': 4451685225093714772084598273548424L, 'b': 2061118396808653202902996166388514L,
+                              'Gx': 188281465057972534892223778713752L, 'Gy': 3419875491033170827167861896082688L},
+             'factor_data': {'factors': [2, 3, 7, 1453958119802281L, 5207091687747401L],
+                             'exponents': [2, 1, 2, 1, 1]}
+             },
+        'Secp128r1':
+            {'curve': 'Sepc128r1',
+             'prime': 340282366762482138434845932244680310783L,
+             'curve_params': {'a': '1329227995165945853261116922830782463L',
+                              'b': 1206995559461897101683291410318290526L,
+                              'Gx': 29408993404948928992877151431649155974L,
+                              'Gy': 275621562871047521857442314737465260675L},
+             'factor_data': {'factors': [2, 2147483647L],
+                             'exponents': [97, 1]}
+             },
+        'Secp160k1':
+            {'curve': 'Sepc160k1',
+             'prime': 1461501637330902918203684832716283019651637554291L,
+             'curve_params': {'a': 0, 'b': 7,
+                              'Gx': 338530205676502674729549372677647997389429898939L,
+                              'Gy': 842365456698940303598009444920994870805149798382L},
+             'factor_data': {'factors': [2, 37, 44481592398149L, 222002193056774815430442568663621L],
+                             'exponents': [2, 1, 1, 1]}
+             },
+        'Secp224k1':
+            {'curve': 'Sep224k1',
+             'prime': 26959946667150639794667015087019630673637144422540572481099315275117L,
+             'curve_params': {'a': 0, 'b': 5,
+                              'Gx': 16983810465656793445178183341822322175883642221536626637512293983324L,
+                              'Gy': 13272896753306862154536785447615077600479862871316829862783613755813L},
+             'factor_data': {'factors': [2, 50238476144222203L, 268319709675859997416334102104367237320252177313653L],
+                             'exponents': [1, 2, 2]}
+             },
+        'Sepc256k1':
+            {'curve': 'Sepc256k1',
+             'prime': 115792089237316195423570985008687907853269984665640564039457584007908834671663L,
+             'curve_params': {'a': 0, 'b': 7,
+                              'Gx': 55066263022277343669578718895168534326250603453777594175500187360389116729240L,
+                              'Gy': 32670510020758816978083085130507043184471273380659243275938904335757337482424L},
+             'factor_data': {
+                 'factors': [2, 7322137L, 45422601869677L, 21759506893163426790183529804034058295931507131047955271L],
+                 'exponents': [4, 1, 1, 1]}
+             },
+        'BN128': {
+            'curve': 'BN128',
+            'prime': 21888242871839275222246405745257275088548364400416034343698204186575808495617L,
+            'curve_params': {'a': 0, 'b': 3,
+                             'Gx': 1L,
+                             'Gy': 2L},
+            'factor_data': {'factors': [2, 3, 13, 29, 983, 11003, 237073, 405928799L, 1670836401704629L,
+                                        13818364434197438864469338081L],
+                            'exponents': [28, 2, 1, 1, 1, 1, 1, 1, 1, 1]}
+        },
+    }
 
     @staticmethod
-    def find_primes(start,end, cnt=0):
-       """
-       Finds all prime numbers between start and end. If cnt is provided, funtion exists 
-        when number of primes found is equal to cnt
+    def find_primes(start, end, cnt=0):
+        """
+         Finds all prime numbers between start and end. If cnt is provided, funtion exists
+          when number of primes found is equal to cnt
 
-       NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
-      """
-      # Initialize a list
-      primes = []
-      for possiblePrime in xrange(start,end):
-          if all((possiblePrime % i != 0) for i in range(2, int(math.floor(math.sqrt(possiblePrime))) + 1)):
-              primes.append(possiblePrime)
-          if len(primes) >= cnt and cnt != 0:
-              break
-  
-      return primes
+         NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
+        """
+        # Initialize a list
+        primes = []
+        for possiblePrime in xrange(start, end):
+            if all((possiblePrime % i != 0) for i in range(2, int(math.floor(math.sqrt(possiblePrime))) + 1)):
+                primes.append(possiblePrime)
+            if len(primes) >= cnt and cnt != 0:
+                break
+
+        return primes
 
     @staticmethod
     def prime_factors(n):
-       """
-        Factorizes number into prime factors. Returns dictionary with following info:
-         'factors' : array of prime factors
-         'exponents' : array of prime factor exponent
+        """
+         Factorizes number into prime factors. Returns dictionary with following info:
+          'factors' : array of prime factors
+          'exponents' : array of prime factor exponent
 
-       NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
-       """
-       if n < 1:
-           assert True,  "Number needs to be larger than 1"
-       result = {'factors' :[], 'exponents' : [] }
-       i = 2
-       number = n
-       end = math.sqrt(n)
-       while i <= end:
-           if n % i == 0:
-               n //= i
-               result['factors'].append(i)
-               result['exponents'].append(1)
-               while n % i == 0:
-                   n //= i
-                   result['exponents'][-1]+=1
-               end = math.sqrt(n)
-           i += 1
-       if n > 1:
-           result['factors'].append(n)
-           result['exponents'].append(1)
-           while n % i == 0 and n > 0:
-               n //= i
-               result['exponents'][-1]+=1
-       assert np.prod([r**e for r,e in zip(result['factors'],result['exponents'])]) == number
-  
-       return result
+        NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
+        """
+        if n < 1:
+            assert True, "Number needs to be larger than 1"
+        result = {'factors': [], 'exponents': []}
+        i = 2
+        number = n
+        end = math.sqrt(n)
+        while i <= end:
+            if n % i == 0:
+                n //= i
+                result['factors'].append(i)
+                result['exponents'].append(1)
+                while n % i == 0:
+                    n //= i
+                    result['exponents'][-1] += 1
+                end = math.sqrt(n)
+            i += 1
+        if n > 1:
+            result['factors'].append(n)
+            result['exponents'].append(1)
+            while n % i == 0 and n//i > 1:
+                n //= i
+                result['exponents'][-1] += 1
+        if np.prod([r ** e for r, e in zip(result['factors'], result['exponents'])]) != number:
+            print number
+            print result
+            assert True, "Incorrect factorization"
 
-
-
-
-
+        return result
