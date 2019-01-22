@@ -79,6 +79,7 @@ class ECC(object):
     one = [None, None]
     two = [None, None]
     three = [None, None]
+    four = [None, None]
     eight = [None, None]
 
     a = [None, None]
@@ -96,42 +97,47 @@ class ECC(object):
               'a' : long/int
               'b' : long/int
         """
-        tmp_p = p
-        if not isinstance(p,ECC) or type(p) is not list or (length(p) < 2 and length(p) != 0) or length(p) > 3:
-            assert True, "Invalid point format. Expected a list"
-        elif ((isinstance(self, ECCAffine) and len(p) != 2) or
-              (isinstance(self, ECCProjective) and len(p) != 3) or
-              (isinstance(self, ECCJacobian) and len(p) != 3)):
-            assert True, "Coordinate format doesn't match with point format"
-        elif not ZField.is_init():
+        if not ZField.is_init():
             assert True, "Finite field not initialized"
         elif curve is None and not ECC.is_curve_init():
             assert True, "Curve is not initialized"
-        elif curve is not None:
-            if not isinstance(int, curve['a']) and not isinstance(long, curve['a']):
+        elif type(p) is list:
+            p_l = p
+            if ((isinstance(self, ECCAffine) and len(p) != 2) or
+                (isinstance(self, ECCProjective) and len(p) != 3) or
+                (isinstance(self, ECCJacobian) and len(p) != 3)):
+                    assert True, "Coordinate format doesn't match with point format"
+        elif isinstance(p,ECC):
+            p_l = p.P
+        else:
+            assert True, "Unexpected type"
+
+        if curve is not None:
+            if not isinstance(curve['a'],int) and not isinstance(curve['a'],long):
                 assert True, "Unexpected curve parameters"
-            elif not isinstance(int, curve['b']) and not isinstance(long, curve['b']):
+            elif not isinstance(curve['b'],int) and not isinstance(curve['b'],long):
                 assert True, "Unexpected curve parameters"
             else:
                 self.init_curve(curve['a'], curve['b'])
+
+        # p can be a list of int, long, BigInt
+        if isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
+            self.P = [ZFieldElExt(x) for x in p_l]
+            self.FIDX = ECC.FEXT
+        elif isinstance(p[ECC.X], ZFieldElRedc):
+            self.P = [ZFieldElRedc(x) for x in p_l]
+            self.FIDX = ECC.FRDC
+        elif p[ECC.X] is None:
+            self.P = p_l
         else:
-            if isinstance(p,ECC):
-                tmp_p = p.P
-            # p can be a list of int, long, BigInt
-            if isinstance(p2[ECC.X], int) or isinstance(p2[ECC.X], long) or isinstance(p2[ECC.X], ZFieldElExt):
-                self.P = [ZFieldElExt(x) for x in tmp_p]
-                self.FIDX = FEXT
-            elif isinstance(p[ECC.X], ZFieldElRedc):
-                self.P = [ZFieldElRedc(x) for x in tmp_p]
-                self.FIDX = FRDC
-            else:
-                assert True, "Unexpected format"
+            assert True, "Unexpected format"
 
         if ECC.constants_init is False:
-            ECC.one = [ZFieldElExt(1), ZFieldElRedc(1)]
-            ECC.two = [ZFieldElExt(2), ZFieldElRedc(2)]
-            ECC.three = [ZFieldElExt(3), ZFieldElRedc(3)]
-            ECC.eight = [ZFieldElExt(8), ZFieldElRedc(8)]
+            ECC.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
+            ECC.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
+            ECC.three = [ZFieldElExt(3), ZFieldElExt(3).reduce()]
+            ECC.four = [ZFieldElExt(4), ZFieldElExt(4).reduce()]
+            ECC.eight = [ZFieldElExt(8), ZFieldElExt(8).reduce()]
 
             ECC.constants_init = True
 
@@ -141,8 +147,8 @@ class ECC(object):
 
     @classmethod
     def init_curve(cls, a, b):
-        ECC.a = [ZFieldElExt(a), ZFieldElRedc(a)]
-        ECC.b = [ZFieldElExt(b), ZFieldElRedc(b)]
+        ECC.a = [ZFieldElExt(a), ZFieldElExt(a).reduce()]
+        ECC.b = [ZFieldElExt(b), ZFieldElExt(b).reduce()]
 
     @classmethod
     def get_curve(cls):
@@ -235,7 +241,10 @@ class ECC(object):
             assert True, "Unexpected data type"
 
     def as_list(self):
-        return [p.as_long() for p in self.P]
+        if not self.is_inf():
+            return [p.as_long() for p in self.P]
+        else:
+            return [None] * len(self.P)
 
     def showP(self):
         print self.as_list()
@@ -244,7 +253,7 @@ class ECC(object):
         """
          returns True of self and P2 are same format of ECC coordinate representation
         """
-        return type(self) == type(p2c)
+        return type(self) == type(P2)
 
     @abstractmethod
     def __eq__(self, P2):
@@ -281,12 +290,41 @@ class ECC(object):
         """
         pass
 
-    @abstractmethod
     def __mul__(self, alpha):
         """
-          alpha * P1
+          P1 * alpha
+          TODO : pending += for ECC points and >>= for BigInt, SLINDING window
         """
-        pass
+        if isinstance(alpha, int) or isinstance(alpha, long):
+            scalar = alpha
+        elif isinstance(alpha, ZFieldElRedc):
+            assert True, "Unexpected type"
+        elif isinstance(alpha,BigInt):
+            scalar = alpha.bignum
+        else:
+            assert True, "Unexpected type"
+
+        if self.is_inf():
+            return self.point_at_inf()
+
+        if scalar < 0:
+            scalar = -scalar
+
+        newP = self.point_at_inf()
+        result = self
+        while scalar != 0:
+            if scalar & 1 != 0:
+                newP += result
+            result = result.double()
+            scalar >>= 1
+        return result
+
+    def __rmul__(self, alpha):
+        """
+          alpha * P
+          TODO : pending += for ECC points and >>= for BigInt, SLINDING window
+        """
+        return self * alpha
 
     @abstractmethod
     def double(self):
@@ -303,6 +341,12 @@ class ECC(object):
         """
         pass
 
+    @abstractmethod
+    def point_at_inf(self):
+        """"
+          Return point at infinity
+        """
+        pass
 
 class ECCAffine(ECC):
     """
@@ -351,9 +395,9 @@ class ECCAffine(ECC):
           False otherwise
         """
         return not self.is_inf() and \
-               (self.P[ECC.Y] * self.P[ECC.Y]).extend() == \
-               (self.P[ECC.X] * self.P[ECC.X].extend()).extend() + \
-               (ECC.a[self.FIDX] * self.P[ECC.X]).extend() + ECC.b[ECC_FIDX]
+               (self.P[ECC.Y] * self.P[ECC.Y]) == \
+               (self.P[ECC.X] * self.P[ECC.X] * self.P[ECC.X]) + \
+               (ECC.a[self.FIDX] * self.P[ECC.X]) + ECC.b[self.FIDX]
 
     # Arithmetic operators
     # +, - , neg, *
@@ -362,7 +406,7 @@ class ECCAffine(ECC):
           P1 + P2
 
         """
-        if not isinstance(ECCAffine, P2):
+        if not isinstance(P2,ECCAffine):
             assert True, "Incorrect point format"
         elif not self.same_format(P2):
             assert True, "Finite Field represenation does not match"
@@ -396,54 +440,41 @@ class ECCAffine(ECC):
         if self.is_inf():
             return self
         else:
-            return ([self.P[ECC.X], -self.P[ECC.Y]])
-
-    def __mul__(self, alpha):
-        """
-          alpha * P1
-          TODO : SLIDING window
-        """
-        if isinstance(alpha, int) or isinstance(alpha, long):
-            scalar = alpha
-        elif isinstance(alpha, BigInt):
-            scalar = alpha.bignum
-
-        if self.is_inf():
-            return ECCAffine([None, None])
-
-        if scalar < 0:
-            scalar = -scalar
-
-        newP = ECCAffine([None, None])
-        temp = self
-        while scalar != 0:
-            if scalar & 1 != 0:
-                newP += temp
-            temp = temp.double()
-            scalar >>= 1
-        return result
+            return ECCAffine([self.P[ECC.X], -self.P[ECC.Y]])
 
     # doubling operation
     def double(self):
         """
          2 * P1
+         https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Affine_Coordinates
+         1LD + 2M + 2S
         """
         if self.is_inf() or self.P[ECC.Y] == 0:
-            return self
+            return self.point_at_inf()
 
-        s = self.P[ECC.X] * self.P[ECC.X]
+        X = self.P[ECC.X]
+        Xsq = X * X
+        Y = self.P[ECC.Y]
+
+        a = ECC.a[self.FIDX]
+        one = ECC.one[self.FIDX]
+        two = ECC.two[self.FIDX]
+        three = ECC.three[self.FIDX]
+
         if self.FIDX == ECC.FEXT:
-            s += (self.P[ECC.X] * self.P[ECC.X]) << ECC.one[self.FIDX]
-            s += ECC.a[self.FIDX]
-            s += (self.P[ECC.Y] << ECC.one[self.FIDX]).inv()
-            rx = s * s - (self.P[ECC.X] << ECC.one[self.FIDX])
+            Y2 = Y << one
+            X2 = X << one
+            l = Xsq << one
+            l += Xsq
         else:
-            s += (self.P[ECC.X] * self.P[ECC.X]) * ECC.two[self.FIDX]
-            s += ECC.a[self.FIDX]
-            s += (self.P[ECC.Y] * ECC.two[self.FIDX]).inv()
-            rx = s * s - (self.P[ECC.X] * ECC.two[self.FIDX])
+            Y2 = Y * two
+            X2 = X * two
+            l = three * Xsq
 
-        ry = s * (self.P[ECC.X] - rx) - self.P[ECC.Y]
+        l += a
+        l = l * Y2.inv()
+        rx = l * l - X2
+        ry = l *(X - rx) - Y
 
         return ECCAffine([rx, ry])
 
@@ -453,10 +484,10 @@ class ECCAffine(ECC):
         """
           P1 == P2
         """
-        if not isinstance(P2, ECCAffine):
+        if self.is_inf() and P2.is_inf():
+          return True
+        elif not isinstance(P2, ECCAffine):
             assert True, "Unexpected data type"
-        elif self.is_zero() and P2.is_zero():
-            return True
         else:
             return (self.P[ECC.X], self.P[ECC.Y]) == (P2.P[ECC.X], P2.P[ECC.Y])
 
@@ -467,6 +498,11 @@ class ECCAffine(ECC):
         """
         return not (self == P2)
 
+    def point_at_inf(self):
+        """"
+          Return point at infinity
+        """
+        return ECCAffine([None, None])
 
 class ECCProjective(ECC):
     """
@@ -490,18 +526,12 @@ class ECCProjective(ECC):
           Converts point to AFFINE
         """
         if self.is_inf():
-            return ECCProjective([None, None])
+            return ECCAffine([None, None])
         elif isinstance(self.P[ECC.X], ZFieldEl):
-            div = ZField.inv(self.P[ECC.Z])
-            return ECCProjective([self.P[ECC.X] * div, self.P[ECC.Y] * div])
+            div = self.P[ECC.Z].inv()
+            return ECCAffine([self.P[ECC.X] * div, self.P[ECC.Y] * div])
         else:
             assert True, "Unexpected data type"
-
-    def to_projective(self):
-        """
-          Don't do eanything
-        """
-        pass
 
     def to_jacobian(self):
         """
@@ -526,9 +556,10 @@ class ECCProjective(ECC):
     def __add__(self, P2):
         """
           P1 + P2
-
+        https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Standard_Projective_Coordinates
+        12M + 2S
         """
-        if not isinstance(ECCProjective, P2):
+        if not isinstance(P2,ECCProjective):
             assert True, "Incorrect point format"
         elif not self.same_format(P2):
             assert True, "Finite Field represenation does not match"
@@ -538,27 +569,38 @@ class ECCProjective(ECC):
         elif P2.is_inf():
             return self
 
-        t0 = self.P[ECC.Y] * P2.P[ECC.Z]
-        t1 = P2.P[ECC.Y] * self.P[ECC.Z]
-        u0 = self.P[ECC.X] * P2.P[ECC.Z]
-        u1 = P2.P[ECC.X] * self.P[ECC.Z]
+        X1, Y1, Z1 = self.P
+        X2, Y2, Z2 = P2.P
 
-        if u0 == u1:
-            if t0 == t1:
-                return self.double()
-            else:
+        U1 = Y2 * Z1
+        U2 = Y1 * Z2
+        V1 = X2 * Z1
+        V2 = X1 * Z2
+
+        if V1 == V2:
+          if U1 != U2:
                 return ECCProjective([None, None, None])
+          else:
+                return self.double()
+
+        U = U1 - U2
+        V = V1 - V2
+        Usq = U**2
+        Vsq = V**2
+        Vcube = Vsq * V
+        W = Z1 * Z2
+        A = (Usq * W) - Vcube
+      
+        if self.FIDX == ECC.FEXT:
+           A -= (Vsq * V2) << ECC.one[self.FIDX]
         else:
-            t = t0 - t1
-            u = u0 - u1
-            u2 = u * u
-            v = self.P[ECC.Z] * P2.P[ECC.Z]
-            w = t * t * v - u2 * (u0 + u1)
-            u3 = u = u2
-            rx = u * w
-            ry = t * (u0 * u2 - w) - t0 * u3
-            rz = u3 * v
-        return ECCProjective([rx, ry, rz])
+           A -= (Vsq * V2) * ECC.two[self.FIDX] 
+
+        X3 = V * A
+        Y3 = U * (Vsq * V2 - A) - Vcube*U2
+        Z3 = Vcube * W
+
+        return ECCProjective([X3, Y3, Z3])
 
     def __sub__(self, P2):
         """
@@ -574,78 +616,61 @@ class ECCProjective(ECC):
         if self.is_inf():
             return self
         else:
-            return ([self.P[ECC.X], -self.P[ECC.Y]], self.P[ECC.Z])
+            return ECCProjective([self.P[ECC.X], -self.P[ECC.Y], self.P[ECC.Z]])
 
-    def __mul__(self, alpha):
-        """
-          alpha * P1
-          TODO : pending += for ECC points and >>= for BigInt, SLINDING window
-        """
-        if isinstance(alpha, int) or isinstance(alpha, long):
-            scalar = alpha
-        elif isinstance(alpha, BigInt):
-            scalar = alpha.bignum
-
-        if self.is_inf():
-            return ECCProjective([None, None, None])
-
-        if scalar < 0:
-            scalar = -scalar
-
-        newP = ECCProjective([None, None, None])
-        temp = self
-        while scalar != 0:
-            if scalar & 1 != 0:
-                newP += temp
-            temp = temp.double()
-            scalar >>= 1
-        return result
-
-    # doubling operation
     def double(self):
         """
          2 * P1
+        https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Standard_Projective_Coordinates
+        7M + 5S / 7M + 3S
         """
-        if self.is_inf() or seld.P[ECC.Y] == 0:
+        if self.is_inf() or self.P[ECC.Y] == 0:
             return self
 
-        S = self.P[ECC.Y] * self.P[ECC.Z]  # S = Y * Z
-        S2 = S * S  # S2 = S*S
-        B = self.P[ECC.X] * self.P[ECC.Y] * S  # B = X * Y * S
+        X,Y,Z = self.P
 
-        if ECC.a[self.FIDX] == ECC.three[self.FIDX]:  # W = 3*(X+Z)*(X-Z)
-            W = (self.P[ECC.X] + self.P[ECC.Z]) * \
-                (self.P[ECC.X] - self.P[ECC.Z])
+        a = ECC.a[self.FIDX]
+        one = ECC.one[self.FIDX]
+        two = ECC.two[self.FIDX]
+        three = ECC.three[self.FIDX]
+        four = ECC.four[self.FIDX]
+        eight = ECC.eight[self.FIDX]
 
+        S = Y * Z  # S = Y * Z
+        Ssq = S * S  # Ssq = S*S
+        Scube = Ssq * S  # Scube = S*S*S
+        Ysq = Y * Y
+        B = X * Y * S # B = X * Y * S
+
+        if a == three:  # W = 3*(X+Z)*(X-Z)
+            W = (X + Z) *  (X - Z)
             if self.FIDX == ECC.FEXT:
-                W1 = W << ECC.one[self.FIDX]
+                W1 = W << one
                 W += W1
             else:
-                W = ECC.three[self.FIDX] * W
+                W = three * W
         else:  # W = a*Z^2 + 3*X^2
-            W = ECC.a[ECC_FIDX] * self.P[ECC.Z] * self.P[ECC.Z]
-            X2 = self.P[ECC.X] * self.P[ECC.X]
+            W = a * Z * Z
+            Xsq = X * X
             if self.FIDX == ECC.FEXT:
-                W1 = X2 << ECC.one[self.FIDX]
-                W = W + W1 + X2
+                W1 = Xsq << one
+                W +=  W1 + Xsq
             else:
-                W1 = X2 * ECC.three[self.FIDX]
-                W = W + W1
+                W1 = Xsq * three
+                W += W1
 
         if self.FIDX == ECC.FEXT:
-            H = W * W - B << ECC.three[self.FIDX]  # H = W^2 - 8*B
-            rx = H * S << ECC.one[self.FIDX]  # X' = 2 * H * S
+            H = W * W - (B << three)  # H = W^2 - 8*B
+            rx = H * S << one       # X' = 2 * H * S
             # Y' = W*(4*B-H) - 8*Y^2*S^2
-            ry = W * (B << ECC.two[self.FIDX] - H) - \
-                 self.P[Y] * self.P[Y] * S2 << ECC.three[self.FIDX]
-            rz = S2 * S << ECC.three[self.FIDX]  # Z' =8 * S^3
+            ry = W * ( (B << two) - H) - (Ysq * Ssq << three)
+            rz = Scube << three  # Z' =8 * S^3
         else:
-            H = W * W - B * ECC.eight[self.FIDX]  # H = W^2 - 8*B
-            rx = H * S * ECC.two[self.FIDX]  # X' = 2 * H * S
+            H = W * W - B * eight  # H = W^2 - 8*B
+            rx = H * S * two  # X' = 2 * H * S
             # Y' = W*(4*B-H) - 8*Y^2*S^2
-            ry = W * (B * ECC.eight[self.FIDX] - H) - \
-                 self.P[Y] * self.P[Y] * S2 * ECC.eight[self.FIDX]
-            rz = S2 * S * ECC.eight[self.FIDX]  # Z' =8 * S^3
+            ry = W * (B * four - H) - Ysq * Ssq * eight
+            rz = Scube * eight  # Z' =8 * S^3
 
         return ECCProjective([rx, ry, rz])
 
@@ -654,10 +679,10 @@ class ECCProjective(ECC):
         """
           P1 == P2
         """
-        if not isinstance(P2, ECCProjective):
-            assert True, "Unexpected data type"
-        elif self.is_zero() and P2.is_zero():
+        if self.is_inf() and P2.is_inf():
             return True
+        elif not isinstance(P2, ECCProjective):
+            assert True, "Unexpected data type"
         else:
             return (self.P[ECC.X] * P2.P[ECC.Z], self.P[ECC.Y] * P2.P[ECC.Z]) == \
                    (P2.P[ECC.X] * self.P[ECC.Z], P2.P[ECC.Y] * self.P[ECC.Z])
@@ -668,6 +693,12 @@ class ECCProjective(ECC):
           False otherwis
         """
         return not (self == P2)
+
+    def point_at_inf(self):
+        """"
+          Return point at infinity
+        """
+        return ECCProjective([None, None, None])
 
 
 class ECCJacobian(ECC):
@@ -692,12 +723,13 @@ class ECCJacobian(ECC):
     def to_affine(self):
         """
           Converts point to AFFINE
+          TODO
         """
         pass
 
     def to_jacobian(self):
         """
-          Don't do eanything
+          Don't do anything
         """
         pass
 
@@ -705,6 +737,7 @@ class ECCJacobian(ECC):
         """
           True of point is on curve
           False otherwise
+          TODO
         """
         pass
 
@@ -713,7 +746,7 @@ class ECCJacobian(ECC):
     def __add__(self, P2):
         """
           P1 + P2
-
+          TODO
         """
         pass
 
@@ -721,19 +754,14 @@ class ECCJacobian(ECC):
         """
           P1 - P2
           Check P2 is Projective
+          TODO
         """
         pass
 
     def __neg__(self):
         """
           -P1
-        """
-        pass
-
-    def __mul__(self, alpha):
-        """
-          alpha * P1
-          TODO : pending += for ECC points and >>= for BigInt, SLINDING window
+          TODO
         """
         pass
 
@@ -741,6 +769,7 @@ class ECCJacobian(ECC):
     def double(self):
         """
          2 * P1
+         TODO
         """
         pass
 
@@ -748,6 +777,7 @@ class ECCJacobian(ECC):
     def __eq__(self, P2):
         """
           P1 == P2
+          TODO
         """
         pass
 
@@ -755,5 +785,13 @@ class ECCJacobian(ECC):
         """
           True if points are different
           False otherwis
+          TODO
         """
         pass
+
+    def point_at_inf(self):
+        """"
+          Return point at infinity
+        """
+        return ECCProjective([None, None, None])
+
