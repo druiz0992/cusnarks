@@ -36,24 +36,22 @@
 // ------------------------------------------------------------------
 
 """
-from random import randint
-import unittest
-
 import sys
+import unittest
+from random import randint
+
 sys.path.append('../../src/python')
 
 from bigint import *
 
 
 class BigIntTest(unittest.TestCase):
-
     TEST_ITER = 1000
-    LONG_THR  = 23432043289577921739247892346893264783264382764L
-    INT_THR  = 134
-    BIT_THR  = randint(0,100)
+    LONG_THR = 23432043289577921739247892346893264783264382764L
+    INT_THR = 134
+    BIT_THR = randint(0, 100)
 
     def test_0init(self):
-
 
         ## Init given number as dec string
         a_str = "12345643245354635394758934758937895378957"
@@ -63,7 +61,7 @@ class BigIntTest(unittest.TestCase):
         ## Init given number as hex string
         a_str = "0x23452abc234590aacf67f3"
         a_bn = BigInt(a_str)
-        self.assertTrue(long(a_str,16) == a_bn.as_long())
+        self.assertTrue(long(a_str, 16) == a_bn.as_long())
 
         ## Init given number as int
         a_int = randint(-12332424, 12334545)
@@ -92,8 +90,8 @@ class BigIntTest(unittest.TestCase):
         min_str = "0xabc32546afcda34"
         max_str = "0x123dfabcf464aaccdd3256"
         bn = BigInt(max_str, min_bignum=min_str)
-        self.assertTrue(bn.as_long() <= long(max_str,16))
-        self.assertTrue(bn.as_long() >= long(min_str,16))
+        self.assertTrue(bn.as_long() <= long(max_str, 16))
+        self.assertTrue(bn.as_long() >= long(min_str, 16))
 
         ## Init random number as int
         min_int = 1324242
@@ -115,7 +113,6 @@ class BigIntTest(unittest.TestCase):
         bn = BigInt(max_bn, min_bignum=min_bn)
         self.assertTrue(bn.as_long() <= max_bn.as_long())
         self.assertTrue(bn.as_long() >= min_bn.as_long())
-
 
     def test_1arithmetic(self):
         for i in xrange(BigIntTest.TEST_ITER):
@@ -165,7 +162,7 @@ class BigIntTest(unittest.TestCase):
 
             # pow
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.INT_THR)
+            y_l = randint(0, BigIntTest.INT_THR)
             r_l = x_l ** y_l
 
             x_bn = BigInt(x_l)
@@ -209,13 +206,11 @@ class BigIntTest(unittest.TestCase):
 
             self.assertTrue(r_bn.as_long() == long(r_l))
 
-
-
     def test_2bitwise(self):
         for i in xrange(BigIntTest.TEST_ITER):
             # <<
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.BIT_THR)
+            y_l = randint(0, BigIntTest.BIT_THR)
             r_l = x_l << y_l
 
             x_bn = BigInt(x_l)
@@ -226,7 +221,7 @@ class BigIntTest(unittest.TestCase):
 
             # >>
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.BIT_THR)
+            y_l = randint(0, BigIntTest.BIT_THR)
             r_l = x_l >> y_l
 
             x_bn = BigInt(x_l)
@@ -237,7 +232,7 @@ class BigIntTest(unittest.TestCase):
 
             # &
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.BIT_THR)
+            y_l = randint(0, BigIntTest.BIT_THR)
             r_l = x_l & y_l
 
             x_bn = BigInt(x_l)
@@ -248,7 +243,7 @@ class BigIntTest(unittest.TestCase):
 
             # |
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.BIT_THR)
+            y_l = randint(0, BigIntTest.BIT_THR)
             r_l = x_l | y_l
 
             x_bn = BigInt(x_l)
@@ -259,7 +254,7 @@ class BigIntTest(unittest.TestCase):
 
             # <<= 
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.BIT_THR)
+            y_l = randint(0, BigIntTest.BIT_THR)
             r_l = x_l
             r_l <<= y_l
 
@@ -272,7 +267,7 @@ class BigIntTest(unittest.TestCase):
 
             # >>= 
             x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
-            y_l = randint(0,BigIntTest.BIT_THR)
+            y_l = randint(0, BigIntTest.BIT_THR)
             r_l = x_l
             r_l >>= y_l
 
@@ -286,8 +281,8 @@ class BigIntTest(unittest.TestCase):
     def test_3comparison(self):
         for i in xrange(BigIntTest.TEST_ITER):
             # <
-            x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
-            y_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
+            x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
+            y_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
             r1 = x_l < y_l
 
             x_bn = BigInt(x_l)
@@ -297,8 +292,8 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r1 == r2)
 
             # <=
-            x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
-            y_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
+            x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
+            y_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
             r1 = x_l <= y_l
 
             x_bn = BigInt(x_l)
@@ -308,8 +303,8 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r1 == r2)
 
             # >
-            x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
-            y_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
+            x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
+            y_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
             r1 = x_l > y_l
 
             x_bn = BigInt(x_l)
@@ -319,8 +314,8 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r1 == r2)
 
             # >=
-            x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
-            y_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
+            x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
+            y_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
             r1 = x_l >= y_l
 
             x_bn = BigInt(x_l)
@@ -330,7 +325,7 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r1 == r2)
 
             # ==
-            x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
+            x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
             y_l = x_l + 2
 
             x_bn = BigInt(x_l)
@@ -342,7 +337,7 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r2 == False)
 
             # !=
-            x_l = randint(-BigIntTest.LONG_THR,BigIntTest.LONG_THR)
+            x_l = randint(-BigIntTest.LONG_THR, BigIntTest.LONG_THR)
             y_l = x_l + 2
 
             x_bn = BigInt(x_l)
@@ -354,7 +349,5 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r2 == True)
 
 
-
 if __name__ == "__main__":
     unittest.main()
-

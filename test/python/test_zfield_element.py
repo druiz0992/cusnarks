@@ -50,7 +50,7 @@ class ZFieldElTest(unittest.TestCase):
 
     TEST_ITER = 1000
     INT_THR  = 13423
-    LONG_THR = ZField.FIELD_DATA['BN128']['prime'] * 4
+    LONG_THR = ZUtils.CURVE_DATA['BN128']['prime'] * 4
     FIND_N_PRIMES = 20
     MAX_PRIME = int(1e4)
     SMALL_PRIME_LIST = ZUtils.find_primes(randint(3,MAX_PRIME), MAX_PRIME, cnt=FIND_N_PRIMES)
@@ -119,8 +119,8 @@ class ZFieldElTest(unittest.TestCase):
 
     def test_3conv_large_prime(self):
 
-       prime = ZField.FIELD_DATA['BN128']['prime']
-       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
+       prime = ZUtils.CURVE_DATA['BN128']['prime']
+       ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
        reduction_data = ZField.get_reduction_data()
 
        for i in xrange(ZFieldElTest.TEST_ITER):
@@ -191,19 +191,44 @@ class ZFieldElTest(unittest.TestCase):
             self.assertTrue(y_z.as_long() < prime)
             self.assertTrue(e_z.as_long() < prime)
 
-            # // TODO -> // not implemented for montgomery
-            # TODO does % work for montgomery?
-            if y_z > 0:
-              r_z = x_z // y_z
-              r_z2 = x_z % y_z
+            # * (montgomery * ext)
+            r_zr1 = x_zr * y_zr
+            r_zr2 = x_zr * y_z
+            r_zr3 = x_z * y_zr
 
-              self.assertTrue(x_z.as_long() == ((r_z * y_z + r_z2).as_long()))
+            self.assertTrue(r_zr1 == r_zr2)
+            self.assertTrue(r_zr1 == r_zr3)
+
+
+            # TODO does % work for montgomery?
+            if y_z > 0 and x_z > 0:
+              r_z = x_z / y_z
+              r_z2 = x_z % y_z
+              r_zr = x_zr % y_zr
+
+              self.assertTrue(x_z.as_long() == ((r_z * y_z).as_long()))
+              self.assertTrue(r_z2.as_long() == x_z.as_long() % y_z.as_long() )
+              self.assertTrue(r_zr.as_long() == x_zr.as_long() % y_zr.as_long() )
               self.assertTrue(x_z.as_long() < prime)
               self.assertTrue(y_z.as_long() < prime)
               self.assertTrue(e_z.as_long() < prime)
 
+              # / (montgomery / ext) -> TODO
+              r_zr1 = x_zr / y_zr
+              r_zr2 = x_zr / y_z
+              r_zr3 = x_z / y_zr
+
+              self.assertTrue(r_zr1 == r_zr2)
+              self.assertTrue(r_zr1 == r_zr3)
+
+              # inv -> TODO
+              r_z = x_z.inv()
+              r_zr = x_zr.inv()
+
+              self.assertTrue(r_z.as_long() == r_zr.extend().as_long())
 
             # pow
+            e_l = 2
             r_l = pow(x_l,e_l, prime)
             r_z = x_z ** e_l
             r_zr = x_zr ** e_l
@@ -259,99 +284,154 @@ class ZFieldElTest(unittest.TestCase):
 
     def test_5arithmetic_large_prime(self):
 
-       prime = ZField.FIELD_DATA['BN128']['prime']
-       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
+       prime = ZUtils.CURVE_DATA['BN128']['prime']
+       ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
        for i in xrange(ZFieldElTest.TEST_ITER):
-          # init operands
-          x_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
-          y_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
-          e_l = randint(1, ZFieldElTest.INT_THR)
+            # init operands
+            x_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
+            y_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
+            e_l = randint(1, ZFieldElTest.INT_THR)
             
-          x_z = ZFieldElExt(x_l)
-          y_z = ZFieldElExt(y_l)
-          e_z = ZFieldElExt(e_l)
+            x_z = ZFieldElExt(x_l)
+            y_z = ZFieldElExt(y_l)
+            e_z = ZFieldElExt(e_l)
 
-          x_zr = x_z.reduce()
-          y_zr = y_z.reduce()
-          e_zr = e_z.reduce()
+            x_zr = x_z.reduce()
+            y_zr = y_z.reduce()
+            e_zr = e_z.reduce()
 
-          # +
-          r_l  = (x_l + y_l) % prime
-          r_z  = x_z + y_z
-          r_zr = x_zr + y_zr
-          r2_z  = r_zr.extend()
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
+            # +
+            r_l  = (x_l + y_l) % prime
+            r_z  = x_z + y_z
+            r_zr = x_zr + y_zr
+            r2_z  = r_zr.extend()
 
-          # -
-          r_l = (x_l - y_l) % prime
-          r_z = x_z - y_z
-          r_zr = x_zr - y_zr
-          r2_z  = r_zr.extend()
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
+            # -
+            r_l = (x_l - y_l) % prime
+            r_z = x_z - y_z
+            r_zr = x_zr - y_zr
+            r2_z  = r_zr.extend()
 
-          # *
-          r_l = (x_l * y_l) % prime
-          r_z = x_z * y_z
-          r_zr = x_zr * y_zr
-          r2_z  = r_zr.extend()
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
+            # *
+            r_l = (x_l * y_l) % prime
+            r_z = x_z * y_z
+            r_zr = x_zr * y_zr
+            r2_z  = r_zr.extend()
 
-          # // TODO -> // not implemented for montgomery
-          # TODO does % work for montgomery
-          if y_z > 0:
-            r_z = x_z // y_z
-            r_z2 = x_z % y_z
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
 
-            self.assertTrue(x_z.as_long() == ((r_z * y_z + r_z2).as_long()))
+            # * (montgomery * ext)
+            r_zr1 = x_zr * y_zr
+            r_zr2 = x_zr * y_z
+            r_zr3 = x_z * y_zr
 
-          # pow
-          r_l = pow(x_l,e_l, prime)
-          r_z = x_z ** e_l
-          r_zr = x_zr ** e_l
-          r2_z  = r_zr.extend()
+            self.assertTrue(r_zr1 == r_zr2)
+            self.assertTrue(r_zr1 == r_zr3)
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
 
-          # += 
-          r_l = x_l
-          r_l = (r_l + y_l) % prime
-          r_z = x_z 
-          r_z += y_z 
-          r_zr = x_zr
-          r_zr += y_zr 
-          r2_z  = r_zr.extend()
+            # TODO does % work for montgomery?
+            if y_z > 0 and x_z > 0:
+              r_z = x_z / y_z
+              r_z2 = x_z % y_z
+              r_zr = x_zr % y_zr
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
+              self.assertTrue(x_z.as_long() == ((r_z * y_z).as_long()))
+              self.assertTrue(r_z2.as_long() == x_z.as_long() % y_z.as_long() )
+              self.assertTrue(r_zr.as_long() == x_zr.as_long() % y_zr.as_long() )
+              self.assertTrue(x_z.as_long() < prime)
+              self.assertTrue(y_z.as_long() < prime)
+              self.assertTrue(e_z.as_long() < prime)
 
-          # -= 
-          r_l = x_l
-          r_l = (r_l - y_l) % prime
-          r_z = x_z 
-          r_z -= y_z 
-          r_zr = x_zr
-          r_zr -= y_zr
-          r2_z  = r_zr.extend()
+              # / (montgomery / ext) -> TODO
+              r_zr1 = x_zr / y_zr
+              r_zr2 = x_zr / y_z
+              r_zr3 = x_z / y_zr
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
+              self.assertTrue(r_zr1 == r_zr2)
+              self.assertTrue(r_zr1 == r_zr3)
 
-          # neg
-          r_l = -x_l % prime
-          r_z = -x_z
-          r_zr = -x_zr 
-          r2_z  = r_zr.extend()
+              # inv -> TODO
+              r_z = x_z.inv()
+              r_zr = x_zr.inv()
 
-          self.assertTrue(r_z.as_long() == long(r_l))
-          self.assertTrue(r_z.as_long() == r2_z.as_long())
+              self.assertTrue(r_z.as_long() == r_zr.extend().as_long())
+
+            # pow
+            e_l = 2
+            r_l = pow(x_l,e_l, prime)
+            r_z = x_z ** e_l
+            r_zr = x_zr ** e_l
+            r2_z  = r_zr.extend()
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
+
+            # += 
+            r_l = x_l
+            r_l = (r_l + y_l) % prime
+            r_z = x_z
+            r_z += y_z 
+            r_zr = x_zr
+            r_zr += y_zr 
+            r2_z  = r_zr.extend()
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
+
+            # -= 
+            r_l = x_l
+            r_l = (r_l - y_l) % prime
+            r_z = x_z 
+            r_z -= y_z 
+            r_zr = x_zr
+            r_zr -= y_zr
+            r2_z  = r_zr.extend()
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
+
+            # neg
+            r_l = -x_l % prime
+            r_z = -x_z
+            r_zr = -x_zr 
+            r2_z  = r_zr.extend()
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == r2_z.as_long())
+            self.assertTrue(x_z.as_long() < prime)
+            self.assertTrue(y_z.as_long() < prime)
+            self.assertTrue(e_z.as_long() < prime)
+
 
     def test_6bitwise_small_prime(self):
 
@@ -360,8 +440,8 @@ class ZFieldElTest(unittest.TestCase):
 
           for i in xrange(ZFieldElTest.TEST_ITER):
             # init operands
-            x_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
-            y_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
+            x_l = randint(0, prime-1)
+            y_l = randint(0, prime-1)
             e_l = randint(0, int(math.log(prime,2)))
             
             x_z = ZFieldElExt(x_l)
@@ -373,88 +453,129 @@ class ZFieldElTest(unittest.TestCase):
             e_zr = e_z.reduce()
 
             # <<
-            r_l  = (x_l % prime) << e_l
+            r_l  = (x_l << e_l) % prime
             r_z  = x_z << e_l
             r_zr = x_zr << e_l
 
             self.assertTrue(r_z.as_long() == long(r_l))
-            self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
             # >>
-            r_l  = (x_l % prime) >> e_l
+            r_l  = (x_l >> e_l) % prime
             r_z  = x_z >> e_l
             r_zr = x_zr >> e_l
 
             self.assertTrue(r_z.as_long() == long(r_l))
-            self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
+
+            # <<=
+            r_l  = (x_l << e_l) % prime
+            r_z = x_z
+            r_z  <<= e_l
+            r_zr = x_zr 
+            r_zr <<= e_l
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
+
+            # >>=
+            r_l  = (x_l >> e_l) % prime
+            r_z = x_z
+            r_z  >>= e_l
+            r_zr = x_zr 
+            r_zr >>= e_l
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
             # &
-            r_l  = (x_l % prime) & e_l
+            r_l  = (x_l & e_l) % prime
             r_z  = x_z & e_l
             r_zr = x_zr & e_l
 
             self.assertTrue(r_z.as_long() == long(r_l))
-            self.assertTrue(r_zr.as_long() == (x_zr.as_long() & e_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() & e_l) % prime)
 
             # |
-            r_l  = (x_l % prime) | e_l
+            r_l  = (x_l | e_l) % prime
             r_z  = x_z | e_l
             r_zr = x_zr | e_l
 
             self.assertTrue(r_z.as_long() == long(r_l))
-            self.assertTrue(r_zr.as_long() == (x_zr.as_long() | e_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() | e_l) % prime)
 
     def test_7bitwise_large_prime(self):
 
-       prime = ZField.FIELD_DATA['BN128']['prime']
-       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
+       prime = ZUtils.CURVE_DATA['BN128']['prime']
+       ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
        for i in xrange(ZFieldElTest.TEST_ITER):
-         # init operands
-         x_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
-         y_l = randint(-ZFieldElTest.LONG_THR, ZFieldElTest.LONG_THR)
-         e_l = randint(0, int(math.log(prime,2)))
+            # init operands
+            x_l = randint(0, prime-1)
+            y_l = randint(0, prime-1)
+            e_l = randint(0, int(math.log(prime,2)))
             
-         x_z = ZFieldElExt(x_l)
-         y_z = ZFieldElExt(y_l)
-         e_z = ZFieldElExt(e_l)
+            x_z = ZFieldElExt(x_l)
+            y_z = ZFieldElExt(y_l)
+            e_z = ZFieldElExt(e_l)
 
-         x_zr = x_z.reduce()
-         y_zr = y_z.reduce()
-         e_zr = e_z.reduce()
+            x_zr = x_z.reduce()
+            y_zr = y_z.reduce()
+            e_zr = e_z.reduce()
 
-         # <<
-         r_l  = (x_l % prime) << e_l
-         r_z  = x_z << e_l
-         r_zr = x_zr << e_l
+            # <<
+            r_l  = (x_l << e_l) % prime
+            r_z  = x_z << e_l
+            r_zr = x_zr << e_l
 
-         self.assertTrue(r_z.as_long() == long(r_l))
-         self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l))
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
-         # >>
-         r_l  = (x_l % prime) >> e_l
-         r_z  = x_z >> e_l
-         r_zr = x_zr >> e_l
+            # >>
+            r_l  = (x_l >> e_l) % prime
+            r_z  = x_z >> e_l
+            r_zr = x_zr >> e_l
 
-         self.assertTrue(r_z.as_long() == long(r_l))
-         self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l))
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
-         # &
-         r_l  = (x_l % prime) & e_l
-         r_z  = x_z & e_l
-         r_zr = x_zr & e_l
+            # <<=
+            r_l  = (x_l << e_l) % prime
+            r_z = x_z
+            r_z  <<= e_l
+            r_zr = x_zr 
+            r_zr <<= e_l
 
-         self.assertTrue(r_z.as_long() == long(r_l))
-         self.assertTrue(r_zr.as_long() == (x_zr.as_long() & e_l))
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
-         # |
-         r_l  = (x_l % prime) | e_l
-         r_z  = x_z | e_l
-         r_zr = x_zr | e_l
+            # >>=
+            r_l  = (x_l >> e_l) % prime
+            r_z = x_z
+            r_z  >>= e_l
+            r_zr = x_zr 
+            r_zr >>= e_l
 
-         self.assertTrue(r_z.as_long() == long(r_l))
-         self.assertTrue(r_zr.as_long() == (x_zr.as_long() | e_l))
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
+            # &
+            r_l  = (x_l & e_l) % prime
+            r_z  = x_z & e_l
+            r_zr = x_zr & e_l
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() & e_l) % prime)
+
+            # |
+            r_l  = (x_l | e_l) % prime
+            r_z  = x_z | e_l
+            r_zr = x_zr | e_l
+
+            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_zr.as_long() == (x_zr.as_long() | e_l) % prime)
+
+ 
     def test_8comparison_small_prime(self):
 
         for prime in ZFieldElTest.SMALL_PRIME_LIST:
@@ -547,8 +668,8 @@ class ZFieldElTest(unittest.TestCase):
             self.assertTrue(r_z == False)
 
     def test_9comparison_large_prime(self):
-       prime = ZField.FIELD_DATA['BN128']['prime']
-       ZField(prime, ZField.FIELD_DATA['BN128']['field'])
+       prime = ZUtils.CURVE_DATA['BN128']['prime']
+       ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
        for i in xrange(ZFieldElTest.TEST_ITER):
            # init operands
