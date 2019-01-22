@@ -48,35 +48,59 @@
 import math
 from zfield import ZField
 
-class ZPoly:
-   def __init__(self,degree):
+class ZPoly(object):
+   FEXT = 0
+   FRDC = 1
+
+
+   def __init__(self,p):
       if not ZField.is_init():
         assert True, "Prime field not initialized"
+      elif isinstance(p,int) or isinstance(p,long):
+        self.degree = p;
+        prime = ZField.get_extended_p()
+        self.zcoeff = [ZFieldElExt(random.randint(0,prime-1)) for x in xrange(p+1)]
+        self.FIDX = ZPoly.FEXT
+      elif type(p) is list:
+        self.degree = len(p)
+        if isinstance(zcoeff,ZfieldElExt):
+            self.zcoeff = p.get_coeff()
+            self.FIDX = ZPoly.FEXT
+        elif isinstance(zcoeff, ZFieldElRedc):
+            self.zcoeff = p.get_coeff()
+            self.FIDX = ZPoly.FRDC
+        elif isinstance(p,int) or isinstance(p,long) or isinstance(p, BigInt):
+            self.zcoeff = [ZFieldElExt(c) for t in p]
+            self.FIDX = ZPoly.FEXT
+        else:
+           assert True, "Unexpected data type"
+      elif isinstance(p, ZPoly)
+         self.degree = p.get_degree()
+         sel.zcoeff  = p.get_coeff()
+         if isinstance(p,ZFieldElExt): 
+            self.FIDX = ZPoly.FEXT
+         else:
+            self.FIDX = ZPoly.FRDC
+      else:
+         assert True, "Unexpected data type"
 
-      self.degree = degree;
-      prime = ZField.get_extended()
-      self.zcoeff = [ZFieldEl(random.randint(0,prime)) for x in xrange(degree+1)]
+    def get_degree(self):
+       return self.degree
 
-   def __init__(self,coeffs):
-      if not ZField.is_init():
-        assert True, "Prime field not initialized"
-      elif type(coeffs) is not list:
-        assert True, "Coefficients need to be a list"
+    def get_coeff(self):
+       return self.zcoeff
 
-      self.degree = degree;
-      self.zcoeff = [ZFieldEl(coeffs[x]) for x in xrange(degree+1)]
+    def extend(self):
+       if self.FIDX = ECC.FRDC
+          return ZPoly([c.extend() for c in self.get_coeff()])
+       else:
+          return self
 
-   def __init__(self,zpoly):
-      if not ZField.is_init():
-        assert True, "Prime field not initialized"
-      elif not isinstance(ZPoly,zpoly):
-        assert True, "Argument needs to be of type ZPoly"
-
-      self.degree = zpoly.degree;
-      self.zcoeff = [ZFieldEl(zpoly[x]) for x in xrange(degree+1)]
-   
-    def deg(self):
-       return this.degree
+    def reduce(self):
+       if self.FIDX = ECC.FEXT
+          return ZPoly([c.reduce() for c in self.get_coeff()])
+       else:
+          return self
 
     def scale(self, n):
       """
@@ -102,13 +126,13 @@ class ZPoly:
          return ZPoly([p * a.get() for p in self.zcoeff])
 
        elif isinstance(ZPoly,a):
-         d = self.deg() + a.deg()
+         d = self.get_degree() + a.get_degree()
          d2 = int(math.ceil(math.log(d,2))
          
          p1 = ZPoly(self)
-         p1.extend(d2)
+         p1.add_coeff(d2)
          p2 = ZPoly(a)
-         p2.extend(d2)
+         p2.add_coeff(d2)
         
          roots, inv_roots = ZField.get_roots()
 
@@ -176,7 +200,7 @@ class ZPoly:
       scaler = ZField.inv(len(powtable), Zfield.get_extended())
       self = self * scaler
  
-    def extend(self,d):
+    def add_coeff(self,d):
       """
        Extend list ``p`` representing a polynomial ``p(x)`` to
         match polynomials of degree ``d-1``.
@@ -194,9 +218,9 @@ class ZPoly:
       p1 = ZPoly(self)
       p2 = ZPoly(v)
 
-      d = max(p1.deg(), p2.deg())
-      p1.extend(d)
-      p2.extend(d)
+      d = max(p1.get_degree(), p2.get_degree())
+      p1.add_coeff(d)
+      p2.add_coeff(d)
 
       p1 = ZPoly([p1.zcoeff[i] + p2.zcoeff[i] for i in xrange(d+1)])
 
@@ -212,9 +236,9 @@ class ZPoly:
       p1 = ZPoly(self)
       p2 = ZPoly(v)
 
-      d = max(p1.deg(), p2.deg())
-      p1.extend(d)
-      p2.extend(d)
+      d = max(p1.get_degree(), p2.get_degree())
+      p1.add_coeff(d)
+      p2.add_coeff(d)
 
       p1 = ZPoly([p1.zcoeff[i] - p2.zcoeff[i] for i in xrange(d+1)])
 
@@ -225,7 +249,7 @@ class ZPoly:
        Calculate the reciprocal of polynomial ``p(x)`` with degree ``k-1``,
        defined as: ``x^(2k-2) / p(x)``, where ``k`` is a power of 2.
       """
-     k = self.deg() + 1
+     k = self.get_degree() + 1
      assert k>0 and self.zcoeff[-1] != 0 and 2**round(math.log(k,2)) == k
 
      if k == 1:
@@ -251,8 +275,8 @@ class ZPoly:
       if not isinstance(ZPoly,v):
         assert True, "Unexpected data type"
 
-      m = self.deg()
-      n = v.deg()
+      m = self.get_degree()
+      n = v.get_degree()
       
       if m < n
         return ZPoly([0])
