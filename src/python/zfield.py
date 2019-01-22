@@ -860,7 +860,7 @@ class ZFieldElExt(ZFieldEl):
         elif isinstance(x, BigInt):
             return ZFieldElExt((self.bignum * x.as_long()))
         else:
-            assert True, "Invalid type"
+            return x * self
 
     def __rmul__(self, x):
         return self * x
@@ -901,7 +901,7 @@ class ZFieldElExt(ZFieldEl):
 
 class ZFieldElRedc(ZFieldEl):
 
-    def __init__(self, bignum):
+    def __init__(self, bignum, convert=False):
         """
          Constructor
 
@@ -955,7 +955,7 @@ class ZFieldElRedc(ZFieldEl):
             # standard multiplication
             return ZFieldElRedc((self.bignum * x) )
         else:
-            assert True, "Invalid type"
+            return x * self
 
         mod = ZField.get_extended_p().as_long()
         reduction_data = ZField.get_reduction_data()
