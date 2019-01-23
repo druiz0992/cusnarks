@@ -806,6 +806,31 @@ class ZFieldEl(BigInt):
         else:
             return ZFieldElRedc(newZ)
 
+    @classmethod
+    def as_zel(self,l):
+       if type(l) is list:
+           if isinstance(l[0],ZfieldElExt) or isinstance(l[0],ZfieldElRedc):
+              return l
+           elif isinstance(l[0],int) or isinstance(l[0],long) or isinstance(l[0], BigInt):
+              return [ZFieldElExt(t) for t in l]
+           else:
+              assert True, "Unexpected type"
+       elif type(l) is dict:
+           if isinstance(l.keys()[0],ZfieldElExt) or isinstance(l.keys()[0],ZfieldElRedc):
+              return l
+           elif isinstance(l.keys[0],int) or isinstance(l.keys()[0],long) or \
+                  isinstance(l.keys[0], BigInt):
+              return {i : ZFieldElExt(p[i]) for i in p.keys()}
+           else:
+              assert True, "Unexpected type"
+       elif isinstance(l,ZfieldElExt) or isinstance(l,ZfieldElRedc):
+           return l
+       elif isinstance(l,int) or isinstance(l,long) or isinstance(l, BigInt):
+           return ZFieldElExt(l)
+       else:
+            assert True, "Unexpected type"
+            
+         
 
 class ZFieldElExt(ZFieldEl):
 
