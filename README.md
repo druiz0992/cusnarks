@@ -6,12 +6,12 @@ CUDA implementation of SNARKs proof Groth protocol (based on https://github.com/
 Implementation of the protocol in Python. Required modules:
 * Big Integer Library : Done
 * Finite Field Library : Done
-** Montgomery reduction
+  - Montgomery reduction
 * Elliptical Curve : Done
-** Points can be defined in Affine, Projective or Jacobian coordinates : Pending Jacobian implementation, but left for next stage once we can evaluate performance
-** Finite field elements can be defined in default or Montfomery format : Done
+  - Points can be defined in Affine, Projective or Jacobian coordinates : Pending Jacobian implementation, but left for next stage once we can evaluate performance
+  - Finite field elements can be defined in default or Montfomery format : Done
 * Poly : Ongoing
-** Arithmetic written, pending sparse polys, tests ongoing.
+  - Arithmetic written, pending sparse polys, tests ongoing.
 * Groth protocol : Pending
 
 ### TODO
@@ -25,9 +25,9 @@ Implementation of the protocol in Python. Required modules:
   amounts of data
 
 ### Requirements 
-* Pthon (Tested with Python 2.7)
-**  numpy
-* Cython : Cython will be used to build wrappers of C++/CUDA functions callable from Python modules
+* python (Tested with Python 2.7)
+  - numpy
+* cython : Cython will be used to build wrappers of C++/CUDA functions callable from Python modules
 * c++/gcc
 * CUDA toolkit
 
@@ -36,8 +36,8 @@ Implementation of the protocol in Python. Required modules:
 * data\     : Auxiliary files
 * lib\      : Generated dynamic libraries
 * src\
-**  c \     : C/C++ sources (.cpp, .c, .cu)
-**  include : Header files (.h)
-**  c-wrappers : Cython files (.pyx, .pxd)
+  - c \     : C/C++ sources (.cpp, .c, .cu)
+  - include : Header files (.h)
+  - c-wrappers : Cython files (.pyx, .pxd)
 * test  \
-**  python \ : Test source files (written in python)
+  - python \ : Test source files (written in python)
