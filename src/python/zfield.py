@@ -115,8 +115,6 @@ from zutils import *
 class ZField(object):
     PRIME_THR = long(1e10)
 
-    PREDEFINED_FIELDS = ['BN128', 'P1009']
-
     init_prime = False  # Flag : Is prime initialized
     ext_prime = None  # Field prime
     redc_prime = None  # Field Prime (montgomery reduced)
@@ -325,6 +323,9 @@ class ZField(object):
         """
           Computes and returns nroots of unity. If find_inv_roots is True, inverse roots are
             also computed
+
+            TODO : roots are [1, r1, r2, r3,..., rn-1], inv_roots = [1,rn-1, rn-2,... r2, r1].
+             So, it is not necessary to store both versions. We can just store half
         """
         if not ZField.is_init():
             assert True, "Prime not initialized"
