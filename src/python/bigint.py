@@ -148,6 +148,8 @@ class BigInt(object):
             return BigInt(self.bignum - x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             return BigInt(self.bignum - x)
+        else:
+            assert True, "Invalid type"
 
     def __mul__(self, x):
         """
@@ -157,6 +159,8 @@ class BigInt(object):
             return BigInt(self.bignum * x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             return BigInt(self.bignum * x)
+        else :
+            return x * self
 
     def __pow__(self, x):
         """
