@@ -20,8 +20,7 @@
 
 # NOTES:
 
-# Montgomery reduction algorithm (Python) based from Project Nayuki 
-# Number-theoretic transform and factorization code based in Project Nayuki
+# Number-theoretic transform code based in Project Nayuki
 # 
 # Copyright (c) 2018 Project Nayuki
 # All rights reserved. Contact Nayuki for licensing.
@@ -30,6 +29,8 @@
 # Based some additional code from snipets at
 #    https://stackoverflow.com/questions/44770632/fft-division-for-fast-polynomial-division
 #
+# Based some additional code from snipets at
+#           https://github.com/iden3/iden3js
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
@@ -40,8 +41,16 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Implements polynomial functionality whose coefficiens below to a finite field
+//  Implements polynomial functionality whose coefficiens below to a finite field. A 
+//  polynomial p(x) is defined as a0 + a1 * X + a2 * x^2 + ... + an_1 * X^n-1a.
 //
+//  There are two poly representations defined in two different classes
+//   Dense -> class ZPoly(object)        : Poly with all coeffs defined in a list
+//   Sparse -> class ZPolySparse(ZPoly)  : Poly with coeffs defined in dictionary. 
+//
+//  TODO : Check if i need reverse operation in ntt. Maybe I can live without reversing in NTT/INTT
+//  TODO : After every operation (poly mul. scalar mul, add , sub, << include normalization to remove unwanted
+//            coeffs
 // ------------------------------------------------------------------
 
 """
@@ -52,24 +61,57 @@ from zfield import *
 
 
 class ZPoly(object):
-    FEXT = 0
-    FRDC = 1
-
+    # beyond this degree, poly mul is done with FFT
     FFT_MUL_THRES = 128
 
+    one = [None, None]
+    two = [None, None]
 
-    def __init__(self, p):
+    init = False
+
+
+    def __init__(self, p, force_init=False):
+        """
+          ZPoly Constructor. A ZPoly p(x) is defined as p(x) = a0 + a1*x + a2*x^2 + ... + an_1 * x^n_1.
+             Polynomial coefficients a0, a1,.., an_1 belong to a pre defined Finite Field. Polynomial member variables are:
+            - degree : Polynomial degree. 
+            - zcoeff : Coefficients stored in a list as [a0, a1,.., an-1] or in a dic with coeffs as {'0' : a0, '1': a1,..,'n_1':an_1}
+            - FIDX   : coefficients format. ZPoly FEXT -> default / ZPoly/FRDC -> Montgomery reduced
+
+          NOTE : Requires ZField to be initialized
+
+          Arguments:
+          ------------
+           Single input argument with different meanings depending on type.
+           
+           - int/long/BigInt (Extended) : Polynomial degree. It needs to be positive. A poly of these degree is initialized with
+               randomp coefficients. Highest degree coefficient is always nonzero. 
+
+           - list of int/long/BigInt/ZFieldEl : Array with coefficients.
+
+           - dictionary : Keys are strings with coefficients as string. Values are int/long/BigInt/ZFieldEl indicating coefficients.
+              ext: p = {'1' : 45, '23':54} creates poly p(x) = 45*x + 54*x^23
+
+           - ZPoly : New Poly is copied
+        """
+        if force_init:
+            ZPoly.init = False
+
         if not ZField.is_init():
             assert True, "Prime field not initialized"
-        elif isinstance(p, int) or isinstance(p, long):
+        elif isinstance(p, int) or isinstance(p, long) or isinstance(p, BigInt):
             if p < 0:
                 assert True, "Polynomial needs to be at least degree 0"
             else:
                 self.degree = p;
                 prime = ZField.get_extended_p()
                 self.zcoeff = [ZFieldElExt(randint(0, prime.as_long() - 1)) for x in xrange(p + 1)]
-                self.FIDX = ZPoly.FEXT
-        elif type(p) is list or type(p) is dict:
+                self.zcoeff[-1] = ZFieldElExt(randint(1, prime.as_long() - 1))
+                self.FIDX = ZUtils.FEXT
+        elif type(p) is list and isinstance(self, ZPolySparse) :
+            assert True, "Unexpected data type"
+        #elif type(p) is list or type(p) is dict:
+        elif type(p) is list or isinstance(self, ZPolySparse):
             self.zcoeff, self.degree, self.FIDX = ZPoly.set_properties(p)
         elif isinstance(p, ZPoly):
             self.degree = p.get_degree()
@@ -78,19 +120,31 @@ class ZPoly(object):
         else:
             assert True, "Unexpected data type"
 
+        if ZPoly.init == False:
+            ZPoly.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
+            ZPoly.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
+            ZPoly.init = True
+
     @classmethod
     def set_properties(cls, p):
+        """
+         Retrieve poly properties coeff, degree and FIDX from list/dictionaty with coefficients.
+
+         p : List/Dict with coefficients
+
+        return zcoeff, degree, FIDX
+        """
         if type(p) is list:
             degree = len(p) - 1
             if isinstance(p[0], ZFieldElExt):
                 zcoeff = p
-                FIDX = ZPoly.FEXT
+                FIDX = ZUtils.FEXT
             elif isinstance(p[0], ZFieldElRedc):
                 zcoeff = p
-                FIDX = ZPoly.FRDC
+                FIDX = ZUtils.FRDC
             elif isinstance(p[0], int) or isinstance(p[0], long) or isinstance(p[0], BigInt):
                 zcoeff = [ZFieldElExt(t) for t in p]
-                FIDX = ZPoly.FEXT
+                FIDX = ZUtils.FEXT
             else:
                 assert True, "Unexpected data type"
         elif type(p) is dict:
@@ -99,13 +153,13 @@ class ZPoly(object):
             d_k = str(degree)
             if isinstance(p[d_k], ZFieldElExt):
                 zcoeff = p
-                FIDX = ZPoly.FEXT
+                FIDX = ZUtils.FEXT
             elif isinstance(p[d_k], ZFieldElRedc):
                 zcoeff = p
-                FIDX = ZPoly.FRDC
+                FIDX = ZUtils.FRDC
             elif isinstance(p[d_k], int) or isinstance(p[d_k], long) or isinstance(p[d_k], BigInt):
                 zcoeff = {i: ZFieldElExt(p[i]) for i in p.keys()}
-                FIDX = ZPoly.FEXT
+                FIDX = ZUtils.FEXT
             elif isinstance(p, ZPoly):
                 zcoeff = p.get_coeff()
                 degree = p.get_degree()
@@ -116,46 +170,69 @@ class ZPoly(object):
         return zcoeff, degree, FIDX
 
     def get_properties(self):
+        """
+          Returns poly properties zcoeff (as list), degree, FIDX
+        """
         if type(self.get_coeff()) is list:
             return self.zcoeff, self.degree, self.FIDX
         else:
-            return ZPoly.dict_to_list(self.zcoeff), self.degree, self.FIDX
+            return self.dict_to_list(), self.degree, self.FIDX
 
-    @classmethod
-    def dict_to_list(cls, d):
-        c = sorted([long(k) for k in d.keys()])
-        if isinstance(d[str(c[0])], ZFieldElRedc):
-            l = np.asarray([ZFieldElRedc(0)] * (c[-1] + 1))
-        else:
-            l = np.asarray([ZFieldElExt(0)] * (c[-1] + 1))
+    def dict_to_list(self):
+        """
+          Returns dictionary of coeffs to list of coeffs.
+        """
 
-        l[c] = [d[str(k)] for k in c]
+        c = sorted([long(k) for k in self.zcoeff.keys()])
+        l = np.asarray(self.zero().get_coeff() * (c[-1] + 1))
+        l[c] = [self.zcoeff[str(k)] for k in c]
 
         return list(l)
 
-    def to_sparse(self):
-        pass
-
     def to_dense(self):
-        pass
+        """
+          Do nothing
+        """
+        return self
+
+    def to_sparse(self):
+        """
+          Return sparse representation of dense poly. 
+
+          TODO : implement to_sparse
+        """
+        assert True, "Operation not supported"
+
 
     def get_degree(self):
+        """
+          Get poly degree
+        """
         return self.degree
 
     def get_coeff(self):
+        """
+          Get poly coeffs as list or dict
+        """
         if type(self.zcoeff) == list:
             return list(self.zcoeff)
         else :
             return dict(self.zcoeff)
 
     def extend(self):
-        if self.FIDX == ZPoly.FRDC:
+        """
+          Convert poly coeffs from REDC to EXT 
+        """
+        if self.FIDX == ZUtils.FRDC:
             return ZPoly([c.extend() for c in self.get_coeff()])
         else:
             return self
 
     def reduce(self):
-        if self.FIDX == ZPoly.FEXT:
+        """
+          Convert poly coeffs from EXT to REDC
+        """
+        if self.FIDX == ZUtils.FEXT:
             return ZPoly([c.reduce() for c in self.get_coeff()])
         else:
             return self
@@ -163,6 +240,8 @@ class ZPoly(object):
     def norm(self):
         """
         Normalize poly to have a non zero most significant coefficient
+
+         NOTE   https://stackoverflow.com/questions/44770632/fft-division-for-fast-polynomial-division
         """
         coeff = self.get_coeff()
 
@@ -173,10 +252,7 @@ class ZPoly(object):
             if c != 0:
                 return ZPoly(coeff[:-i])
 
-        if self.FIDX == ZPoly.FEXT:
-          return ZPoly([ZFieldElExt(0)])
-        else:
-          return ZPoly([ZFieldElRedc(0)])
+        return self.zero()
 
     def poly_mul(self, p2):
         """
@@ -217,23 +293,38 @@ class ZPoly(object):
 
         else:
             self.poly_mul_fft(p2)
-
+        
         return       
         
     def poly_mul_normal(self, p2):
-         p1 = [c.as_long() for c in self.get_coeff()]
-         p2 = [c.as_long() for c in p2.get_coeff()]
-         p1 = np.polymul(p1[::-1], p2[::-1])
-         if self.FIDX == ZPoly.FEXT:
-            self.zcoeff = [ZFieldElExt(c) for c in p1[::-1]]
+         """
+          Normal poly implementation O(n^2)
+
+         """
+         if self.FIDX == ZUtils.FEXT:
+             pa = self
+             pb = p2
          else:
-            self.zcoeff = [ZFieldElRedc(c) for c in p1[::-1]]
+             pa = self.extend()
+             pb = p2.extend()
+
+         p1 = [c.as_long() for c in pa.get_coeff()]
+         p2 = [c.as_long() for c in pb.get_coeff()]
+         p1 = np.polymul(p1, p2)
+
+         if self.FIDX == ZUtils.FEXT:
+            self.zcoeff = [ZFieldElExt(c) for c in p1]
+         else:
+            self.zcoeff = [ZFieldElExt(c).reduce() for c in p1]
 
          self.degree = len(self.zcoeff) - 1
 
          return
 
     def poly_square(self):
+        """
+          Multiply poly by itself 
+        """
         roots, inv_roots = ZField.get_roots()
 
         d1 = self.get_degree()
@@ -242,16 +333,19 @@ class ZPoly(object):
 
         # Recompute roots in case nroots changed or format.
         if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
-            roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZPoly.FEXT)
+            roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
         self.expand_to_degree(dt, self)
-        self.ntt(roots[:dt/2 + 1])
+        self._ntt(roots[:dt/2 + 1])
         for i in xrange(dt+1):
            self.zcoeff[i] = self.zcoeff[i] ** 2
 
-        self.intt(inv_roots[:dt/2 + 1])
+        self._intt(inv_roots[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
 
-    def poly_mul_fft(self, p2): 
+    def poly_mul_fft(self, p2, skip_fft=False): 
+        """
+          Multiply poly using FFT
+        """
 
         roots, inv_roots = ZField.get_roots()
 
@@ -262,38 +356,67 @@ class ZPoly(object):
 
         # Recompute roots in case nroots changed or format.
         if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
-            roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZPoly.FEXT)
+            roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
         p2.expand_to_degree(dt, p2)
-        self.ntt(roots[:dt/2 + 1])
-        p2.ntt(roots[:dt/2 + 1])
+
+        if not skip_fft:
+           self._ntt(roots[:dt/2 + 1])
+           p2._ntt(roots[:dt/2 + 1])
+
         for i in xrange(dt+1):
            self.zcoeff[i] *= p2.zcoeff[i]
 
-        self.intt(inv_roots[:dt/2 + 1])
+        self._intt(inv_roots[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
 
-    def __rmul__(self, a):
+    def ntt(self): 
         """
-         Multiply scalar with polynomial ``p(x)``
+          FFT
         """
-        return self * a
+        roots,_ = ZField.get_roots()
 
-    def __mul__(self, a):
-        """
-         Multiply polynomial ``p(x)`` with scalar (constant) ``a``.
-        """
-        if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
-            return ZPoly([p * a for p in self.zcoeff])
-        else:
-            assert True, "Unexpected data type"
+        d1 = self.get_degree()
+        dtp = d1
+        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
-    def ntt(self, powtable):
+        # Recompute roots in case nroots changed or format.
+        if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
+            roots, _ = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+
+        self.expand_to_degree(dt, self)
+
+        self._ntt(roots[:dt/2 + 1])
+
+    def intt(self): 
+        """
+          IFFT
+        """
+
+        _,inv_roots = ZField.get_roots()
+
+        d1 = self.get_degree()
+        dtp = d1
+        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+
+        # Recompute roots in case nroots changed or format.
+        if len(inv_roots) != dt or not isinstance(inv_roots[0],type(self.zcoeff[0])):
+            _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+
+        self.expand_to_degree(dt, self)
+        self._intt(inv_roots[:dt/2 + 1])
+
+    def _ntt(self, powtable):
         """
          Computes the forward number-theoretic transform of the given vector in place,
          with respect to the given primitive nth root of unity under the given modulus.
          The length of the vector must be a power of 2.
+
+         Powtable is table with nth root roots of unity where n is the number of points in NTT
+         Only N/2 roots of unity are needed
+
+         NOTE https://www.nayuki.io/page/number-theoretic-transform-integer-dft
         """
         vector = self.zcoeff
         n = len(vector)
@@ -325,162 +448,36 @@ class ZPoly(object):
                     right = vector[l] * powtable[k]
                     vector[j] = left + right
                     vector[l] = left - right
-                    # print size, i, j, l, hex(mod), hex(powtable[k]), hex(vector[j]), hex(vector[l])
                     k += tablestep
             size *= 2
 
-    def intt(self, powtable):
+    def _intt(self, powtable):
         """
          Computes the inverse number-theoretic transform of the given vector in place,
          with respect to the given primitive nth root of unity under the given modulus.
          The length of the vector must be a power of 2.
+
+         Powtable is table with nth root roots of unity where n is the number of points in NTT
+         Only N/2 roots of unity are needed
         """
-        self.ntt(powtable)
+        self._ntt(powtable)
         nroots = ZFieldElExt(len(powtable)*2)
-        if self.FIDX == ZPoly.FEXT:
+        if self.FIDX == ZUtils.FEXT:
            scaler = nroots.inv()
         else:
            scaler = nroots.inv().reduce()
 
         self.zcoeff = [c * scaler for c in self.get_coeff()]
 
-    def expand_to_degree(self, d, ret=None):
-        """
-         Extend list ``p`` representing a polynomial ``p(x)`` to
-          match polynomials of degree ``d-1``.
-        """
-        if ret is not None:
-            newP = ret
-        else:
-            newP = ZPoly(0)
-        
-        if d >= self.get_degree() :
-            if self.FIDX == ZPoly.FEXT:
-                newP.zcoeff = self.get_coeff() + [ZFieldElExt(0)] * (d - self.get_degree())
-            else:
-                newP.zcoeff = self.get_coeff() + [ZFieldElRedc(0)] * (d - self.get_degree())
-                newP.FIDX = ZPoly.FRDC
-        else:
-            newP.zcoeff = self.get_coeff()[:d+1]
-
-        newP.degree = len(newP.zcoeff)-1
-
-        return newP
-
-    def scale(self, d, ret=None):
-        """
-         Extend list ``p`` representing a polynomial ``p(x)`` to
-          match polynomials of degree ``d-1``.
-        """
-        if ret is not None:
-            newP = ret
-        else:
-            newP = ZPoly(0)
-        
-        if d >= 0:
-            if self.FIDX == ZPoly.FEXT:
-                newP.zcoeff = [ZFieldElExt(0)] * d + self.get_coeff()
-            else:
-                newP.zcoeff = [ZFieldElRedc(0)] * d + self.get_coeff()
-                newP.FIDX = ZPoly.FRDC
-        else:
-            newP.zcoeff = self.get_coeff()[-d:]
-
-        newP.FIDX =   self.FIDX
-        newP.degree = len(newP.zcoeff)-1
-
-        return newP
-
-    def __add__(self, v):
-        """
-          Add polynomials ``u(x)`` and ``v(x)``.
-        """
-        if not isinstance(v, ZPoly):
-            assert True, "Unexpected data type"
-
-        min_d = min(self.get_degree(), v.get_degree())
-        if self.get_degree() >= v.get_degree():
-            new_p = ZPoly(self.get_coeff())
-        else:
-            new_p = ZPoly(v)
-
-        c1 = self.get_coeff()
-        c2 = v.get_coeff()
-
-        new_p.zcoeff[:min_d+1] = [c1[i] + c2[i] for i in xrange(min_d + 1)]
-
-        return new_p
-
-    def __sub__(self, v):
-        """
-          Sub polynomials ``u(x)`` and ``v(x)``.
-        """
-        return self + (-v)
-
-    def __neg__(self):
-        """
-          Negate polynomial coeffs
-        """
-        new_p = ZPoly(self)
-        new_p_coeff = new_p.get_coeff()
-        new_p.zcoeff = [-c for c in new_p_coeff]
-
-        return new_p
-
-    def zero(self):
-        """
-          return 0 poly
-        """
-        if self.FIDX == self.FEXT:
-            return ZPoly([ZFieldElExt(0)])
-        else:
-            return ZPoly([ZFieldElRedc(0)])
-    def inv(self):
-        """
-         Calculate the reciprocal of polynomial ``p(x)`` with degree ``k-1``,
-         defined as: ``x^(2k-2) / p(x)``, where ``k`` is a power of 2.
-        # TODO : implement double when multiplying by 2
-        # TODO : Montgomery inversion doesn't work
-        """
-        k = self.get_degree() + 1
-        assert k > 0 and self.zcoeff[-1] != 0 and 2 ** round(math.log(k, 2)) == k
-
-        if k == 1:
-            return ZPoly([self.zcoeff[0].inv()])
-
-        npa = self.scale(-k/2)
-        q = npa.inv()
-        # TODO : implement double when multiplying by 2. shift, and store 2 as reduced
-        if self.FIDX == ZPoly.FEXT:
-           a = (q * 2).scale(3*k/2-2)
-        else :
-           a = ( q * ZFieldElRedc(2)).scale(3*k/2-2)
-        q.poly_mul(q)
-        b = ZPoly(self)
-        b.poly_mul(q)
-
-        r = a - b 
-        r.scale(-k + 2, r)
-
-        return r
-
-    def show(self):
-       if type(self.get_coeff()) is list:
-          print [c.as_long() for c in self.get_coeff()]
-       else :
-          l =  ZPoly.dict_to_list(self.zcoeff)
-          print [c.as_long() for c in l]
-
     def poly_div(self, v):
         """
           Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
           m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
           as ``n``.
-          TODO if degree of u(x) > 2 * degree v(x), function doesn't work!!
-          TODO optimize. There are far too many copies in this function and in multiplication
-          TODO : Montgomery division doesn't work
-          TODO : Two version of division. Keep 1
-      
+
+           NOTE https://github.com/iden3/iden3js
+
+           TODO optimize. There are far too many copies in this function and in multiplication
         """
         if not isinstance(v, ZPoly):
             assert True, "Unexpected data type"
@@ -507,7 +504,7 @@ class ZPoly(object):
             ve_copy = ZPoly(ve)
             s_copy = ZPoly(s)
             s_copy.poly_mul(ve_copy)
-            t = ZPoly([1]).scale( 2 * ne) - s_copy
+            t = ZPoly([ZPoly.one[self.FIDX]]).scale( 2 * ne) - s_copy
 
         q = self.zero()
         rem = ZPoly(ue)
@@ -524,173 +521,325 @@ class ZPoly(object):
                 t_copy = ZPoly(t)
                 rem.poly_mul(t_copy)
                 rem = rem.scale(-2*ne)
-                #s_copy = ZPoly(s)
-                #rem.poly_mul(s_copy)
-                #rem.scale(-2*ne)
-                me = rem.get_degree()- ne
+                me = rem.get_degree()
             else:
                 done = True
 
-            rem = ZPoly(us)
-
-
         return q
-
-    def poly_div2(self, v):
-        """
-          Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
-          m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
-          as ``n``.
-        """
-        if not isinstance(v, ZPoly):
-            assert True, "Unexpected data type"
-
-        m = self.get_degree()
-        n = v.get_degree()
-
-        if m < n:
-            return self.zero()
-
-        # ensure deg(v) is one less than some power of 2
-        # by extending v -> ve, u -> ue (mult by x^nd)
-        nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
-        ue = self.scale(nd)
-        ve = v.scale(nd)
-        me = m + nd
-        ne = n + nd
-
-        s = ve.inv()
-
-        q = ZPoly(ue)
-        s_copy = ZPoly(s)
-        q.poly_mul(s_copy)
-        q = q.scale(-2 * ne)
-
-        # handle the case when m>2n
-        if me > 2 * ne:
-            # t = x^2n - s*v
-            ve_copy = ZPoly(ve)
-            s.poly_mul(ve_copy)
-            t = ZPoly([1]).scale( 2 * ne) - s
-            t.poly_mul(ue)
-            t.scale(-2 * ne,t)
-            #q2,r2 = t.poly_div(ve)
-            q2 = t.poly_div(ve)
-            q = q + q2
-
-            # remainder, r = u - v*q
-        #r = ZPoly(v)
-        #r.poly_mul(q)
-        #r = self - r
-        #return q, r
-
-        return q
-
-
-class ZPolySparse(ZPoly):
-    def __init__(self, p):
-        ZPoly.__init__(p)
-
-    def extend(self):
-        if self.FIDX == ZPoly.FRDC:
-            return ZPoly([c.extend() for c in self.get_coeff()])
-        else:
-            return self
-
-    def reduce(self):
-        pass
-
-    def to_sparse(self):
-        pass
-
-    def to_dense(self):
-        pass
-
-    def scale(self, n):
-        """
-         Multiply polynomial ``p(x)`` with ``x^n``.
-          If n is negative, poly ``p(x)`` is divided with ``x^n``, and remainder is
-         discarded (truncated division).
-        """
-        pass
-
-    def __mul__(self, a):
-        """
-         Multiply polynomial ``p(x)`` with scalar (constant) ``a``.
-        """
-        pass
-
-    def norm(self):
-        """
-        Normalize poly to have a non zero most significant coefficient
-        """
-        pass
-
-    def __rmul__(self, a):
-        """
-         Multiply scalar with polynomial ``p(x)``
-        """
-        pass
-
-    def ntt(self, powtable):
-        """
-         Computes the forward number-theoretic transform of the given vector in place,
-         with respect to the given primitive nth root of unity under the given modulus.
-         The length of the vector must be a power of 2.
-        """
-        pass
-
-    def intt(self, powtable):
-        """
-         Computes the inverse number-theoretic transform of the given vector in place,
-         with respect to the given primitive nth root of unity under the given modulus.
-         The length of the vector must be a power of 2.
-        """
-        pass
-
-    def expand_to_degree(self, d):
-        """
-         Extend list ``p`` representing a polynomial ``p(x)`` to
-          match polynomials of degree ``d-1``.
-        """
-        pass
-
-    def __add__(self, v):
-        """
-          Add polynomials ``u(x)`` and ``v(x)``.
-        """
-        pass
-
-    def __sub__(self, v):
-        """
-          Sub polynomials ``u(x)`` and ``v(x)``.
-        """
-        pass
-
-    def __neg__(self):
-        """
-          Negate polynomial coeffs
-        """
-        pass
-
-    def reciprocal(self):
-        """
-         Calculate the reciprocal of polynomial ``p(x)`` with degree ``k-1``,
-         defined as: ``x^(2k-2) / p(x)``, where ``k`` is a power of 2.
-        """
-        pass
-
-    def poly_div(self, v):
-        """
-          Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
-          m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
-          as ``n``.
-        """
-        pass
 
     def inv(self):
         """
          Calculate the reciprocal of polynomial ``p(x)`` with degree ``k-1``,
          defined as: ``x^(2k-2) / p(x)``, where ``k`` is a power of 2.
+
+         NOTE https://github.com/iden3/iden3js
+         TODO invert is recursive -> change to iterative
         """
-        pass
+        k = self.get_degree() + 1
+        assert k > 0 and self.zcoeff[-1] != 0 and 2 ** round(math.log(k, 2)) == k
+
+        if k == 1:
+            return ZPoly([self.zcoeff[0].inv()])
+
+        npa = self.scale(-k/2)
+        q = npa.inv()
+        if self.FIDX == ZUtils.FEXT:
+           a = (q << ZPoly.one[self.FIDX]).scale(3*k/2-2)
+        else :
+           a = ( q * ZPoly.two[self.FIDX]).scale(3*k/2-2)
+        q.poly_mul(q)
+        b = ZPoly(self)
+        b.poly_mul(q)
+
+        r = a - b 
+        r.scale(-k + 2, r)
+
+        return r
+
+    def expand_to_degree(self, d, ret=None):
+        """
+         Extend list ``p`` representing a polynomial ``p(x)`` to
+          match polynomials of degree ``d-1``. 
+
+          If d > 0, fills higher degree coefficients with 0.
+          If d < 0, removes higher order coefficients
+        """
+        if ret is not None:
+            newP = ret
+        else:
+            newP = ZPoly(0)
+        
+        if d >= self.get_degree() :
+            newP.zcoeff = self.get_coeff() + self.zero().get_coeff() * (d- self.get_degree())
+        else:
+            newP.zcoeff = self.get_coeff()[:d+1]
+
+        newP.FIDX =   self.FIDX
+        newP.degree = len(newP.zcoeff)-1
+
+        return newP
+
+    def scale(self, d, ret=None):
+        """
+          multiplies poly by x^d
+
+          NOTE :  https://www.nayuki.io/page/number-theoretic-transform-integer-dft
+        """
+        if ret is not None:
+            newP = ret
+        else:
+            newP = ZPoly(0)
+        
+        if d >= 0:
+            newP.zcoeff = self.zero().get_coeff() * d + self.get_coeff()
+        else:
+            newP.zcoeff = self.get_coeff()[-d:]
+
+        newP.FIDX =   self.FIDX
+        newP.degree = len(newP.zcoeff)-1
+
+        return newP
+
+    def __rmul__(self, a):
+        """
+         Multiply scalar with polynomial 
+        """
+        return self * a
+
+    def __mul__(self, a):
+        """
+         Multiply polynomial p(x) with scalar (constant) 
+        """
+        if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
+            return ZPoly([p * a for p in self.zcoeff])
+        else:
+            assert True, "Unexpected data type"
+
+    def __add__(self, v):
+        """
+          Add polynomials ``u(x)`` and ``v(x)``.
+        """
+        if not isinstance(v, ZPoly):
+            assert True, "Unexpected data type"
+        elif isinstance(v,ZPolySparse):
+            return v + self
+        else :
+            min_d = min(self.get_degree(), v.get_degree())
+            if self.get_degree() >= v.get_degree():
+                new_p = ZPoly(self.get_coeff())
+            else:
+                new_p = ZPoly(v)
+    
+            c1 = self.get_coeff()
+            c2 = v.get_coeff()
+    
+            new_p.zcoeff[:min_d+1] = [c1[i] + c2[i] for i in xrange(min_d + 1)]
+    
+            return new_p.norm()
+
+    def __sub__(self, v):
+        """
+          Sub polynomials ``u(x)`` and ``v(x)``.
+        """
+        return (self + (-v)).norm()
+
+    def __neg__(self):
+        """
+          Negate polynomial coeffs
+        """
+        new_p = ZPoly(self)
+        new_p_coeff = new_p.get_coeff()
+        new_p.zcoeff = [-c for c in new_p_coeff]
+
+        return new_p
+
+    def __lshift__(self,k):
+        """
+          << K to all coeffs of poly
+        """
+        if isinstance(k,int) or isinstance(k,long) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
+            return ZPoly([c << k for c in self.get_coeff()])
+        else:
+            assert True, "Unexpected data type"
+
+    def zero(self):
+        """
+          return 0 poly
+        """
+        if self.FIDX == ZUtils.FEXT:
+            return ZPoly([ZFieldElExt(0)])
+        else:
+            return ZPoly([ZFieldElRedc(0)])
+
+
+    def show(self):
+        """
+         Print poly
+        """
+        if type(self.get_coeff()) is list:
+          print [c.as_long() for c in self.get_coeff()]
+        else :
+          l =  self.dict_to_list()
+          print [c.as_long() for c in l]
+
+
+class ZPolySparse(ZPoly):
+    def __init__(self, p):
+        super(ZPolySparse, self).__init__(p)
+
+    def to_sparse(self):
+        """
+          Convert to sparse. Do nothing
+        """
+        return self
+
+    def to_dense(self):
+        """
+          Convert to dense poly representation
+        """
+        zcoeffs = self.dict_to_list()
+
+        return ZPoly(zcoeffs)
+
+
+    def norm(self):
+        """
+        Normalize poly to have a non zero most significant coefficient
+        """
+        newP = ZPolySparse(self)
+        coeff = sorted([long(k) for k in newP.zcoeff.keys()])
+
+        if coeff[-1] != 0:
+                return newP
+
+        for c in coeff[::-1]:
+            if newP.zcoeff[str(c)] == 0:
+                del newP.zcoeff[str(c)]
+            else:
+                break
+
+        newP.degree = len(newP.zcoeff.keys())-1
+        if newP.degree > 0:
+            return newP
+        else :
+            return self.zero()
+        
+
+    def poly_mul(self, p2):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+        
+    def poly_mul_normal(self, p2):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def poly_square(self):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def poly_mul_fft(self, p2): 
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def __rmul__(self, a):
+        """
+         Multiply scalar with polynomial ``p(x)``
+        """
+        return self * a
+
+    def __mul__(self, a):
+        """
+         Multiply polynomial ``p(x)`` with scalar (constant) ``a``.
+        """
+        if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
+            return ZPolySparse([self.zcoeff[k] * a for k in self.zcoeff.keys()])
+        else:
+            assert True, "Unexpected data type"
+
+    def ntt(self, powtable):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def intt(self, powtable):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def expand_to_degree(self, d, ret=None):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def scale(self, d, ret=None):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def __add__(self, v):
+        """
+          Add polynomials ``u(x)`` and ``v(x)``.
+        """
+        if not isinstance(v, ZPoly):
+            assert True, "Unexpected data type"
+
+        elif isinstance(v,ZPolySparse):   
+            # sparse + sparse -> sparse
+            newP = ZPolySparse(self)
+
+            for k in v.zcoeff.keys():
+                if k in newP.zcoeff:
+                   newP.zcoeff[k] += v.zcoeff[k]
+                else:
+                   newP.zcoeff[k] = v.zcoeff[k]
+        else :
+            # sparse + dense -> dense
+            newP = ZPoly(v)
+            coeff = sorted([long(k) for k in p.keys()])
+            if coeff[-1] > newP.get_degree():
+                newP.expand_to_degree(c[-1])
+
+            for c in coeff:
+                newP[c] += v[str(c)]
+        newP.norm()
+
+        return new_p
+
+    def __neg__(self):
+        """
+          Negate polynomial coeffs
+        """
+        return ZPolySparse({i: -p[i] for i in p.keys()})
+
+    def __lshift__(self,k):
+        """
+        """
+        if isinstance(k,int) or isinstance(k,long) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
+            return ZPolySparse([self.zcoeff[k] << k for k in self.zcoeff.keys()])
+        else:
+            assert True, "Unexpected data type"
+
+    def inv(self):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+
+    def poly_div(self, v):
+        """
+          Not supported
+        """
+        assert True, "Operation not supported"
+

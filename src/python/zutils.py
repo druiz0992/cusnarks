@@ -119,11 +119,46 @@ class ZUtils(object):
             'curve_params': {'a': 0, 'b': 3,
                              'Gx': 1L,
                              'Gy': 2L},
+            'curve_params_g2': {'G1x' : 10857046999023057135944570762232829481370756359578518086990519993285655852781L,
+                                'G1y' : 11559732032986387107991004021392285783925812861821192530917403151452391805634L,
+                                'G2x' : 8495653923123431417604973247489272438418190587263600148770280649306958101930L,
+                                'G2y' : 4082367875863433681332203403145435568316851327593401208105741076214120093531L
+                                },
             'factor_data': {'factors': [2, 3, 13, 29, 983, 11003, 237073, 405928799L, 1670836401704629L,
                                         13818364434197438864469338081L],
                             'exponents': [28, 2, 1, 1, 1, 1, 1, 1, 1, 1]}
         },
     }
+
+    AFFINE     = 0
+    PROJECTIVE = 1
+    JACOBIAN = 2
+
+    DEFAULT_IN_REP_FORMAT = AFFINE
+
+    FEXT = 0
+    FRDC = 1
+    DEFAULT_IN_PFORMAT = FEXT
+
+
+    @classmethod
+    def get_default_in_rep_format(cls):
+        return ZUtils.DEFAULT_IN_REP_FORMAT
+
+    @classmethod
+    def set_default_in_rep_format(cls, fmt):
+        if fmt == ZUtils.PROJECTIVE or fmt == ZUtils.AFFINE or fmt == ZUtils.JACOBIAN:
+            ZUtils.DEFAULT_IN_REP_FORMAT = fmt
+      
+
+    @classmethod
+    def get_default_in_p_format(cls):
+        return ZUtils.DEFAULT_IN_PFORMAT
+
+    @classmethod
+    def set_default_in_p_format(cls, fmt):
+        if fmt == ZUtils.FEXT or fmt == ZUtils.FRDC:
+            ZUtils.DEFAULT_IN_PFORMAT = fmt
 
     @staticmethod
     def find_primes(start, end, cnt=0):

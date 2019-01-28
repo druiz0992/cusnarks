@@ -91,7 +91,7 @@ class ECCTest(unittest.TestCase):
 
         ## Init ECC 
         # F ext
-        p1_exta = ECCAffine(zel1_exta, curve=c['curve_params'])
+        p1_exta = ECCAffine(zel1_exta, curve=c['curve_params'],force_init=True)
         p1_extp = ECCProjective(zel1_extp,curve =c['curve_params'])
         p1_extj = ECCJacobian(zel1_extj, curve=c['curve_params'])
 
@@ -174,8 +174,8 @@ class ECCTest(unittest.TestCase):
             zel1_rdca = [zel1_exta[0].reduce(), zel1_exta[1].reduce()]
             zel2_rdca = [zel2_exta[0].reduce(), zel2_exta[1].reduce()]
 
-            # Affine -> JAcobian (TODO)
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'])
+            # Affine -> Projective
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
             p1_extp = p1_exta.to_projective()
             p1_rdca = ECCAffine(zel1_rdca)
             p1_rdcp = p1_rdca.to_projective()
@@ -199,14 +199,43 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(p1_rdca == p1_rdcp.to_affine())
             self.assertTrue(p1_rdca.to_projective() == p1_rdcp)
 
+            # Affine -> JAcobian
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'])
+            p1_extj = p1_exta.to_jacobian()
+            p1_rdca = ECCAffine(zel1_rdca)
+            p1_rdcj = p1_rdca.to_jacobian()
+            p2_exta = ECCAffine(zel2_exta)
+            p2_extj = p2_exta.to_jacobian()
+            p2_rdca = ECCAffine(zel2_rdca)
+            p2_rdcj = p2_rdca.to_jacobian()
+
+            p3_exta = p1_exta + p2_exta
+            p3_rdca = p1_rdca + p2_rdca
+            p3_extj = p1_extj + p2_extj
+            p3_rdcj = p1_rdcj + p2_rdcj
+
+            self.assertTrue(p3_exta == p3_rdca.extend())
+            self.assertTrue(p3_rdca == p3_exta.reduce())
+            self.assertTrue(p3_extj == p3_rdcj.extend())
+            self.assertTrue(p3_rdcj == p3_extj.reduce())
+
+            self.assertTrue(p1_exta == p1_extj.to_affine())
+            self.assertTrue(p1_exta.to_jacobian() == p1_extj)
+            self.assertTrue(p1_rdca == p1_rdcj.to_affine())
+            self.assertTrue(p1_rdca.to_jacobian() == p1_rdcj)
+
             # Define affine point at infinity
             p1_exta = ECCAffine([None, None])
             p1_extp = ECCProjective([None, None, None])
+            p1_extj = ECCJacobian([None, None, None])
 
             self.assertTrue(p1_exta == p1_extp)
             self.assertTrue((p1_exta != p1_extp) == False)
+            self.assertTrue((p1_exta != p1_extj) == False)
             self.assertTrue(p1_exta.to_projective() == p1_extp)
             self.assertTrue(p1_extp.to_affine() == p1_exta)
+            self.assertTrue(p1_exta.to_jacobian() == p1_extj)
+            self.assertTrue(p1_extj.to_affine() == p1_exta)
 
 
     def test_2operators(self):
@@ -224,7 +253,7 @@ class ECCTest(unittest.TestCase):
             zero_a = [None, None]
             zero_p = [None, None, None]
 
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'])
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
 
             while True:
               z1 = ZFieldElExt(randint(0, p-1))
@@ -425,7 +454,222 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(r3_extp.is_on_curve() == True)
             self.assertTrue(r4_rdcp.is_on_curve() == True)
 
-    def test_3is_on_curve(self):
+    def test_3operators_jacobian(self):
+        c = ZUtils.CURVE_DATA['BN128']
+        ZField(c['prime'], c['factor_data'])
+        p = c['prime']
+
+        for test in xrange(ECCTest.TEST_ITER2):
+            alpha_ext = ZFieldElExt(randint(0, p-1))
+            k = ZFieldElExt(1)
+
+            # Affine
+            zel1_exta = [k * c['curve_params']['Gx'], k * c['curve_params']['Gy']]
+
+            zero_a = [None, None]
+            zero_p = [None, None, None]
+
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
+            while True:
+              z1 = ZFieldElExt(randint(0, p-1))
+              z2 = ZFieldElExt(randint(0, p-1))
+              p1_exta = z1 * p1_exta
+              p2_exta = z2 * p1_exta
+              if p1_exta != p2_exta:
+                  break
+
+            # Affine -> JAcobian
+            p1_extj = p1_exta.to_jacobian()
+            p2_extj = p2_exta.to_jacobian()
+
+            p1_rdca = p1_exta.reduce()
+            p1_rdcj = p1_rdca.to_jacobian()
+            p2_rdca = p2_exta.reduce()
+            p2_rdcj = p2_rdca.to_jacobian()
+
+            pzero_a = ECCAffine(zero_a)
+            pzero_j = ECCJacobian(zero_p)
+
+            self.assertTrue(p1_exta.is_on_curve() == True)
+            self.assertTrue(p2_exta.is_on_curve() == True)
+            self.assertTrue(p1_rdca.is_on_curve() == True)
+            self.assertTrue(p2_rdca.is_on_curve() == True)
+            self.assertTrue(p1_extj.is_on_curve() == True)
+            self.assertTrue(p2_extj.is_on_curve() == True)
+            self.assertTrue(p1_rdcj.is_on_curve() == True)
+            self.assertTrue(p2_rdcj.is_on_curve() == True)
+
+            # Operators: +. -. neg, mul. double
+            r_exta = p1_exta + p2_exta
+            r_rdca = p1_rdca + p2_rdca
+            r_extj = p1_extj + p2_extj
+            r_rdcj = p1_rdcj + p2_rdcj
+
+            # test __eq__
+            self.assertTrue(r_exta.reduce() == r_rdca)
+            self.assertTrue(r_exta == r_rdca.extend())
+            self.assertTrue(r_exta.to_jacobian() == r_extj)
+            self.assertTrue(r_exta == r_extj.to_affine())
+            self.assertTrue(r_exta.to_jacobian().reduce() == r_rdcj)
+            self.assertTrue(r_exta.reduce().to_jacobian() == r_rdcj)
+            self.assertTrue(r_exta == r_rdcj.to_affine().extend())
+            self.assertTrue(r_exta == r_rdcj.extend().to_affine())
+
+            # test ne
+            self.assertTrue((r_exta.reduce() != r_rdca) == False)
+            self.assertTrue((r_exta != r_rdca.extend()) == False)
+            self.assertTrue((r_exta.to_jacobian() != r_extj) == False)
+            self.assertTrue((r_exta != r_extj.to_affine()) == False)
+            self.assertTrue((r_exta.to_jacobian().reduce() != r_rdcj) == False)
+            self.assertTrue((r_exta.reduce().to_jacobian() != r_rdcj) == False)
+            self.assertTrue((r_exta != r_rdcj.to_affine().extend()) == False)
+            self.assertTrue((r_exta != r_rdcj.extend().to_affine()) == False)
+
+            self.assertTrue(r_exta.is_on_curve() == True)
+            self.assertTrue(r_rdca.is_on_curve() == True)
+            self.assertTrue(r_extj.is_on_curve() == True)
+            self.assertTrue(r_rdcj.is_on_curve() == True)
+
+            # Operators: + Zero
+            r_exta = p1_exta + pzero_a
+            r_rdca = p1_rdca + pzero_a
+            r_extj = p1_extj + pzero_j
+            r_rdcj = p1_rdcj + pzero_j
+
+            # test __eq__
+            self.assertTrue(r_exta.reduce() == r_rdca)
+            self.assertTrue(r_exta == r_rdca.extend())
+            self.assertTrue(r_exta.to_jacobian() == r_extj)
+            self.assertTrue(r_exta == r_extj.to_affine())
+            self.assertTrue(r_exta.to_jacobian().reduce() == r_rdcj)
+            self.assertTrue(r_exta.reduce().to_jacobian() == r_rdcj)
+            self.assertTrue(r_exta == r_rdcj.to_affine().extend())
+            self.assertTrue(r_exta == r_rdcj.extend().to_affine())
+
+            self.assertTrue(r_exta == p1_exta)
+            self.assertTrue(r_rdca == p1_rdca)
+            self.assertTrue(r_extj == p1_extj)
+            self.assertTrue(r_rdcj == p1_rdcj)
+
+            self.assertTrue(r_exta.is_on_curve() == True)
+            self.assertTrue(r_rdca.is_on_curve() == True)
+            self.assertTrue(r_extj.is_on_curve() == True)
+            self.assertTrue(r_rdcj.is_on_curve() == True)
+            # Operators: + Zero
+            r_exta = pzero_a + p1_exta
+            r_rdca = pzero_a + p1_rdca
+            r_extj = pzero_j + p1_extj
+            r_rdcj = pzero_j + p1_rdcj
+
+            # test __eq__
+            self.assertTrue(r_exta.reduce() == r_rdca)
+            self.assertTrue(r_exta == r_rdca.extend())
+            self.assertTrue(r_exta.to_jacobian() == r_extj)
+            self.assertTrue(r_exta == r_extj.to_affine())
+            self.assertTrue(r_exta.to_jacobian().reduce() == r_rdcj)
+            self.assertTrue(r_exta.reduce().to_jacobian() == r_rdcj)
+            self.assertTrue(r_exta == r_rdcj.to_affine().extend())
+            self.assertTrue(r_exta == r_rdcj.extend().to_affine())
+
+            self.assertTrue(r_exta == p1_exta)
+            self.assertTrue(r_rdca == p1_rdca)
+            self.assertTrue(r_extj == p1_extj)
+            self.assertTrue(r_rdcj == p1_rdcj)
+
+            self.assertTrue(r_exta.is_on_curve() == True)
+            self.assertTrue(r_rdca.is_on_curve() == True)
+            self.assertTrue(r_extj.is_on_curve() == True)
+            self.assertTrue(r_rdcj.is_on_curve() == True)
+            # sub
+            r_exta = p1_exta - p2_exta
+            r_rdca = p1_rdca - p2_rdca
+            r_extj = p1_extj - p2_extj
+            r_rdcj = p1_rdcj - p2_rdcj
+
+            self.assertTrue(r_exta.reduce() == r_rdca)
+            self.assertTrue(r_exta == r_rdca.extend())
+            self.assertTrue(r_exta.to_jacobian() == r_extj)
+            self.assertTrue(r_exta == r_extj.to_affine())
+            self.assertTrue(r_exta.to_jacobian().reduce() == r_rdcj)
+            self.assertTrue(r_exta.reduce().to_jacobian() == r_rdcj)
+            self.assertTrue(r_exta == r_rdcj.to_affine().extend())
+            self.assertTrue(r_exta == r_rdcj.extend().to_affine())
+
+            self.assertTrue(r_exta.is_on_curve() == True)
+            self.assertTrue(r_rdca.is_on_curve() == True)
+            self.assertTrue(r_extj.is_on_curve() == True)
+            self.assertTrue(r_rdcj.is_on_curve() == True)
+            r_exta = -p1_exta
+            r_rdca = -p1_rdca
+            r_extj = -p1_extj
+            r_rdcj = -p1_rdcj
+
+            self.assertTrue(r_exta.reduce() == r_rdca)
+            self.assertTrue(r_exta == r_rdca.extend())
+            self.assertTrue(r_exta.to_jacobian() == r_extj)
+            self.assertTrue(r_exta == r_extj.to_affine())
+            self.assertTrue(r_exta.to_jacobian().reduce() == r_rdcj)
+            self.assertTrue(r_exta.reduce().to_jacobian() == r_rdcj)
+            self.assertTrue(r_exta == r_rdcj.to_affine().extend())
+            self.assertTrue(r_exta == r_rdcj.extend().to_affine())
+
+            self.assertTrue(r_exta.is_on_curve() == True)
+            self.assertTrue(r_rdca.is_on_curve() == True)
+            self.assertTrue(r_extj.is_on_curve() == True)
+            self.assertTrue(r_rdcj.is_on_curve() == True)
+            #double operation
+            r_exta = p1_exta.double()
+            r_rdca = p1_rdca.double()
+            r_extj = p1_extj.double()
+            r_rdcj = p1_rdcj.double()
+
+            self.assertTrue(r_exta.reduce() == r_rdca)
+            self.assertTrue(r_exta == r_rdca.extend())
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+            self.assertTrue(r_exta.to_jacobian() == r_extj)
+            self.assertTrue(r_exta == r_extj.to_affine())
+
+            self.assertTrue(r_exta.is_on_curve() == True)
+            self.assertTrue(r_rdca.is_on_curve() == True)
+            self.assertTrue(r_extj.is_on_curve() == True)
+            self.assertTrue(r_rdcj.is_on_curve() == True)
+            # *
+            r1_exta = p1_exta * alpha_ext
+            r2_rdca = p1_rdca * alpha_ext
+            r3_exta = alpha_ext * p1_exta
+            r4_rdca = alpha_ext * p1_rdca
+            r1_extj = p1_extj * alpha_ext
+            r2_rdcj = p1_rdcj * alpha_ext
+            r3_extj = alpha_ext * p1_extj
+            r4_rdcj = alpha_ext * p1_rdcj
+
+            self.assertTrue(r1_exta == r2_rdca.extend())
+            self.assertTrue(r3_exta == r4_rdca.extend())
+            self.assertTrue(r1_exta == r3_exta)
+
+            self.assertTrue(r1_extj == r2_rdcj.extend())
+            self.assertTrue(r3_extj == r4_rdcj.extend())
+            self.assertTrue(r1_extj == r3_extj)
+
+            self.assertTrue(r1_exta == r3_extj.to_affine())
+
+            self.assertTrue(isinstance(r1_exta.get_P()[0], ZFieldElExt))
+            self.assertTrue(isinstance(r2_rdca.get_P()[0], ZFieldElRedc))
+            self.assertTrue(isinstance(r1_extj.get_P()[0], ZFieldElExt))
+            self.assertTrue(isinstance(r2_rdcj.get_P()[0], ZFieldElRedc))
+
+            self.assertTrue(r1_exta.is_on_curve() == True)
+            self.assertTrue(r2_rdca.is_on_curve() == True)
+            self.assertTrue(r3_exta.is_on_curve() == True)
+            self.assertTrue(r4_rdca.is_on_curve() == True)
+            self.assertTrue(r1_extj.is_on_curve() == True)
+            self.assertTrue(r2_rdcj.is_on_curve() == True)
+            self.assertTrue(r3_extj.is_on_curve() == True)
+            self.assertTrue(r4_rdcj.is_on_curve() == True)
+
+    def test_4is_on_curve(self):
         c = ZUtils.CURVE_DATA['BN128']
         ZField(c['prime'], c['factor_data'])
         p = c['prime']
@@ -439,23 +683,28 @@ class ECCTest(unittest.TestCase):
             zero_a = [None, None]
             zero_p = [None, None, None]
 
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'])
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
 
-            # Affine -> JAcobian (TODO)
             p1_extp = p1_exta.to_projective()
+            p1_extj = p1_exta.to_jacobian()
 
             p1_rdca = p1_exta.reduce()
             p1_rdcp = p1_rdca.to_projective()
+            p1_rdcj = p1_rdca.to_jacobian()
 
             pzero_a = ECCAffine(zero_a)
             pzero_p = ECCProjective(zero_p)
+            pzero_j = ECCJacobian(zero_p)
 
             self.assertTrue(p1_exta.is_on_curve() == False)
             self.assertTrue(p1_rdca.is_on_curve() == False)
             self.assertTrue(p1_extp.is_on_curve() == False)
             self.assertTrue(p1_rdcp.is_on_curve() == False)
+            self.assertTrue(p1_extj.is_on_curve() == False)
+            self.assertTrue(p1_rdcj.is_on_curve() == False)
             self.assertTrue(pzero_a.is_on_curve() == False)
             self.assertTrue(pzero_p.is_on_curve() == False)
+            self.assertTrue(pzero_j.is_on_curve() == False)
 
 if __name__ == "__main__":
         unittest.main()
