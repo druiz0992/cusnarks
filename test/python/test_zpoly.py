@@ -30,10 +30,14 @@
 // Description:
 //   Poly test
 //
-// TODO 
-//    incorrect format  -> once asserts substituted by exceptions,
+// TODO  incorrect format  -> once asserts substituted by exceptions,
 //         test incorrect formats can be done
-// ------------------------------------------------------------------
+// TODO after arithmetic operation, we normalize poly. so we need to make
+//    sure that when we compare pèration to expected result, expected result
+//    is also normalized
+// TODO check norm operation after arithmetic operation
+//
+// -----------------------------------------------------------------
 
 """
 import sys
@@ -48,8 +52,9 @@ from zutils import *
 
 
 class ZPolyTest(unittest.TestCase):
-    TEST_ITER = 20
+    TEST_ITER = 1
     MAX_POLY_DEGREE = 1000
+    SHIFT_SCALAR = 70
 
     def test_0init_ext(self):
         c = ZUtils.CURVE_DATA['BN128']
@@ -208,6 +213,33 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
 
             # Pending Sparse Poly
+            p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
+            n_coeff = randint(1, p_d)
+            p_c = sample(xrange(p_d + 1), n_coeff)
+            p_d = max(sorted(p_c))
+            p_lc = {str(coeff_at): ZFieldElExt(randint(0, prime * 2)) for coeff_at in p_c}
+            poly_a = ZPolySparse(p_lc)
+
+            coeff = poly_a.get_coeff()
+            coeff_ext = {c: coeff[c].extend() for c in coeff.keys()}
+            coeff_rdc = {c: coeff[c].reduce() for c in coeff.keys()}
+
+            poly_ext = ZPolySparse(coeff_ext)
+            poly_rdc = ZPolySparse(coeff_rdc)
+
+            rext_c, rext_d, rext_f = poly_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = poly_rdc.get_properties()
+
+            self.assertTrue(len(rext_c) == p_d + 1)
+            self.assertTrue(rext_d == p_d)
+            self.assertTrue(isinstance(rext_c[0], ZFieldElExt))
+            self.assertTrue(rext_f == ZPoly.FEXT)
+            self.assertTrue(len(rrdc_c) == p_d + 1)
+            self.assertTrue(rrdc_d == p_d)
+            self.assertTrue(isinstance(rrdc_c[0], ZFieldElRedc))
+            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
+            self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
 
     def test_2expand(self):
         c = ZUtils.CURVE_DATA['BN128']
@@ -241,8 +273,6 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(rrdc_c[p_d + 1:] == [ZFieldElRedc(0)] * (new_d - p_d))
             self.assertTrue(rrdc_c[:p_d + 1] == poly_rdc.get_coeff()[:p_d + 1])
 
-            # Pending Sparse Poly
-
     def test_3aritmetic(self):
         c = ZUtils.CURVE_DATA['BN128']
         prime = c['prime']
@@ -252,6 +282,7 @@ class ZPolyTest(unittest.TestCase):
         for i in xrange(ZPolyTest.TEST_ITER):
             p1_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
             p2_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
+            shift_sc = randint(1, ZPolyTest.SHIFT_SCALAR)
 
             scalar_l = randint(1,prime-1)
             scalar_bn = BigInt(scalar_l)
@@ -315,6 +346,22 @@ class ZPolyTest(unittest.TestCase):
             else:
                 self.assertTrue(rext_c[p1_d+1:] == [-c for c in poly2_ext.get_coeff()[p1_d + 1:]])
                 self.assertTrue(rrdc_c[p1_d+1:] == [-c for c in poly2_rdc.get_coeff()[p1_d + 1:]])
+
+            # 
+            p3_ext = poly1_ext << shift_sc
+            p3_rdc = poly1_rdc << shift_sc
+
+            rext_c, rext_d, rext_f = p3_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_rdc.get_properties()
+
+            self.assertTrue(rext_d == poly1_ext.get_degree())
+            self.assertTrue(rrdc_d == poly1_rdc.get_degree())
+            self.assertTrue(rext_f == ZPoly.FEXT)
+            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(len(rext_c) == len(rrdc_c))
+            self.assertTrue(len(rext_c) == rext_d+1)
+            self.assertTrue(rext_c == [r2 << shift_sc for r2 in poly1_ext.get_coeff()])
+            self.assertTrue(rrdc_c == [r2 << shift_sc for r2 in poly1_rdc.get_coeff()])
 
             # scalar mul
             ## mont * mont -> mont
@@ -490,7 +537,7 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue([c.as_long() for c in rext_c[:len(p3_c)]] == p3_c)
 
-            # /
+            # / degree num poly < 2* degree den poly
             pn_ext   = poly1_ext.scale(-p1_d/2)
             pd_ext = ZPoly(pn_ext)
 
@@ -517,19 +564,117 @@ class ZPolyTest(unittest.TestCase):
             rext_c, rext_d, rext_f = p3_ext.get_properties()
             rrdc_c, rrdc_d, rrdc_f = p3_rdc.get_properties()
 
-
-            #TODO : Montgomery division doesn't work
             self.assertTrue(rext_d == pnum_ext.get_degree())
             self.assertTrue(rrdc_d == pnum_rdc.get_degree())
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(rext_f == ZPoly.FEXT)
             self.assertTrue(rrdc_f == ZPoly.FRDC)
-            #self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
-            #self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
+            self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
+            self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(rext_c == pnum_ext.get_coeff())
-            #self.assertTrue(rrdc_c == pnum_rdc.get_coeff())
+            self.assertTrue(rrdc_c == pnum_rdc.get_coeff())
 
+            # / degree num poly > 2* degree den poly
+
+            pnum_ext = ZPoly(poly1_ext)
+            pden_ext = pnum_ext.scale(-p1_d/4)
+            pd_ext   = ZPoly(pden_ext)
+            prem_ext = pden_ext.scale(-p1_d/4 )
+
+            pnum_ext.poly_mul(pd_ext)
+            pnum_ext = pnum_ext + prem_ext
+
+            pnum_rdc = pnum_ext.reduce()
+            pden_rdc = pden_ext.reduce()
+            prem_rdc = prem_ext.reduce()
+
+            p3_ext = pnum_ext.poly_div(pden_ext)
+            p3_rdc = pnum_rdc.poly_div(pden_rdc)
+
+            p3_ext.poly_mul(pden_ext)
+            p3_ext = p3_ext + prem_ext
+
+            p3_rdc.poly_mul(pden_rdc)
+            p3_rdc = p3_rdc + prem_rdc
+
+            rext_c, rext_d, rext_f = p3_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_rdc.get_properties()
+
+            self.assertTrue(rext_d == pnum_ext.get_degree())
+            self.assertTrue(rrdc_d == pnum_rdc.get_degree())
+            self.assertTrue(len(rext_c) == rext_d+1)
+            self.assertTrue(len(rext_c) == len(rrdc_c))
+            self.assertTrue(rext_f == ZPoly.FEXT)
+            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
+            self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
+            self.assertTrue(rext_c == pnum_ext.get_coeff())
+            self.assertTrue(rrdc_c == pnum_rdc.get_coeff())
+
+
+    def test_4aritmetic_sparse(self):
+        c = ZUtils.CURVE_DATA['BN128']
+        prime = c['prime']
+        ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
+
+        # *, + , - , /, inv, scalar mul
+        for i in xrange(ZPolyTest.TEST_ITER):
+
+            # Pending Sparse Poly
+            p1_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
+            n_coeff = randint(1, p1_d)
+            p1_c = sample(xrange(p_d + 1), n_coeff)
+            p1_d = max(sorted(p1_c))
+            p1_lc = {str(coeff_at): ZFieldElExt(randint(0, prime * 2)) for coeff_at in p1_c}
+            coeff1_rdc = {c: p1_lc[c].reduce() for c in p1_lc.keys()}
+
+            p2_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
+            n_coeff = randint(1, p2_d)
+            p2_c = sample(xrange(p2_d + 1), n_coeff)
+            p2_d = max(sorted(p2_c))
+            p2_lc = {str(coeff_at): ZFieldElExt(randint(0, prime * 2)) for coeff_at in p2_c}
+            coeff2_rdc = {c: p2_lc[c].reduce() for c in p2_lc.keys()}
+
+            p1_dd = randint(1, ZPolyTest.MAX_POLY_DEGREE)
+            p2_dd = randint(1, ZPolyTest.MAX_POLY_DEGREE)
+
+            scalar_l = randint(1,prime-1)
+            scalar_bn = BigInt(scalar_l)
+            scalar_ext = ZFieldElExt(scalar_bn)
+            scalar_rdc = scalar_ext.reduce()
+
+            poly1_sp_ext = ZPolySparse(p1_lc)
+            poly2_sp_ext = ZPolySparse(p2_lc)
+
+            poly1_sp_rdc = ZPolySparse(coeff1_rdc)
+            poly2_sp_rdc = ZPolySparse(coeff2_rdc)
+
+            poly1_dn_ext = poly1_sp_ext.to_sparse()
+            poly2_dn_ext = ZPoly(p2_dd)
+
+            poly1_dn_rdc = poly1_dn_ext.reduce()
+            poly2_dn_rdc = poly2_dn_ext.reduce()
+
+            # Check to sparse
+            rext_sp_c, rext_sp_d, rext_sp_f = poly1_sp_ext.get_properties()
+            rrdc_sp_c, rrdc_sp_d, rrdc_sp_f = poly1_sp_rdc.get_properties()
+            rext_dn_c, rext_dn_d, rext_dn_f = poly1_sp_ext.get_properties()
+            rrdc_dn_c, rrdc_dn_d, rrdc_dn_f = poly1_sp_rdc.get_properties()
+
+            # +  Sparse + Sparse
+
+
+            # -
+
+            # <<
+
+            # * scalar
+
+
+    def test_5norm(self):
+        #TODO
+        pass
 
 if __name__ == "__main__":
     unittest.main()

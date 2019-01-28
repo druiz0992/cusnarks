@@ -72,9 +72,6 @@ class ECC(object):
     Y = 1
     Z = 2
 
-    FEXT = 0
-    FRDC = 1
-
     constants_init = False
     one = [None, None]
     two = [None, None]
@@ -85,7 +82,7 @@ class ECC(object):
     a = [None, None]
     b = [None, None]
 
-    def __init__(self, p, curve=None):
+    def __init__(self, p=None, curve=None):
         """
           Constructor
 
@@ -109,8 +106,8 @@ class ECC(object):
                     assert True, "Coordinate format doesn't match with point format"
         elif isinstance(p,ECC):
             p_l = p.P
-        else:
-            assert True, "Unexpected type"
+        elif p is None:
+            p_l = None
 
         if curve is not None:
             if not isinstance(curve['a'],int) and not isinstance(curve['a'],long):
@@ -121,15 +118,17 @@ class ECC(object):
                 self.init_curve(curve['a'], curve['b'])
 
         # p can be a list of int, long, BigInt
-        if isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
+        if p_l is None or p_l[ECC.X] is None:
+            #self.P = p_l
+            self.P = [None, None, None]
+            self.FIDX = None
+        elif isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
             self.P = [ZFieldElExt(x) for x in p_l]
-            self.FIDX = ECC.FEXT
-        elif isinstance(p[ECC.X], ZFieldElRedc):
+            self.FIDX = ZUtils.FEXT
+        elif isinstance(p_l[ECC.X], ZFieldElRedc):
             self.P = [ZFieldElRedc(x) for x in p_l]
-            self.FIDX = ECC.FRDC
-        elif p[ECC.X] is None:
-            self.P = p_l
-        else:
+            self.FIDX = ZUtils.FRDC
+        else :
             assert True, "Unexpected format"
 
         if ECC.constants_init is False:
@@ -143,7 +142,7 @@ class ECC(object):
 
     @classmethod
     def is_curve_init(cls):
-        return ECC.a[ECC.FEXT] is not None and ECC.b[ECC.FEXT] is not None
+        return ECC.a[ZUtils.FEXT] is not None and ECC.b[ZUtils.FEXT] is not None
 
     @classmethod
     def init_curve(cls, a, b):
@@ -155,7 +154,7 @@ class ECC(object):
         """
           Returns curve parameters a,b
         """
-        return ECC.a[ECC.FEXT], ECC.b[ECC.FEXT]
+        return ECC.a[ZUtils.FEXT], ECC.b[ZUtils.FEXT]
 
     def get_P(self):
         """
@@ -262,12 +261,11 @@ class ECC(object):
         """
         pass
 
-    @abstractmethod
     def __ne__(self, P2):
         """
           P1 != P2
         """
-        pass
+        return not (self == P2)
 
     @abstractmethod
     def __add__(self, P2):
@@ -355,8 +353,10 @@ class ECCAffine(ECC):
         x,y are part of finite field Fp
     """
 
-    def __init__(self, p, curve=None):
-        ECC.__init__(self, p, curve)
+    def __init__(self, p=None, curve=None,force_init=False):
+        if force_init :
+            ECC.constants_init = False
+        ECC.__init__(self, p=p, curve=curve)
 
     def to_projective(self):
         """
@@ -374,7 +374,7 @@ class ECCAffine(ECC):
         """
           Converts point to AFFINE
         """
-        pass
+        return self
 
     def to_jacobian(self):
         """
@@ -461,7 +461,7 @@ class ECCAffine(ECC):
         two = ECC.two[self.FIDX]
         three = ECC.three[self.FIDX]
 
-        if self.FIDX == ECC.FEXT:
+        if self.FIDX == ZUtils.FEXT:
             Y2 = Y << one
             X2 = X << one
             l = Xsq << one
@@ -491,18 +491,17 @@ class ECCAffine(ECC):
         else:
             return (self.P[ECC.X], self.P[ECC.Y]) == (P2.P[ECC.X], P2.P[ECC.Y])
 
-    def __ne__(self, P2):
-        """
-          True if points are different
-          False otherwis
-        """
-        return not (self == P2)
-
     def point_at_inf(self):
         """"
           Return point at infinity
         """
-        return ECCAffine([None, None])
+        newP =  ECCAffine([None, None])
+        if self.FIDX is None:
+            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
+        else:
+            newP.FIDX = self.FIDX
+
+        return newP
 
 class ECCProjective(ECC):
     """
@@ -511,15 +510,18 @@ class ECCProjective(ECC):
         x,y are part of finite field Fp
     """
 
-    def __init__(self, p, curve=None):
-        ECC.__init__(self, p, curve)
+    def __init__(self, p=None, curve=None,force_init=False):
+        if force_init :
+           ECC.constants_init = False
+
+        ECC.__init__(self, p=p, curve=curve)
 
     def to_projective(self):
         """
           Convert Projective to Projective coordinates. Point coordinates are maintained in their
            actual format (Montgomery/Extended)
         """
-        pass
+        return self
 
     def to_affine(self):
         """
@@ -539,7 +541,7 @@ class ECCProjective(ECC):
            actual format (Montgomery/Extended)
          TODO
         """
-        pass
+        return self.to_affine().to_jacobian()
 
     def is_on_curve(self):
         """
@@ -591,7 +593,7 @@ class ECCProjective(ECC):
         W = Z1 * Z2
         A = (Usq * W) - Vcube
       
-        if self.FIDX == ECC.FEXT:
+        if self.FIDX == ZUtils.FEXT:
            A -= (Vsq * V2) << ECC.one[self.FIDX]
         else:
            A -= (Vsq * V2) * ECC.two[self.FIDX] 
@@ -642,9 +644,9 @@ class ECCProjective(ECC):
         Ysq = Y * Y
         B = X * Y * S # B = X * Y * S
 
-        if a == three:  # W = 3*(X+Z)*(X-Z)
+        if a == -three:  # W = 3*(X+Z)*(X-Z)
             W = (X + Z) *  (X - Z)
-            if self.FIDX == ECC.FEXT:
+            if self.FIDX == ZUtils.FEXT:
                 W1 = W << one
                 W += W1
             else:
@@ -652,14 +654,14 @@ class ECCProjective(ECC):
         else:  # W = a*Z^2 + 3*X^2
             W = a * Z * Z
             Xsq = X * X
-            if self.FIDX == ECC.FEXT:
+            if self.FIDX == ZUtils.FEXT:
                 W1 = Xsq << one
                 W +=  W1 + Xsq
             else:
                 W1 = Xsq * three
                 W += W1
 
-        if self.FIDX == ECC.FEXT:
+        if self.FIDX == ZUtils.FEXT:
             H = W * W - (B << three)  # H = W^2 - 8*B
             rx = H * S << one       # X' = 2 * H * S
             # Y' = W*(4*B-H) - 8*Y^2*S^2
@@ -687,18 +689,17 @@ class ECCProjective(ECC):
             return (self.P[ECC.X] * P2.P[ECC.Z], self.P[ECC.Y] * P2.P[ECC.Z]) == \
                    (P2.P[ECC.X] * self.P[ECC.Z], P2.P[ECC.Y] * self.P[ECC.Z])
 
-    def __ne__(self, P2):
-        """
-          True if points are different
-          False otherwis
-        """
-        return not (self == P2)
-
     def point_at_inf(self):
         """"
           Return point at infinity
         """
-        return ECCProjective([None, None, None])
+        newP =  ECCProjective([None, None])
+        if self.FIDX is None:
+            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
+        else:
+            newP.FIDX = self.FIDX
+
+        return newP
 
 
 class ECCJacobian(ECC):
@@ -708,30 +709,38 @@ class ECCJacobian(ECC):
         x,y are part of finite field Fp
     """
 
-    def __init__(self, p, curve=None):
-        ECC.__init__(self, p, curve)
+    def __init__(self, p=None, curve=None,force_init=False):
+        if force_init :
+             ECC.constants_init = False
+        ECC.__init__(self, p=p, curve=curve)
 
     def to_projective(self):
         """
           Convert Jacobian to Projective coordinates. Point coordinates are maintained in their
            actual format (Montgomery/Extended)
 
-          TODO
         """
-        pass
+        return self.to_affine().to_projective()
 
     def to_affine(self):
         """
           Converts point to AFFINE
-          TODO
         """
-        pass
+        if self.is_inf():
+            return ECCAffine([None, None])
+        elif isinstance(self.P[ECC.X], ZFieldEl):
+            zinv = self.P[ECC.Z].inv()
+            zinv_sq = zinv * zinv
+            zinv_cube = zinv_sq * zinv
+            return ECCAffine([self.P[ECC.X] * zinv_sq, self.P[ECC.Y] * zinv_cube])
+        else:
+            assert True, "Unexpected data type"
 
     def to_jacobian(self):
         """
           Don't do anything
         """
-        pass
+        return self
 
     def is_on_curve(self):
         """
@@ -739,59 +748,167 @@ class ECCJacobian(ECC):
           False otherwise
           TODO
         """
-        pass
+        return self.to_affine().is_on_curve()
 
     # Arithmetic operators
     # +, - , neg, *
     def __add__(self, P2):
         """
           P1 + P2
-          TODO
+          12M + 4S
         """
-        pass
+        if not isinstance(P2,ECCJacobian):
+            assert True, "Incorrect point format"
+        elif not self.same_format(P2):
+            assert True, "Finite Field represenation does not match"
+
+        if self.is_inf():
+            return P2
+        elif P2.is_inf():
+            return self
+
+        X1, Y1, Z1 = self.P
+        X2, Y2, Z2 = P2.P
+
+        Z1sq = Z1 * Z1
+        Z1cube = Z1sq * Z1
+        Z2sq = Z2 * Z2
+        Z2cube = Z2sq * Z2
+
+        U1 = X1 * Z2sq   
+        U2 = X2 * Z1sq   
+        S1 = Y1 * Z2cube 
+        S2 = Y2 * Z1cube 
+
+        if U1 == U2:
+            if S1 != S2:
+                return self.point_at_inf()
+            else:
+                return self.double()
+
+        H = U2 - U1   
+        R = S2 - S1   
+        Hsq = H * H
+        Hcube = Hsq * H
+
+        X3 = R * R - Hcube   
+        if self.FIDX == ZUtils.FEXT:
+          X3 = X3 - (U1 * (Hsq << ECC.one[self.FIDX]) )
+        else: 
+          X3 = X3 - (U1 * Hsq * ECC.two[self.FIDX])
+ 
+        Y3 = R * (U1*Hsq - X3) - S1 * Hcube
+        Z3 = H * Z1 *Z2
+
+        return ECCJacobian([X3, Y3, Z3])
+
 
     def __sub__(self, P2):
         """
           P1 - P2
-          Check P2 is Projective
-          TODO
+          Check P2 is Jacobian
         """
-        pass
+        return self + -P2
 
     def __neg__(self):
         """
           -P1
           TODO
         """
-        pass
+        if self.is_inf():
+            return self
+        else:
+            return ECCJacobian([self.P[ECC.X], -self.P[ECC.Y], self.P[ECC.Z]])
 
     # doubling operation
     def double(self):
         """
          2 * P1
-         TODO
+
+         4M + 6S / 4M + 4S
         """
-        pass
+        if self.is_inf() or self.P[ECC.Y] == 0:
+            return self.point_at_inf()
+
+        X,Y,Z = self.get_P()
+
+        Ysq = Y * Y
+        Ysqsq = Ysq * Ysq
+        Zsq = Z * Z
+
+        S = X * Ysq
+        if self.FIDX == ZUtils.FEXT:
+            S = (S << ECC.two[self.FIDX])
+        else:
+            S = S * ECC.four[self.FIDX]
+
+        if ECC.a[self.FIDX] == -ECC.three[self.FIDX]:
+            M1 = (X + Zsq) * (X - Zsq)
+            if self.FIDX == ZUtils.FEXT:
+                M  = (M1 << ECC.one[self.FIDX])
+                M  = M + M1
+            else:
+                M  = ECC.three[self.FIDX] * M1
+        else:
+            M1 = X * X
+            if self.FIDX == ZUtils.FEXT:
+                M = M1 + (M1 << ECC.one[self.FIDX])
+            else:
+                M = ECC.three[self.FIDX] * M1
+            M = M + ECC.a[self.FIDX] * Zsq * Zsq
+
+        X3 = M * M
+        Z3 = Y * Z
+        if self.FIDX == ZUtils.FEXT:
+            X3 = X3 - (S << ECC.one[self.FIDX])
+            Y3 = M * (S - X3) - (Ysqsq << ECC.three[self.FIDX])
+            Z3 = (Z3 << ECC.one[self.FIDX])
+        else:
+            X3 = X3 - (S * ECC.two[self.FIDX])
+            Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
+            Z3 = Z3 * ECC.two[self.FIDX]
+
+        return ECCJacobian([X3, Y3, Z3])
 
     # comparison operators
     def __eq__(self, P2):
         """
           P1 == P2
-          TODO
         """
-        pass
+        if self.is_inf() and P2.is_inf():
+            return True
+        elif not isinstance(P2, ECCJacobian):
+            assert True, "Unexpected data type"
+        else:
+            Z1sq = self.P[ECC.Z] * self.P[ECC.Z]
+            Z1cube = Z1sq * self.P[ECC.Z]
+            Z2sq = P2.P[ECC.Z] * P2.P[ECC.Z]
+            Z2cube = Z2sq * P2.P[ECC.Z]
 
-    def __ne__(self, P2):
-        """
-          True if points are different
-          False otherwis
-          TODO
-        """
-        pass
+            return (self.P[ECC.X] * Z2sq, self.P[ECC.Y] * Z2cube) == \
+                   (P2.P[ECC.X] * Z1sq, P2.P[ECC.Y] * Z1cube)
 
     def point_at_inf(self):
         """"
           Return point at infinity
         """
-        return ECCProjective([None, None, None])
+        newP =  ECCJacobian([None, None])
+
+        if self.FIDX is None:
+            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
+        else:
+            newP.FIDX = self.FIDX
+
+        return newP
+
+def ECC_F1(p=None):
+    if ZUtils.DEFAULT_IN_REP_FORMAT == ZUtils.AFFINE:
+        return ECCAffine(p=p)
+    elif ZUtils.DEFAULT_IN_REP_FORMAT == ZUtils.JACOBIAN:
+        return ECCJacobian(p=p)
+    elif ZUtils.DEFAULT_IN_REP_FORMAT == ZUtils.PROJECTIVE:
+        return ECCProjective(p=p)
+    else :
+        assert True, "Unexpected type"
+
 
