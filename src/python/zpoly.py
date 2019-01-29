@@ -111,7 +111,8 @@ class ZPoly(object):
         elif type(p) is list and isinstance(self, ZPolySparse) :
             assert True, "Unexpected data type"
         #elif type(p) is list or type(p) is dict:
-        elif type(p) is list or isinstance(self, ZPolySparse):
+        #elif type(p) is list or isinstance(self, ZPolySparse):
+        elif type(p) is list or type(p) is dict:
             self.zcoeff, self.degree, self.FIDX = ZPoly.set_properties(p)
         elif isinstance(p, ZPoly):
             self.degree = p.get_degree()
@@ -149,7 +150,14 @@ class ZPoly(object):
                 assert True, "Unexpected data type"
         elif type(p) is dict:
             c = sorted([long(k) for k in p.keys()])
-            degree = long(c[-1])
+            if len(c) > 0:
+                degree = long(c[-1])
+            else:
+                # TODO : Improve this. IT will fail if coeffs are ZFieldElRedc. Also, I am using
+                # this case to solve issue win groth protocol when array y sparse polys includes
+                # empty case. I should solve that in a different way
+                p = {'0':0 }
+                degree = 0
             d_k = str(degree)
             if isinstance(p[d_k], ZFieldElExt):
                 zcoeff = p
@@ -310,12 +318,12 @@ class ZPoly(object):
 
          p1 = [c.as_long() for c in pa.get_coeff()]
          p2 = [c.as_long() for c in pb.get_coeff()]
-         p1 = np.polymul(p1, p2)
+         p1 = np.polymul(p1[::-1], p2[::-1])
 
          if self.FIDX == ZUtils.FEXT:
-            self.zcoeff = [ZFieldElExt(c) for c in p1]
+            self.zcoeff = [ZFieldElExt(c) for c in p1[::-1]]
          else:
-            self.zcoeff = [ZFieldElExt(c).reduce() for c in p1]
+            self.zcoeff = [ZFieldElExt(c).reduce() for c in p1[::-1]]
 
          self.degree = len(self.zcoeff) - 1
 
@@ -331,9 +339,13 @@ class ZPoly(object):
         dtp = 2*d1
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
+        inv_roots = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
         # Recompute roots in case nroots changed or format.
-        if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
-            roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+        #TODO
+        #if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
+            #roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
         self.expand_to_degree(dt, self)
         self._ntt(roots[:dt/2 + 1])
         for i in xrange(dt+1):
@@ -354,9 +366,12 @@ class ZPoly(object):
         dtp = d1 + d2
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
+        inv_roots = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
         # Recompute roots in case nroots changed or format.
-        if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
-            roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+        #TODO
+        #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
+        #    roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
         p2.expand_to_degree(dt, p2)
@@ -381,9 +396,11 @@ class ZPoly(object):
         dtp = d1
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
+        roots = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
         # Recompute roots in case nroots changed or format.
-        if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
-            roots, _ = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+        #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
+        #    roots, _ = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
 
@@ -400,9 +417,12 @@ class ZPoly(object):
         dtp = d1
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
+        inv_roots = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
         # Recompute roots in case nroots changed or format.
-        if len(inv_roots) != dt or not isinstance(inv_roots[0],type(self.zcoeff[0])):
-            _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+        #TODO
+        #if len(inv_roots) != dt+1 or not isinstance(inv_roots[0],type(self.zcoeff[0])):
+        #    _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
         self._intt(inv_roots[:dt/2 + 1])
@@ -611,7 +631,14 @@ class ZPoly(object):
          Multiply polynomial p(x) with scalar (constant) 
         """
         if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
-            return ZPoly([p * a for p in self.zcoeff])
+            if a == 0 and self.FIDX == ZUtils.FEXT:
+               return ZPoly([0])
+            elif a == 0 and self.FIDX == ZUtils.FRDC:
+               return ZPoly([ZFieldElRedc(0)])
+            elif a == 1:
+               return ZPoly(self)
+            else:
+               return ZPoly([p * a for p in self.zcoeff])
         else:
             assert True, "Unexpected data type"
 
@@ -661,6 +688,23 @@ class ZPoly(object):
             return ZPoly([c << k for c in self.get_coeff()])
         else:
             assert True, "Unexpected data type"
+
+    def __eq__(self, v):
+        if not isinstance(v, ZPoly):
+            assert True, "Unexpected data type"
+        p1 = self.norm()
+        p2 = v.norm()
+        if p1.degree != p2.degree :
+            return False
+
+        for idx in xrange(p1.degree+1):
+           if p1.zcoeff[idx] != p2.zcoeff[idx]:
+               return False
+
+        return True
+
+    def __ne__ (self,v):
+        return not self == v
 
     def zero(self):
         """
@@ -743,7 +787,7 @@ class ZPolySparse(ZPoly):
         """
         assert True, "Operation not supported"
 
-    def poly_mul_fft(self, p2): 
+    def poly_mul_fft(self, p2):
         """
           Not supported
         """
@@ -760,7 +804,14 @@ class ZPolySparse(ZPoly):
          Multiply polynomial ``p(x)`` with scalar (constant) ``a``.
         """
         if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
-            return ZPolySparse([self.zcoeff[k] * a for k in self.zcoeff.keys()])
+            if a == 0 and self.FIDX == ZUtils.FEXT:
+               return ZPolySparse({'0':0})
+            elif a == 0 and self.FIDX == ZUtils.FRDC:
+               return ZPolySparse({'0':ZFieldElRedc(0)})
+            elif a == 1:
+               return ZPolySparse(self)
+            else:
+               return ZPolySparse({k : self.zcoeff[k] * a for k in self.zcoeff.keys()})
         else:
             assert True, "Unexpected data type"
 
@@ -807,15 +858,16 @@ class ZPolySparse(ZPoly):
         else :
             # sparse + dense -> dense
             newP = ZPoly(v)
-            coeff = sorted([long(k) for k in p.keys()])
-            if coeff[-1] > newP.get_degree():
-                newP.expand_to_degree(c[-1])
+            self_coeff = self.get_coeff()
+            self_coeff_deg = sorted([long(k) for k in self_coeff.keys()])
+            if self_coeff_deg[-1] > newP.get_degree():
+                newP.expand_to_degree(self_coeff_deg[-1])
 
-            for c in coeff:
-                newP[c] += v[str(c)]
+            for c in self_coeff_deg:
+                newP.zcoeff[c] += self_coeff[str(c)]
         newP.norm()
 
-        return new_p
+        return newP
 
     def __neg__(self):
         """

@@ -243,6 +243,12 @@ class ECC_F2(object):
 
         if scalar < 0:
             scalar = -scalar
+        elif scalar == 0:
+            return self.point_at_inf(self)
+        elif scalar == 1:
+            return ECC_F2(p1=self.ecc1, p2=self.ecc2)
+        elif self.is_inf():
+            return self.point_at_inf(self)
 
         newP = self.point_at_inf()
         result = self
