@@ -280,6 +280,7 @@ class ZField(object):
         if not ZField.is_init():
             assert True, "Finite field not initialized"
 
+        #alpha = long(1)
         gamma = long(1)
         prime = ZField.get_extended_p().as_long()
         for i in xrange(len(ZField.factor_data['factors'])):
@@ -290,9 +291,10 @@ class ZField(object):
             # alpha is random number between 0 and mod (inclusive)
             while beta == 1:
                 alpha = randint(0, prime)
+                #alpha +=1
                 beta = pow(alpha, (prime - 1) / prime_factor, prime)
 
-            gamma = gamma * pow(alpha, (prime - 1) / (prime_factor ** exponent), prime)
+            gamma = gamma * pow(alpha, (prime - 1) / pow(prime_factor, exponent,prime), prime)
             gamma = gamma % (prime)
 
         return ZFieldElExt(gamma)

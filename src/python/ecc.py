@@ -197,7 +197,7 @@ class ECC(object):
           True if point on infinite
           False otherwise
         """
-        return self.P[ECC.X] is None
+        return self.P[ECC.X] is None or (len(self.P) == 3 and self.P[ECC.Z] == 0)
 
     def reduce(self):
         """
