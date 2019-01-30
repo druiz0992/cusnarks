@@ -62,6 +62,7 @@
 from abc import ABCMeta, abstractmethod
 
 from zfield import *
+from z2field_element import *
 
 
 class ECC(object):
@@ -73,6 +74,7 @@ class ECC(object):
     Z = 2
 
     constants_init = False
+    zero = [None, None]
     one = [None, None]
     two = [None, None]
     three = [None, None]
@@ -82,56 +84,25 @@ class ECC(object):
     a = [None, None]
     b = [None, None]
 
-    def __init__(self, p=None, curve=None):
+    def __init__(self, p, curve=None):
         """
           Constructor
 
           Parameters
           ----------
-            p           : list of None, int, long, BigInt or ZFieldEl
-                            of 2 (AFFINE) or 3(JACOBIAN/PROJECTIVE) elements
-            curve           : Dictionary with curve coefficiennts a,b that define curve y^2=x^3+a*x + b. Keys :
+            p           : list of int, long, BigInt, ZFieldEl, Z2FieldEl
+                            of (AFFINE/JACOBIAN/PROJECTIVE) elements
+            curve           : Dictionary with curve coefficients a,b that define curve y^2=x^3+a*x + b. Keys :
               'a' : long/int
               'b' : long/int
         """
         if not ZField.is_init():
-            assert True, "Finite field not initialized"
-        elif curve is None and not ECC.is_curve_init():
-            assert True, "Curve is not initialized"
-        elif type(p) is list:
-            p_l = p
-            if ((isinstance(self, ECCAffine) and len(p) != 2) or
-                (isinstance(self, ECCProjective) and len(p) != 3) or
-                (isinstance(self, ECCJacobian) and len(p) != 3)):
-                    assert True, "Coordinate format doesn't match with point format"
-        elif isinstance(p,ECC):
-            p_l = p.P
-        elif p is None:
-            p_l = None
+            assert False, "Finite field not initialized"
+            return
 
-        if curve is not None:
-            if not isinstance(curve['a'],int) and not isinstance(curve['a'],long):
-                assert True, "Unexpected curve parameters"
-            elif not isinstance(curve['b'],int) and not isinstance(curve['b'],long):
-                assert True, "Unexpected curve parameters"
-            else:
-                self.init_curve(curve['a'], curve['b'])
-
-        # p can be a list of int, long, BigInt
-        if p_l is None or p_l[ECC.X] is None:
-            #self.P = p_l
-            self.P = [None, None, None]
-            self.FIDX = None
-        elif isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
-            self.P = [ZFieldElExt(x) for x in p_l]
-            self.FIDX = ZUtils.FEXT
-        elif isinstance(p_l[ECC.X], ZFieldElRedc):
-            self.P = [ZFieldElRedc(x) for x in p_l]
-            self.FIDX = ZUtils.FRDC
-        else :
-            assert True, "Unexpected format"
-
+        # Initialize params
         if ECC.constants_init is False:
+            ECC.zero = [ZFieldElExt(0), ZFieldElRedc(0)]
             ECC.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
             ECC.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
             ECC.three = [ZFieldElExt(3), ZFieldElExt(3).reduce()]
@@ -139,6 +110,41 @@ class ECC(object):
             ECC.eight = [ZFieldElExt(8), ZFieldElExt(8).reduce()]
 
             ECC.constants_init = True
+
+        if curve is None and not ECC.is_curve_init():
+            assert False, "Curve is not initialized"
+            return
+        elif type(p) is list and len(p) == 3:
+            p_l = p
+        elif isinstance(p,ECC):
+            p_l = p.P
+        else :
+            assert False, "Unexpected data type"
+            return
+
+        if curve is not None:
+            if not isinstance(curve['a'],int) and not isinstance(curve['a'],long):
+                assert False, "Unexpected curve parameters"
+            elif not isinstance(curve['b'],int) and not isinstance(curve['b'],long):
+                assert False, "Unexpected curve parameters"
+            else:
+                self.init_curve(curve['a'], curve['b'])
+
+        # p can be a list of int, long, BigInt
+        if isinstance(p_l[ECC.X], Z2FieldEl):
+            self.P = [Z2FieldEl(x) for x in p_l]
+            self.FIDX = ZUtils.FEXT
+            if isinstance(self.P[ECC.X][0], ZFieldElRedc):
+                self.FIDX = ZUtils.FRDC
+        if isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
+            self.P = [ZFieldElExt(x) for x in p_l]
+            self.FIDX = ZUtils.FEXT
+        elif isinstance(p_l[ECC.X], ZFieldElRedc):
+            self.P = [ZFieldElRedc(x) for x in p_l]
+            self.FIDX = ZUtils.FRDC
+        else :
+            assert False, "Unexpected format"
+
 
     @classmethod
     def is_curve_init(cls):
@@ -197,18 +203,16 @@ class ECC(object):
           True if point on infinite
           False otherwise
         """
-        return self.P[ECC.X] is None or (len(self.P) == 3 and self.P[ECC.Z] == 0)
+        if isinstance(self.P[ECC.X],Z2FieldEl):
+            return self.P[ECC.Z].as_list() == [0,0]
+        elif isinstance(self.P[ECC.X],ZFieldEl):
+            return self.P[ECC.Z].as_long() == 0
 
     def reduce(self):
         """
          Return new Elliptic curve point with coordinates expressed in Montgomert format
         """
-        if self.is_inf() or isinstance(self.P[ECC.X], ZFieldElRedc):
-            newP = self.P
-        elif isinstance(self.P[ECC.X], ZFieldElExt):
-            newP = [x.reduce() for x in self.P]
-        else:
-            assert True, "Unexpected data type"
+        newP = [x.reduce() for x in self.P]
 
         if isinstance(self, ECCProjective):
             return ECCProjective(newP)
@@ -217,18 +221,13 @@ class ECC(object):
         elif isinstance(self, ECCAffine):
             return ECCAffine(newP)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def extend(self):
         """
          Return new Elliptic curve point with coordinates expressed in extended format
         """
-        if self.is_inf() or isinstance(self.P[ECC.X], ZFieldElExt):
-            newP = self.P
-        if isinstance(self.P[ECC.X], ZFieldElRedc):
-            newP = [x.extend() for x in self.P]
-        else:
-            assert True, "Unexpected data type"
+        newP = [x.extend() for x in self.P]
 
         if isinstance(self, ECCProjective):
             return ECCProjective(newP)
@@ -237,7 +236,7 @@ class ECC(object):
         elif isinstance(self, ECCAffine):
             return ECCAffine(newP)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def as_list(self):
         if not self.is_inf():
@@ -252,7 +251,10 @@ class ECC(object):
         """
          returns True of self and P2 are same format of ECC coordinate representation
         """
-        return type(self) == type(P2)
+        if isinstance(P2,Z2FieldEl):
+            return type(self.P[0][0]) == type(P2.P[0][0])
+        else:
+            return type(self.P[0]) == type(P2.P[0])
 
     @abstractmethod
     def __eq__(self, P2):
@@ -296,11 +298,11 @@ class ECC(object):
         if isinstance(alpha, int) or isinstance(alpha, long):
             scalar = alpha
         elif isinstance(alpha, ZFieldElRedc):
-            assert True, "Unexpected type"
+            assert False, "Unexpected type"
         elif isinstance(alpha,BigInt):
             scalar = alpha.bignum
         else:
-            assert True, "Unexpected type"
+            assert False, "Unexpected type"
 
         if self.is_inf():
             return self.point_at_inf()
@@ -339,12 +341,32 @@ class ECC(object):
         """
         pass
 
-    @abstractmethod
     def point_at_inf(self):
         """"
           Return point at infinity
         """
-        pass
+        if isinstance(self.P[0],Z2FieldEl):
+            one = Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])
+            zero = Z2FieldEl([ECC.zero[self.FIDX], ECC.zero[self.FIDX]])
+        else:
+            one = ECC.one[self.FIDX]
+            zero = ECC.zero[self.FIDX]
+
+        inf = [zero, one, zero]
+        if isinstance(self,ECCAffine):
+            newP =  ECCAffine(inf)
+        elif isinstance(self,ECCProjective):
+            newP =  ECCProjective(inf)
+        else:
+            newP =  ECCJacobian(inf)
+
+        if self.FIDX is None:
+            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
+        else:
+            newP.FIDX = self.FIDX
+
+
+        return newP
 
 class ECCAffine(ECC):
     """
@@ -353,10 +375,10 @@ class ECCAffine(ECC):
         x,y are part of finite field Fp
     """
 
-    def __init__(self, p=None, curve=None,force_init=False):
+    def __init__(self, p, curve=None,force_init=False):
         if force_init :
             ECC.constants_init = False
-        ECC.__init__(self, p=p, curve=curve)
+        ECC.__init__(self, p, curve=curve)
 
     def to_projective(self):
         """
@@ -364,11 +386,13 @@ class ECCAffine(ECC):
            actual format (Montgomery/Extended)
         """
         if self.is_inf():
-            return ECCProjective([None, None, None])
+            return ECCAffine(self)
+        elif isinstance(self.P[ECC.X], Z2FieldEl):
+            return ECCProjective([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])])
         elif isinstance(self.P[ECC.X], ZFieldEl):
             return ECCProjective([self.P[ECC.X], self.P[ECC.Y], ECC.one[self.FIDX]])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def to_affine(self):
         """
@@ -383,11 +407,13 @@ class ECCAffine(ECC):
         """
 
         if self.is_inf():
-            return ECCJacobian([None, None, None])
+            return ECCJacobian(self)
+        elif isinstance(self.P[ECC.X], Z2FieldEl):
+            return ECCProjective([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])])
         elif isinstance(self.P[ECC.X], ZFieldEl):
             return ECCJacobian([self.P[ECC.X], self.P[ECC.Y], ECC.one[self.FIDX]])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def is_on_curve(self):
         """
@@ -407,24 +433,29 @@ class ECCAffine(ECC):
 
         """
         if not isinstance(P2,ECCAffine):
-            assert True, "Incorrect point format"
+            assert False, "Incorrect point format"
         elif not self.same_format(P2):
-            assert True, "Finite Field represenation does not match"
+            assert False, "Finite Field represenation does not match"
 
         if self.is_inf():
-            return P2
+            return ECCAffine(P2)
         elif P2.is_inf():
-            return self
+            return ECCAffine(self)
         elif self == P2:
             return self.double()
         elif self.P[ECC.X] == P2.P[ECC.X] and self.P[ECC.Y] != P2.P[ECC.Y]:
-            return ECCAffine([None, None])
+            return self.point_at_inf()
         else:
             s = (self.P[ECC.Y] - P2.P[ECC.Y]) * (self.P[ECC.X] - P2.P[ECC.X]).inv()
             rx = s * s - self.P[ECC.X] - P2.P[ECC.X]
             ry = s * (self.P[ECC.X] - rx) - self.P[ECC.Y]
 
-        return ECCAffine([rx, ry])
+        if isinstance(self.P[0],Z2FieldEl):
+           one = Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])
+        else:
+           one = ECC.one[self.FIDX]
+
+        return ECCAffine([rx, ry, one])
 
     def __sub__(self, P2):
         """
@@ -438,9 +469,13 @@ class ECCAffine(ECC):
         -P1
         """
         if self.is_inf():
-            return self
+            return ECCAffine(self)
         else:
-            return ECCAffine([self.P[ECC.X], -self.P[ECC.Y]])
+            if isinstance(self.P[0],Z2FieldEl):
+                one = Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])
+            else:
+                one = ECC.one[self.FIDX]
+            return ECCAffine([self.P[ECC.X], -self.P[ECC.Y], one])
 
     # doubling operation
     def double(self):
@@ -449,7 +484,7 @@ class ECCAffine(ECC):
          https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Affine_Coordinates
          1LD + 2M + 2S
         """
-        if self.is_inf() or self.P[ECC.Y] == 0:
+        if self.is_inf() or self.P[ECC.Y].as_list() == [0] or self.P[ECC.Y].as_list() == [0,0]:
             return self.point_at_inf()
 
         X = self.P[ECC.X]
@@ -476,7 +511,12 @@ class ECCAffine(ECC):
         rx = l * l - X2
         ry = l *(X - rx) - Y
 
-        return ECCAffine([rx, ry])
+        if isinstance(self.P[0],Z2FieldEl):
+            onef = Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])
+        else:
+            onef = ECC.one[self.FIDX]
+
+        return ECCAffine([rx, ry, onef])
 
         # comparison operators
 
@@ -487,21 +527,9 @@ class ECCAffine(ECC):
         if self.is_inf() and P2.is_inf():
           return True
         elif not isinstance(P2, ECCAffine):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         else:
             return (self.P[ECC.X], self.P[ECC.Y]) == (P2.P[ECC.X], P2.P[ECC.Y])
-
-    def point_at_inf(self):
-        """"
-          Return point at infinity
-        """
-        newP =  ECCAffine([None, None])
-        if self.FIDX is None:
-            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
-        else:
-            newP.FIDX = self.FIDX
-
-        return newP
 
 class ECCProjective(ECC):
     """
@@ -510,11 +538,11 @@ class ECCProjective(ECC):
         x,y are part of finite field Fp
     """
 
-    def __init__(self, p=None, curve=None,force_init=False):
+    def __init__(self, p, curve=None,force_init=False):
         if force_init :
            ECC.constants_init = False
 
-        ECC.__init__(self, p=p, curve=curve)
+        ECC.__init__(self, p, curve=curve)
 
     def to_projective(self):
         """
@@ -527,13 +555,18 @@ class ECCProjective(ECC):
         """
           Converts point to AFFINE
         """
+        if isinstance(self.P[0],Z2FieldEl):
+            one = Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])
+        else:
+            one = ECC.one[self.FIDX]
+
         if self.is_inf():
-            return ECCAffine([None, None])
+            return ECCAffine(self)
         elif isinstance(self.P[ECC.X], ZFieldEl):
             div = self.P[ECC.Z].inv()
-            return ECCAffine([self.P[ECC.X] * div, self.P[ECC.Y] * div])
+            return ECCAffine([self.P[ECC.X] * div, self.P[ECC.Y] * div, one])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def to_jacobian(self):
         """
@@ -562,14 +595,14 @@ class ECCProjective(ECC):
         12M + 2S
         """
         if not isinstance(P2,ECCProjective):
-            assert True, "Incorrect point format"
+            assert False, "Incorrect point format"
         elif not self.same_format(P2):
-            assert True, "Finite Field represenation does not match"
+            assert False, "Finite Field represenation does not match"
 
         if self.is_inf():
-            return P2
+            return ECCProjective(P2)
         elif P2.is_inf():
-            return self
+            return ECCProjective(self)
 
         X1, Y1, Z1 = self.P
         X2, Y2, Z2 = P2.P
@@ -581,7 +614,7 @@ class ECCProjective(ECC):
 
         if V1 == V2:
           if U1 != U2:
-                return ECCProjective([None, None, None])
+                return self.point_at_inf(self)
           else:
                 return self.double()
 
@@ -616,7 +649,7 @@ class ECCProjective(ECC):
           -P1
         """
         if self.is_inf():
-            return self
+            return ECCProjective(self)
         else:
             return ECCProjective([self.P[ECC.X], -self.P[ECC.Y], self.P[ECC.Z]])
 
@@ -626,8 +659,8 @@ class ECCProjective(ECC):
         https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Standard_Projective_Coordinates
         7M + 5S / 7M + 3S
         """
-        if self.is_inf() or self.P[ECC.Y] == 0:
-            return self
+        if self.is_inf() or self.P[ECC.Y].as_list() == [0] or self.P[ECC.Y].as_list() == [0,0]:
+            return ECCProjective(self)
 
         X,Y,Z = self.P
 
@@ -684,23 +717,10 @@ class ECCProjective(ECC):
         if self.is_inf() and P2.is_inf():
             return True
         elif not isinstance(P2, ECCProjective):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         else:
             return (self.P[ECC.X] * P2.P[ECC.Z], self.P[ECC.Y] * P2.P[ECC.Z]) == \
                    (P2.P[ECC.X] * self.P[ECC.Z], P2.P[ECC.Y] * self.P[ECC.Z])
-
-    def point_at_inf(self):
-        """"
-          Return point at infinity
-        """
-        newP =  ECCProjective([None, None])
-        if self.FIDX is None:
-            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
-        else:
-            newP.FIDX = self.FIDX
-
-        return newP
-
 
 class ECCJacobian(ECC):
     """
@@ -709,10 +729,10 @@ class ECCJacobian(ECC):
         x,y are part of finite field Fp
     """
 
-    def __init__(self, p=None, curve=None,force_init=False):
+    def __init__(self, p, curve=None,force_init=False):
         if force_init :
              ECC.constants_init = False
-        ECC.__init__(self, p=p, curve=curve)
+        ECC.__init__(self, p, curve=curve)
 
     def to_projective(self):
         """
@@ -726,15 +746,20 @@ class ECCJacobian(ECC):
         """
           Converts point to AFFINE
         """
+        if isinstance(self.P[0],Z2FieldEl):
+            one = Z2FieldEl([ECC.one[self.FIDX], ECC.one[self.FIDX]])
+        else:
+            one = ECC.one[self.FIDX]
+
         if self.is_inf():
-            return ECCAffine([None, None])
+            return ECCAffine(self)
         elif isinstance(self.P[ECC.X], ZFieldEl):
             zinv = self.P[ECC.Z].inv()
             zinv_sq = zinv * zinv
             zinv_cube = zinv_sq * zinv
-            return ECCAffine([self.P[ECC.X] * zinv_sq, self.P[ECC.Y] * zinv_cube])
+            return ECCAffine([self.P[ECC.X] * zinv_sq, self.P[ECC.Y] * zinv_cube, one])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def to_jacobian(self):
         """
@@ -758,14 +783,14 @@ class ECCJacobian(ECC):
           12M + 4S
         """
         if not isinstance(P2,ECCJacobian):
-            assert True, "Incorrect point format"
+            assert False, "Incorrect point format"
         elif not self.same_format(P2):
-            assert True, "Finite Field represenation does not match"
+            assert False, "Finite Field represenation does not match"
 
         if self.is_inf():
-            return P2
+            return ECCJacobian(P2)
         elif P2.is_inf():
-            return self
+            return ECCJacobian(self)
 
         X1, Y1, Z1 = self.P
         X2, Y2, Z2 = P2.P
@@ -816,7 +841,7 @@ class ECCJacobian(ECC):
           TODO
         """
         if self.is_inf():
-            return self
+            return ECCJacobian(self)
         else:
             return ECCJacobian([self.P[ECC.X], -self.P[ECC.Y], self.P[ECC.Z]])
 
@@ -827,7 +852,7 @@ class ECCJacobian(ECC):
 
          4M + 6S / 4M + 4S
         """
-        if self.is_inf() or self.P[ECC.Y] == 0:
+        if self.is_inf() or self.P[ECC.Y].as_list() == [0] or self.P[ECC.Y].as_list() == [0,0]:
             return self.point_at_inf()
 
         X,Y,Z = self.get_P()
@@ -878,7 +903,7 @@ class ECCJacobian(ECC):
         if self.is_inf() and P2.is_inf():
             return True
         elif not isinstance(P2, ECCJacobian):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         else:
             Z1sq = self.P[ECC.Z] * self.P[ECC.Z]
             Z1cube = Z1sq * self.P[ECC.Z]
@@ -888,19 +913,6 @@ class ECCJacobian(ECC):
             return (self.P[ECC.X] * Z2sq, self.P[ECC.Y] * Z2cube) == \
                    (P2.P[ECC.X] * Z1sq, P2.P[ECC.Y] * Z1cube)
 
-    def point_at_inf(self):
-        """"
-          Return point at infinity
-        """
-        newP =  ECCJacobian([None, None])
-
-        if self.FIDX is None:
-            newP.FIDX = ZUtils.DEFAULT_IN_PFORMAT
-        else:
-            newP.FIDX = self.FIDX
-
-        return newP
-
 def ECC_F1(p=None):
     if ZUtils.DEFAULT_IN_REP_FORMAT == ZUtils.AFFINE:
         return ECCAffine(p=p)
@@ -909,6 +921,6 @@ def ECC_F1(p=None):
     elif ZUtils.DEFAULT_IN_REP_FORMAT == ZUtils.PROJECTIVE:
         return ECCProjective(p=p)
     else :
-        assert True, "Unexpected type"
+        assert False, "Unexpected type"
 
 

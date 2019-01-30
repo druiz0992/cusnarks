@@ -92,7 +92,7 @@ class ECC_F2(object):
            self.ecc2 = ECCJacobian(p2)
 
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
           
 
     def get_P(self):
@@ -122,7 +122,7 @@ class ECC_F2(object):
         elif isinstance(newP1, ECCAffine):
             return ECC_F2(p1=newP1, p2=newP2, coor_fmt=ZUtils.AFFINE)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def extend(self):
         """
@@ -138,7 +138,7 @@ class ECC_F2(object):
         elif isinstance(newP1, ECCAffine):
             return ECC_F2(p1=newP1, p2=newP2, coor_fmt=ZUtils.AFFINE)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def as_list(self):
         if not self.is_inf():
@@ -157,7 +157,7 @@ class ECC_F2(object):
             newP1, newP2 = self.get_P()
             return  ECC_F2(p1 = newP1, p2 = newP2,coor_fmt = ZUtils.PROJECTIVE)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def to_affine(self):
         """
@@ -177,7 +177,7 @@ class ECC_F2(object):
             newP1, newP2 = self.get_P()
             return ECC_F2(p1=newP1, p2=newP2, coor_fmt = ZUtils.JACOBIAN)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def is_on_curve(self):
         """
@@ -203,7 +203,7 @@ class ECC_F2(object):
         elif isinstance(self.ecc1, ECCAffine) and isinstance (other.ecc1, ECCAffine):
             return ECC_F2(p1=newP1.get_P(), p2 = newP2.get_P(), coor_fmt = ZUtils.AFFINE)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     # doubling operation
     def double(self):
@@ -222,7 +222,7 @@ class ECC_F2(object):
         elif isinstance(self.ecc1, ECCAffine):
             return ECC_F2(p1=newP1.get_P(), p2 = newP2.get_P(), coor_fmt = ZUtils.AFFINE)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def __mul__(self, alpha):
         """
@@ -232,11 +232,11 @@ class ECC_F2(object):
         if isinstance(alpha, int) or isinstance(alpha, long):
             scalar = alpha
         elif isinstance(alpha, ZFieldElRedc):
-            assert True, "Unexpected type"
+            assert False, "Unexpected type"
         elif isinstance(alpha,BigInt):
             scalar = alpha.bignum
         else:
-            assert True, "Unexpected type"
+            assert False, "Unexpected type"
 
         if self.is_inf():
             return self.point_at_inf()
@@ -277,5 +277,5 @@ class ECC_F2(object):
         elif isinstance(self.ecc1, ECCAffine):
             return ECC_F2(coor_fmt = ZUtils.AFFINE)
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 

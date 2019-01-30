@@ -98,10 +98,10 @@ class ZPoly(object):
             ZPoly.init = False
 
         if not ZField.is_init():
-            assert True, "Prime field not initialized"
+            assert False, "Prime field not initialized"
         elif isinstance(p, int) or isinstance(p, long) or isinstance(p, BigInt):
             if p < 0:
-                assert True, "Polynomial needs to be at least degree 0"
+                assert False, "Polynomial needs to be at least degree 0"
             else:
                 self.degree = p;
                 prime = ZField.get_extended_p()
@@ -109,7 +109,7 @@ class ZPoly(object):
                 self.zcoeff[-1] = ZFieldElExt(randint(1, prime.as_long() - 1))
                 self.FIDX = ZUtils.FEXT
         elif type(p) is list and isinstance(self, ZPolySparse) :
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         #elif type(p) is list or type(p) is dict:
         #elif type(p) is list or isinstance(self, ZPolySparse):
         elif type(p) is list or type(p) is dict:
@@ -119,7 +119,7 @@ class ZPoly(object):
             self.zcoeff = p.get_coeff()
             self.FIDX = p.FIDX
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
         if ZPoly.init == False:
             ZPoly.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
@@ -147,7 +147,7 @@ class ZPoly(object):
                 zcoeff = [ZFieldElExt(t) for t in p]
                 FIDX = ZUtils.FEXT
             else:
-                assert True, "Unexpected data type"
+                assert False, "Unexpected data type"
         elif type(p) is dict:
             c = sorted([long(k) for k in p.keys()])
             if len(c) > 0:
@@ -173,7 +173,7 @@ class ZPoly(object):
                 degree = p.get_degree()
                 FIDX = p.FIDX
             else:
-                assert True, "Unexpected data type"
+                assert False, "Unexpected data type"
 
         return zcoeff, degree, FIDX
 
@@ -209,7 +209,7 @@ class ZPoly(object):
 
           TODO : implement to_sparse
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
 
     def get_degree(self):
@@ -274,10 +274,10 @@ class ZPoly(object):
          TODO : Force polys are pre-scaled to have a power of 2 number of coeffs
         """
         if not isinstance(p2, ZPoly):    # TODO : For now, limit poly mul to coeffs in same format
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         
         if self.FIDX != p2.FIDX:
-            assert True, "Coefficients need to be in the same format"
+            assert False, "Coefficients need to be in the same format"
         # TODO : Assuming that poly are not pre-scaled with power of two length. 
         #  enforcing that polys have a power of two number of coefficients will save
         #  this operation
@@ -500,7 +500,7 @@ class ZPoly(object):
            TODO optimize. There are far too many copies in this function and in multiplication
         """
         if not isinstance(v, ZPoly):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
         m = self.get_degree()
         n = v.get_degree()
@@ -640,14 +640,14 @@ class ZPoly(object):
             else:
                return ZPoly([p * a for p in self.zcoeff])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def __add__(self, v):
         """
           Add polynomials ``u(x)`` and ``v(x)``.
         """
         if not isinstance(v, ZPoly):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         elif isinstance(v,ZPolySparse):
             return v + self
         else :
@@ -687,11 +687,11 @@ class ZPoly(object):
         if isinstance(k,int) or isinstance(k,long) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
             return ZPoly([c << k for c in self.get_coeff()])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def __eq__(self, v):
         if not isinstance(v, ZPoly):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
         p1 = self.norm()
         p2 = v.norm()
         if p1.degree != p2.degree :
@@ -773,25 +773,25 @@ class ZPolySparse(ZPoly):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
         
     def poly_mul_normal(self, p2):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def poly_square(self):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def poly_mul_fft(self, p2):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def __rmul__(self, a):
         """
@@ -813,38 +813,38 @@ class ZPolySparse(ZPoly):
             else:
                return ZPolySparse({k : self.zcoeff[k] * a for k in self.zcoeff.keys()})
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def ntt(self, powtable):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def intt(self, powtable):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def expand_to_degree(self, d, ret=None):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def scale(self, d, ret=None):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def __add__(self, v):
         """
           Add polynomials ``u(x)`` and ``v(x)``.
         """
         if not isinstance(v, ZPoly):
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
         elif isinstance(v,ZPolySparse):   
             # sparse + sparse -> sparse
@@ -881,17 +881,17 @@ class ZPolySparse(ZPoly):
         if isinstance(k,int) or isinstance(k,long) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
             return ZPolySparse([self.zcoeff[k] << k for k in self.zcoeff.keys()])
         else:
-            assert True, "Unexpected data type"
+            assert False, "Unexpected data type"
 
     def inv(self):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 
     def poly_div(self, v):
         """
           Not supported
         """
-        assert True, "Operation not supported"
+        assert False, "Operation not supported"
 

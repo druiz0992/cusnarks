@@ -189,7 +189,7 @@ class ZUtils(object):
         NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
         """
         if n < 1:
-            assert True, "Number needs to be larger than 1"
+            assert False, "Number needs to be larger than 1"
         result = {'factors': [], 'exponents': []}
         i = 2
         number = n
@@ -213,6 +213,6 @@ class ZUtils(object):
         if np.prod([r ** e for r, e in zip(result['factors'], result['exponents'])]) != number:
             print number
             print result
-            assert True, "Incorrect factorization"
+            assert False, "Incorrect factorization"
 
         return result

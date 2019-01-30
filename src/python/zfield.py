@@ -230,7 +230,7 @@ class ZField(object):
             ZField.redc_prime = BigInt(ZField.redc_data['R'])
 
         else:
-            assert True, "Finite field not initialized"
+            assert False, "Finite field not initialized"
 
     @staticmethod
     def inv(x):
@@ -241,15 +241,15 @@ class ZField(object):
           NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
         """
         if not ZField.is_init():
-            assert True, "Finite field not initialized"
+            assert False, "Finite field not initialized"
         elif isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             x_l = x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             x_l = x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         num = x_l
         p = ZField.get_extended_p().as_long()
@@ -266,7 +266,7 @@ class ZField(object):
             return ZFieldElExt(a % p)
         else:
             print "X : {}, P : {}".format(num, p)
-            assert True, "Reciprocal does not exist"
+            assert False, "Reciprocal does not exist"
 
     @classmethod
     def find_generator(cls):
@@ -278,7 +278,7 @@ class ZField(object):
            Section 11.1 (page 328)
         """
         if not ZField.is_init():
-            assert True, "Finite field not initialized"
+            assert False, "Finite field not initialized"
 
         #alpha = long(1)
         gamma = long(1)
@@ -307,7 +307,7 @@ class ZField(object):
          NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
         """
         if not ZField.is_init():
-            assert True, "Finite field not initialized"
+            assert False, "Finite field not initialized"
 
         gen = ZField.find_generator().as_long()
         prime = ZField.get_extended_p().as_long()
@@ -330,7 +330,7 @@ class ZField(object):
              So, it is not necessary to store both versions. We can just store half
         """
         if not ZField.is_init():
-            assert True, "Prime not initialized"
+            assert False, "Prime not initialized"
 
         # initialize roots
         ZField.roots = [ZFieldElExt(1), ZField.find_primitive_root(nroots)]
@@ -356,7 +356,7 @@ class ZField(object):
          Factorizes prime - 1. Only works for small primes less than PRIME_THR.
         """
         if not ZField.is_init():
-            assert True, "Finite field not initialized"
+            assert False, "Finite field not initialized"
         elif isinstance(factor_data, dict) and 'factors' in factor_data and 'exponents' in factor_data:
             ZField.factor_data = factor_data
 
@@ -364,10 +364,10 @@ class ZField(object):
             if factor_data in ZUtils.CURVE_DATA:
                 ZField.factor_data = ZUtils.CURVE_DATA[factor_data]['factor_data']
             else:
-                assert True, "Field information not available"
+                assert False, "Field information not available"
 
         elif ZField.get_extended_p() > ZField.PRIME_THR:
-            assert True, "Prime is too large to factorize"
+            assert False, "Prime is too large to factorize"
 
         else:
             prime_1 = ZField.get_extended_p().as_long() - 1
@@ -397,11 +397,14 @@ class ZFieldEl(BigInt):
           bignum : BigInt/ZFieldElRedcd/ZFieldElExt -> Initializes element
         """
         if not ZField.is_init():
-            assert True, "Finite Field not initialized"
+            assert False, "Finite Field not initialized"
         elif bignum is None:
             self.bignum = None
         else:
             BigInt.__init__(self, bignum)
+
+    def as_list(self):
+        return [self.bignum]
 
     # Arithmetic operators
     # +, -, *, %, pow, neg, +=, -=
@@ -414,13 +417,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 newz = (self.bignum + x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum + x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElRedc):
             return ZFieldElRedc(newz)
@@ -436,13 +439,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 newz = (self.bignum - x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum - x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElRedc):
             return ZFieldElRedc(newz)
@@ -469,13 +472,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 newz = (self.bignum + x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum + x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElRedc):
             self = ZFieldElRedc(newz)
@@ -493,13 +496,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 newz = (self.bignum - x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum - x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElRedc):
             self = ZFieldElRedc(newz)
@@ -517,14 +520,14 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 newz = (self.bignum % x.bignum)
 
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum % x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElRedc):
             return ZFieldElRedc(newz)
@@ -580,13 +583,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return self.bignum < x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             return self.bignum < x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __le__(self, x):
         """
@@ -599,13 +602,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return self.bignum <= x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             return self.bignum <= x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __eq__(self, x):
         """
@@ -618,13 +621,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return self.bignum == x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             return self.bignum == x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __ne__(self, x):
         """
@@ -637,13 +640,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return self.bignum != x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             return self.bignum != x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __gt__(self, x):
         """
@@ -656,13 +659,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return self.bignum > x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             return self.bignum > x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __ge__(self, x):
         """
@@ -675,13 +678,13 @@ class ZFieldEl(BigInt):
         if isinstance(x, BigInt):
             if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return self.bignum >= x.bignum
         elif isinstance(x, int) or isinstance(x, long):
             return self.bignum >= x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     # Bitwise operators
     #  <<, >>, <<=, >>=, &, |
@@ -691,13 +694,13 @@ class ZFieldEl(BigInt):
            x : BigInt/int/long/ZFieldElExt
         """
         if isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             newZ = (self.as_long() << x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
             newZ = (self.as_long() << x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElExt):
             return ZFieldElExt(newZ)
@@ -712,13 +715,13 @@ class ZFieldEl(BigInt):
          NOTE : x cannot be ZfieldElRedc
         """
         if isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             newZ = (self.as_long() >> x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
             newZ = (self.as_long() >> x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElExt):
             return ZFieldElExt(newZ)
@@ -731,13 +734,13 @@ class ZFieldEl(BigInt):
          NOTE : x cannot be ZfieldElRedc
         """
         if isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             newZ = (self.as_long() >> x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
             newZ = (self.as_long() >> x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElExt):
             self = ZFieldElExt(newZ)
@@ -752,13 +755,13 @@ class ZFieldEl(BigInt):
          NOTE : x cannot be ZfieldElRedc
         """
         if isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             newZ = (self.as_long() << x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
             newZ = (self.as_long() << x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElExt):
             self = ZFieldElExt(newZ)
@@ -775,13 +778,13 @@ class ZFieldEl(BigInt):
          NOTE : x cannot be ZfieldElRedc
         """
         if isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             newZ = (self.as_long() & x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
             newZ = (self.as_long() & x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElExt):
             return ZFieldElExt(newZ)
@@ -796,13 +799,13 @@ class ZFieldEl(BigInt):
          NOTE : x cannot be ZfieldElRedc
         """
         if isinstance(x, ZFieldElRedc):
-            assert True, "Invalid type"
+            assert False, "Invalid type"
         elif isinstance(x, BigInt):
             newZ = (self.as_long() | x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
             newZ = (self.as_long() | x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if isinstance(self, ZFieldElExt):
             return ZFieldElExt(newZ)
@@ -817,7 +820,7 @@ class ZFieldEl(BigInt):
            elif isinstance(l[0],int) or isinstance(l[0],long) or isinstance(l[0], BigInt):
               return [ZFieldElExt(t) for t in l]
            else:
-              assert True, "Unexpected type"
+              assert False, "Unexpected type"
        elif type(l) is dict:
            if isinstance(l.keys()[0],ZfieldElExt) or isinstance(l.keys()[0],ZfieldElRedc):
               return l
@@ -825,13 +828,13 @@ class ZFieldEl(BigInt):
                   isinstance(l.keys[0], BigInt):
               return {i : ZFieldElExt(p[i]) for i in p.keys()}
            else:
-              assert True, "Unexpected type"
+              assert False, "Unexpected type"
        elif isinstance(l,ZfieldElExt) or isinstance(l,ZfieldElRedc):
            return l
        elif isinstance(l,int) or isinstance(l,long) or isinstance(l, BigInt):
            return ZFieldElExt(l)
        else:
-            assert True, "Unexpected type"
+            assert False, "Unexpected type"
             
          
 
@@ -847,14 +850,14 @@ class ZFieldElExt(ZFieldEl):
         """
 
         if not ZField.is_init():
-            assert True, "Finite Field not initialized"
+            assert False, "Finite Field not initialized"
 
         if bignum is None:
             ZFieldEl.__init__(None)
         elif not isinstance(bignum, BigInt) and \
                 not isinstance(bignum, int) and \
                 not isinstance(bignum, long):
-            assert True, "Incorrect Finite Field element format"
+            assert False, "Incorrect Finite Field element format"
         else:
             ZFieldEl.__init__(self, bignum % ZField.get_extended_p().as_long())
 
@@ -886,7 +889,10 @@ class ZFieldElExt(ZFieldEl):
         elif isinstance(x, int) or isinstance(x, long):
             return ZFieldElExt((self.bignum * x))
         elif isinstance(x, BigInt):
-            return ZFieldElExt((self.bignum * x.as_long()))
+            try:
+               return ZFieldElExt((self.bignum * x.as_long()))
+            except  AttributeError :
+                return x * self
         else:
             return x * self
 
@@ -902,11 +908,11 @@ class ZFieldElExt(ZFieldEl):
             return ZFieldElExt(pow(self.bignum, x))
         elif isinstance(x, BigInt):
             if isinstance(x, ZFieldElRedc):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             else:
                 return ZFieldElExt(pow(self.bignum, x.bignum))
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __div__(self, x):
         """
@@ -918,7 +924,7 @@ class ZFieldElExt(ZFieldEl):
         elif isinstance(x, BigInt) or isinstance(x, int) or isinstance(x, long):
             return self * ZField.inv(x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def inv(self):
         """
@@ -938,7 +944,7 @@ class ZFieldElRedc(ZFieldEl):
           bignum : BigInt/ZFieldElRedc/ZFieldElExt -> Initializes element
         """
         if not ZField.is_init():
-            assert True, "Finite Field not initialized"
+            assert False, "Finite Field not initialized"
 
         if bignum is None:
             ZFieldEl.__init__(None)
@@ -946,7 +952,7 @@ class ZFieldElRedc(ZFieldEl):
         elif not isinstance(bignum, BigInt) and \
                 not isinstance(bignum, int) and \
                 not isinstance(bignum, long):
-            assert True, "Incorrect Finite Field element format"
+            assert False, "Incorrect Finite Field element format"
         else:
             ZFieldEl.__init__(self, bignum % ZField.get_extended_p().as_long())
 
@@ -1009,13 +1015,13 @@ class ZFieldElRedc(ZFieldEl):
         if isinstance(x, BigInt):
             x_l = x.as_long()
             if isinstance(x, ZFieldElRedc):
-                assert True, "Invalid type"
+                assert False, "Invalid type"
             elif x < 0:
-                assert True, "Negative exponent"
+                assert False, "Negative exponent"
         elif isinstance(x, int) or isinstance(x, long):
             x_l = x
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         tmpEl = ZFieldElRedc(self)
         z = ZFieldElRedc(ZField.get_reduction_data()['RmodP'])
@@ -1036,7 +1042,7 @@ class ZFieldElRedc(ZFieldEl):
         elif isinstance(x, BigInt) or isinstance(x, int) or isinstance(x, long):
             return self * x.inv()  # Montgomery division
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
 
     def inv(self):

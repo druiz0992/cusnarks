@@ -61,11 +61,11 @@ class ECCTest(unittest.TestCase):
         ZField(c['prime'], c['factor_data'])
         p = c['prime']
 
-        zel1 = [ZFieldElExt(randint(0, p-1)) for x in range(2)]
-        zel2 = [ZFieldElExt(randint(0, p-1)) for x in range(2)]
+        zel1 = [ZFieldElExt(randint(0, p - 1)) for x in range(2)]
+        zel2 = [ZFieldElExt(randint(0, p - 1)) for x in range(2)]
 
-        zel1_exta = [zel1[0] * c['curve_params']['Gx'], zel1[1] * c['curve_params']['Gy']]
-        zel2_exta = [zel2[0] * c['curve_params']['Gx'], zel2[1] * c['curve_params']['Gy']]
+        zel1_exta = [zel1[0] * c['curve_params']['Gx'], zel1[1] * c['curve_params']['Gy'], 1]
+        zel2_exta = [zel2[0] * c['curve_params']['Gx'], zel2[1] * c['curve_params']['Gy'], 1]
 
         zel1_rdca = [zel1_exta[0].reduce(), zel1_exta[1].reduce()]
         zel2_rdca = [zel2_exta[0].reduce(), zel2_exta[1].reduce()]
@@ -91,8 +91,8 @@ class ECCTest(unittest.TestCase):
 
         ## Init ECC 
         # F ext
-        p1_exta = ECCAffine(zel1_exta, curve=c['curve_params'],force_init=True)
-        p1_extp = ECCProjective(zel1_extp,curve =c['curve_params'])
+        p1_exta = ECCAffine(zel1_exta, curve=c['curve_params'], force_init=True)
+        p1_extp = ECCProjective(zel1_extp, curve=c['curve_params'])
         p1_extj = ECCJacobian(zel1_extj, curve=c['curve_params'])
 
         a, b = ECC.get_curve()
@@ -130,33 +130,12 @@ class ECCTest(unittest.TestCase):
         p1_extp = ECCProjective(zel1_extp)
         p2_extp = ECCProjective(p1_extp)
 
-        #TODO -> Not implemented
-        #p1_extj = ECCJacobian(zel1_extj)
-        #p2_extj = ECCJacobian(p1_extj)
+        p1_extj = ECCJacobian(zel1_extj)
+        p2_extj = ECCJacobian(p1_extj)
 
         self.assertTrue(p1_exta == p2_exta)
         self.assertTrue(p1_extp == p2_extp)
-        #self.assertTrue(p1_extj == p2_extj)
-
-        # Init point at infinity
-        p1_exta = ECCAffine([None, None])
-        p1_extp = ECCProjective([None, None, None])
-        p1_extj = ECCJacobian([None, None, None])
-
-        self.assertTrue(p1_exta.is_inf() == True)
-        self.assertTrue(p1_exta.is_affine() == True)
-        self.assertTrue(p1_exta.is_projective() == False)
-        self.assertTrue(p1_exta.is_jacobian() == False)
-
-        self.assertTrue(p1_extp.is_inf() == True)
-        self.assertTrue(p1_extp.is_affine() == False)
-        self.assertTrue(p1_extp.is_projective() == True)
-        self.assertTrue(p1_extp.is_jacobian() == False)
-
-        self.assertTrue(p1_extj.is_inf() == True)
-        self.assertTrue(p1_extj.is_affine() == False)
-        self.assertTrue(p1_extj.is_projective() == False)
-        self.assertTrue(p1_extj.is_jacobian() == True)
+        self.assertTrue(p1_extj == p2_extj)
 
     def test_1conversion(self):
         c = ZUtils.CURVE_DATA['Secp112r1']
@@ -164,18 +143,18 @@ class ECCTest(unittest.TestCase):
         p = c['prime']
 
         for test in xrange(ECCTest.TEST_ITER):
-            zel1 = [ZFieldElExt(randint(0, p-1)) for x in range(2)]
-            zel2 = [ZFieldElExt(randint(0, p-1)) for x in range(2)]
+            zel1 = [ZFieldElExt(randint(0, p - 1)) for x in range(2)]
+            zel2 = [ZFieldElExt(randint(0, p - 1)) for x in range(2)]
 
             # Affine
-            zel1_exta = [zel1[0] * c['curve_params']['Gx'], zel1[1] * c['curve_params']['Gy']]
-            zel2_exta = [zel2[0] * c['curve_params']['Gx'], zel2[1] * c['curve_params']['Gy']]
+            zel1_exta = [zel1[0] * c['curve_params']['Gx'], zel1[1] * c['curve_params']['Gy'], 1]
+            zel2_exta = [zel2[0] * c['curve_params']['Gx'], zel2[1] * c['curve_params']['Gy'], 1]
 
-            zel1_rdca = [zel1_exta[0].reduce(), zel1_exta[1].reduce()]
-            zel2_rdca = [zel2_exta[0].reduce(), zel2_exta[1].reduce()]
+            zel1_rdca = [zel1_exta[0].reduce(), zel1_exta[1].reduce(), zel1_exta[1].reduce()]
+            zel2_rdca = [zel2_exta[0].reduce(), zel2_exta[1].reduce(), zel1_exta[1].reduce()]
 
             # Affine -> Projective
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'], force_init=True)
             p1_extp = p1_exta.to_projective()
             p1_rdca = ECCAffine(zel1_rdca)
             p1_rdcp = p1_rdca.to_projective()
@@ -224,44 +203,27 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(p1_rdca == p1_rdcj.to_affine())
             self.assertTrue(p1_rdca.to_jacobian() == p1_rdcj)
 
-            # Define affine point at infinity
-            p1_exta = ECCAffine([None, None])
-            p1_extp = ECCProjective([None, None, None])
-            p1_extj = ECCJacobian([None, None, None])
-
-            self.assertTrue(p1_exta == p1_extp)
-            self.assertTrue((p1_exta != p1_extp) == False)
-            self.assertTrue((p1_exta != p1_extj) == False)
-            self.assertTrue(p1_exta.to_projective() == p1_extp)
-            self.assertTrue(p1_extp.to_affine() == p1_exta)
-            self.assertTrue(p1_exta.to_jacobian() == p1_extj)
-            self.assertTrue(p1_extj.to_affine() == p1_exta)
-
-
     def test_2operators(self):
         c = ZUtils.CURVE_DATA['BN128']
         ZField(c['prime'], c['factor_data'])
         p = c['prime']
 
         for test in xrange(ECCTest.TEST_ITER2):
-            alpha_ext = ZFieldElExt(randint(0, p-1))
+            alpha_ext = ZFieldElExt(randint(0, p - 1))
             k = ZFieldElExt(1)
 
             # Affine
-            zel1_exta = [k * c['curve_params']['Gx'], k * c['curve_params']['Gy']]
+            zel1_exta = [k * c['curve_params']['Gx'], k * c['curve_params']['Gy'], 1]
 
-            zero_a = [None, None]
-            zero_p = [None, None, None]
-
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'], force_init=True)
 
             while True:
-              z1 = ZFieldElExt(randint(0, p-1))
-              z2 = ZFieldElExt(randint(0, p-1))
-              p1_exta = z1 * p1_exta
-              p2_exta = z2 * p1_exta
-              if p1_exta != p2_exta:
-                  break
+                z1 = ZFieldElExt(randint(0, p - 1))
+                z2 = ZFieldElExt(randint(0, p - 1))
+                p1_exta = z1 * p1_exta
+                p2_exta = z2 * p1_exta
+                if p1_exta != p2_exta:
+                    break
 
             # Affine -> JAcobian (TODO)
             p1_extp = p1_exta.to_projective()
@@ -272,8 +234,8 @@ class ECCTest(unittest.TestCase):
             p2_rdca = p2_exta.reduce()
             p2_rdcp = p2_rdca.to_projective()
 
-            pzero_a = ECCAffine(zero_a)
-            pzero_p = ECCProjective(zero_p)
+            pzero_p = p1_extp.point_at_inf()
+            pzero_a = p1_exta.point_at_inf()
 
             self.assertTrue(p1_exta.is_on_curve() == True)
             self.assertTrue(p2_exta.is_on_curve() == True)
@@ -317,9 +279,9 @@ class ECCTest(unittest.TestCase):
 
             # Operators: + Zero
             r_exta = p1_exta + pzero_a
-            r_rdca = p1_rdca + pzero_a
+            r_rdca = p1_rdca + pzero_a.reduce()
             r_extp = p1_extp + pzero_p
-            r_rdcp = p1_rdcp + pzero_p
+            r_rdcp = p1_rdcp + pzero_p.reduce()
 
             # test __eq__
             self.assertTrue(r_exta.reduce() == r_rdca)
@@ -342,9 +304,9 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(r_rdcp.is_on_curve() == True)
             # Operators: + Zero
             r_exta = pzero_a + p1_exta
-            r_rdca = pzero_a + p1_rdca
+            r_rdca = pzero_a.reduce() + p1_rdca
             r_extp = pzero_p + p1_extp
-            r_rdcp = pzero_p + p1_rdcp
+            r_rdcp = pzero_p.reduce() + p1_rdcp
 
             # test __eq__
             self.assertTrue(r_exta.reduce() == r_rdca)
@@ -402,7 +364,7 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(r_rdca.is_on_curve() == True)
             self.assertTrue(r_extp.is_on_curve() == True)
             self.assertTrue(r_rdcp.is_on_curve() == True)
-            #double operation
+            # double operation
             r_exta = p1_exta.double()
             r_rdca = p1_rdca.double()
             r_extp = p1_extp.double()
@@ -460,23 +422,20 @@ class ECCTest(unittest.TestCase):
         p = c['prime']
 
         for test in xrange(ECCTest.TEST_ITER2):
-            alpha_ext = ZFieldElExt(randint(0, p-1))
+            alpha_ext = ZFieldElExt(randint(0, p - 1))
             k = ZFieldElExt(1)
 
             # Affine
-            zel1_exta = [k * c['curve_params']['Gx'], k * c['curve_params']['Gy']]
+            zel1_exta = [k * c['curve_params']['Gx'], k * c['curve_params']['Gy'], 1]
 
-            zero_a = [None, None]
-            zero_p = [None, None, None]
-
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'], force_init=True)
             while True:
-              z1 = ZFieldElExt(randint(0, p-1))
-              z2 = ZFieldElExt(randint(0, p-1))
-              p1_exta = z1 * p1_exta
-              p2_exta = z2 * p1_exta
-              if p1_exta != p2_exta:
-                  break
+                z1 = ZFieldElExt(randint(0, p - 1))
+                z2 = ZFieldElExt(randint(0, p - 1))
+                p1_exta = z1 * p1_exta
+                p2_exta = z2 * p1_exta
+                if p1_exta != p2_exta:
+                    break
 
             # Affine -> JAcobian
             p1_extj = p1_exta.to_jacobian()
@@ -487,8 +446,8 @@ class ECCTest(unittest.TestCase):
             p2_rdca = p2_exta.reduce()
             p2_rdcj = p2_rdca.to_jacobian()
 
-            pzero_a = ECCAffine(zero_a)
-            pzero_j = ECCJacobian(zero_p)
+            pzero_j = p1_extj.point_at_inf()
+            pzero_a = p1_exta.point_at_inf()
 
             self.assertTrue(p1_exta.is_on_curve() == True)
             self.assertTrue(p2_exta.is_on_curve() == True)
@@ -532,9 +491,9 @@ class ECCTest(unittest.TestCase):
 
             # Operators: + Zero
             r_exta = p1_exta + pzero_a
-            r_rdca = p1_rdca + pzero_a
+            r_rdca = p1_rdca + pzero_a.reduce()
             r_extj = p1_extj + pzero_j
-            r_rdcj = p1_rdcj + pzero_j
+            r_rdcj = p1_rdcj + pzero_j.reduce()
 
             # test __eq__
             self.assertTrue(r_exta.reduce() == r_rdca)
@@ -557,9 +516,9 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(r_rdcj.is_on_curve() == True)
             # Operators: + Zero
             r_exta = pzero_a + p1_exta
-            r_rdca = pzero_a + p1_rdca
+            r_rdca = pzero_a.reduce() + p1_rdca
             r_extj = pzero_j + p1_extj
-            r_rdcj = pzero_j + p1_rdcj
+            r_rdcj = pzero_j.reduce() + p1_rdcj
 
             # test __eq__
             self.assertTrue(r_exta.reduce() == r_rdca)
@@ -617,7 +576,7 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(r_rdca.is_on_curve() == True)
             self.assertTrue(r_extj.is_on_curve() == True)
             self.assertTrue(r_rdcj.is_on_curve() == True)
-            #double operation
+            # double operation
             r_exta = p1_exta.double()
             r_rdca = p1_rdca.double()
             r_extj = p1_extj.double()
@@ -675,15 +634,12 @@ class ECCTest(unittest.TestCase):
         p = c['prime']
 
         for test in xrange(ECCTest.TEST_ITER):
-            alpha_ext = ZFieldElExt(randint(0, p-1))
+            alpha_ext = ZFieldElExt(randint(0, p - 1))
 
             # Affine
-            zel1_exta = [alpha_ext * c['curve_params']['Gx'], alpha_ext * c['curve_params']['Gy']]
+            zel1_exta = [alpha_ext * c['curve_params']['Gx'], alpha_ext * c['curve_params']['Gy'], 1]
 
-            zero_a = [None, None]
-            zero_p = [None, None, None]
-
-            p1_exta = ECCAffine(zel1_exta, c['curve_params'],force_init=True)
+            p1_exta = ECCAffine(zel1_exta, c['curve_params'], force_init=True)
 
             p1_extp = p1_exta.to_projective()
             p1_extj = p1_exta.to_jacobian()
@@ -692,9 +648,9 @@ class ECCTest(unittest.TestCase):
             p1_rdcp = p1_rdca.to_projective()
             p1_rdcj = p1_rdca.to_jacobian()
 
-            pzero_a = ECCAffine(zero_a)
-            pzero_p = ECCProjective(zero_p)
-            pzero_j = ECCJacobian(zero_p)
+            pzero_j = p1_extj.point_at_inf()
+            pzero_a = p1_exta.point_at_inf()
+            pzero_p = p1_extp.point_at_inf()
 
             self.assertTrue(p1_exta.is_on_curve() == False)
             self.assertTrue(p1_rdca.is_on_curve() == False)
@@ -706,5 +662,6 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(pzero_p.is_on_curve() == False)
             self.assertTrue(pzero_j.is_on_curve() == False)
 
+
 if __name__ == "__main__":
-        unittest.main()
+    unittest.main()

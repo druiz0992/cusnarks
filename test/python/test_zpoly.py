@@ -33,7 +33,7 @@
 // TODO  incorrect format  -> once asserts substituted by exceptions,
 //         test incorrect formats can be done
 // TODO after arithmetic operation, we normalize poly. so we need to make
-//    sure that when we compare pèration to expected result, expected result
+//    sure that when we compare operation to expected result, expected result
 //    is also normalized
 // TODO check norm operation after arithmetic operation
 //
@@ -59,7 +59,7 @@ class ZPolyTest(unittest.TestCase):
     def test_0init_ext(self):
         c = ZUtils.CURVE_DATA['BN128']
         prime = c['prime']
-        ZField(prime)
+        ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         ## Init poly by degree
         p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -185,7 +185,7 @@ class ZPolyTest(unittest.TestCase):
     def test_1reduce_extend(self):
         c = ZUtils.CURVE_DATA['BN128']
         prime = c['prime']
-        ZField(prime)
+        ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         for i in xrange(ZPolyTest.TEST_ITER):
             p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -244,7 +244,7 @@ class ZPolyTest(unittest.TestCase):
     def test_2expand(self):
         c = ZUtils.CURVE_DATA['BN128']
         prime = c['prime']
-        ZField(prime)
+        ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         for i in xrange(ZPolyTest.TEST_ITER):
             p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
