@@ -50,10 +50,10 @@ import numpy as np
 
 from zutils import ZUtils
 from random import randint
-from zfield import ZField, ZFieldEl, ZFieldElExt, ZFieldElRedc
-from ecc import ECC, ECCAffine, ECCProjective, ECCJacobian, ECC_F1
-from eccf2 import ECC_F2
-from zpoly import ZPoly, ZPolySparse
+from zfield import *
+from ecc import *
+#from eccf2 import ECC_F2
+from zpoly import *
 
 DEFAULT_WITNESS_LOC = "../../data/witness.json"
 DEFAULT_PROVING_KEY_LOC = "../../data/proving_key.json"
@@ -81,7 +81,7 @@ class GrothSnarks(object):
         self.public_f = public_f
         self.curve_data = ZUtils.CURVE_DATA[curve]
         ZField(self.curve_data['prime'], self.curve_data['factor_data'])
-        ECCAffine(curve=self.curve_data['curve_params'])
+        ECCAffine([1,1,1],curve=self.curve_data['curve_params'])
         ZUtils.set_default_in_p_format(in_point_fmt)  # FEXT
         ZUtils.set_default_in_rep_format(in_coor_fmt) # AFFINE/PROJECTIVE/JACOBIAN
         self.prime = ZField.get_extended_p()
@@ -179,12 +179,10 @@ class GrothSnarks(object):
         self.vk_beta_1_eccf1 = ECC_F1(p=self.vk_proof['vk_beta_1'])
         self.vk_delta_1_eccf1 = ECC_F1(p=self.vk_proof['vk_delta_1'])
 
-        #TODO -> check beta2
-        beta2 = np.transpose(self.vk_proof['vk_beta_2']).tolist()
-        self.vk_beta_2_eccf2 = ECC_F2(p1=beta2[0], p2=beta2[1])
-        #TODO -> check delta 2
-        delta2 = np.transpose(self.vk_proof['vk_delta_2']).tolist()
-        self.vk_delta_2_eccf2 = ECC_F2(p1=delta2[0], p2=delta2[1])
+        beta2 = [Z2FieldEl(el) for el in self.vk_proof['vk_beta_2']]
+        self.vk_beta_2_eccf2 = ECC_F2(beta2)
+        delta2 = [Z2FieldEl(el) for el in self.vk_proof['vk_delta_2']]
+        self.vk_delta_2_eccf2 = ECC_F2(delta2)
 
         
         self.A_eccf1 = []
@@ -194,13 +192,12 @@ class GrothSnarks(object):
         self.hExps_eccf1 = []
         self.public_signals = None
 
-        B2 = np.asarray(self.vk_proof['B2'])
         for s in xrange(self.vk_proof['nVars']):
             self.A_eccf1.append(ECC_F1(p=self.vk_proof['A'][s]))
             self.B1_eccf1.append(ECC_F1(p=self.vk_proof['B1'][s]))
             #TODO -> Fix B2
-            B2T = np.transpose(B2[s]).tolist()
-            self.B2_eccf2.append(ECC_F2(p1=B2T[0], p2=B2T[1]))
+            B2 = [Z2FieldEl(el) for el in self.vk_proof['B2'][s]]
+            self.B2_eccf2.append(ECC_F2(B2))
 
         for s in xrange(self.vk_proof['nPublic']+1,self.vk_proof['nVars']):
              #TODO : Check values of C
@@ -270,16 +267,16 @@ class GrothSnarks(object):
             self.pi_a_eccf1 = self.pi_a_eccf1 + (self.A_eccf1[s] * self.witness_scl[s]) 
 
             #pi_b = pi_b + B[s] * witness[s];
-            #self.pi_b_eccf2 = self.pi_b_eccf2 + (self.B2_eccf2[s] * self.witness_scl[s])
-            k1 = (self.B2_eccf2[s] * self.witness_scl[s])
-            self.pi_b_eccf2 = self.pi_b_eccf2 + k1
-            print s
-            print self.B2_eccf2[s].ecc1.as_list()
-            print self.B2_eccf2[s].ecc2.as_list()
-            print k1.ecc1.as_list()
-            print k1.ecc2.as_list()
-            print self.pi_b_eccf2.ecc1.as_list()
-            print self.pi_b_eccf2.ecc2.as_list()
+            self.pi_b_eccf2 = self.pi_b_eccf2 + (self.B2_eccf2[s] * self.witness_scl[s])
+            #k1 = (self.B2_eccf2[s] * self.witness_scl[s])
+            #self.pi_b_eccf2 = self.pi_b_eccf2 + k1
+            #print s
+            #print self.B2_eccf2[s].ecc1.as_list()
+            #print self.B2_eccf2[s].ecc2.as_list()
+            #print k1.ecc1.as_list()
+            #print k1.ecc2.as_list()
+            #print self.pi_b_eccf2.ecc1.as_list()
+            #print self.pi_b_eccf2.ecc2.as_list()
 
             pib1_eccf1 = pib1_eccf1 + (self.B1_eccf1[s] * self.witness_scl[s]) 
 

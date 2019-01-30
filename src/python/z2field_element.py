@@ -69,6 +69,8 @@ class Z2FieldEl(ZFieldEl):
                 ((isinstance(el[0], ZFieldElExt) and isinstance(el[1], ZFieldElExt)) or \
                  (isinstance(el[0], ZFieldElRedc) and isinstance(el[1], ZFieldElRedc))):
             self.P = el
+        elif type(el) is list and len(el) == 2 and not isinstance(el[0], ZFieldElRedc):
+            self.P = [ZFieldElExt(x) for x in el]
         elif el is None:
             self.P = copy.copy(Z2FieldEl.zero[ZUtils.DEFAULT_IN_REP_FORMAT])
         else:
@@ -112,6 +114,20 @@ class Z2FieldEl(ZFieldEl):
         newZ2.P[1] = -newZ2.P[1]
         return newZ2
 
+    def square(self):
+        idx = 0
+        if isinstance(self.P[0], ZFieldElRedc):
+            idx = 1
+
+        newZ2 = Z2FieldEl(self)
+        ab = self.P[0] * self.P[1]
+        newZ2.P[1] = ab + ab
+        t1 = self.P[0] + Z2FieldEl.non_residue[idx] * self.P[1]
+        a2 = self.P[0] + self.P[1]
+        newZ2.P[0] = t1 * a2 - (ab + Z2FieldEl.non_residue[idx] * ab)
+
+        return newZ2
+
     def __mul__(self, other):
         """
           X * Y
@@ -121,7 +137,10 @@ class Z2FieldEl(ZFieldEl):
             idx = 1
 
         if isinstance(other, Z2FieldEl):
-            if not ((isinstance(self.P[0], ZFieldElExt) and isinstance(self.P[1], ZFieldElExt)) or \
+            if self == other:
+                 return self.square()
+
+            elif not ((isinstance(self.P[0], ZFieldElExt) and isinstance(self.P[1], ZFieldElExt)) or \
                     (isinstance(self.P[0], ZFieldElRedc) and isinstance(self.P[1], ZFieldElRedc))):
                 assert False, "Invalid type"
 
@@ -130,7 +149,7 @@ class Z2FieldEl(ZFieldEl):
 
             newZ2 = Z2FieldEl(self)
             newZ2.P[0] = aA + Z2FieldEl.non_residue[idx] * bB
-            newZ2.P[1] = ((self.P[0] + self.P[1]) * (other.P[0] + other.P[1])) - aA + bB
+            newZ2.P[1] = ((self.P[0] + self.P[1]) * (other.P[0] + other.P[1])) - aA - bB
 
             return newZ2
         elif isinstance(other, int) or isinstance(other, long) or isinstance(other, BigInt) or \
@@ -141,7 +160,9 @@ class Z2FieldEl(ZFieldEl):
             if self.P == Z2FieldEl.zero[idx]:
                 return Z2FieldEl(self)
 
-            if scalar < 0:
+            if scalar == 0:
+              return Z2FieldEl(Z2FieldEl.zero[idx])
+            elif scalar < 0:
                 scalar = -scalar
 
             newZ2 = Z2FieldEl(Z2FieldEl.zero[idx])
@@ -198,6 +219,11 @@ class Z2FieldEl(ZFieldEl):
     def as_list(self):
         return [self.P[0].as_long(), self.P[1].as_long()]
 
+    """
+    def as_long(self):
+        return self.as_list()
+    """
+
     def __div__(self, other):
         assert False, "Operation not supported"
         return
@@ -207,5 +233,17 @@ class Z2FieldEl(ZFieldEl):
         return
 
     def inv(self):
-        assert False, "Operation not supported"
-        return
+        idx = 0
+        if isinstance(self.P[0], ZFieldElRedc):
+            idx = 1
+
+        t0 = self.P[0] * self.P[0]
+        t1 = self.P[1] * self.P[1]
+        t2 = t0 - Z2FieldEl.non_residue[idx] * t1
+        t3 = t2.inv()
+
+        newZ2 = Z2FieldEl(self)
+        newZ2.P[0] = self.P[0] * t3
+        newZ2.P[1] = -(self.P[1] * t3)
+
+        return newZ2
