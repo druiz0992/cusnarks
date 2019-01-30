@@ -84,12 +84,12 @@ class BigInt(object):
                     try:
                         lthr = long(min_bignum, 16)
                     except ValueError:
-                        assert True, "min_bignum string not a hexadecimal number"
+                        assert False, "min_bignum string not a hexadecimal number"
                 else:
                     try:
                         lthre = long(min_bignum, 10)
                     except ValueError:
-                        assert True, "min_bignum string not a decimal number"
+                        assert False, "min_bignum string not a decimal number"
 
             elif isinstance(min_bignum, BigInt):
                 lthr = long(min_bignum.bignum)
@@ -98,7 +98,7 @@ class BigInt(object):
                 lthr = long(min_bignum)
 
             else:
-                assert True, "Invalid type min_bignum"
+                assert False, "Invalid type min_bignum"
 
         # Check if input is string and convert to long format
         if isinstance(bignum, str):
@@ -106,12 +106,12 @@ class BigInt(object):
                 try:
                     self.bignum = long(bignum, 16)
                 except ValueError:
-                    assert True, "String not a hexadecimal number"
+                    assert False, "String not a hexadecimal number"
             else:
                 try:
                     self.bignum = long(bignum, 10)
                 except ValueError:
-                    assert True, "String not a decimal number"
+                    assert False, "String not a decimal number"
 
         elif isinstance(bignum, BigInt):
             self.bignum = bignum.bignum
@@ -120,7 +120,7 @@ class BigInt(object):
             self.bignum = long(bignum)
 
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
         if lthr is not None:
             self.bignum = randint(lthr, self.bignum)
@@ -138,7 +138,7 @@ class BigInt(object):
             return BigInt(self.bignum + x)
 
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __sub__(self, x):
         """
@@ -149,7 +149,7 @@ class BigInt(object):
         elif isinstance(x, int) or isinstance(x, long):
             return BigInt(self.bignum - x)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __mul__(self, x):
         """
@@ -171,7 +171,7 @@ class BigInt(object):
         elif isinstance(x, BigInt) and x <= BigInt.POW_THR:
             return BigInt(self.bignum ** x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __floordiv__(self, x):
         """
@@ -182,7 +182,7 @@ class BigInt(object):
         elif isinstance(x, BigInt):
             return BigInt(self.bignum // x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __mod__(self, x):
         """
@@ -193,7 +193,7 @@ class BigInt(object):
         elif isinstance(x, BigInt):
             return BigInt(self.bignum % x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __neg__(self):
         """
@@ -212,7 +212,7 @@ class BigInt(object):
             self.bignum += x
             return BigInt(self.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __isub__(self, x):
         """
@@ -225,7 +225,7 @@ class BigInt(object):
             self.bignum -= x
             return BigInt(self.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     # Bitwise operators
     #  <<, >>, <<=, >>=, &, |
@@ -238,7 +238,7 @@ class BigInt(object):
         elif isinstance(x, BigInt):
             return BigInt(self.bignum << x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __rshift__(self, x):
         """
@@ -249,7 +249,7 @@ class BigInt(object):
         elif isinstance(x, BigInt):
             return BigInt(self.bignum >> x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __ilshift__(self, x):
         """
@@ -262,7 +262,7 @@ class BigInt(object):
             self.bignum <<= x.bignum
             return BigInt(self.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __rshift__(self, x):
         """
@@ -275,7 +275,7 @@ class BigInt(object):
             self.bignum >>= x.bignum
             return BigInt(self.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __and__(self, x):
         """
@@ -286,7 +286,7 @@ class BigInt(object):
         elif isinstance(x, BigInt):
             return BigInt(self.bignum & x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __or__(self, x):
         """
@@ -297,7 +297,7 @@ class BigInt(object):
         elif isinstance(x, BigInt):
             return BigInt(self.bignum | x.bignum)
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     # Comparison operators
     # <, <=, >, >=, ==, !=
@@ -311,7 +311,7 @@ class BigInt(object):
         elif isinstance(y, int) or isinstance(y, long):
             return self.bignum < y
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __le__(self, y):
         """
@@ -322,7 +322,7 @@ class BigInt(object):
         elif isinstance(y, int) or isinstance(y, long):
             return self.bignum <= y
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __eq__(self, y):
         """
@@ -333,7 +333,7 @@ class BigInt(object):
         elif isinstance(y, int) or isinstance(y, long):
             return self.bignum == y
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __ne__(self, y):
         """
@@ -344,7 +344,7 @@ class BigInt(object):
         elif isinstance(y, int) or isinstance(y, long):
             return self.bignum != y
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __gt__(self, y):
         """
@@ -355,7 +355,7 @@ class BigInt(object):
         elif isinstance(y, int) or isinstance(y, long):
             return self.bignum > y
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def __ge__(self, y):
         """
@@ -366,7 +366,7 @@ class BigInt(object):
         elif isinstance(y, int) or isinstance(y, long):
             return self.bignum >= y
         else:
-            assert True, "Invalid type"
+            assert False, "Invalid type"
 
     def show(self):
         """
