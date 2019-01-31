@@ -116,18 +116,21 @@ class ZField(object):
     PRIME_THR = long(1e10)
 
     init_prime = False  # Flag : Is prime initialized
-    ext_prime = None  # Field prime
-    redc_prime = None  # Field Prime (montgomery reduced)
+    ext_prime = []  # Field prime
+    redc_prime = []  # Field Prime (montgomery reduced)
     roots = []  # Field roots of unity
     inv_roots = []  # Filed inverse roots of unity
 
     # Montgomery reduction data
-    redc_data = {'Rbitlen': 0, 'R': 0, 'Rmask': 0, 'Rp': 0, 'Pp': 0, 'RmodP': 0, 'R3modP': 0}
+    redc_data = []
 
     # Factorization data
-    factor_data = {'factors': [],  # prime factors of prime - 1
-                   'exponents': []  # prime factors exponents of prime  - 1
-                   }
+    factor_data = []
+    #factor_data.append({'factors': [],  # prime factors of prime - 1
+    #               'exponents': []  # prime factors exponents of prime  - 1
+    #                   })
+
+    active_prime_idx = 0
 
     def __init__(self, q, factor_data=None):
         """
@@ -152,18 +155,40 @@ class ZField(object):
                                                (factor[N-1] ** exponent[N-1])
         """
         ZField.init_prime = True
-        ZField.ext_prime = BigInt(q)
+        ZField.ext_prime = [BigInt(q)]
         # Apply processing for future reduction
         ZField.reduce()
         # init factorization data
-        ZField.factorize(factor_data)
+        ZField.factorize(factor_data=factor_data)
+        ZField.add_roots([],[])
+
+    @classmethod
+    def set_field(cls,idx):
+        ZField.active_prime_idx=idx
+
+    @classmethod
+    def add_field(cls,p, factor_data=None):
+        ZField.ext_prime.append(BigInt(p))
+        idx = len(ZField.ext_prime)-1
+        old_idx = ZField.active_prime_idx
+        ZField.active_prime_idx = idx
+        ZField.reduce()
+        ZField.factorize(factor_data=factor_data)
+        ZField.add_roots([],[])
+        ZField.active_prime_idx = old_idx
+
+    @classmethod
+    def add_roots(cls, r,ri):
+        ZField.roots.append(r)
+        ZField.inv_roots.append(ri)
 
     @classmethod
     def get_extended_p(cls):
         """
           Returns extended prime as BigInt
         """
-        return ZField.ext_prime
+        idx = ZField.active_prime_idx
+        return ZField.ext_prime[idx]
 
     @classmethod
     def get_reduced_p(cls):
@@ -171,7 +196,8 @@ class ZField(object):
           Returns reduced prime as BigInt.
            If None, it means that Field has't undergone Montgomery reduction
         """
-        return ZField.redc_prime
+        idx = ZField.active_prime_idx
+        return ZField.redc_prime[idx]
 
     @classmethod
     def get_reduction_data(cls):
@@ -191,7 +217,8 @@ class ZField(object):
                RmodP :    (long) R (mod P)
                R3modP :   (long) R^3 (mod P)
         """
-        return ZField.redc_data
+        idx = ZField.active_prime_idx
+        return ZField.redc_data[idx]
 
     @classmethod
     def is_init(cls):
@@ -217,17 +244,20 @@ class ZField(object):
             NOTE : function based on https://www.nayuki.io/page/montgomery-reduction-algorithm
         """
         if ZField.is_init():
+            redc_data = {'Rbitlen': 0, 'R': 0, 'Rmask': 0, 'Rp': 0, 'Pp': 0, 'RmodP': 0, 'R3modP': 0}
             p = ZField.get_extended_p().as_long()
             bitlen = int(math.ceil(math.log(p, 2)))
             t = 1 << bitlen | 1  # force it to be odd
-            ZField.redc_data['Rbitlen'] = (t.bit_length() // 8 + 1) * 8  # Multiple of 8
-            ZField.redc_data['R'] = long(1 << ZField.redc_data['Rbitlen'])
-            ZField.redc_data['Rmask'] = long(ZField.redc_data['R'] - 1)
-            ZField.redc_data['Rp'] = ZField.inv(ZField.redc_data['R'] % p).as_long()
-            ZField.redc_data['Pp'] = (ZField.redc_data['R'] * ZField.redc_data['Rp'] - 1) // p
-            ZField.redc_data['RmodP'] = ZField.redc_data['R'] % p
-            ZField.redc_data['R3modP'] = (ZField.redc_data['R'] * ZField.redc_data['R'] * ZField.redc_data['R']) % p
-            ZField.redc_prime = BigInt(ZField.redc_data['R'])
+            redc_data['Rbitlen'] = (t.bit_length() // 8 + 1) * 8  # Multiple of 8
+            redc_data['R'] = long(1 << redc_data['Rbitlen'])
+            redc_data['Rmask'] = long(redc_data['R'] - 1)
+            redc_data['Rp'] = ZField.inv(redc_data['R'] % p).as_long()
+            redc_data['Pp'] = (redc_data['R'] * redc_data['Rp'] - 1) // p
+            redc_data['RmodP'] = redc_data['R'] % p
+            redc_data['R3modP'] = (redc_data['R'] * redc_data['R'] * redc_data['R']) % p
+
+            ZField.redc_prime.append(BigInt(redc_data['R']))
+            ZField.redc_data.append(redc_data)
 
         else:
             assert False, "Finite field not initialized"
@@ -281,12 +311,13 @@ class ZField(object):
             assert False, "Finite field not initialized"
 
         #alpha = long(1)
+        idx = ZField.active_prime_idx
         gamma = long(1)
         prime = ZField.get_extended_p().as_long()
-        for i in xrange(len(ZField.factor_data['factors'])):
+        for i in xrange(len(ZField.factor_data[idx]['factors'])):
             beta = long(1)
-            prime_factor = ZField.factor_data['factors'][i]
-            exponent = ZField.factor_data['exponents'][i]
+            prime_factor = ZField.factor_data[idx]['factors'][i]
+            exponent = ZField.factor_data[idx]['exponents'][i]
 
             # alpha is random number between 0 and mod (inclusive)
             while beta == 1:
@@ -318,7 +349,8 @@ class ZField(object):
         """
           returns computed roots of unity
         """
-        return ZField.roots, ZField.inv_roots
+        idx = ZField.active_prime_idx
+        return ZField.roots[idx], ZField.inv_roots[idx]
 
     @classmethod
     def find_roots(cls, nroots, find_inv_roots=True, rformat_ext=True):
@@ -332,23 +364,23 @@ class ZField(object):
         if not ZField.is_init():
             assert False, "Prime not initialized"
 
+        idx = ZField.active_prime_idx
         # initialize roots
-        ZField.roots = [ZFieldElExt(1), ZField.find_primitive_root(nroots)]
+        ZField.roots[idx] = [ZFieldElExt(1), ZField.find_primitive_root(nroots)]
 
-        ZField.inv_roots = []
-        root_1 = ZField.roots[1]
+        root_1 = ZField.roots[idx][1]
         for i in xrange(nroots - 2):
-            ZField.roots.append(root_1 * ZField.roots[-1])
+            ZField.roots[idx] = ZField.roots[idx] + [root_1 * ZField.roots[idx][-1]]
 
         if find_inv_roots:
-            ZField.inv_roots = [ZFieldElExt(1)]
-            ZField.inv_roots[1:] = map(ZField.inv, ZField.roots[1:])
+            ZField.inv_roots[idx] = [ZFieldElExt(1)]
+            ZField.inv_roots[idx][1:] = map(ZField.inv, ZField.roots[idx][1:])
 
         if rformat_ext == False:
-            ZField.roots = [x.reduce() for x in ZField.roots]
-            ZField.inv_roots = [x.reduce() for x in ZField.inv_roots]
+            ZField.roots[idx] = [x.reduce() for x in ZField.roots]
+            ZField.inv_roots[idx] = [x.reduce() for x in ZField.inv_roots]
 
-        return ZField.roots, ZField.inv_roots
+        return ZField.roots[idx], ZField.inv_roots[idx]
 
     @classmethod
     def factorize(cls, factor_data=None):
@@ -358,22 +390,22 @@ class ZField(object):
         if not ZField.is_init():
             assert False, "Finite field not initialized"
         elif isinstance(factor_data, dict) and 'factors' in factor_data and 'exponents' in factor_data:
-            ZField.factor_data = factor_data
+            ZField.factor_data.append(factor_data)
 
         elif isinstance(factor_data, str):
             if factor_data in ZUtils.CURVE_DATA:
-                ZField.factor_data = ZUtils.CURVE_DATA[factor_data]['factor_data']
+                ZField.factor_data.append(ZUtils.CURVE_DATA[factor_data]['factor_data'])
             else:
                 assert False, "Field information not available"
 
         elif ZField.get_extended_p() > ZField.PRIME_THR:
-            assert False, "Prime is too large to factorize"
+            ZField.factor_data.append([None])
 
         else:
             prime_1 = ZField.get_extended_p().as_long() - 1
-            ZField.factor_data = ZUtils.prime_factors(prime_1)
+            ZField.factor_data.append(ZUtils.prime_factors(prime_1))
 
-        return ZField.factor_data
+        return ZField.factor_data[-1]
 
     @classmethod
     def get_factors(cls):
@@ -382,7 +414,8 @@ class ZField(object):
             'factors' : array of prime factors
             'exponents' : array of prime factor exponent
         """
-        return ZField.factor_data
+        idx = ZField.active_prime_idx
+        return ZField.factor_data[idx]
 
 
 class ZFieldEl(BigInt):
@@ -874,7 +907,7 @@ class ZFieldElExt(ZFieldEl):
         """
           Do nothing
         """
-        return self
+        return ZFieldElExt(self)
 
     # Arithmetic operators
     # *, /, pow
@@ -960,7 +993,7 @@ class ZFieldElRedc(ZFieldEl):
         """
          Do nothing
         """
-        return self
+        return ZFieldElRedc(self)
 
     def extend(self):
         """
