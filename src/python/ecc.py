@@ -102,14 +102,7 @@ class ECC(object):
 
         # Initialize params
         if ECC.constants_init is False:
-            ECC.zero = [ZFieldElExt(0), ZFieldElRedc(0)]
-            ECC.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
-            ECC.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
-            ECC.three = [ZFieldElExt(3), ZFieldElExt(3).reduce()]
-            ECC.four = [ZFieldElExt(4), ZFieldElExt(4).reduce()]
-            ECC.eight = [ZFieldElExt(8), ZFieldElExt(8).reduce()]
-
-            ECC.constants_init = True
+            ECC.init_constants()
 
         if curve is None and not ECC.is_curve_init():
             assert False, "Curve is not initialized"
@@ -149,6 +142,22 @@ class ECC(object):
     @classmethod
     def is_curve_init(cls):
         return ECC.a[ZUtils.FEXT] is not None and ECC.b[ZUtils.FEXT] is not None
+
+    @classmethod
+    def init(cls, curve_params):
+        ECC.init_curve(curve_params['a'], curve_params['b'])
+        ECC.init_constants()
+
+    @classmethod
+    def init_constants(cls):
+         ECC.zero = [ZFieldElExt(0), ZFieldElRedc(0)]
+         ECC.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
+         ECC.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
+         ECC.three = [ZFieldElExt(3), ZFieldElExt(3).reduce()]
+         ECC.four = [ZFieldElExt(4), ZFieldElExt(4).reduce()]
+         ECC.eight = [ZFieldElExt(8), ZFieldElExt(8).reduce()]
+
+         ECC.constants_init = True
 
     @classmethod
     def init_curve(cls, a, b):
@@ -333,7 +342,7 @@ class ECC(object):
                 newP += result
             result = result.double()
             scalar >>= 1
-        return result
+        return newP
 
     def __rmul__(self, alpha):
         """

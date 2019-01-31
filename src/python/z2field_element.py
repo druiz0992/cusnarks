@@ -172,7 +172,7 @@ class Z2FieldEl(ZFieldEl):
                     newZ2 += result
                 result = result.double()
                 scalar >>= 1
-            return result
+            return newZ2
 
     def __rmul__(self, alpha):
         return self * alpha

@@ -94,9 +94,6 @@ class ZPoly(object):
 
            - ZPoly : New Poly is copied
         """
-        if force_init:
-            ZPoly.init = False
-
         if not ZField.is_init():
             assert False, "Prime field not initialized"
         elif isinstance(p, int) or isinstance(p, long) or isinstance(p, BigInt):
@@ -121,7 +118,7 @@ class ZPoly(object):
         else:
             assert False, "Unexpected data type"
 
-        if ZPoly.init == False:
+        if ZPoly.init == False or force_init:
             ZPoly.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
             ZPoly.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
             ZPoly.init = True
