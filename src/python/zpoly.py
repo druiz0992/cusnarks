@@ -119,9 +119,21 @@ class ZPoly(object):
             assert False, "Unexpected data type"
 
         if ZPoly.init == False or force_init:
-            ZPoly.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
-            ZPoly.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
-            ZPoly.init = True
+            ZPoly.init_constants()
+
+    @classmethod
+    def init_constants(cls):
+        ZPoly.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
+        ZPoly.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
+        ZPoly.init = True
+
+    @classmethod
+    def init(cls, idx=None):
+        old_idx = ZField.active_prime_idx
+        if idx is not None:
+            ZField.set_field(idx)
+        ZPoly.init_constants()
+        ZField.active_prime_idx = old_idx
 
     @classmethod
     def set_properties(cls, p):
@@ -290,7 +302,7 @@ class ZPoly(object):
             p = self * p2.zcoeff[0]
             self.zcoeff, self.degree, self.FIDX = p.get_properties()
 
-        elif d1+d2 < ZPoly.FFT_MUL_THRES :
+        elif d1+d2 < ZPoly.FFT_MUL_THRES:
             self.poly_mul_normal(p2)
 
         elif self == p2:
@@ -336,20 +348,20 @@ class ZPoly(object):
         dtp = 2*d1
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
-        roots = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
 
         # Recompute roots in case nroots changed or format.
         #TODO
         #if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
             #roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
         self.expand_to_degree(dt, self)
-        self._ntt(roots[:dt/2 + 1])
-        self.zcoeff = np.multiply(self.zcoeff, self.zcoeff).tolist()
-        #for i in xrange(dt+1):
-           #self.zcoeff[i] = self.zcoeff[i] ** 2
+        self._ntt(roots_slice[:dt/2 + 1])
+        #self.zcoeff = np.multiply(self.zcoeff, self.zcoeff).tolist()
+        for i in xrange(dt+1):
+           self.zcoeff[i] = self.zcoeff[i] ** 2
 
-        self._intt(inv_roots[:dt/2 + 1])
+        self._intt(inv_roots_slice[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
 
     def poly_mul_fft(self, p2, skip_fft=False): 
@@ -364,8 +376,8 @@ class ZPoly(object):
         dtp = d1 + d2
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
-        roots = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
         # Recompute roots in case nroots changed or format.
         #TODO
         #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
@@ -375,14 +387,14 @@ class ZPoly(object):
         p2.expand_to_degree(dt, p2)
 
         if not skip_fft:
-           self._ntt(roots[:dt/2 + 1])
-           p2._ntt(roots[:dt/2 + 1])
+           self._ntt(roots_slice[:dt/2 + 1])
+           p2._ntt(roots_slice[:dt/2 + 1])
 
         self.zcoeff = np.multiply(self.zcoeff, p2.zcoeff).tolist()
         #for i in xrange(dt+1):
         #   self.zcoeff[i] *= p2.zcoeff[i]
 
-        self._intt(inv_roots[:dt/2 + 1])
+        self._intt(inv_roots_slice[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
 
     def ntt(self): 
@@ -395,7 +407,7 @@ class ZPoly(object):
         dtp = d1
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        roots = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
 
         # Recompute roots in case nroots changed or format.
         #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
@@ -403,7 +415,7 @@ class ZPoly(object):
 
         self.expand_to_degree(dt, self)
 
-        self._ntt(roots[:dt/2 + 1])
+        self._ntt(roots_slice[:dt/2 + 1])
 
     def intt(self): 
         """
@@ -416,7 +428,7 @@ class ZPoly(object):
         dtp = d1
         dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
 
         # Recompute roots in case nroots changed or format.
         #TODO
@@ -424,7 +436,7 @@ class ZPoly(object):
         #    _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
-        self._intt(inv_roots[:dt/2 + 1])
+        self._intt(inv_roots_slice[:dt/2 + 1])
 
     def _ntt(self, powtable):
         """
@@ -449,7 +461,7 @@ class ZPoly(object):
                 y = (y << 1) | (x & 1)
                 x >>= 1
             return y
-
+ 
         for i in range(n):
             j = reverse(i, levels)
             if j > i:
@@ -767,6 +779,23 @@ class ZPolySparse(ZPoly):
         else :
             return self.zero()
         
+    def extend(self):
+        """
+          Convert poly coeffs from REDC to EXT 
+        """
+        if self.FIDX == ZUtils.FRDC:
+            return ZPolySparse({k : v.extend() for k,v in self.zcoeff.items()})
+        else:
+            return self
+
+    def reduce(self):
+        """
+          Convert poly coeffs from EXT to REDC
+        """
+        if self.FIDX == ZUtils.FEXT:
+            return ZPolySparse({k : v.reduce() for k,v in self.zcoeff.items()})
+        else:
+            return self
 
     def poly_mul(self, p2):
         """
@@ -868,6 +897,11 @@ class ZPolySparse(ZPoly):
         newP.degree = max(self.get_degree(),v.get_degree())
         return newP.norm()
 
+    def __eq__(self,other):
+        return self.FIDX == other.FIDX and self.zcoeff == other.zcoeff and self.degree == other.degree
+
+    def __ne__(self,other):
+        return not self==other
 
     def __neg__(self):
         """

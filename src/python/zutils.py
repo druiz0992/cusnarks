@@ -141,7 +141,7 @@ class ZUtils(object):
     FRDC = 1
     DEFAULT_IN_PFORMAT = FEXT
 
-    NROOTS = 5096
+    NROOTS = 8192
 
     @classmethod
     def get_default_in_rep_format(cls):
