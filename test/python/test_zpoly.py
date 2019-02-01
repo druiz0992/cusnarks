@@ -53,7 +53,7 @@ from zutils import *
 
 class ZPolyTest(unittest.TestCase):
     TEST_ITER = 1
-    MAX_POLY_DEGREE = 1000
+    MAX_POLY_DEGREE = 200
     SHIFT_SCALAR = 70
 
     def test_0init_ext(self):
@@ -70,7 +70,7 @@ class ZPolyTest(unittest.TestCase):
         self.assertTrue(len(r_c) == p_d + 1)
         self.assertTrue(r_d == p_d)
         self.assertTrue(isinstance(r_c[0], ZFieldElExt))
-        self.assertTrue(r_f == ZPoly.FEXT)
+        self.assertTrue(r_f == ZUtils.FEXT)
 
         # inti poly by list
         p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -82,7 +82,7 @@ class ZPolyTest(unittest.TestCase):
         self.assertTrue(len(r_c) == p_d + 1)
         self.assertTrue(r_d == p_d)
         self.assertTrue(isinstance(r_c[0], ZFieldElExt))
-        self.assertTrue(r_f == ZPoly.FEXT)
+        self.assertTrue(r_f == ZUtils.FEXT)
 
         # inti poly by list (ZFieldRdc)
         p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -94,7 +94,7 @@ class ZPolyTest(unittest.TestCase):
         self.assertTrue(len(r_c) == p_d + 1)
         self.assertTrue(r_d == p_d)
         self.assertTrue(isinstance(r_c[0], ZFieldElRedc))
-        self.assertTrue(r_f == ZPoly.FRDC)
+        self.assertTrue(r_f == ZUtils.FRDC)
 
         # inti poly by ZPoly
         p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -135,7 +135,7 @@ class ZPolyTest(unittest.TestCase):
         self.assertTrue(len(r_c) == p_d + 1)
         self.assertTrue(r_d == p_d)
         self.assertTrue(isinstance(r_c[0], ZFieldElExt))
-        self.assertTrue(r_f == ZPoly.FEXT)
+        self.assertTrue(r_f == ZUtils.FEXT)
 
         # inti poly by dict (ZFieldRdc)
         p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -150,7 +150,7 @@ class ZPolyTest(unittest.TestCase):
         self.assertTrue(len(r_c) == p_d + 1)
         self.assertTrue(r_d == p_d)
         self.assertTrue(isinstance(r_c[0], ZFieldElRedc))
-        self.assertTrue(r_f == ZPoly.FRDC)
+        self.assertTrue(r_f == ZUtils.FRDC)
 
         # inti poly by ZPoly
         p_d = randint(1, ZPolyTest.MAX_POLY_DEGREE)
@@ -204,11 +204,11 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(len(rext_c) == p_d + 1)
             self.assertTrue(rext_d == p_d)
             self.assertTrue(isinstance(rext_c[0], ZFieldElExt))
-            self.assertTrue(rext_f == ZPoly.FEXT)
+            self.assertTrue(rext_f == ZUtils.FEXT)
             self.assertTrue(len(rrdc_c) == p_d + 1)
             self.assertTrue(rrdc_d == p_d)
             self.assertTrue(isinstance(rrdc_c[0], ZFieldElRedc))
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
 
@@ -233,11 +233,11 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(len(rext_c) == p_d + 1)
             self.assertTrue(rext_d == p_d)
             self.assertTrue(isinstance(rext_c[0], ZFieldElExt))
-            self.assertTrue(rext_f == ZPoly.FEXT)
+            self.assertTrue(rext_f == ZUtils.FEXT)
             self.assertTrue(len(rrdc_c) == p_d + 1)
             self.assertTrue(rrdc_d == p_d)
             self.assertTrue(isinstance(rrdc_c[0], ZFieldElRedc))
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
 
@@ -261,11 +261,11 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(len(rext_c) == new_d + 1)
             self.assertTrue(rext_d == new_d)
             self.assertTrue(isinstance(rext_c[0], ZFieldElExt))
-            self.assertTrue(rext_f == ZPoly.FEXT)
+            self.assertTrue(rext_f == ZUtils.FEXT)
             self.assertTrue(len(rrdc_c) == new_d + 1)
             self.assertTrue(rrdc_d == new_d)
             self.assertTrue(isinstance(rrdc_c[0], ZFieldElRedc))
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(rext_c[p_d + 1:] == [ZFieldElExt(0)] * (new_d - p_d))
@@ -273,10 +273,16 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(rrdc_c[p_d + 1:] == [ZFieldElRedc(0)] * (new_d - p_d))
             self.assertTrue(rrdc_c[:p_d + 1] == poly_rdc.get_coeff()[:p_d + 1])
 
+            #Expand operarion not defined for Sparse poly
+
     def test_3aritmetic(self):
         c = ZUtils.CURVE_DATA['BN128']
-        prime = c['prime']
+        prime = c['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
+
+        roots_ext, inv_roots_ext = ZField.find_roots(ZUtils.NROOTS, rformat_ext=True)
+        roots_rdc = [r.reduce() for r in roots_ext]
+        inv_roots_rdc = [r.reduce() for r in inv_roots_ext]
 
         # *, + , - , /, inv, scalar mul
         for i in xrange(ZPolyTest.TEST_ITER):
@@ -306,8 +312,8 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(rrdc_d == max(p1_d, p2_d))
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(rext_c[:min(p1_d,p2_d)+1] == [r1 + r2 for r1, r2 in zip(poly1_ext.get_coeff()[:min(p1_d, p2_d) + 1],
@@ -330,8 +336,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == max(p1_d, p2_d))
             self.assertTrue(rrdc_d == max(p1_d, p2_d))
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -356,8 +362,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(rext_c == [r2 << shift_sc for r2 in poly1_ext.get_coeff()])
@@ -377,8 +383,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -395,8 +401,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -413,8 +419,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -431,8 +437,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -449,8 +455,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -467,8 +473,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rext_d == poly1_ext.get_degree())
             self.assertTrue(rrdc_d == poly1_rdc.get_degree())
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
@@ -485,8 +491,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rrdca_d == poly1_ext.get_degree())
             self.assertTrue(rrdcb_d == poly1_rdc.get_degree())
-            self.assertTrue(rrdca_f == ZPoly.FRDC)
-            self.assertTrue(rrdcb_f == ZPoly.FRDC)
+            self.assertTrue(rrdca_f == ZUtils.FRDC)
+            self.assertTrue(rrdcb_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re == rr for re, rr in zip(rrdca_c, rrdcb_c)]))
@@ -502,8 +508,8 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(rrdca_d == poly1_ext.get_degree())
             self.assertTrue(rrdcb_d == poly1_rdc.get_degree())
-            self.assertTrue(rrdca_f == ZPoly.FRDC)
-            self.assertTrue(rrdcb_f == ZPoly.FRDC)
+            self.assertTrue(rrdca_f == ZUtils.FRDC)
+            self.assertTrue(rrdcb_f == ZUtils.FRDC)
             self.assertTrue(len(rext_c) == len(rrdc_c))
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(all([re == rr for re, rr in zip(rrdca_c, rrdcb_c)]))
@@ -516,64 +522,68 @@ class ZPolyTest(unittest.TestCase):
             p2_ext = ZPoly(poly2_ext)
             p2_rdc = ZPoly(poly2_rdc)
 
+            ZField.roots[0] = roots_ext
+            ZField.inv_roots[0] = inv_roots_ext
             p1_ext.poly_mul(p2_ext)
+
+            ZField.roots[0] = roots_rdc
+            ZField.inv_roots[0] = inv_roots_rdc
             p1_rdc.poly_mul(p2_rdc)
 
             rext_c, rext_d, rext_f = p1_ext.get_properties()
             rrdc_c, rrdc_d, rrdc_f = p1_rdc.get_properties()
 
 
-            p1_c = [c.as_long() for c in poly1_ext.get_coeff()]
-            p2_c = [c.as_long() for c in poly2_ext.get_coeff()]
-            p3_c = np.polymul(p1_c, p2_c)
-            p3_c = [c % prime for c in p3_c]
-            p3_d = len(p3_c)- 1
+            poly1_ext.poly_mul_normal(poly2_ext)
+            p3_c, p3_d, p3_f = p1_ext.get_properties()
 
             self.assertTrue(rext_d == rrdc_d)
             self.assertTrue(rext_d == p3_d)
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue([c.as_long() for c in rext_c[:len(p3_c)]] == p3_c)
 
-            # / degree num poly < 2* degree den poly
+            # /
             pn_ext   = poly1_ext.scale(-p1_d/2)
-            pd_ext = ZPoly(pn_ext)
+            pd_ext   = poly2_ext.scale(-p2_d/2)
+            pnum     = ZPoly(pn_ext)
+            pden     = ZPoly(pd_ext)
+            prem_ext     = ZPoly(pden.get_degree()/4)
 
-            pnum_ext = pn_ext.scale(p1_d/4)
-            pden_ext = pd_ext.scale(p1_d/4)
-            prem_ext = pd_ext.scale(-p1_d/4 )
 
-            pnum_ext.poly_mul(pd_ext)
-            pnum_ext = pnum_ext + prem_ext
+            ZField.roots[0] = roots_ext
+            ZField.inv_roots[0] = inv_roots_ext
+            pnum.poly_mul(pden)
+            pnum = pnum + prem_ext
+            q_ext    = pnum.poly_div(pd_ext)
 
-            pnum_rdc = pnum_ext.reduce()
-            pden_rdc = pden_ext.reduce()
+            pn_rdc   = poly1_rdc.scale(-p1_d/2)
+            pd_rdc   = poly2_rdc.scale(-p2_d/2)
+            pnum     = ZPoly(pn_rdc)
+            pden     = ZPoly(pd_rdc)
             prem_rdc = prem_ext.reduce()
 
-            p3_ext = pnum_ext.poly_div(pden_ext)
-            p3_rdc = pnum_rdc.poly_div(pden_rdc)
+            ZField.roots[0] = roots_rdc
+            ZField.inv_roots[0] = inv_roots_rdc
+            pnum.poly_mul(pden)
+            pnum = pnum + prem_rdc
+            q_rdc    = pnum.poly_div(pd_rdc)
 
-            p3_ext.poly_mul(pden_ext)
-            p3_ext = p3_ext + prem_ext
+            rext_c, rext_d, rext_f = q_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = q_rdc.get_properties()
 
-            p3_rdc.poly_mul(pden_rdc)
-            p3_rdc = p3_rdc + prem_rdc
-
-            rext_c, rext_d, rext_f = p3_ext.get_properties()
-            rrdc_c, rrdc_d, rrdc_f = p3_rdc.get_properties()
-
-            self.assertTrue(rext_d == pnum_ext.get_degree())
-            self.assertTrue(rrdc_d == pnum_rdc.get_degree())
+            self.assertTrue(rext_d == pn_ext.get_degree())
+            self.assertTrue(rrdc_d == pn_rdc.get_degree())
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(len(rext_c) == len(rrdc_c))
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
-            self.assertTrue(rext_c == pnum_ext.get_coeff())
-            self.assertTrue(rrdc_c == pnum_rdc.get_coeff())
+            self.assertTrue(rext_c == pn_ext.get_coeff())
+            self.assertTrue(rrdc_c == pn_rdc.get_coeff())
 
             # / degree num poly > 2* degree den poly
 
@@ -589,7 +599,12 @@ class ZPolyTest(unittest.TestCase):
             pden_rdc = pden_ext.reduce()
             prem_rdc = prem_ext.reduce()
 
+            ZField.roots[0] = roots_ext
+            ZField.inv_roots[0] = inv_roots_ext
             p3_ext = pnum_ext.poly_div(pden_ext)
+
+            ZField.roots[0] = roots_rdc
+            ZField.inv_roots[0] = inv_roots_rdc
             p3_rdc = pnum_rdc.poly_div(pden_rdc)
 
             p3_ext.poly_mul(pden_ext)
@@ -605,8 +620,8 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(rrdc_d == pnum_rdc.get_degree())
             self.assertTrue(len(rext_c) == rext_d+1)
             self.assertTrue(len(rext_c) == len(rrdc_c))
-            self.assertTrue(rext_f == ZPoly.FEXT)
-            self.assertTrue(rrdc_f == ZPoly.FRDC)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
             self.assertTrue(all([re.reduce() == rr for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(rext_c == pnum_ext.get_coeff())

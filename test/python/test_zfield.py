@@ -98,7 +98,7 @@ class ZFieldTest(unittest.TestCase):
 
         # Check reduction is correctly initialized  - BN128
         # R * Rp - P * Pp = 1
-        a_str = ZUtils.CURVE_DATA['BN128']['prime']
+        a_str = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(hex(long(a_str)), ZUtils.CURVE_DATA['BN128']['curve'])
 
         r_data = ZField.get_reduction_data()
@@ -125,7 +125,7 @@ class ZFieldTest(unittest.TestCase):
         self.assertTrue(factor_data['exponents'] == ZUtils.CURVE_DATA['P1009']['factor_data']['exponents'])
 
         # Check factorization - BN128 with input data
-        a_str = ZUtils.CURVE_DATA['BN128']['prime']
+        a_str = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(a_str, ZUtils.CURVE_DATA['BN128']['factor_data'])
 
         factor_data = ZField.get_factors()
@@ -170,7 +170,7 @@ class ZFieldTest(unittest.TestCase):
     def test3_generator_large_primes(self):
         # For a list of primes, check that generator can generate all the field
 
-        p = ZUtils.CURVE_DATA['BN128']['prime']
+        p = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(p, ZUtils.CURVE_DATA['BN128']['curve'])
         gen = ZField.find_generator().as_long()
 
@@ -211,7 +211,7 @@ class ZFieldTest(unittest.TestCase):
             self.assertTrue(rinv_s == rinvdc_s)
 
     def test5_roots_large_prime(self):
-        p = ZUtils.CURVE_DATA['BN128']['prime']
+        p = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(p, ZUtils.CURVE_DATA['BN128']['curve'])
 
         for i in xrange(ZFieldTest.NROOTS_THR - 1):
@@ -247,7 +247,7 @@ class ZFieldTest(unittest.TestCase):
                 self.assertTrue(r.as_long() == 1)
 
     def test7_inv_large_prime(self):
-        prime = ZUtils.CURVE_DATA['BN128']['prime']
+        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         for i in xrange(ZFieldTest.TEST_ITER):

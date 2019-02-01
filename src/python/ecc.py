@@ -124,7 +124,7 @@ class ECC(object):
                 self.init_curve(curve['a'], curve['b'])
 
         # p can be a list of int, long, BigInt
-        if isinstance(p_l[ECC.X], Z2FieldEl):
+        if isinstance(p_l[ECC.X], Z2FieldEl) or type(p_l[ECC.X]) is list:
             self.P = [Z2FieldEl(x) for x in p_l]
             self.FIDX = ZUtils.FEXT
             if isinstance(self.P[ECC.X].as_list()[0], ZFieldElRedc):
