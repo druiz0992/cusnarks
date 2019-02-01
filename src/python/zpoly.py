@@ -345,8 +345,9 @@ class ZPoly(object):
             #roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
         self.expand_to_degree(dt, self)
         self._ntt(roots[:dt/2 + 1])
-        for i in xrange(dt+1):
-           self.zcoeff[i] = self.zcoeff[i] ** 2
+        self.zcoeff = np.multiply(self.zcoeff, self.zcoeff).tolist()
+        #for i in xrange(dt+1):
+           #self.zcoeff[i] = self.zcoeff[i] ** 2
 
         self._intt(inv_roots[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
@@ -377,8 +378,9 @@ class ZPoly(object):
            self._ntt(roots[:dt/2 + 1])
            p2._ntt(roots[:dt/2 + 1])
 
-        for i in xrange(dt+1):
-           self.zcoeff[i] *= p2.zcoeff[i]
+        self.zcoeff = np.multiply(self.zcoeff, p2.zcoeff).tolist()
+        #for i in xrange(dt+1):
+        #   self.zcoeff[i] *= p2.zcoeff[i]
 
         self._intt(inv_roots[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
@@ -858,13 +860,14 @@ class ZPolySparse(ZPoly):
             self_coeff = self.get_coeff()
             self_coeff_deg = sorted([long(k) for k in self_coeff.keys()])
             if self_coeff_deg[-1] > newP.get_degree():
-                newP.expand_to_degree(self_coeff_deg[-1])
+                newP = newP.expand_to_degree(self_coeff_deg[-1])
 
             for c in self_coeff_deg:
                 newP.zcoeff[c] += self_coeff[str(c)]
-        newP.norm()
 
-        return newP
+        newP.degree = max(self.get_degree(),v.get_degree())
+        return newP.norm()
+
 
     def __neg__(self):
         """

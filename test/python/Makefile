@@ -30,7 +30,7 @@
 PYTHON_TESTS = $(shell find -name 'test_*.py')
 test:
 	@for i in $(PYTHON_TESTS); do \
-	echo "Starting Test in $$i"; \
+	echo "Starting Test :  $$i"; \
 	python $$i; \
 	done
 

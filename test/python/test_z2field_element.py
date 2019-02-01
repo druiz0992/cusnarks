@@ -50,7 +50,7 @@ class Z2FieldElTest(unittest.TestCase):
     TEST_ITER = 1000
 
     def test_0init_ext(self):
-        prime = ZUtils.CURVE_DATA['BN128']['prime']
+        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         ## Init 
@@ -84,7 +84,7 @@ class Z2FieldElTest(unittest.TestCase):
 
     def test_1reduce_extend(self):
 
-        prime = ZUtils.CURVE_DATA['BN128']['prime']
+        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         for i in xrange(Z2FieldElTest.TEST_ITER):
@@ -102,7 +102,7 @@ class Z2FieldElTest(unittest.TestCase):
 
     def test_2arithmetic(self):
 
-        prime = ZUtils.CURVE_DATA['BN128']['prime']
+        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
 
         for i in xrange(Z2FieldElTest.TEST_ITER):

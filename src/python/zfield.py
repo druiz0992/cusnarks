@@ -156,6 +156,12 @@ class ZField(object):
         """
         ZField.init_prime = True
         ZField.ext_prime = [BigInt(q)]
+        ZField.redc_prime = []
+        ZField.roots = []
+        ZField.inv_roots = []
+        ZField.redc_data= []
+        ZField.factor_data = []
+        ZField.active_prime_idx = 0
         # Apply processing for future reduction
         ZField.reduce()
         # init factorization data
@@ -187,6 +193,8 @@ class ZField(object):
         """
           Returns extended prime as BigInt
         """
+        if not ZField.is_init():
+            return None
         idx = ZField.active_prime_idx
         return ZField.ext_prime[idx]
 
@@ -196,6 +204,8 @@ class ZField(object):
           Returns reduced prime as BigInt.
            If None, it means that Field has't undergone Montgomery reduction
         """
+        if not ZField.is_init():
+            return None
         idx = ZField.active_prime_idx
         return ZField.redc_prime[idx]
 
@@ -349,6 +359,8 @@ class ZField(object):
         """
           returns computed roots of unity
         """
+        if not ZField.is_init():
+            return ([],[])
         idx = ZField.active_prime_idx
         return ZField.roots[idx], ZField.inv_roots[idx]
 
@@ -377,8 +389,8 @@ class ZField(object):
             ZField.inv_roots[idx][1:] = map(ZField.inv, ZField.roots[idx][1:])
 
         if rformat_ext == False:
-            ZField.roots[idx] = [x.reduce() for x in ZField.roots]
-            ZField.inv_roots[idx] = [x.reduce() for x in ZField.inv_roots]
+            ZField.roots[idx] = [x.reduce() for x in ZField.roots[idx]]
+            ZField.inv_roots[idx] = [x.reduce() for x in ZField.inv_roots[idx]]
 
         return ZField.roots[idx], ZField.inv_roots[idx]
 
@@ -414,6 +426,8 @@ class ZField(object):
             'factors' : array of prime factors
             'exponents' : array of prime factor exponent
         """
+        if not ZField.is_init():
+            return {'factors' : [], 'exponents' : []} 
         idx = ZField.active_prime_idx
         return ZField.factor_data[idx]
 

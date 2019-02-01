@@ -89,14 +89,14 @@ TEST_SUBDIRS := $(test_dirs)
 	#echo "clearing all in $$i..."; \
 	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
-test:   
-	@for i in $(TEST_SUBDIRS); do \
-	echo "make test in $$i..."; \
-	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
-
 #depend:
 	#@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
 	#echo "make depend in $$i..."; \
 	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) depend); done
+
+test:   
+	@for i in $(TEST_SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
 .PHONY:	test

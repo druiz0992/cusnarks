@@ -54,8 +54,10 @@ from zfield import *
 from ecc import *
 from zpoly import *
 
-DEFAULT_WITNESS_LOC = "../../data/witness.json"
-DEFAULT_PROVING_KEY_LOC = "../../data/proving_key.json"
+DEFAULT_WITNESS_LOC = "../../data/witness_pedersen.json"
+#DEFAULT_WITNESS_LOC = "../../data/witness_multiplier.json"
+#DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_multiplier.json"
+DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_pedersen.json"
 DEFAULT_PROOF_LOC =  "../../data/proof.json"
 DEFAULT_PUBLIC_LOC =  "../../data/public.json"
 
@@ -89,7 +91,6 @@ class GrothSnarks(object):
         ECC.init(self.curve_data['curve_params'])
         ZUtils.set_default_in_p_format(in_point_fmt)  # FEXT
         ZUtils.set_default_in_rep_format(in_coor_fmt) # AFFINE/PROJECTIVE/JACOBIAN
-        #self.prime = ZField.get_extended_p()
 
         #init class variables
         self.init_vars()
@@ -98,79 +99,15 @@ class GrothSnarks(object):
           TODO : pending capability to switch from FEXt to REDC and from/to affine/projective/affine
             right now, everything is ext and jacobian. Also witness_scl needs to be xformed
 
-        ZUtils.set_default_in_p_format(work_point_fmt)  # FEXT
-        ZUtils.set_default_in_rep_format(work_coor_fmt) # AFFINE/PROJECTIVE/JACOBIAN
-
-        # xfrom vars Representation format, point format
-        coor_cb, point_cb = self.get_cb(in_coor_fmt, work_coor_fmt,in_point_fmt, work_point_fmt)  
-        self.xform_vars(coor_cb, point_cb)
         """
 
-    """
-    def get_cb(self, in_coor_fmt, work_coor_fmt, in_point_fmt, work_point_fmt):
-        coor_cb, point_cb = None
-        if in_coor_fmt != work_point_fmt:
-            if work_coor_fmt == ZUtils.AFFINE:
-                coor_cb = to_affine
-            elif work_coor_fmt == ZUtils.JACOBIAN:
-                coor_cb = to_jacobian
-            else:
-                coor_cb = to_projective
-
-        if in_point_fmt != work_point_fmt:
-            if work_point_fmt == ZUtils.FEX:
-                point_cb = extend
-            else:
-                point_cb = reduce
-
-        return coor_cb, point_cb
-
- 
-    def xform_vars(self, coord_cb, point_cb):
-        self.pi_a_eccf1 = self.pi_a_eccf1.coord_cb()
-        self.pi_b_eccf2 = ECC_F2()
-        self.pi_c_eccf1 = ECC_F1()
-  
-        self.polsA = ZPolySparse(self.vk_proof['polsA'])
-        self.polsB = ZPolySparse(self.vk_proof['polsB'])
-        self.polsC = ZPolySparse(self.vk_proof['polsC'])
-
-        self.vk_alfa_1_eccf1 = ECC_F1(p=self.vk_proof['vk_alfa_1'])
-        self.vk_beta_1_eccf1 = ECC_F1(p=self.vk_proof['vk_beta_1'])
-        self.vk_delta_1_eccf1 = ECC_F1(p=self.vk_proof['vk_delta_1'])
-
-        self.vk_beta_2_eccf2 = ECC_F2(p1=beta2[0], p2=beta[1])
-        self.vk_delta_2_eccf2 = ECC_F2(p1=delta2[0], p2=delta2[1])
-
-        
-        self.A_eccf1 = 
-        self.B1_eccf1 = 
-        self.B2_eccf2 = 
-        self.C_eccf1 = []
-        self.hExps_eccf1 = []
-
-        B2 = np.asarray(self.vk_prook['B2'])
-        for s in xrange(self.vk_proof['nVars']):
-            self.A_eccf1.append(ECC_F1(p=self.vk_proof['A'][s]))
-            self.B1_eccf1.append(ECC_F1(p=self.vk_proof['B1'][s]))
-            #TODO -> Fix B2
-            B2T = np.transpose(B2[s]).tolist()
-            self.B2_eccf2.append(ECC_F2(p1=B2T[0], p2=B2T[1]))
-
-         for s in xrange(self.vk_proof.nPublic+1,self.vk_proof['nVars']):
-             #TODO : Check values of C
-             self.C_eccf1.append(ECC_F1(p=self.vk_proof['C'][s]))
-    
-         for s in xrange(len(self.vk_proof['hExps'])):
-             self.hExps_eccf1.append(ECC_F1(p=self.vk_proof['hExps'][s]))
-    """
     def init_vars(self):
         # Init witness to Field El.
         # TODO :  I am assuming that all field el are FielElExt (witness_scl, polsA_sps, polsB_sps, polsC_sps, alfa1...
         # Witness is initialized a BitInt as it will operate on different fields
         self.witness_scl = [BigInt(el) for el in self.witness_scl]
-     
-        # Init pi's  
+
+        # Init pi's
         self.pi_a_eccf1 = ECC_F1()
         self.pi_b_eccf2 = ECC_F2()
         self.pi_c_eccf1 = ECC_F1()
@@ -184,27 +121,26 @@ class GrothSnarks(object):
         delta2 = [Z2FieldEl(el) for el in self.vk_proof['vk_delta_2']]
         self.vk_delta_2_eccf2 = ECC_F2(delta2)
 
-        
-        self.A_eccf1 = []
-        self.B1_eccf1 = []
-        self.B2_eccf2 = []
-        self.C_eccf1 = []
-        self.hExps_eccf1 = []
+
+        #self.C_eccf1 = []
+        #self.hExps_eccf1 = []
         self.public_signals = None
 
-        for s in xrange(self.vk_proof['nVars']):
-            self.A_eccf1.append(ECC_F1(p=self.vk_proof['A'][s]))
-            self.B1_eccf1.append(ECC_F1(p=self.vk_proof['B1'][s]))
-            #TODO -> Fix B2
-            B2 = [Z2FieldEl(el) for el in self.vk_proof['B2'][s]]
-            self.B2_eccf2.append(ECC_F2(B2))
+        self.A_eccf1     = map(ECC_F1,self.vk_proof['A'])
+        self.B1_eccf1    = map(ECC_F1,self.vk_proof['B1'])
+        self.B2_eccf2    = map(ECC_F2, self.vk_proof['B2'])
+        self.C_eccf1     = map(ECC_F1,self.vk_proof['C'])
+        self.hExps_eccf1 = map(ECC_F1,self.vk_proof['hExps'])
 
+
+        """"
         for s in xrange(self.vk_proof['nPublic']+1,self.vk_proof['nVars']):
              #TODO : Check values of C
              self.C_eccf1.append(ECC_F1(p=self.vk_proof['C'][s]))
-    
+
         for s in xrange(len(self.vk_proof['hExps'])):
              self.hExps_eccf1.append(ECC_F1(p=self.vk_proof['hExps'][s]))
+        """
 
         ZField.set_field(GrothSnarks.FieldIDX)
 
@@ -273,6 +209,15 @@ class GrothSnarks(object):
         # can be accomplised by each thread performing a multiplication and storing
         # values in same input EC point
         # Second step is to add all ECC points
+        nVars = self.vk_proof['nVars']
+        nPublic = self.vk_proof['nPublic']
+
+        self.pi_a_eccf1  += np.sum(np.multiply(self.A_eccf1[:nVars], self.witness_scl[:nVars]))
+        self.pi_b_eccf2  += np.sum(np.multiply(self.B2_eccf2[:nVars], self.witness_scl[:nVars]))
+        pib1_eccf1       += np.sum(np.multiply(self.B1_eccf1[:nVars], self.witness_scl[:nVars]))
+        self.pi_c_eccf1  += np.sum(np.multiply(self.C_eccf1[nPublic+1:nVars], self.witness_scl[nPublic+1:nVars]))
+
+        """
         for s in xrange(self.vk_proof['nVars']):
             # pi_a = pi_a + A[s] * witness[s];
             self.pi_a_eccf1 = self.pi_a_eccf1 + (self.A_eccf1[s] * self.witness_scl[s]) 
@@ -290,18 +235,25 @@ class GrothSnarks(object):
             #print self.pi_b_eccf2.ecc2.as_list()
 
             pib1_eccf1 = pib1_eccf1 + (self.B1_eccf1[s] * self.witness_scl[s]) 
+        """
+        """
+        for (let s= vk_proof.nPublic+1; s< vk_proof.nVars; s++) {
 
+            // pi_a  = pi_a  + A[s]  * witness[s];
+            proof.pi_c  = G1.add( proof.pi_c, G1.mulScalar( vk_proof.C[s], witness[s]));
+        }
+        """
         # pi_a = pi_a + alfa1 + delta1 * r
-        self.pi_a_eccf1  = self.pi_a_eccf1 + self.vk_alfa_1_eccf1
-        self.pi_a_eccf1  = self.pi_a_eccf1 + (self.vk_delta_1_eccf1 * self.r_scl)
+        self.pi_a_eccf1  += self.vk_alfa_1_eccf1
+        self.pi_a_eccf1  += (self.vk_delta_1_eccf1 * self.r_scl)
 
         # pi_b = pi_b + beta2 + delta2 * s
-        self.pi_b_eccf2  = self.pi_b_eccf2 + self.vk_beta_2_eccf2 
-        self.pi_b_eccf2  = self.pi_b_eccf2 + (self.vk_delta_2_eccf2 * self.s_scl)
+        self.pi_b_eccf2  += self.vk_beta_2_eccf2
+        self.pi_b_eccf2  += (self.vk_delta_2_eccf2 * self.s_scl)
 
         # pib1 = pib1 + beta1 + delta1 * s
-        pib1_eccf1 = pib1_eccf1 + self.vk_beta_1_eccf1
-        pib1_eccf1 = pib1_eccf1 + (self.vk_delta_1_eccf1 * self.s_scl)
+        pib1_eccf1 += self.vk_beta_1_eccf1
+        pib1_eccf1 += (self.vk_delta_1_eccf1 * self.s_scl)
 
         ZField.set_field(GrothSnarks.FieldIDX)
         d1 = d2 = d3 = 0
@@ -312,17 +264,19 @@ class GrothSnarks(object):
         ZField.set_field(GrothSnarks.GroupIDX)
 
         # Accumulate products of S ecc points and S scalars (same as at the beginning)
+        n_coeff_h = len(coeffH)
+        self.pi_c_eccf1 += np.sum(np.multiply(self.hExps_eccf1[:n_coeff_h ], coeffH[:n_coeff_h]))
+        """
         for i in range(len(coeffH)):
            self.pi_c_eccf1 = self.pi_c_eccf1 + (self.hExps_eccf1[i] * coeffH[i])
+        """   
 
         
         # pi_c = pi_c  + pi_a * s + pib1 * r + delta1  * - (r * s)
-        self.pi_c_eccf1  = self.pi_c_eccf1 + (self.pi_a_eccf1 * self.s_scl)
-        self.pi_c_eccf1  = self.pi_c_eccf1 + (pib1_eccf1 * self.r_scl)
+        self.pi_c_eccf1  += (self.pi_a_eccf1 * self.s_scl) + (pib1_eccf1 * self.r_scl) + d4
         ## TODO  -> PolF.F.affine(PolF.F.neg(PolF.F.mul(r,s) )))) : -(r * s ) mod PolF
         #proof.pi_c  = G1.add( proof.pi_c, G1.mulScalar( vk_proof.vk_delta_1, PolF.F.affine(PolF.F.neg(PolF.F.mul(r,s) ))));
         # IT could do this operation earlier
-        self.pi_c_eccf1  = self.pi_c_eccf1 + d4
 
         self.public_signals = self.witness_scl[1:self.vk_proof['nPublic']+1]
 
@@ -377,10 +331,17 @@ class GrothSnarks(object):
         # polA_T[0] = polA_t[0] + (witness[2] * polsA[2]['0'])
         
 
+        nVars = self.vk_proof['nVars']
+        #polA_T = np.multiply( self.witness_scl[:nVars], self.polsA_sps[:nVars])
+        polA_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polA_T] + self.polsA_sps[:nVars]))
+        polB_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polB_T] + self.polsB_sps[:nVars]))
+        polC_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polC_T] + self.polsC_sps[:nVars]))
+        """
         for s in xrange(self.vk_proof['nVars']):
             polA_T = polA_T + self.witness_scl[s] * self.polsA_sps[s]
             polB_T = polB_T + self.witness_scl[s] * self.polsB_sps[s]
             polC_T = polC_T + self.witness_scl[s] * self.polsC_sps[s]
+        """
 
 
         # in : poly deg nVars-1.  out : poly deg nVars - 1
@@ -395,9 +356,7 @@ class GrothSnarks(object):
 
         # in : 2xpoly deg nVars-1.  out : poly deg nVars - 1
         polAB_S = ZPoly(polA_S)
-        polAB_S.poly_mul_fft(ZPoly(polB_S))
-        polAB_S2 = ZPoly(polA_S)
-        polAB_S2.poly_mul_normal(ZPoly(polB_S))
+        polAB_S.poly_mul(ZPoly(polB_S))
 
         polABC_S = polAB_S - polC_S
     
@@ -417,13 +376,16 @@ class GrothSnarks(object):
 
         # add coefficients of the polynomial (d2*A + d1*B - d3) + d1*d2*Z 
     
-        polH_S = polH_S.expand_to_degree(m)
-  
+
+        polH_S = polH_S + d2 * polA_S + d2 * polB_S
+        """
         for idx in xrange(m):
            d2A = d2 * polA_S.zcoeff[idx]
            d1B = d1 * polB_S.zcoeff[idx]
            polH_S.zcoeff[idx] += d2A + d1B
+        """
 
+        polH_S = polH_S.expand_to_degree(m)
         polH_S.zcoeff[0] -= d3
     
         # Z = x^m -1
