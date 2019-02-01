@@ -89,6 +89,8 @@ class GrothSnarks(object):
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data['curve_params'])
+        ZPoly.init(GrothSnarks.FieldIDX)
+
         ZUtils.set_default_in_p_format(in_point_fmt)  # FEXT
         ZUtils.set_default_in_rep_format(in_coor_fmt) # AFFINE/PROJECTIVE/JACOBIAN
 
