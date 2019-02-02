@@ -177,6 +177,11 @@ class Z2FieldElTest(unittest.TestCase):
             self.assertTrue(z2_rext1 == z2_rext2)
             self.assertTrue(isinstance(z2_rext1.P[0], ZFieldElExt) and isinstance(z2_rext1.P[1], ZFieldElExt))
 
+            alpha_ext = randint(1, 100)
+            r1_ext = z2el2_ext * alpha_ext
+            r2_ext = np.sum([z2el2_ext]*alpha_ext)
+
+            self.assertTrue(r1_ext == r2_ext)
 
 if __name__ == "__main__":
     unittest.main()

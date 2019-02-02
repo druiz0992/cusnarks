@@ -331,7 +331,7 @@ class ZField(object):
 
             # alpha is random number between 0 and mod (inclusive)
             while beta == 1:
-                alpha = randint(0, prime)
+                alpha = randint(1, prime-1)
                 #alpha +=1
                 beta = pow(alpha, (prime - 1) / prime_factor, prime)
 

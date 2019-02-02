@@ -67,7 +67,7 @@ class ZPoly(object):
     one = [None, None]
     two = [None, None]
 
-    init = False
+    init_zpoly = False
 
 
     def __init__(self, p, force_init=False):
@@ -118,14 +118,14 @@ class ZPoly(object):
         else:
             assert False, "Unexpected data type"
 
-        if ZPoly.init == False or force_init:
+        if ZPoly.init_zpoly == False or force_init:
             ZPoly.init_constants()
 
     @classmethod
     def init_constants(cls):
         ZPoly.one = [ZFieldElExt(1), ZFieldElExt(1).reduce()]
         ZPoly.two = [ZFieldElExt(2), ZFieldElExt(2).reduce()]
-        ZPoly.init = True
+        ZPoly.init_zpoly = True
 
     @classmethod
     def init(cls, idx=None):
@@ -907,13 +907,13 @@ class ZPolySparse(ZPoly):
         """
           Negate polynomial coeffs
         """
-        return ZPolySparse({i: -p[i] for i in p.keys()})
+        return ZPolySparse({i: -self.zcoeff[i] for i in self.zcoeff.keys()})
 
-    def __lshift__(self,k):
+    def __lshift__(self,x):
         """
         """
-        if isinstance(k,int) or isinstance(k,long) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
-            return ZPolySparse([self.zcoeff[k] << k for k in self.zcoeff.keys()])
+        if isinstance(x,int) or isinstance(x,long) or isinstance(x, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
+            return ZPolySparse({k : self.zcoeff[k] << x for k in self.zcoeff.keys()})
         else:
             assert False, "Unexpected data type"
 

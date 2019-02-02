@@ -628,7 +628,117 @@ class ECCTest(unittest.TestCase):
             self.assertTrue(r3_extj.is_on_curve() == True)
             self.assertTrue(r4_rdcj.is_on_curve() == True)
 
-    def test_4is_on_curve(self):
+            #
+            alpha_ext = randint(1, 100)
+            r1_ext = p1_exta * alpha_ext
+            r2_ext = np.sum([p1_exta]*alpha_ext)
+            self.assertTrue(r1_ext == r2_ext)
+
+    def test_4operators_jacobian_ecc2(self):
+        c = ZUtils.CURVE_DATA['BN128']
+        ZField(c['prime'], c['factor_data'])
+        p = c['prime']
+
+        for test in xrange(ECCTest.TEST_ITER2):
+            alpha_ext = ZFieldElExt(randint(0, p - 1))
+            k = ZFieldElExt(1)
+
+            # Affine
+            zelx_exta = [k * c['curve_params_g2']['G1x'], k * c['curve_params_g2']['G2x']]
+            zely_exta = [k * c['curve_params_g2']['G1y'], k * c['curve_params_g2']['G2y']]
+            zelz_exta = [1, 0]
+
+            p1_exta = ECCJacobian([zelx_exta, zely_exta, zelz_exta], c['curve_params'], force_init=True)
+            while True:
+                z1 = ZFieldElExt(randint(0, p - 1))
+                z2 = ZFieldElExt(randint(0, p - 1))
+                p1_exta = z1 * p1_exta
+                p2_exta = z2 * p1_exta
+                if p1_exta != p2_exta:
+                    break
+
+            # Affine -> JAcobian
+            p1_extj = p1_exta
+            p2_extj = p2_exta
+
+            p1_rdcj = p1_extj.reduce()
+            p2_rdcj = p2_extj.reduce()
+
+            pzero_j = p1_extj.point_at_inf()
+
+            # Operators: +. -. neg, mul. double
+            r_extj = p1_extj + p2_extj
+            r_rdcj = p1_rdcj + p2_rdcj
+
+            # test __eq__
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+            # test ne
+            self.assertTrue((r_extj.reduce() != r_rdcj) == False)
+            self.assertTrue((r_extj != r_rdcj.extend()) == False)
+
+            # Operators: + Zero
+            r_extj = p1_extj + pzero_j
+            r_rdcj = p1_rdcj + pzero_j.reduce()
+
+            # test __eq__
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+            self.assertTrue(r_extj == p1_extj)
+            self.assertTrue(r_rdcj == p1_rdcj)
+
+            # Operators: + Zero
+            r_extj = pzero_j + p1_extj
+            r_rdcj = pzero_j.reduce() + p1_rdcj
+
+            # test __eq__
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+            self.assertTrue(r_extj == p1_extj)
+            self.assertTrue(r_rdcj == p1_rdcj)
+
+            # sub
+            r_extj = p1_extj - p2_extj
+            r_rdcj = p1_rdcj - p2_rdcj
+
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+            r_extj = -p1_extj
+            r_rdcj = -p1_rdcj
+
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+            # double operation
+            r_extj = p1_extj.double()
+            r_rdcj = p1_rdcj.double()
+
+            self.assertTrue(r_extj.reduce() == r_rdcj)
+            self.assertTrue(r_extj == r_rdcj.extend())
+
+
+            # *
+            r1_extj = p1_extj * alpha_ext
+            r2_rdcj = p1_rdcj * alpha_ext
+            r3_extj = alpha_ext * p1_extj
+            r4_rdcj = alpha_ext * p1_rdcj
+
+            self.assertTrue(r1_extj == r2_rdcj.extend())
+            self.assertTrue(r3_extj == r4_rdcj.extend())
+            self.assertTrue(r1_extj == r3_extj)
+
+
+            #
+            alpha_ext = randint(0, 100)
+            r1_ext = p1_exta * alpha_ext
+            r2_ext = np.sum([p1_exta]*alpha_ext)
+            self.assertTrue(r1_ext == r2_ext)
+
+    def test_5is_on_curve(self):
         c = ZUtils.CURVE_DATA['BN128']
         ZField(c['prime'], c['factor_data'])
         p = c['prime']

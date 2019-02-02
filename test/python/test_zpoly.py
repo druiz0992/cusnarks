@@ -56,7 +56,6 @@ class ZPolyTest(unittest.TestCase):
     MAX_POLY_DEGREE = 200
     SHIFT_SCALAR = 70
 
-    """
     def test_0init_ext(self):
         c = ZUtils.CURVE_DATA['BN128']
         prime = c['prime']
@@ -587,9 +586,8 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(all([re == rr.extend() for re, rr in zip(rext_c, rrdc_c)]))
             self.assertTrue(rext_c == pn_ext.get_coeff())
             self.assertTrue(rrdc_c == pn_rdc.get_coeff())
-    """
 
-    def test_00aritmetic_sparse(self):
+    def test_4aritmetic_sparse(self):
         c = ZUtils.CURVE_DATA['BN128']
         prime = c['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
@@ -625,6 +623,8 @@ class ZPolyTest(unittest.TestCase):
             scalar_ext = ZFieldElExt(scalar_bn)
             scalar_rdc = scalar_ext.reduce()
 
+            shift_b = randint(0,ZPolyTest.SHIFT_SCALAR-1)
+
             # + Sparse + Sparse
             p3_sps_ext = poly1_sps_ext + poly2_sps_ext
             p3_sps_rdc = poly1_sps_rdc + poly2_sps_rdc
@@ -650,8 +650,8 @@ class ZPolyTest(unittest.TestCase):
 
             r3_dense_ext = poly1_dense_ext + poly3_dense_ext
 
-            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
-            rrdc_c, rrdc_d, rrdc_f = p3_sps_rdc.get_properties()
+            rext_c, rext_d, rext_f = p3_dense_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_dense_rdc.get_properties()
 
             self.assertTrue(rext_d == rrdc_d)
             self.assertTrue(r3_dense_ext.get_degree() == rext_d)
@@ -670,8 +670,8 @@ class ZPolyTest(unittest.TestCase):
 
             r3_dense_ext = poly3_dense_ext + poly1_dense_ext
 
-            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
-            rrdc_c, rrdc_d, rrdc_f = p3_sps_rdc.get_properties()
+            rext_c, rext_d, rext_f = p3_dense_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_dense_rdc.get_properties()
 
             self.assertTrue(rext_d == rrdc_d)
             self.assertTrue(r3_dense_ext.get_degree() == rext_d)
@@ -684,8 +684,178 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(isinstance(p3_dense_rdc, ZPoly))
 
             # -
+            # Sparse - Sparse
+            p3_sps_ext = poly1_sps_ext - poly2_sps_ext
+            p3_sps_rdc = poly1_sps_rdc - poly2_sps_rdc
+
+            r3_dense_ext = poly1_dense_ext - poly2_dense_ext
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_sps_rdc.get_properties()
+
+            self.assertTrue(rext_d == rrdc_d)
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(p3_sps_rdc.to_dense() == r3_dense_ext.reduce())
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
+            self.assertTrue(p3_sps_ext.reduce() == p3_sps_rdc)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+            self.assertTrue(isinstance(p3_sps_rdc, ZPolySparse))
+
+            # Sparse - Dense
+            p3_dense_ext = poly1_sps_ext - poly3_dense_ext
+            p3_dense_rdc = poly1_sps_rdc - poly3_dense_rdc
+
+            r3_dense_ext = poly1_dense_ext - poly3_dense_ext
+
+            rext_c, rext_d, rext_f = p3_dense_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_dense_rdc.get_properties()
+
+            self.assertTrue(rext_d == rrdc_d)
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_dense_ext == r3_dense_ext)
+            self.assertTrue(p3_dense_rdc == r3_dense_ext.reduce())
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
+            self.assertTrue(p3_dense_ext.reduce() == p3_dense_rdc)
+            self.assertTrue(isinstance(p3_dense_ext, ZPoly))
+            self.assertTrue(isinstance(p3_dense_rdc, ZPoly))
+
+            #  Dense - Sparse
+            p3_dense_ext = poly3_dense_ext - poly1_sps_ext
+            p3_dense_rdc = poly3_dense_rdc - poly1_sps_rdc
+
+            r3_dense_ext = poly3_dense_ext - poly1_dense_ext
+
+            rext_c, rext_d, rext_f = p3_dense_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_dense_rdc.get_properties()
+
+            self.assertTrue(rext_d == rrdc_d)
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_dense_ext == r3_dense_ext)
+            self.assertTrue(p3_dense_rdc == r3_dense_ext.reduce())
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
+            self.assertTrue(p3_dense_ext.reduce() == p3_dense_rdc)
+            self.assertTrue(isinstance(p3_dense_ext, ZPoly))
+            self.assertTrue(isinstance(p3_dense_rdc, ZPoly))
+
+            # neg
+            p3_sps_ext = -poly2_sps_ext
+            p3_sps_rdc = -poly2_sps_rdc
+
+            r3_dense_ext = -poly2_dense_ext
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+            rrdc_c, rrdc_d, rrdc_f = p3_sps_rdc.get_properties()
+
+            self.assertTrue(rext_d == rrdc_d)
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(p3_sps_rdc.to_dense() == r3_dense_ext.reduce())
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
+            self.assertTrue(p3_sps_ext.reduce() == p3_sps_rdc)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+            self.assertTrue(isinstance(p3_sps_rdc, ZPolySparse))
+
             # * scalar
+            #scalar_l = randint(1,prime-1)
+            #scalar_bn = BigInt(scalar_l)
+            #scalar_ext = ZFieldElExt(scalar_bn)
+            #scalar_rdc = scalar_ext.reduce()
+            # Sparse - Sparse
+            p3_sps_ext =  scalar_l * poly2_sps_ext
+            r3_dense_ext = scalar_l * poly2_dense_ext
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+            p3_sps_ext =  poly2_sps_ext * scalar_l
+            r3_dense_ext = poly2_dense_ext * scalar_l
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+            p3_sps_ext =  scalar_bn * poly2_sps_ext
+            r3_dense_ext = scalar_bn * poly2_dense_ext
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+            p3_sps_ext =  poly2_sps_ext * scalar_bn
+            r3_dense_ext = poly2_dense_ext * scalar_bn
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+            p3_sps_ext =  scalar_ext * poly2_sps_ext
+            r3_dense_ext = scalar_ext * poly2_dense_ext
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+            p3_sps_ext =  poly2_sps_ext * scalar_ext
+            r3_dense_ext = poly2_dense_ext * scalar_ext
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+            p3_sps_rdc =  scalar_rdc * poly2_sps_rdc
+            r3_dense_rdc = scalar_rdc * poly2_dense_rdc
+
+            rrdc_c, rrdc_d, rrdc_f = p3_sps_rdc.get_properties()
+
+            self.assertTrue(r3_dense_rdc.get_degree() == rrdc_d)
+            self.assertTrue(p3_sps_rdc.to_dense() == r3_dense_rdc)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
+            self.assertTrue(isinstance(p3_sps_rdc, ZPolySparse))
+
+            p3_sps_rdc =  poly2_sps_rdc * scalar_rdc
+            r3_dense_rdc = poly2_dense_rdc * scalar_rdc
+
+            rrdc_c, rrdc_d, rrdc_f = p3_sps_rdc.get_properties()
+
+            self.assertTrue(r3_dense_rdc.get_degree() == rrdc_d)
+            self.assertTrue(p3_sps_rdc.to_dense() == r3_dense_rdc)
+            self.assertTrue(rrdc_f == ZUtils.FRDC)
+            self.assertTrue(isinstance(p3_sps_rdc, ZPolySparse))
+
             # <<
+            p3_sps_ext =  poly2_sps_ext << shift_b
+            r3_dense_ext = poly2_dense_ext << shift_b
+
+            rext_c, rext_d, rext_f = p3_sps_ext.get_properties()
+
+            self.assertTrue(r3_dense_ext.get_degree() == rext_d)
+            self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
+            self.assertTrue(rext_f == ZUtils.FEXT)
+            self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
 
 if __name__ == "__main__":
     unittest.main()
