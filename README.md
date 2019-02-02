@@ -1,6 +1,6 @@
 # CUSNARKS
 
-CUDA implementation of SNARKs proof Groth protocol (based on https://github.com/iden3/snarkjs)
+CUDA implementation of SNARKs proof using Groth protocol (based on https://github.com/iden3/snarkjs)
 
 
 ### Requirements 
@@ -9,6 +9,9 @@ CUDA implementation of SNARKs proof Groth protocol (based on https://github.com/
 * cython : Cython will be used to build wrappers of C++/CUDA functions callable from Python modules
 * c++/gcc
 * CUDA toolkit
+
+### Tests
+make test
 
 ### Directory Structure
 * build\    : Object files
