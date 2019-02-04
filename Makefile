@@ -38,17 +38,19 @@ SHELL=/bin/sh
 #####
 # Define Paths
 
-CUSNARKS_PATH = ${CURDIR}
-INCLUDE_PATH_TOP = ./src/main/include
-INCLUDE_TEST_PATH_TOP = ./test/include
-OBJECT_PATH_TOP = ./build
-LIB_PATH_TOP = ./lib
-CPSRC_PATH_TOP = ./src/main/c-wrappers
-PYSRC_PATH_TOP = ./src/main/python
+CUSNARKS_PATH = ${PWD}
+INCLUDE_PATH = $(CUSNARKS_PATH)/src/cuda
+OBJECT_PATH = $(CUSNARKS_PATH)/build
+LIB_PATH = $(CUSNARKS_PATH)/lib
+CTSRC_PATH = $(CUSNARKS_PATH)/src/cython
+PYSRC_PATH = $(CUSNARKS_PATH)/src/python
+PYTST_PATH = $(CUSNARKS_PATH)/test/python
+CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
 
-dirs= ./src/python
+dirs= $(CTSRC_PATH)
 
-test_dirs = ./test/python 
+test_dirs = $(CTSRC_PATH) \
+            $(PYTST_PATH)
 
 SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
@@ -64,19 +66,20 @@ TEST_SUBDIRS := $(test_dirs)
 #CFLAGS = $(DEBUG_LEVEL) $(EXTRA_FLAGS) $(INCLUDE_PATH) $(DEFINES)
 #LDFLAGS = -shared
 
-#MYMAKEFLAGS = 'INCLUDE_PATH_TOP=$(INCLUDE_PATH_TOP)'   \
-              #'INCLUDE_TEST_PATH_TOP=$(INCLUDE_TEST_PATH_TOP)' \
-              #'CPSRC_PATH_TOP=$(CPSRC_PATH_TOP)'       \
-              #'PYSRC_PATH_TOP=$(PYSRC_PATH_TOP)'       \
-              #'OBJECT_PATH_TOP=$(OBJECT_PATH_TOP)'     \
-              #'LIB_PATH_TOP=$(LIB_PATH_TOP)'           \
+MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
+              'INCLUDE_PATH=$(INCLUDE_PATH)'   \
+              'OBJECT_PATH=$(OBJECT_PATH)'     \
+              'LIB_PATH=$(LIB_PATH)'           \
+              'CTSRC_PATH=$(CTSRC_PATH)'       \
+              'PYSRC_PATH=$(PYSRC_PATH)'       \
+              'PYTST_PATH=$(PYTST_PATH)'       \
+              'CUSRC_PATH=$(CUSRC_PATH)'       
               #'LIBS=$(LIBS)'                           \
               #'DEFINES=$(DEFINES)'                     \
               #'DEFINES_TEST=$(DEFINES_TEST)'                     \
               #'DEBUG_LEVEL=$(DEBUG_LEVEL)'             \
               #'EXTRA_FLAGS=$(EXTRA_FLAGS)'             \
               #'LDFLAGS=$(LDFLAGS)'                     \
-              #'CUSNARKS__PATH=$(CUSNARKS_PATH)'
 
 
 #all:    
@@ -84,19 +87,25 @@ TEST_SUBDIRS := $(test_dirs)
 	#echo "make all in $$i ..."; \
 	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) all); done
 
-#clean:
-	#@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
-	#echo "clearing all in $$i..."; \
-	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
-
 #depend:
 	#@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
 	#echo "make depend in $$i..."; \
 	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) depend); done
+
+build:
+	@for i in $(SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
 
 test:   
 	@for i in $(TEST_SUBDIRS); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
-.PHONY:	test
+clean:
+	@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
+	echo "clearing all in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
+
+
+.PHONY:	test, build

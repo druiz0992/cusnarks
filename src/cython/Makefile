@@ -23,18 +23,33 @@
 #
 # File name  : Makefile
 #
-# Date       : 31/01/2019
+# Date       : 03/02/2019
 #
 # ------------------------------------------------------------------
+#
 
-PYTHON_TESTS = $(shell find -name 'test_*.py')
+
+#####
+# Define Paths
+
+INCLUDE_PATH = $(INCLUDE_PATH)
+OBJECT_PATH = $(OBJECT_PATH)
+LIB_PATH = $(LIB_PATH)
+CTSRC_PATH = $(CTSRC_PATH)
+PYSRC_PATH = $(PYSRC_PATH)
+LD_FLAGS=$(LIB_PATH)
+
+#null :=
+#WS:= $(null) $(null)
+#DEFINE_MACROS:= $(subst $(WS),:,$(DEFINES))
+
+build:
+	LDFLAGS="-L$(LD_FLAGS)" python setup.py build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --rpath=$(LD_FLAGS)
 
 test:
-	@for i in $(PYTHON_TESTS); do \
-	echo "Starting Test :  $$i"; \
-	python $$i; \
-	done
+	LDFLAGS="-L$(LD_FLAGS)" python setup.py build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --rpath=$(LD_FLAGS)
 
 clean:
-	rm -f *.pyc
+	rm -f $(CTSRC_PATH)/*.cpp $(LIB_PATH)/_*.so
+	rm -rf $(OBJECT_PATH)
 

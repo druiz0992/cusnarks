@@ -50,6 +50,7 @@
 """
 
 from random import randint
+import numpy as np
 
 
 class BigInt(object):
@@ -57,6 +58,8 @@ class BigInt(object):
       BigInt class
     """
     POW_THR = 10000
+    WORDS_IN_256BN = 8
+    BMASK_32BIT = 0xFFFFFFFF
 
     def __init__(self, bignum, min_bignum=None):
         """
@@ -379,3 +382,21 @@ class BigInt(object):
            return bignum as long
         """
         return long(self.bignum)
+
+    def as_uint256(self):
+       """ 
+         return big int as numpy array of uint32
+       """
+       bn = self.bignum
+       return np.asarray([bn & BigInt.BMASK_32BIT,
+                             (bn >> 32 ) & BigInt.BMASK_32BIT,
+                             (bn >> 64 ) & BigInt.BMASK_32BIT,
+                             (bn >> 96 ) & BigInt.BMASK_32BIT,
+                             (bn >> 128) & BigInt.BMASK_32BIT,
+                             (bn >> 160) & BigInt.BMASK_32BIT,
+                             (bn >> 192) & BigInt.BMASK_32BIT,
+                             (bn >> 224) & BigInt.BMASK_32BIT], dtype=np.uint32)
+
+       
+
+
