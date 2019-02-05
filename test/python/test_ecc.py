@@ -733,7 +733,7 @@ class ECCTest(unittest.TestCase):
 
 
             #
-            alpha_ext = randint(0, 100)
+            alpha_ext = randint(1, 100)
             r1_ext = p1_exta * alpha_ext
             r2_ext = np.sum([p1_exta]*alpha_ext)
             self.assertTrue(r1_ext == r2_ext)

@@ -1,11 +1,44 @@
 /*
+    Copyright 2018 0kims association.
+
+    This file is part of cusnarks.
+
+    cusnarks is a free software: you can redistribute it and/or
+    modify it under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your option)
+    any later version.
+
+    cusnarks is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.
+
+    You should have received a copy of the GNU General Public License along with
+    cusnarks. If not, see <https://www.gnu.org/licenses/>.
+
+// ------------------------------------------------------------------
+// Author     : David Ruiz
+//
+// File name  : bigint_kernel.cu
+//
+// Date       : 05/02/2019
+//
+// ------------------------------------------------------------------
+//
+// Description:
+//  Implementation of biginteger kernel and device functions
+// ------------------------------------------------------------------
+
+*/
+
+/*
    addition of two 256 bit number modulo p Z[i] = X[i] + Y[i] (mod p)
 
    Input vector contains intercalated X, Y and Z numbers (X[0], Y[0], Z[0], X[1], Y[1], Z[1],..
     X[N-1], Y[N-1], Z[N-1]) where X, Y and Z are 256 bit numbers represented as an array of uint32_t
    
 */
-__global__ void BigInt_ModAdd256(uint32_t *vector, uint32_t *p, uint32_t len)
+__global__ void addm(uint256_t *vector, uint32_t *p, uint32_t len)
 {
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x
@@ -20,11 +53,11 @@ __global__ void BigInt_ModAdd256(uint32_t *vector, uint32_t *p, uint32_t len)
       return;
     }
 
-    x = &vector[tid * 3*BIGINT_NWORDS + BIGINT_XOFFSET];
-    y = &vector[tid * 3*BIGINT_NWORDS + BIGINT_YOFFSET];
-    z = &vector[tid * 3*BIGINT_NWORDS + BIGINT_ZOFFSET];
+    x = (uint32_t *) &vector[tid * 3*NWORDS_256BIT + BIGINT_XOFFSET];
+    y = (uint32_t *) &vector[tid * 3*NWORDS_256BIT + BIGINT_YOFFSET];
+    z = (uint32_t *) &vector[tid * 3*NWORDS_256BIT + BIGINT_ZOFFSET];
 
-    for (i=0; i < BIGINT_NWORDS; i++){
+    for (i=0; i < NWORDS_256BIT; i++){
       z[i] = x[i] + y[i] + c;
       c = (z[i] < x[i]);
     }
