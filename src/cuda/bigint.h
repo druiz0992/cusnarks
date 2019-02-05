@@ -19,29 +19,33 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : types.h
+// File name  : bigint.h
 //
 // Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Definition of basic data types
+//  Definition of big integer class
 // ------------------------------------------------------------------
 
 */
 
-#ifndef _TYPES_H_
-#define _TYPES_H_
+class BigInt {
+    const uint32_t XOFFSET = 0;
+    const uint32_t YOFFSET = 1;
+    const uint32_t ZOFFSET = 2;
+    const uint32_t VWIDTH = 3;
 
-#define NWORDS_256BIT 8
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-typedef unsigned int[NWORDS_256BIT] uint256_t;
-typedef char int8_t;
-typedef short int16_t;
-typedef int int32_t;
-typedef float float_t;
+    private:
+        uint256_t *array_device;    // pointer to device buffer
+        uint256_t *array_host;      // pointer to host buffer
+	uint256_t *p;               // prime number
+        uint32_t  len;              // array len
 
-#endif
+    public:
+        BigInt(uint256_t *vector, uint256_t *p, uint32_t len) ;
+        ~BigInt();
+        void addm();
+        void retrieve(uint256_t *vector, uint32_t len);
+}

@@ -145,6 +145,8 @@ class ECC(object):
 
     @classmethod
     def init(cls, curve_params):
+        if not ZField.is_init():
+            assert False, "Field not initialized"
         ECC.init_curve(curve_params['a'], curve_params['b'])
         ECC.init_constants()
 
