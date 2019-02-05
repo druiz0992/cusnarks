@@ -31,12 +31,14 @@ SRC = bigint.cu \
 
 OBJ=$(SRC:.cu=.o)
 
+clean:
+	rm -f *.o
+
 build : so
 
 ##################################################
 so: $(OBJ)
 	$(NVCC) $(LIBFLAGS) $(LIB_PATH)/$(LIB_NAME) $(OBJ) $(LDFLAGS)
-	mv $(OBJ) $(OBJECT_PATH)/
 
 ##################################################
 %.o : %.cu

@@ -35,6 +35,5 @@ cimport _types as ct
 
 cdef extern from "../cuda/bigint.h":
     cdef cppclass C_BigInt "BigInt":
-        C_BigInt(ct.uint32_t *, ct.uint32_t *, ct.uint32_t) except +
-        void addm()
-        void retrieve(ct.uint32_t *vector)
+        C_BigInt(ct.uint32_t *p, ct.uint32_t len) except +
+        void addm(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
