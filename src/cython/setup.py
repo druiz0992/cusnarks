@@ -147,9 +147,9 @@ except AttributeError:
 
 
 ext = [ Extension('cu_bigint',
-                    sources = ['../cuda/bigint_host.cu', 'bigint.pyx'],
+                    sources = ['_bigint.pyx'],
                     library_dirs = [CUDA['lib64']],
-                    libraries = ['cudart'],
+                    libraries = ['cudart','cusnarks'],
                     language = 'c++',
                     runtime_library_dirs = [CUDA['lib64']],
                      # This syntax is specific to this build system
@@ -159,7 +159,7 @@ ext = [ Extension('cu_bigint',
                      extra_compile_args= {
                          'gcc': [],
                          'nvcc': [
-                         '-arch=sm_30', '--ptxas-options=-v', '-c',
+                         '-arch=sm_60', '--ptxas-options=-v', '-c',
                          '--compiler-options', "'-fPIC'"
                         ]
                       },

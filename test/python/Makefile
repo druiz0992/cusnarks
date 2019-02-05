@@ -38,3 +38,5 @@ test:
 clean:
 	rm -f *.pyc
 
+build:
+	echo "Nothing to do"

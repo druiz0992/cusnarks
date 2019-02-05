@@ -44,9 +44,7 @@ LD_FLAGS=$(LD_FLAGS)
 #DEFINE_MACROS:= $(subst $(WS),:,$(DEFINES))
 
 build:
-	python setup.py build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --library-dirs=$(LIB_PATH)
-
+	echo "Nothing to do"
 clean:
-	rm -f $(CTSRC_PATH)/*.cpp $(LIB_PATH)/*.so
-	rm -rf $(OBJECT_PATH)
+	rm -f *.pyc
 

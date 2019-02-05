@@ -46,11 +46,12 @@ CTSRC_PATH = $(CUSNARKS_PATH)/src/cython
 PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
+LIB_NAME = libcusnarks.so
 
-dirs= $(CTSRC_PATH)
+dirs= $(CUSRC_PATH) \
+      $(CTSRC_PATH) 
 
-test_dirs = $(CTSRC_PATH) \
-            $(PYTST_PATH)
+test_dirs = $(PYTST_PATH) 
 
 SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
@@ -73,7 +74,8 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CTSRC_PATH=$(CTSRC_PATH)'       \
               'PYSRC_PATH=$(PYSRC_PATH)'       \
               'PYTST_PATH=$(PYTST_PATH)'       \
-              'CUSRC_PATH=$(CUSRC_PATH)'       
+              'CUSRC_PATH=$(CUSRC_PATH)'       \
+              'LIB_NAME=$(LIB_NAME)'
               #'LIBS=$(LIBS)'                           \
               #'DEFINES=$(DEFINES)'                     \
               #'DEFINES_TEST=$(DEFINES_TEST)'                     \

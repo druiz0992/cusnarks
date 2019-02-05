@@ -30,22 +30,22 @@
 // ------------------------------------------------------------------
 
 */
+#ifndef _BIGINT_H_
+#define _BIGINT_H_
 
 class BigInt {
-    const uint32_t XOFFSET = 0;
-    const uint32_t YOFFSET = 1;
-    const uint32_t ZOFFSET = 2;
-    const uint32_t VWIDTH = 3;
-
     private:
-        uint256_t *array_device;    // pointer to device buffer
-        uint256_t *array_host;      // pointer to host buffer
-	uint256_t *p;               // prime number
+        uint32_t *array_device;    // pointer to device buffer
+        uint32_t *array_host;      // pointer to host buffer
+	uint32_t *p;               // prime number
         uint32_t  len;              // array len
 
     public:
-        BigInt(uint256_t *vector, uint256_t *p, uint32_t len) ;
+
+        BigInt(uint32_t *vector, uint32_t *p, uint32_t len) ;
         ~BigInt();
         void addm();
-        void retrieve(uint256_t *vector, uint32_t len);
-}
+        void retrieve(uint32_t *vector);
+};
+
+#endif

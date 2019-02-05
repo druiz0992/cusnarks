@@ -19,29 +19,52 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : types.pxd
+// File name  : bigint_pyx
 //
 // Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Definition of basic data types for wrapper functions
+//   Big Integer wrapper function
 // ------------------------------------------------------------------
 
 """
 
+import numpy as np
+cimport numpy as np
 
-cdef extern from "types.h":
+cimport _types as ct
 
-  ctypedef unsigned char uint8_t
-  ctypedef unsigned short uint16_t
-  ctypedef unsigned int uint32_t
-  ctypedef unsigned int[8] uint256_t
-  ctypedef char int8_t
-  ctypedef short int16_t
-  ctypedef int int32_t
-  ctypedef float float_t
-  cdef NWORDS_256BIT
-   
-_NWORDS_256BIT = ct,NWORDS_256BIT
+from _bigint cimport C_BigInt
+
+assert sizeof(ct.uint32_t) == sizeof(np.uint32)
+
+#_VWIDTH = VWIDTH
+
+cdef class BigInt:
+    cdef C_BigInt* g
+    cdef int dim
+
+    def __cinit__(self, np.ndarray[ndim=2, dtype=np.uint32_t] v,
+                         np.ndarray[ndim=1, dtype=np.uint32_t] p):
+
+        if  v.shape[1] != ct.NWORDS_256BIT:
+            return
+
+        self.dim = v.shape[0]
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] v2 = np.zeros(self.dim * v.shape[1], dtype=np.uint32)
+        v2 = np.concatenate(v)
+
+        self.g = new C_BigInt(&v2[0], &p[0], self.dim)
+
+    def addm(self):
+        self.g.addm()
+
+    def retreive(self):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(self.dim * ct.NWORDS_256BIT, dtype=np.uint32)
+
+        self.g.retrieve(&vout[0])
+
+        return vout
+

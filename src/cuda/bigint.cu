@@ -19,7 +19,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : bigint_host.cu
+// File name  : bigint.cu
 //
 // Date       : 05/02/2019
 //
@@ -44,7 +44,7 @@ This class will get translated into python via swig
 
 #include "types.h"
 #include "bigint.h"
-#include "bigint_kernel.cu"
+#include "bigint_device.h"
 
 using namespace std;
 /*
@@ -54,29 +54,36 @@ using namespace std;
       array_host : array of 256 bit numbers located at the host side
       length : Number of 256 bit numbers
 */
-BigInt::BigInt (uint256_t* array_host, uint256_t *p_, uint32_t length) {
+BigInt::BigInt (uint32_t* array_host, uint32_t *p, uint32_t length) {
 
-  array_host = array_host_;
-  len = length;
+  this->array_host = array_host;
+  this->len = length;
 
-  uint32_t size = VWIDTH * len * sizeof(uint256_t);
-  cudaError_t err = cudaMalloc((void**) &array_device, size);
+  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
+
+  cudaError_t err = cudaMalloc((void**) &this->array_device, size);
   assert(err == 0);
-  cudaError_t err = cudaMalloc((void**) &p, sizeof(uint256_t));
+
+  err = cudaMalloc((void**) &this->p, sizeof(uint32_t) * NWORDS_256BIT);
   assert(err == 0);
-  err = cudaMemcpy(array_device, array_host, size, cudaMemcpyHostToDevice);
+
+  err = cudaMemcpy(this->array_device, this->array_host, size, cudaMemcpyHostToDevice);
   assert(err == 0);
-  err = cudaMemcpy(p, p_, sizeof(uint256_t), cudaMemcpyHostToDevice);
+
+  err = cudaMemcpy(this->p, p, sizeof(uint32_t) * NWORDS_256BIT, cudaMemcpyHostToDevice);
+  assert(err == 0);
+
 }
 
 void BigInt::addm() {
-  addm<<<64, 64>>>(array_device, p, len);
+  //addm_kernel<<<64, 64>>>(array_device, p, len);
+  addm_kernel(array_device, p, len);
   cudaError_t err = cudaGetLastError();
   assert(err == 0);
 }
 
-void BigInt::retreive(uint256_t *array_host, uint32_t len) {
-  int size = VWIDTH * len * sizeof(uint256_t);
+void BigInt::retrieve(uint32_t *array_host) {
+  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT ;
   cudaMemcpy(array_host, array_device, size, cudaMemcpyDeviceToHost);
   cudaError_t err = cudaGetLastError();
   if(err != 0) { cout << err << endl; assert(0); }

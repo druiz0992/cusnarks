@@ -1,7 +1,7 @@
 
 import os,sys, os.path
 import numpy as np
-import numpy.testing as npt
+
 from random import randint
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
@@ -17,10 +17,10 @@ def test():
     bn256 = [n.as_uint256() for n in bn]
     
 
-    adder = cu_bigint.BigInt(bn256)
-    adder.mod_add()
+    bn_vector = cu_bigint.BigInt(bn256)
+    bn_vector.addm()
     
-    results2 = adder.retreive()
+    results2 = bn_vector.retreive()
 
 
 if __name__ == "__main__":
