@@ -10,7 +10,7 @@ CUDA implementation of SNARKs proof using Groth protocol (based on https://githu
 * c++/gcc
 * CUDA toolkit
 
-### Tests
+### Launch tests
 make test
 
 ### Directory Structure
@@ -18,8 +18,8 @@ make test
 * data\     : Auxiliary files
 * lib\      : Generated dynamic libraries
 * src\
-  - c \     : C/C++ sources (.cpp, .c, .cu)
-  - include : Header files (.h)
-  - c-wrappers : Cython files (.pyx, .pxd)
+  - cuda \     : C/C++/CUDA sources (.cpp, .c, .cu, .h)
+  - cython \   : Cython files (.pyx, .pxd)
+  - python \   : Python library (.py)
 * test  \
   - python \ : Test source files (written in python)
