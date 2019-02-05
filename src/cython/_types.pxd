@@ -1,4 +1,4 @@
-/*
+"""
     Copyright 2018 0kims association.
 
     This file is part of cusnarks.
@@ -19,31 +19,35 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : types.h
+// File name  : types.pxd
 //
 // Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Definition of basic data types
+//   Definition of basic data types for wrapper functions
 // ------------------------------------------------------------------
 
-*/
+"""
 
-#ifndef _TYPES_H_
-#define _TYPES_H_
 
-#define NWORDS_256BIT (8)
-#define XOFFSET       (0)
-#define YOFFSET       (1)
+cdef extern from "types.h":
+  
+  # Types
+  ctypedef unsigned char uint8_t
+  ctypedef unsigned short uint16_t
+  ctypedef unsigned int uint32_t
+  ctypedef char int8_t
+  ctypedef short int16_t
+  ctypedef int int32_t
+  ctypedef float float_t
+  
+  #Constants 
+  cdef uint32_t NWORDS_256BIT
+  cdef uint32_t XOFFSET
+  cdef uint32_t YOFFSET
+  cdef uint32_t ZOFFSET
+  cdef uint32_t VWIDTH
 
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-//typedef char int8_t;
-typedef short int16_t;
-typedef int int32_t;
-typedef float float_t;
-
-#endif
+_NWORDS_256BIT = NWORDS_256BIT

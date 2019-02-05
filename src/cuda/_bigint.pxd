@@ -1,4 +1,4 @@
-/*
+"""
     Copyright 2018 0kims association.
 
     This file is part of cusnarks.
@@ -19,31 +19,22 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : types.h
+// File name  : _bigint.pxd
 //
 // Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Definition of basic data types
+//   Big Integer wrapper function wrapper
 // ------------------------------------------------------------------
 
-*/
+"""
 
-#ifndef _TYPES_H_
-#define _TYPES_H_
+cimport _types as ct
 
-#define NWORDS_256BIT (8)
-#define XOFFSET       (0)
-#define YOFFSET       (1)
-
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-//typedef char int8_t;
-typedef short int16_t;
-typedef int int32_t;
-typedef float float_t;
-
-#endif
+cdef extern from "../cuda/bigint.h":
+    cdef cppclass C_BigInt "BigInt":
+        C_BigInt(ct.uint32_t *, ct.uint32_t *, ct.uint32_t) except +
+        void addm()
+        void retrieve(ct.uint32_t *vector)

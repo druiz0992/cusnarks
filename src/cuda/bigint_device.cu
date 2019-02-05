@@ -38,14 +38,21 @@
     X[N-1], Y[N-1], Z[N-1]) where X, Y and Z are 256 bit numbers represented as an array of uint32_t
    
 */
-__global__ void addm(uint256_t *vector, uint32_t *p, uint32_t len)
+
+#include <stdio.h>
+
+#include "types.h"
+#include "bigint_device.h"
+
+//void __global__ addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
 {
+    //int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    int tid = 0;
 
-    int tid = threadIdx.x + blockDim.x * blockIdx.x
-
-    uint32_t *x;
-    uint32_t *y;
-    uint32_t *z;
+    const uint32_t *x;
+    const uint32_t *y;
+    uint32_t * z;
     uint32_t c = 0;
     uint32_t i;
  
@@ -53,9 +60,9 @@ __global__ void addm(uint256_t *vector, uint32_t *p, uint32_t len)
       return;
     }
 
-    x = (uint32_t *) &vector[tid * 3*NWORDS_256BIT + BIGINT_XOFFSET];
-    y = (uint32_t *) &vector[tid * 3*NWORDS_256BIT + BIGINT_YOFFSET];
-    z = (uint32_t *) &vector[tid * 3*NWORDS_256BIT + BIGINT_ZOFFSET];
+    x = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
+    y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
 
     for (i=0; i < NWORDS_256BIT; i++){
       z[i] = x[i] + y[i] + c;
