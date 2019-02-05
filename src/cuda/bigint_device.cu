@@ -44,11 +44,19 @@
 #include "types.h"
 #include "bigint_device.h"
 
-//void __global__ addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
-void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+/*
+    Modular addition kernel
+
+    Arguments :
+      in_vector : Input vector of up to N 256 bit elements X[0], X[1], X[2] ... X[N-1].
+      out_vector : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
+      p : 256 bit module in 8 word uint32 array
+      len : number of elements in output vector to be xferred. 
+          Cannot be greater than half amount reseved during constructor, but not checked
+*/
+__global__ void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
 {
-    //int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    int tid = 0;
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
     const uint32_t *x;
     const uint32_t *y;

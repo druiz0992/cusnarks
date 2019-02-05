@@ -35,17 +35,19 @@
 
 class BigInt {
     private:
-        uint32_t *array_device;    // pointer to device buffer
-        uint32_t *array_host;      // pointer to host buffer
+        uint32_t *in_vector_device;    // pointer to device input buffer
+        uint32_t *out_vector_device;    // pointer to device output buffer
 	uint32_t *p;               // prime number
-        uint32_t  len;              // array len
+        const uint32_t  in_vector_len;              // array len
+
+        void copyVectorToDevice(uint32_t *in_vector_host, uint32_t len);
+        void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t len);
 
     public:
 
-        BigInt(uint32_t *vector, uint32_t *p, uint32_t len) ;
+        BigInt(const uint32_t *p, const uint32_t len) ;
         ~BigInt();
-        void addm();
-        void retrieve(uint32_t *vector);
+        void addm(uint32_t *in_vector_host, uint32_t *out_vector_host, const uint32_t len);
 };
 
 #endif

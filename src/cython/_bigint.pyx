@@ -38,33 +38,25 @@ cimport _types as ct
 
 from _bigint cimport C_BigInt
 
-assert sizeof(ct.uint32_t) == sizeof(np.uint32)
-
-#_VWIDTH = VWIDTH
 
 cdef class BigInt:
     cdef C_BigInt* g
     cdef int dim
 
-    def __cinit__(self, np.ndarray[ndim=2, dtype=np.uint32_t] v,
-                         np.ndarray[ndim=1, dtype=np.uint32_t] p):
+    def __cinit__(self, np.ndarray[ndim=1, dtype=np.uint32_t] p, ct.uint32_t vec_len):
+        self.dim = vec_len
 
-        if  v.shape[1] != ct.NWORDS_256BIT:
+        self.g = new C_BigInt(&p[0], self.dim)
+
+    def addm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec):
+
+        if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
             return
 
-        self.dim = v.shape[0]
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] v2 = np.zeros(self.dim * v.shape[1], dtype=np.uint32)
-        v2 = np.concatenate(v)
-
-        self.g = new C_BigInt(&v2[0], &p[0], self.dim)
-
-    def addm(self):
-        self.g.addm()
-
-    def retreive(self):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(self.dim * ct.NWORDS_256BIT, dtype=np.uint32)
-
-        self.g.retrieve(&vout[0])
-
-        return vout
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * in_vec.shape[1], dtype=np.uint32)
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
+        in_vec_flat = np.concatenate(in_vec)
+        self.g.addm(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0]/2)
+       
+        return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 
