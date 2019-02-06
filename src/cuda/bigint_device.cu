@@ -71,24 +71,162 @@ __global__ void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint
     x = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
     y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET];
     z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
-
-    for (i=0; i < NWORDS_256BIT; i++){
-      z[i] = x[i] + y[i] + c;
-      c = (z[i] < x[i]);
-    }
+    
+    addm_uint256(x, y, z, p);
 
     return;
 }
 
+__global__ void monmulm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+{
+    // a, b, t : 32 bit numbers
+    // C : carry bit
+    // S : 64 bit number
+    for i=0 to s-1
+        // i = 0
+        asm("mad.lo.cc.u32         %S[i], %a[0], %b[i], %t[0]\n\t"
+            "mul.hi.u32            %S[i+1],%a[0], %b[i];\n\t") 
+        
+        (C,S) := t[0] + a[0]*b[i]
+        ADD(t[1],C)
+        m := S*n'[0] mod W
+        (C,S) := S + m*n[0]
+
+
+        for j=1 to s-1
+            asm("madc.lo.cc.u32         %0, %, %, % \n\t" : "=r"(z[0]) ,
+                "madc.hi.cc.u32         %1, %, %, % \n\t" 
+
+      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+
+            // j = 1
+            (C,S) := t[1] + a[1]*b[i] + C
+            ADD(t[2],C)
+            (C,S) := S + m*n[1]
+            t[0] := S
+
+            // j = 2
+            (C,S) := t[2] + a[2]*b[i] + C
+            ADD(t[3],C)
+            (C,S) := S + m*n[2]
+            t[1] := S
+
+            // j = 3
+            (C,S) := t[3] + a[3]*b[i] + C
+            ADD(t[4],C)
+            (C,S) := S + m*n[3]
+            t[2] := S
+
+            // j = 4
+            (C,S) := t[4] + a[4]*b[i] + C
+            ADD(t[5],C)
+            (C,S) := S + m*n[4]
+            t[3] := S
+
+            // j = 5
+            (C,S) := t[5] + a[5]*b[i] + C
+            ADD(t[6],C)
+            (C,S) := S + m*n[5]
+            t[4] := S
+
+            // j = 6
+            (C,S) := t[6] + a[6]*b[i] + C
+            ADD(t[7],C)
+            (C,S) := S + m*n[6]
+            t[5] := S
+
+            // j = 7
+            (C,S) := t[7] + a[7]*b[i] + C
+            ADD(t[8],C)
+            (C,S) := S + m*n[7]
+            t[6] := S
+     
+
+        (C,S) := t[s] + C
+        t[s-1] := S
+        t[s] := t[s+1] + C
+        t[s+1] := 0
+
+
+
+}
+
+
+__forceinline__ __device__ void add_uint256(const uint32_t *x, const uint32_t *y, uint32_t *z)
+{
+  // z[i] = x[i] + y[i] for 8x32 bit words
+  asm("add.cc.u32        %0, %8, %12;\n\t"              // sum with carry out
+      "addc.cc.u32       %1, %9,  %13;\n\t"             // sum with carry in and carry out
+      "addc.cc.u32       %2, %10, %14;\n\t"
+      "addc.cc.u32       %3, %11, %15;\n\t"
+      "addc.cc.u32       %4, %12, %16;\n\t"
+      "addc.cc.u32       %5, %13, %17;\n\t"
+      "addc.cc.u32       %6, %14, %18;\n\t"
+      "addc.u32          %7, %15, %19;\n\t"            // sum with carry in
+      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+      : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
+        "r"(x[2]), "r"(y[2]), "r"(x[3]), "r"(y[3]),
+        "r"(x[4]), "r"(y[4]), "r"(x[5]), "r"(y[5]),
+        "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
+}
+
+__forceinline__ __device__ void addm_uint256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p)
+{
+  uint32_t do_modf;
+  uint32_t tmp[8];
+
+  // z[i] = x[i] + y[i] 
+  add_uint256(x, y, );
+
+  // z_tmp[i] = p[i] - z[i]
+  sub_uint256(p, z, z_tmp);
+  
+  // do_modf = most significant bit of z_tmp is 1
+  asm("bf3.b32	%0, %1, 31, 31;\n\t"              
+      : "=r"(do_modf)
+      : "r"(z_tmp[7]));
+
+  // if do_modf, return z_tmp. Else, return <
+  if (do_modf){
+     asm("mov.u32     %0,  %8;\n\t"
+         "mov.u32     %1,  %9;\n\t"
+         "mov.u32     %2,  %10;\n\t"
+         "mov.u32     %3,  %11;\n\t"
+         "mov.u32     %4,  %12;\n\t"
+         "mov.u32     %5,  %13;\n\t"
+         "mov.u32     %6,  %14;\n\t"
+         "mov.u32     %7,  %15;\n\t"
+      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+      : "r"(z_tmp[0]), "r"(z_tmp[1]), "r"(z_tmp[2]), "r"(z_tmp[3]),
+        "r"(z_tmp[4]), "r"(z_tmp[5]), "r"(z_tmp[6]), "r"(z_tmp[7]));
+  }    
+  
+}
+
+__forceinline__ __device__ void sub_uint256(const uint32_t *x, const uint32_t *y, uint32_t *z)
+{
+  // z[i] = x[i] - y[i] for 8x32 bit words
+  asm("sub.cc.u32        %0, %8, %12;\n\t"              // sub with borrow out
+      "subc.cc.u32       %1, %9,  %13;\n\t"             // sub with borrow out and borrow in
+      "subc.cc.u32       %2, %10, %14;\n\t"
+      "subc.cc.u32       %3, %11, %15;\n\t"
+      "subc.cc.u32       %4, %12, %16;\n\t"
+      "subc.cc.u32       %5, %13, %17;\n\t"
+      "subc.cc.u32       %6, %14, %18;\n\t"
+      "subc.u32          %7, %15, %19;\n\t"            // sum with carry in
+      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+      : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
+        "r"(x[2]), "r"(y[2]), "r"(x[3]), "r"(y[3]),
+        "r"(x[4]), "r"(y[4]), "r"(x[5]), "r"(y[5]),
+        "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
+
+}
+
+
 /*
-__global__ void BitInt_ModSub256()
-{
-}
-
-__global__ void BigInt_ModNeg256()
-{
-}
-
 __global__ void ciosV2(KernelArray<unsigned int>d_a1, KernelArray<unsigned int>d_b1, KernelArray<unsigned int>d_ans, KernelArray<unsigned int>d_n, KernelArray<unsigned int>d_n1, int d_s, int blkSize)
 {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;

@@ -1048,6 +1048,37 @@ class ZFieldElRedc(ZFieldEl):
 
         return ZFieldElRedc(result)
 
+    def montmul_uint256(self, x):
+        a = self.bignum.as_uint256()
+        b = x.bignum.as_uint256()
+        t = np.zeros(11,dtype=np.uint32)
+        s = 8
+        n = ZField.get_reduced_p().as_uint256()
+        n_ = ZField.get_reduction_data()['Rp'].as_uint256()
+
+        for i=0 to s-1:
+            S = t[0] + long(a[0])*long(b[i]) 
+            C = (t[0] + a[0] * b[i]) < t[0]
+            t[1] += C           # i need to propagate carry
+            m = S*n_[0] % 2^32  # n_[0] = n[0] mod 2^32
+            S = S + long(m)*long(n[0])
+            C = ((S + m*n[0]) & 0xFFFFFFFF)  < m * n[0]
+
+            for j=1 to s-1:
+                S = t[1] + long(a[j])*long(b[i])  + C
+                C = (t[1] + a[j] * b[i] + C) < t[1]
+                t[j+1] += C   # propagate carry
+                S = S + long(m) *long(n[j])
+                C = ((S + m*n[j]) & 0xFFFFFFFF) < (m*n[j])
+                t[j-1] = S & 0xFFFFFFFF
+
+            S = long(t[s]) + C
+            C = (t[s] + C ) < t[s]
+            t[s-1] = S
+            t[s] = t[s+1] + C
+            t[s+1] = 0
+
+
     def __rmul__(self, x):
         return self * x
 
