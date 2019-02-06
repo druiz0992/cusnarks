@@ -320,7 +320,7 @@ class ZField(object):
         if not ZField.is_init():
             assert False, "Finite field not initialized"
 
-        #alpha = long(1)
+        alpha = long(100)
         idx = ZField.active_prime_idx
         gamma = long(1)
         prime = ZField.get_extended_p().as_long()
@@ -331,8 +331,8 @@ class ZField(object):
 
             # alpha is random number between 0 and mod (inclusive)
             while beta == 1:
-                alpha = randint(1, prime-1)
-                #alpha +=1
+                #alpha = randint(1, prime-1)
+                alpha +=1
                 beta = pow(alpha, (prime - 1) / prime_factor, prime)
 
             gamma = gamma * pow(alpha, (prime - 1) / pow(prime_factor, exponent,prime), prime)
