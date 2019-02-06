@@ -110,4 +110,4 @@ clean:
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
 
-.PHONY:	test, build
+.PHONY:	test build clean
