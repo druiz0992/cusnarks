@@ -383,6 +383,20 @@ class BigInt(object):
         """
         return long(self.bignum)
 
+    @classmethod
+    def from_uint256(cls, bn_uint256):
+        """
+           convert from numpy array represenation to big int
+        """
+        if not isinstance(bn_uint256, np.ndarray):
+            assert False, "Expected numpy array"
+
+        elif bn_uint256.ndim != 1 or bn_uint256.shape[0] != BigInt.WORDS_IN_256BN:
+            assert False, "Unexpected dimensions"
+
+        n = np.asarray([long(x) * long(1 << 32 * i) for i, x in enumerate(bn_uint256)])
+        return BigInt( np.sum(n))
+
     def as_uint256(self):
        """ 
          return big int as numpy array of uint32
