@@ -53,10 +53,10 @@ cdef class BigInt:
         if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
             return
 
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * in_vec.shape[1], dtype=np.uint32)
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
-        self.g.addm(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0]/2)
+        self.g.addm(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 

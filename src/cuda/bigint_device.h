@@ -34,5 +34,11 @@
 #define _BIGINT_DEVICE_H_
 
 __global__ void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector);
+__global__ void montmul_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector);
+__forceinline__ __device__ void umadc32(uint32_t x, uint32_t y, uint32_t a, uint32_t *z, uint32_t *c);
+__forceinline__ __device__ void ucprop32(uint32_t *x, uint32_t *c);
+__forceinline__ __device__ void uadd256(const uint32_t *x, const uint32_t *y, uint32_t *z);
+__forceinline__ __device__ void uaddm256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p);
+__forceinline__ __device__ void usub256(const uint32_t *x, const uint32_t *y, uint32_t *z);
 
 #endif

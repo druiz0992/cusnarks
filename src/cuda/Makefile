@@ -17,24 +17,31 @@ CTSRC_PATH = $(CTSRC_PATH)
 PYSRC_PATH = $(PYSRC_PATH)
 LD_FLAGS=$(LD_PATH)
 LIB_NAME=$(LIB_NAME)
+CUBIN_NAME=$(CUBIN_NAME)
 
 NVCC = nvcc
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
 CFLAGS=-c -O2 -DLINUXINTEL64 -g -I $(INCLUDE_PATH) -w
 CUFLAGS=--compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -dlcm=cg --cudart shared $(GENCODE_ARCH_COMPUTE) 
+CUBINFLAGS=-cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LIBFLAGS= --shared -o 
 LDFLAGS=-lm -lcudart
 
 SRC = bigint.cu \
       bigint_device.cu
 
+NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
 
 OBJ=$(SRC:.cu=.o)
 
 clean:
-	rm -f *.o
+	rm -f *.o *.cubin *.asm
 
 build : so
+
+cubin : 
+	$(NVCC) $(CUBINFLAGS) $(SRC) -o $(CUBIN_NAME)
+	nvdisasm $(CUBIN_NAME) > $(NVDISASM_FILE)
 
 ##################################################
 so: $(OBJ)

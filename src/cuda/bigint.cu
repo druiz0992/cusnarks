@@ -38,6 +38,7 @@
 
 #include <assert.h>
 #include <iostream>
+#include <stdio.h>
 
 #include "types.h"
 #include "bigint.h"
@@ -70,6 +71,9 @@ BigInt::BigInt (const uint32_t *p, const uint32_t device_vector_len) : in_vector
   // Copy modulo p to device memory
   err = cudaMemcpy(this->p, p, sizeof(uint32_t) * NWORDS_256BIT, cudaMemcpyHostToDevice);
   assert(err == 0);
+
+  for (int i=0; i < NWORDS_256BIT; i++)
+    printf("%u \n",p[i]);
 }
 
 /*

@@ -43,4 +43,7 @@
 data/proof.json
 data/public.json
 .idea
-
+.cubin
+.asm
+.bin
+venv/
