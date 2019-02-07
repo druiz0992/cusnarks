@@ -47,6 +47,7 @@ PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
 LIB_NAME = libcusnarks.so
+CUBIN_NAME = cusnarks.cubin
 
 dirs= $(CUSRC_PATH) \
       $(CTSRC_PATH) 
@@ -75,7 +76,8 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'PYSRC_PATH=$(PYSRC_PATH)'       \
               'PYTST_PATH=$(PYTST_PATH)'       \
               'CUSRC_PATH=$(CUSRC_PATH)'       \
-              'LIB_NAME=$(LIB_NAME)'
+              'LIB_NAME=$(LIB_NAME)'           \
+              'CUBIN_NAME=$(CUBIN_NAME)'
               #'LIBS=$(LIBS)'                           \
               #'DEFINES=$(DEFINES)'                     \
               #'DEFINES_TEST=$(DEFINES_TEST)'                     \
@@ -109,5 +111,7 @@ clean:
 	echo "clearing all in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
+cubin:
+	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
 
 .PHONY:	test build clean

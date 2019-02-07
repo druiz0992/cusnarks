@@ -49,7 +49,7 @@ from zfield import *
 
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
-#import cu_bigint
+import cu_bigint
 
 sys.path.append('../../src/python')
 from bigint import *
@@ -60,33 +60,30 @@ class CUBigIntTest(unittest.TestCase):
     def test_0uint256(self):
         prime = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
-
+        """
         z1 =  BigInt.from_uint256(np.asarray([1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668]))
         z2 =  BigInt.from_uint256(np.asarray([596516649, 1189641421 ,1025202362 ,1350490027 , 783368690 ,1102520059 ,2044897763 ,893772102]))
-
-
-
 
         z1_rdc = ZFieldElRedc(z1)
         z2_rdc = ZFieldElRedc(z2)
         z12_rdc = z1_rdc * z2_rdc
+        """
 
 
         for iter in xrange(CUBigIntTest.TEST_ITER):
-            bn = [BigInt(randint(0,prime)) for x in range(100)]
-            bn256 = [n.as_uint256() for n in bn]
+            bn = [BigInt(randint(0,prime-1)) for x in xrange(100000)]
+            bn256 = np.asarray([n.as_uint256() for n in bn])
             r_bn  = [BigInt.from_uint256(n) for n in bn256]
 
             self.assertTrue(bn == r_bn)
    
-            # reduce Montgomery uint256
-            zel_rdc = [ZFieldElExt(x).reduce() for x in bn]
-
-            self.assertTrue(r1_rdc == r2_rdc)
-
-            #bn_vector = cu_bigint.BigInt(bn256)
-            #bn_vector.addm()
+            # Test add kernel:
+            bn_vector = cu_bigint.BigInt(ZField.get_extended_p().as_uint256(), bn256.shape[0])
+            result = bn_vector.addm(bn256)
     
+            self.assertTrue(len(result) == len(bn256)/2)
+            self.assertTrue(result == bn256)
+         
             #results2 = bn_vector.retreive()
 
 

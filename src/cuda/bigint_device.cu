@@ -72,13 +72,14 @@ __global__ void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint
     y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET];
     z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
     
-    addm_uint256(x, y, z, p);
+    uaddm256(x, y, z, p);
 
     return;
 }
 
-__global__ void monmul_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+__global__ void montmul_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
 {
+    return;
 }
 
 /*
@@ -96,7 +97,7 @@ __forceinline__ __device__ void umadc32(uint32_t x, uint32_t y, uint32_t a, uint
        "cvt.u32.u64    %0,    %prod;          \n\t"
        "shr.u64        %prod, %prod, 32;      \n\t"
        "cvt.u32.u64    %1 %prod;              \n\t"
-       : "=r"(z0), "=r"(z1) 
+       : "=r"(z[0]), "=r"(z[1]) 
        : "r"(x), "r"(y), "r"(a));
 
    // (C,S) = t[0] + a[0] * b[i] -> No carry in
@@ -115,7 +116,7 @@ __forceinline__ __device__ void ucprop32(uint32_t *x, uint32_t *c)
        "add.u32     %0, %cin"
        "set.lt.u32  %1, %0, %tmp;        \n\t"
        : "=r"(x[0]), "=r"(c[0]) 
-       : "r"(x[0]), "r"(c[0]);
+       : "r"(x[0]), "r"(c[0]));
 }
 __forceinline__ __device__ void uadd256(const uint32_t *x, const uint32_t *y, uint32_t *z)
 {
@@ -139,16 +140,16 @@ __forceinline__ __device__ void uadd256(const uint32_t *x, const uint32_t *y, ui
 __forceinline__ __device__ void uaddm256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p)
 {
   uint32_t do_modf;
-  uint32_t tmp[8];
+  uint32_t z_tmp[NWORDS_256BIT];
 
   // z[i] = x[i] + y[i] 
-  uadd256(x, y, );
+  uadd256(x, y, z);
 
   // z_tmp[i] = z[i] - p[i]
   usub256(z, p, z_tmp);
   
   // do_modf = most significant bit of z_tmp is 1
-  asm("bf3.b32	%0, %1, 31, 31;\n\t"              
+  asm("bfe.u32	%0, %1, 31, 1;\n\t"              
       : "=r"(do_modf)
       : "r"(z_tmp[7]));
 
