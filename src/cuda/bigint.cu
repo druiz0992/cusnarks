@@ -87,7 +87,10 @@ void BigInt::addm(uint32_t *in_vector_host, uint32_t *out_vector_host, uint32_t 
   copyVectorToDevice(in_vector_host, len);
 
   // perform addition operation and leave results in device memory
-  addm_kernel<<<64, 64>>>(in_vector_device, p, in_vector_len, out_vector_device);
+  int blockD, gridD;
+  blockD = 256;
+  gridD = (len + blockD - 1) / blockD;
+  addm_kernel<<<gridD, blockD>>>(in_vector_device, p, in_vector_len, out_vector_device);
   cudaError_t err = cudaGetLastError();
   assert(err == 0);
 

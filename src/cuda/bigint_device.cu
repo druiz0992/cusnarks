@@ -77,82 +77,47 @@ __global__ void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint
     return;
 }
 
-__global__ void monmulm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+__global__ void monmul_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
 {
-    // a, b, t : 32 bit numbers
-    // C : carry bit
-    // S : 64 bit number
-    for i=0 to s-1
-        // i = 0
-        asm("mad.lo.cc.u32         %S[i], %a[0], %b[i], %t[0]\n\t"
-            "mul.hi.u32            %S[i+1],%a[0], %b[i];\n\t") 
-        
-        (C,S) := t[0] + a[0]*b[i]
-        ADD(t[1],C)
-        m := S*n'[0] mod W
-        (C,S) := S + m*n[0]
-
-
-        for j=1 to s-1
-            asm("madc.lo.cc.u32         %0, %, %, % \n\t" : "=r"(z[0]) ,
-                "madc.hi.cc.u32         %1, %, %, % \n\t" 
-
-      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
-
-            // j = 1
-            (C,S) := t[1] + a[1]*b[i] + C
-            ADD(t[2],C)
-            (C,S) := S + m*n[1]
-            t[0] := S
-
-            // j = 2
-            (C,S) := t[2] + a[2]*b[i] + C
-            ADD(t[3],C)
-            (C,S) := S + m*n[2]
-            t[1] := S
-
-            // j = 3
-            (C,S) := t[3] + a[3]*b[i] + C
-            ADD(t[4],C)
-            (C,S) := S + m*n[3]
-            t[2] := S
-
-            // j = 4
-            (C,S) := t[4] + a[4]*b[i] + C
-            ADD(t[5],C)
-            (C,S) := S + m*n[4]
-            t[3] := S
-
-            // j = 5
-            (C,S) := t[5] + a[5]*b[i] + C
-            ADD(t[6],C)
-            (C,S) := S + m*n[5]
-            t[4] := S
-
-            // j = 6
-            (C,S) := t[6] + a[6]*b[i] + C
-            ADD(t[7],C)
-            (C,S) := S + m*n[6]
-            t[5] := S
-
-            // j = 7
-            (C,S) := t[7] + a[7]*b[i] + C
-            ADD(t[8],C)
-            (C,S) := S + m*n[7]
-            t[6] := S
-     
-
-        (C,S) := t[s] + C
-        t[s-1] := S
-        t[s] := t[s+1] + C
-        t[s+1] := 0
-
-
-
 }
 
+/*
+   (z,c) = x * y + a
+   z is 2 x uint32_t
+   c is carry
+*/
+__forceinline__ __device__ void umadc32(uint32_t x, uint32_t y, uint32_t a, uint32_t *z, uint32_t *c)
+{
 
-__forceinline__ __device__ void add_uint256(const uint32_t *x, const uint32_t *y, uint32_t *z)
+   asm(".reg .u64      %prod;                 \n\t"
+       ".reg .u64      %sum;                  \n\t"
+       ".cvt.u64.u32   %sum   %4;             \n\t"
+       "mad.wide.u32   %prod, %2,    %3, %sum;\n\t"
+       "cvt.u32.u64    %0,    %prod;          \n\t"
+       "shr.u64        %prod, %prod, 32;      \n\t"
+       "cvt.u32.u64    %1 %prod;              \n\t"
+       : "=r"(z0), "=r"(z1) 
+       : "r"(x), "r"(y), "r"(a));
+
+   // (C,S) = t[0] + a[0] * b[i] -> No carry in
+   asm("mad.lo.cc.u32  %0, %3, %4, %5;      \n\t"
+       "madc.hi.cc.u32 %1, %3, %4, 0;       \n\t"
+       "addc.u32       %tmp, %1, 0;         \n\t"
+       "set.lt.u32     %2, %1, %tmp;        \n\t"
+       : "=r"(z[0]), "=r"(z[1]), "=r"(c[0]) 
+       : "r"(x), "r"(y), "r"(a));
+}
+
+__forceinline__ __device__ void ucprop32(uint32_t *x, uint32_t *c)
+{
+   asm("move.u32    %cin, %3;  \n\t"
+       "move.u32    %tmp, %2;  \n\t"
+       "add.u32     %0, %cin"
+       "set.lt.u32  %1, %0, %tmp;        \n\t"
+       : "=r"(x[0]), "=r"(c[0]) 
+       : "r"(x[0]), "r"(c[0]);
+}
+__forceinline__ __device__ void uadd256(const uint32_t *x, const uint32_t *y, uint32_t *z)
 {
   // z[i] = x[i] + y[i] for 8x32 bit words
   asm("add.cc.u32        %0, %8, %12;\n\t"              // sum with carry out
@@ -171,16 +136,16 @@ __forceinline__ __device__ void add_uint256(const uint32_t *x, const uint32_t *y
         "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
 }
 
-__forceinline__ __device__ void addm_uint256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p)
+__forceinline__ __device__ void uaddm256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p)
 {
   uint32_t do_modf;
   uint32_t tmp[8];
 
   // z[i] = x[i] + y[i] 
-  add_uint256(x, y, );
+  uadd256(x, y, );
 
-  // z_tmp[i] = p[i] - z[i]
-  sub_uint256(p, z, z_tmp);
+  // z_tmp[i] = z[i] - p[i]
+  usub256(z, p, z_tmp);
   
   // do_modf = most significant bit of z_tmp is 1
   asm("bf3.b32	%0, %1, 31, 31;\n\t"              
@@ -205,7 +170,7 @@ __forceinline__ __device__ void addm_uint256(const uint32_t *x, const uint32_t *
   
 }
 
-__forceinline__ __device__ void sub_uint256(const uint32_t *x, const uint32_t *y, uint32_t *z)
+__forceinline__ __device__ void usub256(const uint32_t *x, const uint32_t *y, uint32_t *z)
 {
   // z[i] = x[i] - y[i] for 8x32 bit words
   asm("sub.cc.u32        %0, %8, %12;\n\t"              // sub with borrow out
