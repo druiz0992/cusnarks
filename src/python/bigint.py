@@ -397,6 +397,80 @@ class BigInt(object):
         n = np.asarray([long(x) * long(1 << 32 * i) for i, x in enumerate(bn_uint256)])
         return BigInt( np.sum(n))
 
+    @classmethod
+    def addu256(cls, x, y):
+        """
+           Sum 2 numbers of 256 bit
+        """
+        if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
+            assert False, "Expected numpy array"
+
+        x2 = x.reshape((-1, BigInt.WORDS_IN_256BN)).astype(np.uint64)
+        y2 = y.reshape((-1, BigInt.WORDS_IN_256BN)).astype(np.uint64)
+        z2 = np.zeros((x2.shape[0],x2.shape[1]+1), dtype=np.uint64)
+        for i in range(BigInt.WORDS_IN_256BN):
+            z2[:,i] = x2[:,i] + y2[:,i] + z2[:,i]
+            z2[z2[:,i] >> 32 != 0,i+1]=1
+            z2[:,i]= z2[:,i]& ((1 << 32) - 1)
+        z2 = z2[:,:-1].astype(np.uint32)
+        z2.reshape(x.shape)
+        return z2
+
+    @classmethod
+    def subu256(cls, x, y):
+        """
+           Sub 2 numbers of 256 bit
+        """
+        if not isinstance(x, np.ndarray) or not isinstance(y, np.ndarray):
+            assert False, "Expected numpy array"
+
+        x2 = x.reshape((-1, BigInt.WORDS_IN_256BN)).astype(np.uint64)
+        y2 = y.reshape((-1, BigInt.WORDS_IN_256BN)).astype(np.uint64)
+        z2 = np.zeros((x2.shape[0],x2.shape[1]+1), dtype=np.uint64)
+        for i in range(BigInt.WORDS_IN_256BN):
+            z2[:,i] = x2[:,i] - y2[:,i] + z2[:,i]
+            z2[z2[:,i] >> 32 != 0,i+1]=-1
+            z2[:,i]= z2[:,i]& ((1 << 32) - 1)
+        z2 = z2[:,:-1].astype(np.uint32)
+        z2.reshape(x.shape)
+        return z2
+    
+    @clasmethod
+    def addmu256(cls, x, y, p):
+       """
+          Modular addition 2 numbers 256 bit
+       """   
+       z1 = BigInt.addu256(x,y)
+       z2 = BigInt.subu256(z1, np.tile(p,(z1.shape[0],1))
+       do_mod_idx = (z1[:,1] >> 31) == 1
+
+       z1[do_mod_idx] = z2[do_mod_idx]
+       return z1
+
+    @clasmethod
+    def submu256(cls, x, y, p):
+       """
+          Modular sub 2 numbers 256 bit
+       """   
+       z1 = BigInt.sub256(x,y)
+       z2 = BigInt.add256(z1, np.tile(p,(z1.shape[0],1))
+       do_mod_idx = (z1[:,1] >> 31) == 1
+
+       z1[do_mod_idx] = z2[do_mod_idx]
+       return z1
+
+    @clasmethod
+    def modu256(cls, x, p):
+       """
+          Modular sub 2 numbers 256 bit
+       """   
+       z1 = BigInt.addu256(x,p)
+       do_mod_idx = (z1[:,1] >> 31) == 1
+
+       z1[do_mod_idx] = x[do_mod_idx]
+       return z1
+
+
     def as_uint256(self):
        """ 
          return big int as numpy array of uint32

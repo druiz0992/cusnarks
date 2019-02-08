@@ -21,33 +21,26 @@
 //
 // File name  : bigint.h
 //
-// Date       : 05/02/2019
+// Date       : 08/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of big integer class
+//   Random number generator
 // ------------------------------------------------------------------
 
 */
-#ifndef _BIGINT_H_
-#define _BIGINT_H_
 
-class BigInt {
+#include "pcg_random.hpp"
+
+class _RNG {
     private:
-        uint32_t *in_vector_device;    // pointer to device input buffer
-        uint32_t *out_vector_device;    // pointer to device output buffer
-	uint32_t *p;               // prime number
-        const uint32_t  in_vector_len;              // array len
-
-        void copyVectorToDevice(uint32_t *in_vector_host, uint32_t len);
-        void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t len);
+        pcg32 rng;
 
     public:
+        void randu32(uint32_t *samples, uint32_t n_samples);
 
-        BigInt(const uint32_t *p, const uint32_t len) ;
-        ~BigInt();
-        void addm(uint32_t *in_vector_host, uint32_t *out_vector_host, const uint32_t len);
+        _RNG();
+        _RNG(uint32_t seed);
+
 };
-
-#endif

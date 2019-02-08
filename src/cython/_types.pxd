@@ -35,13 +35,8 @@
 cdef extern from "types.h":
   
   # Types
-  ctypedef unsigned char uint8_t
-  ctypedef unsigned short uint16_t
   ctypedef unsigned int uint32_t
-  ctypedef char int8_t
-  ctypedef short int16_t
   ctypedef int int32_t
-  ctypedef float float_t
   
   #Constants 
   cdef uint32_t NWORDS_256BIT

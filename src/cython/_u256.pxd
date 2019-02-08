@@ -19,44 +19,32 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : bigint_pyx
+// File name  : _u256pxd
 //
 // Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Big Integer wrapper function
+//   U256 Integer wrapper function wrapper
 // ------------------------------------------------------------------
 
 """
 
-import numpy as np
-cimport numpy as np
-
 cimport _types as ct
 
-from _bigint cimport C_BigInt
+cdef extern from "rng_cython.h":
+     pass
 
-
-cdef class BigInt:
-    cdef C_BigInt* g
-    cdef int dim
-
-    def __cinit__(self, np.ndarray[ndim=1, dtype=np.uint32_t] p, ct.uint32_t vec_len):
-        self.dim = vec_len
-
-        self.g = new C_BigInt(&p[0], self.dim)
-
-    def addm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec):
-
-        if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
-            return
-
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
-        in_vec_flat = np.concatenate(in_vec)
-        self.g.addm(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
-       
-        return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
+cdef extern from "../cuda/u256.h":
+    cdef cppclass C_U256 "U256":
+        C_U256(ct.uint32_t *p, ct.uint32_t len, ct.uint32_t seed) except +
+        C_U256(ct.uint32_t *p, ct.uint32_t len) except +
+        void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
+        void add(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
+        void sub(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
+        void addm(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
+        void subm(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
+        void mod(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
+        void mulmont(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
 
