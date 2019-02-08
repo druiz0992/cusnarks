@@ -47,3 +47,4 @@ data/public.json
 .asm
 .bin
 venv/
+third_party_libs/

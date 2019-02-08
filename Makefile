@@ -46,16 +46,29 @@ CTSRC_PATH = $(CUSNARKS_PATH)/src/cython
 PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
-LIB_NAME = libcusnarks.so
+
+AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
+PCG_PATH = $(AUX_PATH)/pcg-c/src
+PCG_REPO = https://github.com/imneme/pcg-c.git
+
+
+CUSNARKS_LIB = libcusnarks.so
 CUBIN_NAME = cusnarks.cubin
+PCG_LIB  = libpcg_random.a
 
 dirs= $(CUSRC_PATH) \
       $(CTSRC_PATH) 
 
+aux_dirs = $(PCG_PATH)
+
 test_dirs = $(PYTST_PATH) 
+
+aux_repos = $(PCG_REPO)
 
 SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
+AUX_SUBDIRS := $(aux_dirs)
+AUX_REPOS := $(aux_repos)
 
 #####
 # Define Options
@@ -76,7 +89,7 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'PYSRC_PATH=$(PYSRC_PATH)'       \
               'PYTST_PATH=$(PYTST_PATH)'       \
               'CUSRC_PATH=$(CUSRC_PATH)'       \
-              'LIB_NAME=$(LIB_NAME)'           \
+              'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'
               #'LIBS=$(LIBS)'                           \
               #'DEFINES=$(DEFINES)'                     \
@@ -97,9 +110,14 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
 	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) depend); done
 
 build:
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH);  for j in $(AUX_REPOS); do git clone $$j; done; fi
+	@for i in $(AUX_SUBDIRS); do \
+		(cd $$i; $(MAKE)); done
 	@for i in $(SUBDIRS); do \
-	echo "make test in $$i..."; \
-	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+		echo "make test in $$i..."; \
+		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+	echo "checking third pary libs...";
 
 test:   
 	@for i in $(TEST_SUBDIRS); do \
