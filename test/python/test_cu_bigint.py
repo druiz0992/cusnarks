@@ -39,7 +39,7 @@
 import os,sys, os.path
 import unittest
 import numpy as np
-from random import randint
+from random import randint, sample
 
 sys.path.append('../../src/python')
 
@@ -49,17 +49,21 @@ from zfield import *
 
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
-import cu_bigint
+from cu_u256 import *
 
 sys.path.append('../../src/python')
 from bigint import *
 
 class CUBigIntTest(unittest.TestCase):
     TEST_ITER = 1000
+    prime = ZUtils.CURVE_DATA['BN128']['prime_r']
+    ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
+    nsamples = 100000
+    ntest_points = 1000
+    u256_p = ZField.get_extended_p().as_uint256()
+    u256 = U256(u256_p, nsamples,0)
 
     def test_0uint256(self):
-        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
-        ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
         """
         z1 =  BigInt.from_uint256(np.asarray([1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668]))
         z2 =  BigInt.from_uint256(np.asarray([596516649, 1189641421 ,1025202362 ,1350490027 , 783368690 ,1102520059 ,2044897763 ,893772102]))
@@ -69,23 +73,85 @@ class CUBigIntTest(unittest.TestCase):
         z12_rdc = z1_rdc * z2_rdc
         """
 
+        # Check uint256 conversion routines provide expected results
+        nsamples = 100
+        u256 = CUBigIntTest.u256
+        u256_vector = u256.rand(nsamples)
+        bn_vector  = [BigInt.from_uint256(n) for n in u256_vector]
+        r_bn = [x.as_uint256() for x in bn_vector]
 
+        self.assertTrue(all([all(x==y) for x,y in zip(u256_vector, r_bn) ]))
+
+    def test_1uint256(self):
+
+        u256 = CUBigIntTest.u256
+        ntest_points = CUBigIntTest.ntest_points
+        u256_p = CUBigIntTest.u256_p
         for iter in xrange(CUBigIntTest.TEST_ITER):
-            bn = [BigInt(randint(0,prime-1)) for x in xrange(100000)]
-            bn256 = np.asarray([n.as_uint256() for n in bn])
-            r_bn  = [BigInt.from_uint256(n) for n in bn256]
+            u256_vector = u256.rand(CUBigIntTest.nsamples)
 
-            self.assertTrue(bn == r_bn)
-   
+
             # Test add kernel:
-            bn_vector = cu_bigint.BigInt(ZField.get_extended_p().as_uint256(), bn256.shape[0])
-            result = bn_vector.addm(bn256)
-    
-            self.assertTrue(len(result) == len(bn256)/2)
-            self.assertTrue(result == bn256)
-         
-            #results2 = bn_vector.retreive()
+            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+            test_points2 = np.multiply(test_points,2)
 
+            result = u256.add(u256_vector)
+            r_add = BigInt.addu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
+    
+            self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
+            self.assertTrue(result[test_points] == r_add)
+         
+            # Test sub kernel:
+            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+            test_points2 = np.multiply(test_points,2)
+
+            result = u256.sub(u256_vector)
+            r_sub = BigInt.subu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
+    
+            self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
+            self.assertTrue(result[test_points] == r_sub)
+
+            # Test addm kernel:
+            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+            test_points2 = np.multiply(test_points,2)
+
+            result = u256.addm(u256_vector)
+            r_addm = BigInt.addmu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)], u256_p)
+    
+            self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
+            self.assertTrue(result[test_points] == r_addm)
+
+            # Test subm kernel:
+            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+            test_points2 = np.multiply(test_points,2)
+
+            result = u256.subm(u256_vector)
+            r_subm = BigInt.submu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)], u256_p)
+    
+            self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
+            self.assertTrue(result[test_points] == r_subm)
+
+            # Test mod kernel:
+            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+
+            result = u256.mod(u256_vector)
+            r_mod = BigInt.modu256(u256_vector[test_points], u256_p)
+    
+            self.assertTrue(len(result) == CUBigIntTest.nsamples)
+            self.assertTrue(result[test_points] == r_subm)
+
+            # Test mulmont kernel:
+            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+            test_points2 = np.multiply(test_points,2)
+
+            result = u256.mulmont(u256_vector)
+            x1_rdc = [ZFieldElRedc(BigInt.from_uint256(x) for x in u256_vector[test_points2])
+            x2_rdc = [ZFieldElRedc(BigInt.from_uint256(x) for x in u256_vector[np.add(test_points2,1)])
+            r_rdc = [x + y for x,y in zip(x1_rdx, x2_rdc)]
+            r_mul = [x.as_uint256() for x in r_rdc]
+    
+            self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
+            self.assertTrue(result[test_points] == r_mul)
 
 if __name__ == "__main__":
     unittest.main()

@@ -146,8 +146,8 @@ except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
 
-ext = [ Extension('cu_bigint',
-                    sources = ['_bigint.pyx'],
+ext = [ Extension('cu_u256',
+                    sources = ['_u256.pyx'],
                     library_dirs = [CUDA['lib64']],
                     libraries = ['cudart','cusnarks'],
                     language = 'c++',
@@ -163,7 +163,7 @@ ext = [ Extension('cu_bigint',
                          '--compiler-options', "'-fPIC'"
                         ]
                       },
-                    include_dirs = [numpy_include, CUDA['include'], '../cuda']
+                    include_dirs = [numpy_include, CUDA['include'], '../cuda'] 
                  )
       ]
 

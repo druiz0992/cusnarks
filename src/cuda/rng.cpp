@@ -19,26 +19,44 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : bigint_device.h
+// File name  : bigint.h
 //
-// Date       : 05/02/2019
+// Date       : 08/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of big integer device functionality
+//   Random number generator
 // ------------------------------------------------------------------
 
 */
-#ifndef _BIGINT_DEVICE_H_
-#define _BIGINT_DEVICE_H_
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cassert>
+#include <climits>
+#include <iostream>
+#include <iomanip>
+#include <algorithm>
+#include <numeric>
+#include <random>       // for random_device
 
-__global__ void addm_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector);
-__global__ void montmul_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector);
-__forceinline__ __device__ void umadc32(uint32_t x, uint32_t y, uint32_t a, uint32_t *z, uint32_t *c);
-__forceinline__ __device__ void ucprop32(uint32_t *x, uint32_t *c);
-__forceinline__ __device__ void uadd256(const uint32_t *x, const uint32_t *y, uint32_t *z);
-__forceinline__ __device__ void uaddm256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p);
-__forceinline__ __device__ void usub256(const uint32_t *x, const uint32_t *y, uint32_t *z);
+#include "types.h"
+#include "rng.h"
 
-#endif
+using namespace std;
+
+_RNG::_RNG():rng(43u)
+{
+   this->rng.seed(pcg_extras::seed_seq_from<std::random_device>());
+}
+_RNG::_RNG(uint32_t seed) : rng(seed) { }
+
+
+void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
+{
+   for (int i =0; i < n_samples; i++){
+     samples[i] = rng();
+   }
+}
+
