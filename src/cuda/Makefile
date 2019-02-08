@@ -16,7 +16,7 @@ LIB_PATH = $(LIB_PATH)
 CTSRC_PATH = $(CTSRC_PATH)
 PYSRC_PATH = $(PYSRC_PATH)
 LD_FLAGS=$(LD_PATH)
-LIB_NAME=$(LIB_NAME)
+CUSNARKS_LIB=$(CUSNARKS_LIB)
 CUBIN_NAME=$(CUBIN_NAME)
 
 NVCC = nvcc
@@ -45,7 +45,7 @@ cubin :
 
 ##################################################
 so: $(OBJ)
-	$(NVCC) $(LIBFLAGS) $(LIB_PATH)/$(LIB_NAME) $(OBJ) $(LDFLAGS)
+	$(NVCC) $(LIBFLAGS) $(LIB_PATH)/$(CUSNARKS_LIB) $(OBJ) $(LDFLAGS)
 
 ##################################################
 %.o : %.cu
