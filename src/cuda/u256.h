@@ -41,7 +41,7 @@ class U256 {
         const uint32_t  in_vector_len;   // array len
         _RNG *rng;
 
-        void copyVectorToDevice(uint32_t *in_vector_host, uint32_t len);
+        void copyVectorToDevice(const uint32_t *in_vector_host, uint32_t len);
         void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t len);
 
     public:
@@ -53,7 +53,7 @@ class U256 {
         void addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod);
         void subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod);
         void mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len);
-        void mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, const uint32_t len, uint32_t premod);
+        void mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, const uint32_t len, uint32_t np, uint32_t premod);
 };
 
 #endif

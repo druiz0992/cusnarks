@@ -44,5 +44,5 @@ cdef extern from "../cuda/u256.h":
         void addm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.uint32_t premod)
         void subm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.uint32_t premod)
         void mod(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len)
-        void mulmont(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.uint32_t premod)
+        void mulmont(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.uint32_t nprime, ct.uint32_t premod)
 
