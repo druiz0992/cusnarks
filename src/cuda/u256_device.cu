@@ -31,79 +31,10 @@
 
 */
 
-/*
-   addition of two 256 bit number modulo p Z[i] = X[i] + Y[i] (mod p)
-
-   Input vector contains intercalated X, Y and Z numbers (X[0], Y[0], Z[0], X[1], Y[1], Z[1],..
-    X[N-1], Y[N-1], Z[N-1]) where X, Y and Z are 256 bit numbers represented as an array of uint32_t
-   
-*/
-
 #include <stdio.h>
 
 #include "types.h"
 #include "u256_device.h"
-
-
-/*
-    256 bit addition kernel
-
-    Arguments :
-      in_vector : Input vector of up to N 256 bit elements X[0], X[1], X[2] ... X[N-1].
-      out_vector : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
-      len : number of elements in output vector to be xferred. 
-          Cannot be greater than half amount reseved during constructor, but not checked
-*/
-__global__ void addu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
-{
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-
-    const uint32_t *x;
-    const uint32_t *y;
-    uint32_t * z;
- 
-    if(tid >= len) {
-      return;
-    }
-
-    x = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
-    y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
-    
-    addu256(x, y, z);
-
-    return;
-}
-
-/*
-    256 bit sub kernel
-
-    Arguments :
-      in_vector : Input vector of up to N 256 bit elements X[0], X[1], X[2] ... X[N-1].
-      out_vector : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
-      len : number of elements in output vector to be xferred. 
-          Cannot be greater than half amount reseved during constructor, but not checked
-*/
-__global__ void subu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
-{
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-
-    const uint32_t *x;
-    const uint32_t *y;
-    uint32_t * z;
- 
-    if(tid >= len) {
-      return;
-    }
-
-    x = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
-    y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
-    
-    subu256(x, y, z);
-
-    return;
-}
 
 /*
     Modular addition kernel
@@ -115,7 +46,7 @@ __global__ void subu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, u
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-__global__ void addmu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+__global__ void addmu256_kernel(uint32_t *out_vector, const uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -131,7 +62,12 @@ __global__ void addmu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, 
     y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
     z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
     
-    addmu256(x, y, z, p);
+    if (premod){
+      modu256(x,x,p);
+      modu256(y,y,p);
+    }
+
+    addmu256(z,x, y, p);
 }
 
 /*
@@ -144,7 +80,7 @@ __global__ void addmu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, 
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-__global__ void submu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+__global__ void submu256_kernel(uint32_t *out_vector, const uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -160,7 +96,12 @@ __global__ void submu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, 
     y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
     z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
     
-    submu256(x, y, z, p);
+    if (premod){
+      modu256(x,x,p);
+      modu256(y,y,p);
+    }
+
+    submu256(z,x, y, p);
 }
 
 /*
@@ -173,7 +114,7 @@ __global__ void submu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, 
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-__global__ void modu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+__global__ void modu256_kernel(uint32_t *out_vector, const uint32_t *in_vector, const uint32_t *p, uint32_t len)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -187,26 +128,123 @@ __global__ void modu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, u
     x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
     z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
     
-    modu256(x, z, p);
+    modu256(z, x, p);
 }
 
 
-__global__ void mulmontu256_kernel(uint32_t *in_vector, uint32_t *p, uint32_t len, uint32_t *out_vector)
+__global__ void mulmontu256_kernel(uint32_t *out_vector, const uint32_t *in_vector, const uint32_t *p,  const uint32_t np, uint32_t len, uint32_t premod)
 {
-    return;
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    const uint32_t *A;
+    const uint32_t *B;
+    const uint32_t *P;
+    uint32_t NP;
+    uint32_t * z;
+    uint32_t i,j
+ 
+    A = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
+    B = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
+    U = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    P = p;
+    NP = np;
+   
+    // ensure A, B < p 
+    if (premod){
+      modu256(A,A,p);
+      modu256(B,B,p);
+    }
+
+    if(tid >= len) {
+      return;
+    }
+
+    uint32_t S, C=0, C1, C2, M[2], X[2];
+    uint32_t T={0,0,0,0,0,0,0,0,0,0,0};
+
+    for(i=0; i<NWORDS_256BIT; i++)
+    {
+      // (C,S) = t[0] + a[0]*b[i], worst case 2 words
+      madcu32(&C,&S,A[0],B[i],T[0]);
+
+      // ADD(t[1],C)
+      propcu32(T, C, 1);
+
+     // m = S*n'[0] mod W, where W=2^32
+     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+     mulu32(M, S, NP);
+
+     // (C,S) = S + m*n[0], worst case 2 words
+     madcu32(&C,&S,M[0],P[0],S[0]);
+
+     for(j=1; j<NDigits; j++)
+     {
+       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+       mulu32(X, A[j], B[i]);
+       addcu32(&C1,T[j], C);
+       addcu32(&C2, &S, S, X[0])
+       addcu32(&C, C1, X[1]);
+       addcu32(&C, C, C2,);
+
+       // ADD(t[j+1],C)
+       propcu32(T,C,j+1);
+
+       // (C,S) = S + m*n[j]
+       madcu32(&C,&S,M[0], P[j],S);
+
+       // t[j-1] = S
+       T[j-1] = S;
+     }
+
+     // (C,S) = t[s] + C
+     addcu32(&C,&S, T[NWORDS_256BIT], C);
+     // t[s-1] = S
+     T[NWORDS_256BIT-1] = S;
+     // t[s] = t[s+1] + C
+     addcu32(&C,&T[NWORDS_256BIT], &T[NWORDS_256BIT+1], C);
+     // t[s+1] = 0
+     T[NWORDS_256BIT+1] = 0;
+   }
+
+   /* Step 3: if(u>=n) return u-n else return u */
+   if (ltu256(P,T)){
+      subu256(U,T,P);
+   } else {
+      memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
+   }
+
+   return;
 }
 
-__forceinline__ __device__ void addu256(const uint32_t *x, const uint32_t *y, uint32_t *z)
+__forceinline__ __device__ void addu256(uint32_t *z, const uint32_t *x, const uint32_t *y)
 {
   // z[i] = x[i] + y[i] for 8x32 bit words
-  asm("add.cc.u32        %0, %8,  %9;\n\t"              // sum with carry out
-      "addc.cc.u32       %1, %10, %11;\n\t"             // sum with carry in and carry out
-      "addc.cc.u32       %2, %12, %13;\n\t"
-      "addc.cc.u32       %3, %14, %15;\n\t"
-      "addc.cc.u32       %4, %16, %17;\n\t"
-      "addc.cc.u32       %5, %18, %19;\n\t"
-      "addc.cc.u32       %6, %20, %21;\n\t"
-      "addc.u32          %7, %22, %23;\n\t"            // sum with carry in
+  asm(".reg .u32         %x_;        \n\t"
+      ".reg .u32         %y_;        \n\t"
+      "mov.u32           %x_,%8;     \n\t"
+      "mov.u32           %y_,%9;     \n\t"
+      "add.cc.u32        %0, %x_, %y_;\n\t"             // sum with carry out
+      "mov.u32           %x_,%10;     \n\t"
+      "mov.u32           %y_,%11;     \n\t"
+      "addc.cc.u32       %1, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%12;     \n\t"
+      "mov.u32           %y_,%13;     \n\t"
+      "addc.cc.u32       %2, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%14;     \n\t"
+      "mov.u32           %y_,%15;     \n\t"
+      "addc.cc.u32       %3, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%16;     \n\t"
+      "mov.u32           %y_,%17;     \n\t"
+      "addc.cc.u32       %4, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%18;     \n\t"
+      "mov.u32           %y_,%19;     \n\t"
+      "addc.cc.u32       %5, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%20;     \n\t"
+      "mov.u32           %y_,%21;     \n\t"
+      "addc.cc.u32       %6, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%22;     \n\t"
+      "mov.u32           %y_,%23;     \n\t"
+      "addc.u32          %7, %x_, %y_;\n\t"             // sum with carry in 
       : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
         "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
       : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
@@ -215,17 +253,35 @@ __forceinline__ __device__ void addu256(const uint32_t *x, const uint32_t *y, ui
         "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
 }
 
-__forceinline__ __device__ void subu256(const uint32_t *x, const uint32_t *y, uint32_t *z)
+__forceinline__ __device__ void subu256(uint32_t *z, const uint32_t *x, const uint32_t *y)
 {
   // z[i] = x[i] - y[i] for 8x32 bit words
-  asm("sub.cc.u32        %0, %8,  %9;\n\t"              // sub with borrow out
-      "subc.cc.u32       %1, %10, %11;\n\t"             // sub with borrow out and borrow in
-      "subc.cc.u32       %2, %12, %13;\n\t"
-      "subc.cc.u32       %3, %14, %15;\n\t"
-      "subc.cc.u32       %4, %16, %17;\n\t"
-      "subc.cc.u32       %5, %18, %19;\n\t"
-      "subc.cc.u32       %6, %20, %21;\n\t"
-      "subc.u32          %7, %22, %23;\n\t"            // sum with carry in
+  asm(".reg .u32         %x_;        \n\t"
+      ".reg .u32         %y_;        \n\t"
+      "mov.u32           %x_,%8;     \n\t"
+      "mov.u32           %y_,%9;     \n\t"
+      "sub.cc.u32        %0, %x_, %y_;\n\t"             // sum with borrow out
+      "mov.u32           %x_,%10;     \n\t"
+      "mov.u32           %y_,%11;     \n\t"
+      "subc.cc.u32       %1, %x_, %y_;\n\t"             // sum with borrow in and borrow out
+      "mov.u32           %x_,%12;     \n\t"
+      "mov.u32           %y_,%13;     \n\t"
+      "subc.cc.u32       %2, %x_, %y_;\n\t"             // sum with borrow in and borrow out
+      "mov.u32           %x_,%14;     \n\t"
+      "mov.u32           %y_,%15;     \n\t"
+      "subc.cc.u32       %3, %x_, %y_;\n\t"             // sum with borrow in and borrow out
+      "mov.u32           %x_,%16;     \n\t"
+      "mov.u32           %y_,%17;     \n\t"
+      "subc.cc.u32       %4, %x_, %y_;\n\t"             // sum with borrow in and borrow out
+      "mov.u32           %x_,%18;     \n\t"
+      "mov.u32           %y_,%19;     \n\t"
+      "subc.cc.u32       %5, %x_, %y_;\n\t"             // sum with borrow in and borrow out
+      "mov.u32           %x_,%20;     \n\t"
+      "mov.u32           %y_,%21;     \n\t"
+      "subc.cc.u32       %6, %x_, %y_;\n\t"             // sum with borrow in and borrow out
+      "mov.u32           %x_,%22;     \n\t"
+      "mov.u32           %y_,%23;     \n\t"
+      "subc.u32          %7, %x_, %y_;\n\t"             // sum with borrow in 
       : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
         "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
       : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
@@ -236,104 +292,115 @@ __forceinline__ __device__ void subu256(const uint32_t *x, const uint32_t *y, ui
 }
 
 
-__forceinline__ __device__ void addmu256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p)
+__forceinline__ __device__ uint32_t eq0u256(const uint32_t *x)
 {
-  uint32_t do_modf;
-  uint32_t z_tmp[NWORDS_256BIT];
-
-  // z[i] = x[i] + y[i] 
-  addu256(x, y, z);
-
-  // z_tmp[i] = z[i] - p[i]
-  subu256(z, p, z_tmp);
-  
-  // do_modf = most significant bit of z_tmp is 1
-  asm("bfe.u32	%0, %1, 31, 1;\n\t"              
-      : "=r"(do_modf)
-      : "r"(z_tmp[7]));
-
-  // if do_modf, return z_tmp. Else, return <
-  if (do_modf){
-     asm("mov.u32     %0,  %8;\n\t"
-         "mov.u32     %1,  %9;\n\t"
-         "mov.u32     %2,  %10;\n\t"
-         "mov.u32     %3,  %11;\n\t"
-         "mov.u32     %4,  %12;\n\t"
-         "mov.u32     %5,  %13;\n\t"
-         "mov.u32     %6,  %14;\n\t"
-         "mov.u32     %7,  %15;\n\t"
-      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
-        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
-      : "r"(z_tmp[0]), "r"(z_tmp[1]), "r"(z_tmp[2]), "r"(z_tmp[3]),
-        "r"(z_tmp[4]), "r"(z_tmp[5]), "r"(z_tmp[6]), "r"(z_tmp[7]));
-  }    
-  
+  if (x[0] == 0 && x[1] ==  0 && x[2] == 0 && x[3] == 0 && x[4] == 0 && x[5] == 0 && x[6] == 0 && x[7] == 0){
+    return 1;
+  } else { 
+    return 0;
+  }
 }
-__forceinline__ __device__ void submu256(const uint32_t *x, const uint32_t *y, uint32_t *z, const uint32_t *p)
+
+__forceinline__ __device__ uint32_t ltu256(const uint32_t *x, const uint32 *y)
 {
-  uint32_t do_modf;
-  uint32_t z_tmp[NWORDS_256BIT];
+   if (x[7] > y[7]) return 0;
+   else if (x[7] < y[7]) return 1;
+   else if (x[6] > y[6]) return 0;
+   else if (x[6] < y[6]) return 1;
+   else if (x[5] > y[5]) return 0;
+   else if (x[5] < y[5]) return 1;
+   else if (x[4] > y[4]) return 0;
+   else if (x[4] < y[4]) return 1;
+   else if (x[3] > y[3]) return 0;
+   else if (x[3] < y[3]) return 1;
+   else if (x[2] > y[2]) return 0;
+   else if (x[2] < y[2]) return 1;
+   else if (x[1] > y[1]) return 0;
+   else if (x[1] < y[1]) return 1;
+   else if (x[0] >= y[0]) return 0;
+   else return 1;
+}
+__forceinline__ __device__ void addmu256(uint32_t *z, const uint32_t *x, const uint32_t *y, const uint32_t *p)
+{
+   uint32_t z_tmp[NWORDS_256BIT];
 
-  // z[i] = x[i] - y[i] 
-  subu256(x, y, z);
+   if (eq0u256(y)) {
+      //z[0] = x[0]; z[1] = z[1]; z[2] = x[2]; z[3] = z[3]; z[4] = x[4]; z[5] = x[5]; z[6] = x[6]; z[7] = z[7];
+      asm("mov.u32     %0,  0;\n\t"
+          "mov.u32     %1,  0;\n\t"
+          "mov.u32     %2,  0;\n\t"
+          "mov.u32     %3,  0;\n\t"
+          "mov.u32     %4,  0;\n\t"
+          "mov.u32     %5,  0;\n\t"
+          "mov.u32     %6,  0;\n\t"
+          "mov.u32     %7,  0;\n\t"
+       : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+         "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+       :);
+   } else {
+      subu256(z,p,y);
+      submu256(z,x,z,p);
+   }
+}
 
-  // z_tmp[i] = z[i] + p[i]
-  addu256(z, p, z_tmp);
-  
-  // do_modf = most significant bit of z_tmp is 1
-  asm("bfe.u32	%0, %1, 31, 1;\n\t"              
-      : "=r"(do_modf)
-      : "r"(z_tmp[7]));
+__forceinline__ __device__ void submu256(uint32_t *z, const uint32_t *x, const uint32_t *y, const uint32_t *p)
+{
+  if (ltu256(x,y)){
+    subu256(z,p,y);
+    addu256(z,x,z);
 
-  // if do_modf, return z_tmp. Else, return <
-  if (do_modf){
-     asm("mov.u32     %0,  %8;\n\t"
-         "mov.u32     %1,  %9;\n\t"
-         "mov.u32     %2,  %10;\n\t"
-         "mov.u32     %3,  %11;\n\t"
-         "mov.u32     %4,  %12;\n\t"
-         "mov.u32     %5,  %13;\n\t"
-         "mov.u32     %6,  %14;\n\t"
-         "mov.u32     %7,  %15;\n\t"
-      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
-        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
-      : "r"(z_tmp[0]), "r"(z_tmp[1]), "r"(z_tmp[2]), "r"(z_tmp[3]),
-        "r"(z_tmp[4]), "r"(z_tmp[5]), "r"(z_tmp[6]), "r"(z_tmp[7]));
-  }    
+  } else {
+    subu256(z,x,y);
+  }
   
 }
 
-__forceinline__ __device__ void modu256(const uint32_t *x, uint32_t *z, const uint32_t *p)
+/*
+   Assumes p is at least 254 bits
+   */
+__forceinline__ __device__ void modu256(uint32_t *z, const uint32_t *x, const uint32_t *p)
 {
-  uint32_t do_modf;
-  uint32_t z_tmp[NWORDS_256BIT];
+   asm("mov.u32     %0,  %8;\n\t"
+       "mov.u32     %1,  %9;\n\t"
+       "mov.u32     %2,  %10;\n\t"
+       "mov.u32     %3,  %11;\n\t"
+       "mov.u32     %4,  %12;\n\t"
+       "mov.u32     %5,  %13;\n\t"
+       "mov.u32     %6,  %14;\n\t"
+       "mov.u32     %7,  %15;\n\t"
+    : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+      "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+    : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]),
+      "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 
-  // z_tmp[i] = z[i] + p[i]
-  addu256(x, p, z_tmp);
-  
-  // do_modf = most significant bit of z_tmp is 1
-  asm("bfe.u32	%0, %1, 31, 1;\n\t"              
-      : "=r"(do_modf)
-      : "r"(z_tmp[7]));
+  // x(255 bit number worst case) - p (254 bit number) = z (255 bit number) : ex 31(5 b) - 8(4 b) =23 (5 b) 
+  if (!ltu256(z,p)){
+     subu256(z,z,p);
+  } else { return; }
+  // x(255 bit number) - p (254 bit number) = z (254 bit number) : ex 23(5) - 8(4b) = 15(4 b)
+  if (!ltu256(z,p)){
+     subu256(z,z,p);
+  } else { return; }
+  // x(254 bit number) - p (254 bit number) = z (254 bit number) : ex 15(5) - 8(4b) = 7(3 b)
+  if (!ltu256(z,p)){
+     subu256(z,z,p);
+  } else { return; }
 
-  // if do_modf, return z_tmp. Else, return <
-  if (do_modf){
-     asm("mov.u32     %0,  %8;\n\t"
-         "mov.u32     %1,  %9;\n\t"
-         "mov.u32     %2,  %10;\n\t"
-         "mov.u32     %3,  %11;\n\t"
-         "mov.u32     %4,  %12;\n\t"
-         "mov.u32     %5,  %13;\n\t"
-         "mov.u32     %6,  %14;\n\t"
-         "mov.u32     %7,  %15;\n\t"
-      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
-        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
-      : "r"(z_tmp[0]), "r"(z_tmp[1]), "r"(z_tmp[2]), "r"(z_tmp[3]),
-        "r"(z_tmp[4]), "r"(z_tmp[5]), "r"(z_tmp[6]), "r"(z_tmp[7]));
-  }    
-  
+  assert(0);
+
 }
 
+__forceinline__ __device__ void mulu32(uint32_t *z, const uint32_t x, const uint32_t y)
+{
+  // z[i] = x * y for 32 bit words
+  asm(".reg .u64 %prod;                     \n\t"
+      "mul.wide.u32        %prod, %1,    %2;\n\t"           
+      "cvt.u32.u64         %0,    %prod;    \n\t"
+      "shr.u64             %prod, %prod, 32;\n\t"
+      "cvt.u32.u64         %1,    %prod;    \n\t"
+      : "=r"(z[0]), "=r"(z[1])
+      : "r"(x), "r"(y));
+}
 
 
 /*
@@ -341,35 +408,38 @@ __forceinline__ __device__ void modu256(const uint32_t *x, uint32_t *z, const ui
    z is 2 x uint32_t
    c is carry
 */
-__forceinline__ __device__ void madcu32(uint32_t x, uint32_t y, uint32_t a, uint32_t *z, uint32_t *c)
+__forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a)
 {
-
-   asm(".reg .u64      %prod;                 \n\t"
-       ".reg .u64      %sum;                  \n\t"
-       ".cvt.u64.u32   %sum   %4;             \n\t"
-       "mad.wide.u32   %prod, %2,    %3, %sum;\n\t"
-       "cvt.u32.u64    %0,    %prod;          \n\t"
-       "shr.u64        %prod, %prod, 32;      \n\t"
-       "cvt.u32.u64    %1 %prod;              \n\t"
-       : "=r"(z[0]), "=r"(z[1]) 
-       : "r"(x), "r"(y), "r"(a));
-
    // (C,S) = t[0] + a[0] * b[i] -> No carry in
-   asm("mad.lo.cc.u32  %0, %3, %4, %5;      \n\t"
+   asm(".reg .u32      %tmp;                \n\t"
+       "mad.lo.cc.u32  %0, %3, %4, %5;      \n\t"
        "madc.hi.cc.u32 %1, %3, %4, 0;       \n\t"
        "addc.u32       %tmp, %1, 0;         \n\t"
        "set.lt.u32     %2, %1, %tmp;        \n\t"
        : "=r"(z[0]), "=r"(z[1]), "=r"(c[0]) 
        : "r"(x), "r"(y), "r"(a));
 }
-
-__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t *c)
+__forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y)
 {
-   asm("move.u32    %cin, %3;  \n\t"
-       "move.u32    %tmp, %2;  \n\t"
-       "add.u32     %0, %cin"
-       "set.lt.u32  %1, %0, %tmp;        \n\t"
-       : "=r"(x[0]), "=r"(c[0]) 
-       : "r"(x[0]), "r"(c[0]));
+   // (C,S) = t[0] + a[0] * b[i] -> No carry in
+   asm(".reg .u32      %tmp;            \n\t"
+       "add.cc.u32     %tmp, %2, %3;    \n\t"
+       "set.lt.u32     %2, %1, %tmp;    \n\t"
+       : "=r"(s[0]), "=r"(c[0]) 
+       : "r"(x), "r"(y));
+}
+
+__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit)
+{
+   while ((digit < NWORDS_256BIT_FIOS) && (c))
+   {
+     asm("mov.u32    %cin, %3;  \n\t"
+         "mov.u32    %tmp, %2;  \n\t"
+         "add.cc.u32  %0, %cin"
+         "set.lt.u32  %1, %0, %tmp;        \n\t"
+         : "=r"(x[digit]), "=r"(c) 
+         : "r"(x[digit]), "r"(c));
+     digit++;
+   }
 }
 

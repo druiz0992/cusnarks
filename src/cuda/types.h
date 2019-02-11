@@ -34,9 +34,10 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
-#define NWORDS_256BIT (8)
-#define XOFFSET       (0)
-#define YOFFSET       (1)
+#define NWORDS_256BIT      (8)
+#define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
+#define XOFFSET            (0)
+#define YOFFSET            (1)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;

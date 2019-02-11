@@ -35,12 +35,16 @@
 
 class _RNG {
     private:
-        pcg32 rng;
+        static _RNG *instance;
 
-    public:
-        void randu32(uint32_t *samples, uint32_t n_samples);
-
+        // prevent instances
         _RNG();
         _RNG(uint32_t seed);
+        ~_RNG();
 
+    public:
+	static _RNG* get_instance();
+	static _RNG* get_instance(uint32_t seed);
+        void randu32(uint32_t *samples, uint32_t n_samples);
+	static void destroy()
 };

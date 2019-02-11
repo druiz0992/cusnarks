@@ -96,7 +96,7 @@ class CUBigIntTest(unittest.TestCase):
             test_points2 = np.multiply(test_points,2)
 
             result = u256.add(u256_vector)
-            r_add = BigInt.addu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
+            r_add, _ = BigInt.addu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
     
             self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
             self.assertTrue(result[test_points] == r_add)
@@ -106,7 +106,7 @@ class CUBigIntTest(unittest.TestCase):
             test_points2 = np.multiply(test_points,2)
 
             result = u256.sub(u256_vector)
-            r_sub = BigInt.subu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
+            r_sub, _ = BigInt.subu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
     
             self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
             self.assertTrue(result[test_points] == r_sub)
