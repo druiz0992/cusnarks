@@ -43,6 +43,7 @@ from random import randint
 sys.path.append('../../src/python')
 
 from bigint import *
+from zutils import *
 
 
 class BigIntTest(unittest.TestCase):
@@ -348,6 +349,269 @@ class BigIntTest(unittest.TestCase):
             self.assertTrue(r1 == False)
             self.assertTrue(r2 == True)
 
+    def test_4u256(self):
+        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
+        nsamples = 1000
+        p_u256 = BigInt(prime).as_uint256()
+
+        for iter in xrange(BigIntTest.TEST_ITER):
+           x_l = [randint(0, (1<<256)-1) for  x in range(nsamples)]
+           y_l = [randint(0, (1<<256)-1) for x in  range(nsamples)]
+
+           x_bn = [BigInt(x) for x in x_l]
+           y_bn = [BigInt(x) for x in y_l]
+
+           x_u256 = np.asarray([x.as_uint256() for x in x_bn])
+           y_u256 = np.asarray([x.as_uint256() for x in y_bn])
+
+           # sum
+           z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(x_bn,y_bn)]
+
+           z_u256, _ = BigInt.addu256(x_u256, y_u256)
+           z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+           self.assertTrue(z_bn == z2_bn)
+
+           # sub
+           z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,y_bn)]
+
+           z_u256, _ = BigInt.subu256(x_u256, y_u256)
+           z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+           self.assertTrue(z_bn == z2_bn)
+
+           # mod
+           z_bn = [x % prime for x in x_bn]
+
+           z_u256 = BigInt.modu256(x_u256, p_u256)
+           z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+           self.assertTrue(z_bn == z2_bn)
+
+           # subm
+           z_bn = [(x-y) % prime for x,y in zip(x_bn,y_bn)]
+
+           z_u256 = BigInt.submu256(x_u256, y_u256, p_u256)
+           z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+           self.assertTrue(z_bn == z2_bn)
+
+           # addm
+           z_bn = [(x+y) % prime for x,y in zip(x_bn,y_bn)]
+
+           z_u256 = BigInt.addmu256(x_u256, y_u256, p_u256)
+           z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+           self.assertTrue(z_bn == z2_bn)
+
+    def test_5u256_special(self):
+        prime = ZUtils.CURVE_DATA['BN128']['prime_r']
+        p_u256 = BigInt(prime).as_uint256()
+        p1_u256 = BigInt(prime + 1).as_uint256()
+        p0_u256 = BigInt(prime - 1).as_uint256()
+
+        x0_l = 0
+        xp_l = prime
+        xp1_l = prime + 1
+        xp0_l = prime - 1
+
+
+        x_l = [randint(0, (1<<256)-1) for x in  range(8)]
+        x1_l = x_l + 1
+        y_l = [randint(0, (1<<256)-1) for x in  range(8)]
+
+        x0_bn = [BigInt(x) for x in x0_l]
+        x1_bn = [BigInt(x) for x in x1_l]
+        xp_bn = [BigInt(x) for x in xp_l]
+        x_bn = [BigInt(x) for x in x_l]
+        y_bn = [BigInt(x) for x in y_l]
+
+        x0_u256 = np.asarray([x.as_uint256() for x in x0_bn])
+        x1_u256 = np.asarray([x.as_uint256() for x in x1_bn])
+        xp_u256 = np.asarray([x.as_uint256() for x in xp_bn])
+
+        x_u256 = np.asarray([x.as_uint256() for x in x_bn])
+        y_u256 = np.asarray([x.as_uint256() for x in y_bn])
+
+        # sum 0 + y
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(x0_bn,y_bn)]
+
+        z_u256, _ = BigInt.addu256(x0_u256, y_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum x + 0
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(x_bn,x0_bn)]
+
+        z_u256, _ = BigInt.addu256(x_u256, x0_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum p
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(xp_bn,y_bn)]
+
+        z_u256, _ = BigInt.addu256(xp_u256, y_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+
+        # sub 0 - y
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x0_bn,y_bn)]
+
+        z_u256, _ = BigInt.subu256(x0_u256, y_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - 0
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,x0_bn)]
+
+        z_u256, _ = BigInt.subu256(x_u256, x0_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,xp_bn)]
+
+        z_u256, _ = BigInt.subu256(x_u256, xp_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub p - y
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(xp_bn,x_bn)]
+
+        z_u256, _ = BigInt.subu256(xp_u256, x_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - x
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,x_bn)]
+
+        z_u256, _ = BigInt.subu256(x_u256, x_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum 0 + y % p
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(x0_bn,y_bn)]
+
+        z_u256, _ = BigInt.addmu256(x0_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum x + 0 % p
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(x_bn,x0_bn)]
+
+        z_u256, _ = BigInt.addmu256(x_u256, x0_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum p + y % p
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(xp_bn,y_bn)]
+
+        z_u256, _ = BigInt.addmu256(xp_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum p1 + y % p
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(p1_bn,y_bn)]
+
+        z_u256, _ = BigInt.addmu256(xp1_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sum p0 + y % p
+        z_bn = [(x+y) & ((1<<256)-1) for x,y in zip(p0_bn,y_bn)]
+
+        z_u256, _ = BigInt.addmu256(xp0_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub 0 - y % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x0_bn,y_bn)]
+
+        z_u256, _ = BigInt.submu256(x0_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - 0 % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,x0_bn)]
+
+        z_u256, _ = BigInt.submu256(x_u256, x0_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - p % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,xp_bn)]
+
+        z_u256, _ = BigInt.submu256(x_u256, xp_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub p - y % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(xp_bn,x_bn)]
+
+        z_u256, _ = BigInt.submu256(xp_u256, x_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - x % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,x_bn)]
+
+        z_u256, _ = BigInt.submu256(x_u256, x_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub p1 - y % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(p1_bn,y_bn)]
+
+        z_u256, _ = BigInt.submu256(p1_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub p0 - y % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(p0_bn,y_bn)]
+
+        z_u256, _ = BigInt.submu256(p0_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x1 - x % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x1_bn,y_bn)]
+
+        z_u256, _ = BigInt.submu256(x1_u256, y_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+        # sub x - x1 % p
+        z_bn = [(x-y) & ((1<<256)-1) for x,y in zip(x_bn,x1_bn)]
+
+        z_u256, _ = BigInt.submu256(x_u256, x1_u256, p_u256)
+        z2_bn = [BigInt.from_uint256(x) for x in z_u256]
+
+        self.assertTrue(z_bn == z2_bn)
+
+           
+            
 
 if __name__ == "__main__":
     unittest.main()

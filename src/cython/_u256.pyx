@@ -49,7 +49,10 @@ cdef class U256:
 
         self.g = new C_U256(&p[0], self.dim, seed)
 
-    def add(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec):
+    def __dealloc__(self):
+        del self.g
+
+    def addm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.uint32_t premod=1):
 
         if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
             return
@@ -57,11 +60,11 @@ cdef class U256:
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
-        self.g.add(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
+        self.g.addm(&out_vec_flat[0],&in_vec_flat[0], in_vec.shape[0], premod)
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 
-    def sub(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec):
+    def subm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.uint32_t premod=1):
 
         if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
             return
@@ -69,19 +72,7 @@ cdef class U256:
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
-        self.g.sub(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
-       
-        return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
-
-    def addm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec):
-
-        if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
-            return
-
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
-        in_vec_flat = np.concatenate(in_vec)
-        self.g.addm(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
+        self.g.subm(&out_vec_flat[0],&in_vec_flat[0], in_vec.shape[0], premod)
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 
@@ -93,11 +84,11 @@ cdef class U256:
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
-        self.g.mod(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
+        self.g.mod(&out_vec_flat[0],&in_vec_flat[0], in_vec.shape[0])
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 
-    def mulmont(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec):
+    def mulmont(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.uint32_t premod=1):
 
         if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
             return
@@ -105,7 +96,7 @@ cdef class U256:
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
-        self.g.mulmont(&in_vec_flat[0], &out_vec_flat[0], in_vec.shape[0])
+        self.g.mulmont(&out_vec_flat[0], &int_vec_flat[0], in_vec.shape[0], premod)
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 

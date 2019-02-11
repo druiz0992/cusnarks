@@ -41,10 +41,8 @@ cdef extern from "../cuda/u256.h":
         C_U256(ct.uint32_t *p, ct.uint32_t len, ct.uint32_t seed) except +
         C_U256(ct.uint32_t *p, ct.uint32_t len) except +
         void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
-        void add(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
-        void sub(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
-        void addm(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
-        void subm(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
-        void mod(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
-        void mulmont(ct.uint32_t *in_vector, ct.uint32_t *out_vector, ct.uint32_t len)
+        void addm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.uint32_t premod)
+        void subm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.uint32_t premod)
+        void mod(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len)
+        void mulmont(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.uint32_t premod)
 

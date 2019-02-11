@@ -52,6 +52,28 @@ _RNG::_RNG():rng(43u)
 }
 _RNG::_RNG(uint32_t seed) : rng(seed) { }
 
+_RNG* _RNG::get_instance()
+{
+  if (instance == NULL){
+     instance = new _RNG();
+  }
+
+  return instance;
+}
+_RNG* _RNG::get_instance(uint32_t seed)
+{
+  if (instance == 0){
+     instance = new _RNG(seed);
+  }
+
+  return instance;
+}
+
+void _RNG::destroy()
+{
+  delete instance;
+  instance = NULL;
+}
 
 void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
 {
@@ -59,4 +81,7 @@ void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
      samples[i] = rng();
    }
 }
+
+// null
+_RNG* _RNG::instance=NULL;
 
