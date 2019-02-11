@@ -19,69 +19,41 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : bigint.h
+// File name  : cuda.h
 //
-// Date       : 08/02/2019
+// Date       : 11/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Random number generator
+//  Definition of CUDA specifica constants
 // ------------------------------------------------------------------
 
 */
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <cassert>
-#include <climits>
-#include <iostream>
-#include <iomanip>
-#include <algorithm>
-#include <numeric>
-#include <random>       // for random_device
 
-#include "types.h"
-#include "rng.h"
+#ifndef _CUDA_H_
+#define _CUDA_H_
 
-using namespace std;
+#ifndef assert
+#define assert(X)         \
+  do {                    \
+    if ( !(X) ) {         \
+        printf("Assert. tid %d: %s, %d\n",threadIdx.x, __FILE__, __LINE__);\
+        return;           \
+    }                     \
+  } while(0)
+#endif
 
-_RNG::_RNG():rng(43u)
-{
-   this->rng.seed(pcg_extras::seed_seq_from<std::random_device>());
-}
-_RNG::_RNG(uint32_t seed) : rng(seed) { }
-
-_RNG* _RNG::get_instance()
-{
-  if (instance == NULL){
-     instance = new _RNG();
-  }
-
-  return instance;
-}
-_RNG* _RNG::get_instance(uint32_t seed)
-{
-  if (instance == 0){
-     instance = new _RNG(seed);
-  }
-
-  return instance;
-}
-
-//void _RNG::destroy()
-//{
-  //delete instance;
-  //instance = NULL;
-//}
-
-void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
-{
-   for (int i =0; i < n_samples; i++){
-     samples[i] = rng();
-   }
-}
-
-// null
-_RNG* _RNG::instance=NULL;
-
+#ifndef CCHECK
+#define CCHECK(call)        \
+  do{                    \
+     const cudaError_t error = call;  \
+     if (error != cudaSuccess)        \
+     {                                \
+        printf("Error: %s:%d,  ",__FILE__, __LINE__);  \
+        printf("code:%d, reason: %s\n",error, cudaGetErrorString(error)); \
+        exit(1);                      \
+     }                                \
+   } while(0)
+#endif
+#endif
