@@ -59,9 +59,9 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
-    y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_XOFFSET];
+    y = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     
     if (premod){
       modu256(x,x,p);
@@ -93,9 +93,9 @@ __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
-    y = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_XOFFSET];
+    y = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     
     if (premod){
       modu256(x,x,p);
@@ -126,8 +126,8 @@ __global__ void modu256_kernel(uint32_t *out_vector, const uint32_t *in_vector, 
       return;
     }
 
-    x = (const uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (const uint32_t *) &in_vector[tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     
     modu256(z, x, p);
 }
@@ -145,9 +145,9 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, co
     const uint32_t *P;
     uint32_t i,j, NP;
  
-    A = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + XOFFSET];
-    B = (uint32_t *) &in_vector[tid * 2 * NWORDS_256BIT + YOFFSET * NWORDS_256BIT];
-    U = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    A = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_XOFFSET];
+    B = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
+    U = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     P = p;
     NP = np;
    
@@ -157,59 +157,7 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, co
       modu256(B,B,p);
     }
 
-    uint32_t S, C=0, C1, C2, M[2], X[2];
-    uint32_t T[]={0,0,0,0,0,0,0,0,0,0,0};
-
-    for(i=0; i<NWORDS_256BIT; i++)
-    {
-      // (C,S) = t[0] + a[0]*b[i], worst case 2 words
-      madcu32(&C,&S,A[0],B[i],T[0]);
-
-      // ADD(t[1],C)
-      propcu32(T, C, 1);
-
-     // m = S*n'[0] mod W, where W=2^32
-     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-     mulu32(M, S, NP);
-
-     // (C,S) = S + m*n[0], worst case 2 words
-     madcu32(&C,&S,M[0],P[0],S);
-
-     for(j=1; j<NWORDS_256BIT; j++)
-     {
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, A[j], B[i]);
-       addcu32(&C1, &S, T[j], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&C, &X[0], C1, X[1]);
-       addcu32(&C, &X[0], C, C2);
-
-       // ADD(t[j+1],C)
-       propcu32(T,C,j+1);
-
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P[j],S);
-
-       // t[j-1] = S
-       T[j-1] = S;
-     }
-
-     // (C,S) = t[s] + C
-     addcu32(&C,&S, T[NWORDS_256BIT], C);
-     // t[s-1] = S
-     T[NWORDS_256BIT-1] = S;
-     // t[s] = t[s+1] + C
-     addcu32(&C,&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
-     // t[s+1] = 0
-     T[NWORDS_256BIT+1] = 0;
-   }
-
-   /* Step 3: if(u>=n) return u-n else return u */
-   if (ltu256(P,T)){
-      subu256(U,T,P);
-   } else {
-      memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
-   }
+    mulmontu256(U, (const uint32_t *)A, (const uint32_t *) B, P, NP);
 
    return;
 }
@@ -355,6 +303,67 @@ __forceinline__ __device__ void submu256(uint32_t *z, const uint32_t *x, const u
   
 }
 
+__forceinline__ __device__ void mulmontu256(uint32_t *U, const uint32_t *A, const uint32_t *B, const uint32_t *P, const uint32_t *NP)
+{ 
+    uint32_t i,j;
+    uint32_t S, C=0, C1, C2, M[2], X[2];
+    uint32_t T[]={0,0,0,0,0,0,0,0,0,0,0};
+
+    #pragma unroll
+    for(i=0; i<NWORDS_256BIT; i++)
+    {
+      // (C,S) = t[0] + a[0]*b[i], worst case 2 words
+      madcu32(&C,&S,A[0],B[i],T[0]);
+
+      // ADD(t[1],C)
+      propcu32(T, C, 1);
+
+     // m = S*n'[0] mod W, where W=2^32
+     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+     mulu32(M, S, NP);
+
+     // (C,S) = S + m*n[0], worst case 2 words
+     madcu32(&C,&S,M[0],P[0],S);
+
+     #pragma unroll
+     for(j=1; j<NWORDS_256BIT; j++)
+     {
+       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+       mulu32(X, A[j], B[i]);
+       addcu32(&C1, &S, T[j], C);
+       addcu32(&C2, &S, S, X[0]);
+       addcu32(&C, &X[0], C1, X[1]);
+       addcu32(&C, &X[0], C, C2);
+
+       // ADD(t[j+1],C)
+       propcu32(T,C,j+1);
+
+       // (C,S) = S + m*n[j]
+       madcu32(&C,&S,M[0], P[j],S);
+
+       // t[j-1] = S
+       T[j-1] = S;
+     }
+
+     // (C,S) = t[s] + C
+     addcu32(&C,&S, T[NWORDS_256BIT], C);
+     // t[s-1] = S
+     T[NWORDS_256BIT-1] = S;
+     // t[s] = t[s+1] + C
+     addcu32(&C,&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
+     // t[s+1] = 0
+     T[NWORDS_256BIT+1] = 0;
+   }
+
+   /* Step 3: if(u>=n) return u-n else return u */
+   if (ltu256(P,T)){
+      subu256(U,T,P);
+   } else {
+      memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
+   }
+
+   return;
+}
 /*
    Assumes p is at least 253 bits
    */

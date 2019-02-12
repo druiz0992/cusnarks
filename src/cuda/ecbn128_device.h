@@ -1,4 +1,4 @@
-"""
+/*
     Copyright 2018 0kims association.
 
     This file is part of cusnarks.
@@ -19,30 +19,24 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : _u256pxd
+// File name  : ecbn128_device.h
 //
-// Date       : 05/02/2019
+// Date       : 12/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   U256 Integer wrapper function wrapper
+//  Definition of EC Cuda functionality
 // ------------------------------------------------------------------
 
-"""
+*/
+#ifndef _ECBN128_DEVICE_H_
+#define _ECBN128_DEVICE_H_
 
-cimport _types as ct
+__global__ void addecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
+__global__ void doublecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
+__global__ void scmulecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
+__global__ void addecc_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
+__global__ void scmulecc_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
 
-cdef extern from "rng_cython.h":
-     pass
-
-cdef extern from "../cuda/u256.h":
-    cdef cppclass C_U256 "U256":
-        C_U256(ct.uint32_t *p, ct.uint32_t len, ct.uint32_t seed) except +
-        C_U256(ct.uint32_t *p, ct.uint32_t len) except +
-        void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
-        void addm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.uint32_t premod)
-        void subm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.uint32_t premod)
-        void mod(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len)
-        void mulm(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.uint32_t nprime, ct.uint32_t premod)
-
+#endif

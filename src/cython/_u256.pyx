@@ -88,7 +88,7 @@ cdef class U256:
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 
-    def mulmont(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.uint32_t nprime, ct.uint32_t premod=1):
+    def mulm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.uint32_t nprime, ct.uint32_t premod=1):
 
         if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
             return

@@ -76,7 +76,7 @@ class CUZFieldElTest(unittest.TestCase):
             test_points = sample(xrange(CUZFieldElTest.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
-            result = u256.mulmont(u256_vector, nprime)
+            result = u256.mulm(u256_vector, nprime)
             x1_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[test_points2]]
             x2_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[np.add(test_points2,1)]]
             r_rdc = [x + y for x,y in zip(x1_rdc, x2_rdc)]
