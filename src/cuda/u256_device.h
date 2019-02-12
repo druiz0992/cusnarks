@@ -46,6 +46,7 @@ __forceinline__ __device__ void modu256(uint32_t *z, const uint32_t *x, const ui
 
 __forceinline__ __device__ uint32_t ltu256(const uint32_t *x, const uint32_t *y);
 __forceinline__ __device__ uint32_t eq0u256(const uint32_t *x);
+__forceinline__ __device__ void shr1u256(const uint32_t *x)
 
 __forceinline__ __device__ void mulu32(uint32_t *z, const uint32_t x, const uint32_t y);
 __forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);
