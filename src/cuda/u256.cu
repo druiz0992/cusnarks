@@ -57,33 +57,42 @@ using namespace std;
       p : 256 bit number in 8 word uint32 array
       length : Vector length for future arithmetic operations
 */
-U256::U256 (const uint32_t *p, const uint32_t device_vector_len) : in_vector_len(device_vector_len)
+U256::U256 (const uint32_t *p, uint32_t device_vector_len) : in_vector_len(device_vector_len)
 {
   U256(p, device_vector_len, 0);
 }
 
-U256::U256 (const uint32_t *p, const uint32_t device_vector_len, const uint32_t seed) : in_vector_len(device_vector_len)
+U256::U256 (const uint32_t *p, uint32_t device_vector_len, uint32_t seed) : in_vector_len(device_vector_len)
 {
-  uint32_t size = in_vector_len * sizeof(uint32_t) * NWORDS_256BIT;
+  uint32_t in_size = NWORDS_256BIT * sizeof(uint32_t) * in_vector_len;
+  uint32_t out_size = in_size / 2;
 
+  allocateCudaResources(in_size, out_size)
+  initRNG(seed);
+}
+
+void U256::allocateCudaResources(uint32_t in_size, uint32_t out_size)
+{
   // Allocate global memory in device for input and output
-  CCHECK(cudaMalloc((void**) &this->in_vector_device, size));
+  CCHECK(cudaMalloc((void**) &this->in_vector_device, in_size));
 
-  CCHECK(cudaMalloc((void**) &this->out_vector_device, size/2));
+  CCHECK(cudaMalloc((void**) &this->out_vector_device, out_size);
 
   // Allocate global memory for modulo p
   CCHECK(cudaMalloc((void**) &this->p, sizeof(uint32_t) * NWORDS_256BIT));
 
   // Copy modulo p to device memory
   CCHECK(cudaMemcpy(this->p, p, sizeof(uint32_t) * NWORDS_256BIT, cudaMemcpyHostToDevice));
-
+}
+void U256::initRNG(uint32_t seed)
+{
   if (seed == 0){ rng =  _RNG::get_instance(); }
   else { rng = _RNG::get_instance(seed); }
 }
 
 void U256::rand(uint32_t *samples, const uint32_t n_samples)
 {
-    rng->randu32(samples, n_samples * NWORDS_256BIT);
+    rng->randu32(samples, n_samples * size_mul);
 }
 
 /*
@@ -98,7 +107,9 @@ void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
 {
   if (len > in_vector_len) { return; }
 
-  copyVectorToDevice(in_vector_host, len);
+  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
+
+  copyVectorToDevice(in_vector_host, size);
 
   // perform addition operation and leave results in device memory
   int blockD, gridD;
@@ -109,7 +120,7 @@ void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
 
   CCHECK(cudaDeviceSynchronize());
 
-  copyVectorFromDevice(out_vector_host, len/2);
+  copyVectorFromDevice(out_vector_host, size/2);
 }
 /*
     Modulo p
@@ -123,7 +134,9 @@ void U256::mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32
 {
   if (len > in_vector_len) { return; }
 
-  copyVectorToDevice(in_vector_host, len);
+  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
+
+  copyVectorToDevice(in_vector_host, size);
 
   // perform sub operation and leave results in device memory
   int blockD, gridD;
@@ -134,7 +147,7 @@ void U256::mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32
 
   CCHECK(cudaDeviceSynchronize());
 
-  copyVectorFromDevice(out_vector_host, len);
+  copyVectorFromDevice(out_vector_host, size);
 }
 /*
     Modular sub
@@ -148,7 +161,9 @@ void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
 {
   if (len > in_vector_len) { return; }
 
-  copyVectorToDevice(in_vector_host, len);
+  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
+
+  copyVectorToDevice(in_vector_host, size);
 
   // perform sub operation and leave results in device memory
   int blockD, gridD;
@@ -159,7 +174,7 @@ void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
 
   CCHECK(cudaDeviceSynchronize());
 
-  copyVectorFromDevice(out_vector_host, len/2);
+  copyVectorFromDevice(out_vector_host, size/2);
 }
 /*
     Montgomery Multiplication
@@ -169,11 +184,13 @@ void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
       out_vector_host : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
       len : number of elements in input vector. Cannot be greater than amount reseved during constructor
 */
-void U256::mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t np, uint32_t premod)
+void U256::mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t np, uint32_t premod)
 {
   if (len > in_vector_len) { return; }
 
-  copyVectorToDevice(in_vector_host, len);
+  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
+
+  copyVectorToDevice(in_vector_host, size);
 
   // perform addition operation and leave results in device memory
   int blockD, gridD;
@@ -184,7 +201,7 @@ void U256::mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, ui
 
   CCHECK(cudaDeviceSynchronize());
 
-  copyVectorFromDevice(out_vector_host, len/2);
+  copyVectorFromDevice(out_vector_host, size/2);
 }
 
 /*
@@ -195,9 +212,8 @@ void U256::mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, ui
       len : number of elements in input vector to be xferred. 
           Cannot be greater than amount reseved during constructor, but not checked
 */
-void U256::copyVectorToDevice(const uint32_t *in_vector_host, uint32_t len)
+void U256::copyVectorToDevice(const uint32_t *in_vector_host, uint32_t size)
 {
-  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT ;
   // Copy input data to device memory
   CCHECK(cudaMemcpy(in_vector_device, in_vector_host, size, cudaMemcpyHostToDevice));
 }
@@ -210,12 +226,10 @@ void U256::copyVectorToDevice(const uint32_t *in_vector_host, uint32_t len)
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-void U256::copyVectorFromDevice(uint32_t *out_vector_host, uint32_t len)
+void U256::copyVectorFromDevice(uint32_t *out_vector_host, uint32_t out_size)
 {
-  uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT ;
-  
   // copy results from device to host
-  CCHECK(cudaMemcpy(out_vector_host, out_vector_device, size, cudaMemcpyDeviceToHost));
+  CCHECK(cudaMemcpy(out_vector_host, out_vector_device, out_size, cudaMemcpyDeviceToHost));
   CCHECK(cudaGetLastError());
 }
 

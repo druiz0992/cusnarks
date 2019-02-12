@@ -36,8 +36,16 @@
 
 #define NWORDS_256BIT      (8)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
-#define XOFFSET            (0)
-#define YOFFSET            (1)
+#define U256_XOFFSET            (0 * NWORDS_256BIT)
+#define U256_YOFFSET            (1 * NWORDS_256BIT)
+#define U256_NDIMS              (1)
+#define U256K_OFFSET            (U256_NDIMS * NWORDS_256BIT)
+#define ECP_XOFFSET             (1 * NWORDS_256BIT)
+#define ECP_ZOFFSET             (2 * NWORDS_256BIT)
+#define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
+#define ECPOINT_NDIMS  (2)
+#define ECK_NDIMS      (ECPOINT_NDIMS + U256_NDIMS)
+#define ECK_OFFSET     (ECK_NDIMS * NWORDS_256BIT)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;

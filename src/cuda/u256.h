@@ -41,19 +41,21 @@ class U256 {
         const uint32_t  in_vector_len;   // array len
         _RNG *rng;
 
-        void copyVectorToDevice(const uint32_t *in_vector_host, uint32_t len);
-        void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t len);
+        void copyVectorToDevice(const uint32_t *in_vector_host, uint32_t in_size);
+        void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t out_size);
+        void allocateCudaResources(uint32_t in_size, uint32_t out_size);
+        void initRNG(uint32_t seed);
 
     public:
 
-        U256(const uint32_t *p, const uint32_t len);
-        U256(const uint32_t *p, const uint32_t len, const uint32_t seed);
+        U256(const uint32_t *p, uint32_t len);
+        U256(const uint32_t *p, uint32_t len, uint32_t seed);
         ~U256();
         void rand(uint32_t *samples, const uint32_t n_samples);
         void addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod);
         void subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod);
         void mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len);
-        void mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, const uint32_t len, uint32_t np, uint32_t premod);
+        void mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t np, uint32_t premod);
 };
 
 #endif
