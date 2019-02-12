@@ -180,6 +180,7 @@ void U256::mulmont(uint32_t *out_vector_host, const uint32_t *in_vector_host, ui
   blockD = U256_BLOCK_DIM;
   gridD = (len/2 + blockD - 1) / blockD;
   mulmontu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, p, np, in_vector_len, premod);
+  //mulmontu256_kernel<<<1,1>>>(out_vector_device, in_vector_device, p, np, in_vector_len, premod);
   CCHECK(cudaGetLastError());
 
   CCHECK(cudaDeviceSynchronize());
