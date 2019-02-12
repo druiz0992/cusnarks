@@ -37,6 +37,7 @@
 #include "cuda.h"
 #include "u256_device.h"
 
+__device__ void printNumber(uint32_t *n);
 /*
     Modular addition kernel
 
@@ -160,6 +161,16 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, co
     mulmontu256(U, (const uint32_t *)A, (const uint32_t *) B, P, NP);
 
    return;
+}
+
+__device__ void printNumber(uint32_t *n)
+{
+  uint32_t i;
+  
+  for (i=0; i < NWORDS_256BIT; i++){
+    printf("%u ",n[i]);
+  }
+  printf("\n");
 }
 
 __forceinline__ __device__ void addu256(uint32_t *z, const uint32_t *x, const uint32_t *y)
@@ -415,12 +426,55 @@ __forceinline__ __device__ void modu256(uint32_t *z, const uint32_t *x, const ui
 
 }
 
+/*
+   z = x >> 1
+*/
+__forceinline__ __device__ void shr1u256(const uint32_t *x)
+{
+    
+   asm("{                                    \n\t"
+       ".reg .u32          %tmp;             \n\t"
+       "shr.u32            %0,   %8,  1;     \n\t"  // x[0] = x[0] >> 1
+       "and.b32            %tmp, %9,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %0,   %0,  %tmp;  \n\t"
+       "shr.u32            %1,   %9,   1;     \n\t"  // x[1] = x[1] >> 1
+       "and.b32            %tmp, %10,  1;     \n\t"  // x[1] |= (x[2] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %1,   %1,  %tmp;   \n\t"
+       "shr.u32            %2,   %10,  1;     \n\t"  // x[2] = x[2] >> 1
+       "and.b32            %tmp, %11,  1;     \n\t"  // x[2] |= (x[3] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %2,   %2,  %tmp;   \n\t"
+       "shr.u32            %3,   %11,  1;     \n\t"  // x[3] = x[3] >> 1
+       "and.b32            %tmp, %12,  1;     \n\t"  // x[3] |= (x[4] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %3,   %3,  %tmp;   \n\t"
+       "shr.u32            %4,   %12,  1;     \n\t"  // x[4] = x[4] >> 1
+       "and.b32            %tmp, %13,  1;     \n\t"  // x[4] |= (x[5] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %4,   %4,  %tmp;   \n\t"
+       "shr.u32            %5,   %13,  1;     \n\t"  // x[5] = x[5] >> 1
+       "and.b32            %tmp, %14,  1;     \n\t"  // x[5] |= (x[6] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %5,   %5,  %tmp;   \n\t"
+       "shr.u32            %6,   %14,  1;     \n\t"  // x[6] = x[6] >> 1
+       "and.b32            %tmp, %15,  1;     \n\t"  // x[6] |= (x[7] & 1) << 31
+       "shl.u32            %tmp, %tmp, 31;   \n\t"
+       "or.u32             %6,   %6,  %tmp;   \n\t"
+       "shr.u32            %7,   %15,  1;     \n\t"  // x[7] = x[7] >> 1
+       "}                               \n\t"
+       : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
+         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7])
+       : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
+         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+}
 __forceinline__ __device__ void mulu32(uint32_t *z, const uint32_t x, const uint32_t y)
 {
   // z[i] = x * y for 32 bit words
   asm("{                                    \n\t"
       ".reg .u64 %prod;                     \n\t"
-      "mul.wide.u32        %prod, %1,    %2;\n\t"           
+      "mul.wide.u32        %prod, %2,    %3;\n\t"           
       "cvt.u32.u64         %0,    %prod;    \n\t"
       "shr.u64             %prod, %prod, 32;\n\t"
       "cvt.u32.u64         %1,    %prod;    \n\t"
@@ -439,22 +493,27 @@ __forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, ui
 {
    // (C,S) = t[0] + a[0] * b[i] -> No carry in
    asm("{                                   \n\t"
-       ".reg .u32      %tmp;                \n\t"
-       "mad.lo.cc.u32  %0, %3, %4, %5;      \n\t"
-       "madc.hi.cc.u32 %1, %3, %4, 0;       \n\t"
-       "addc.u32       %tmp, %1, 0;         \n\t"
-       "set.lt.u32.u32 %2, %1, %tmp;        \n\t"
+       //".reg .u32      %tmp;                \n\t"
+       //"mad.lo.cc.u32  %0, %3, %4, %5;      \n\t"
+       //"madc.hi.cc.u32 %1, %3, %4, 0;       \n\t"
+       "mad.lo.cc.u32  %0, %2, %3, %4;      \n\t"
+       "madc.hi.u32    %1, %2, %3, 0;       \n\t"
+       //"addc.u32       %tmp, %1, 0;         \n\t"
+       //"set.lt.u32.u32 %2, %1, %tmp;        \n\t"
        "}                                   \n\t"
-       : "=r"(s[0]), "=r"(s[1]), "=r"(c[0]) 
+       //: "=r"(s[0]), "=r"(s[1]), "=r"(c[0]) 
+       : "=r"(s[0]), "=r"(c[0])
        : "r"(x), "r"(y), "r"(a));
 }
 __forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y)
 {
    // (C,S) = t[0] + a[0] * b[i] -> No carry in
    asm("{                               \n\t"
-       ".reg .u32      %tmp;            \n\t"
-       "add.cc.u32     %tmp, %2, %3;    \n\t"
-       "set.lt.u32.u32 %2, %1, %tmp;    \n\t"
+       ".reg .u32          %tmp;          \n\t"
+       "add.cc.u32         %tmp, %2, %3;    \n\t"
+       "set.lt.u32.u32     %1, %tmp, %2; \n\t"
+       "mov.u32            %0, %tmp;        \n\t"
+       "and.b32            %1, %1,1;     \n\t" 
        "}                               \n\t"
        : "=r"(s[0]), "=r"(c[0]) 
        : "r"(x), "r"(y));
@@ -465,12 +524,13 @@ __forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit
    while ((digit < NWORDS_256BIT_FIOS) && (c))
    {
      asm("{                                   \n\t"
-         ".reg .u32       %cin;               \n\t"
+         //".reg .u32       %cin;               \n\t"
          ".reg .u32       %tmp;               \n\t"
-         "mov.u32         %cin, %3;           \n\t"
+         //"mov.u32         %cin, %3;           \n\t"
          "mov.u32         %tmp, %2;           \n\t"
-         "add.cc.u32      %0,   %cin, %tmp;   \n\t"
+         "add.cc.u32      %0,   %1, %tmp;   \n\t"
          "set.lt.u32.u32  %1,   %0,   %tmp;   \n\t"
+         "and.b32         %1,   %1,   1;      \n\t"
          "}                                   \n\t"
          : "=r"(x[digit]), "=r"(c) 
          : "r"(x[digit]), "r"(c));
