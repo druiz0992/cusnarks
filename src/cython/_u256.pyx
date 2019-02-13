@@ -100,21 +100,4 @@ cdef class U256:
        
         return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
 
-    """
-    def rand(self, np.ndarray[ndim=2, dtype=np.uint32_t ]samples):
-        if samples.shape[1] != ct.NWORDS_256BIT:
-           return
-
-        cdef np.uint32_t [:] samples1d = samples.flatten()
-        self.g.rand(&samples1d[0],samples.shape[0])
-
-        return np.asarray(samples1d, dtype=np.uint32).reshape((-1,ct.NWORDS_256BIT))
-
-    """
-    def rand(self, ct.uint32_t n_samples):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
-        self.g.rand(&samples[0],n_samples)
-
-        return samples.reshape((-1,ct.NWORDS_256BIT))
-     
 

@@ -19,43 +19,32 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : types.pxd
+// File name  : _cusnarks_kernel.pxd
 //
-// Date       : 05/02/2019
+// Date       : 13/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Definition of basic data types for wrapper functions
+//   CUSnarks Kernel wrapper definition
 // ------------------------------------------------------------------
 
 """
 
+cimport _types as ct
 
-import numpy as np
-cimport numpy as np
+cdef extern from "rng_cython.h":
+     pass
 
-cdef extern from "types.h":
-  
-  #Constants 
-  cdef uint32_t NWORDS_256BIT
+cdef extern from "../cuda/cusnarks_kernel.h":
+    cdef cppclass C_CUSnarks "CUSnarks":
+        C_CUSnarks(ct.mod_info_t *p, ct.uint32_t len, ct.uint32_t in_size, ct.uint32_t out_size, 
+                        ct.uint32_t seed) except +
+        C_CUSnarks(ct.mod_info_t *p, ct.uint32_t len, ct.uint32_t in_size, ct.uint32_t out_size) except +
+        void rand(ct.uint32_t *samples, ct.uint32_t n_samples, ct.uint32_t size)
+        void kernelLaunch[kernel_function_t](kernel_function_t &kernel_function, 
+                        ct.uint32_t *out_vector_host, ct.uint32_t *in_vector_host,
+                        ct.uint32_t in_size, ct.uint32_t out_size ,
+                        ct.kernel_config_t, ct.kernel_parameters_t...)
+        void getDeviceInfo()
 
-  # Types
-  ctypedef unsigned int uint32_t
-  ctypedef int int32_t
-
-  ctypedef struct mod_info_t
-	cdef uint32_t p[NWORDS_256BIT]
-        cdef uint32_t p_[NWORDS_256BIT]
-        cdef uint32_t r[NWORDS_256BIT]
-        cdef uint32_t r_[NWORDS_256BIT]
-
-  ctypedef struct kernel_config_t
-        int blockD
-        int gridD
-        int smemblockD
-        int gridD
-        int smemSS
-  
-
-_NWORDS_256BIT = NWORDS_256BIT
