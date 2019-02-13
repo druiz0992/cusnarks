@@ -37,29 +37,31 @@ class CUSnarks {
     private:
         uint32_t *in_vector_device;      // pointer to device input buffer
         uint32_t *out_vector_device;     // pointer to device output buffer
-	uint32_t *p;                     // prime number
         const uint32_t  in_vector_len;   // array len
         _RNG *rng;
 
         void copyVectorToDevice(const uint32_t *in_vector_host, uint32_t in_size);
         void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t out_size);
-        void allocateCudaResources(const uint32_t *p, uint32_t in_size, uint32_t out_size);
+        void allocateCudaResources(const mod_info_t *mod_info, uint32_t in_size, uint32_t out_size);
         void initRNG(uint32_t seed);
+        double elapsedTime(void);
 
     public:
 
-        CUSnarks(const uint32_t *p, uint32_t len, uint32_t in_size, uint32_t out_size);
-        CUSnarks(const uint32_t *p, uint32_t len, uint32_t in_size, uint32_t out_size, uint32_t seed);
+        CUSnarks(const mod_info_t *mod_info, uint32_t len, uint32_t in_size, uint32_t out_size);
+        CUSnarks(const mod_info_t *mod_info, uint32_t len, uint32_t in_size, uint32_t out_size, uint32_t seed);
         ~CUSnarks();
-        void CUSnarks::rand(uint32_t *samples, uint32_t n_samples, uint32_t size);
-        template<typename kernelFunction, typename... kernelParameters>
-            void CUSnarks::kernelLaunch(
+        void rand(uint32_t *samples, uint32_t n_samples, uint32_t size);
+        template<typename kernel_function_t, typename... kernel_parameters_t>
+           void kernelLaunch(
+		const kernel_function_t& kernel_function,
 		uint32_t *out_vector_host,
 	       	const uint32_t *in_vector_host,
 	        uint32_t in_size,
 		uint32_t out_size,
-		const kernelFunction& kernel_function,
-		kernelParameters... kernel_extra_params);
+                kernel_config_t *configuration,
+		kernel_parameters_t... kernel_extra_params)
+        void getDeviceInfo()
 };
 
 #endif

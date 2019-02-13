@@ -81,7 +81,7 @@ U256::U256 (const uint32_t *p, uint32_t device_vector_len, uint32_t seed) : CUSn
 */
 void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod)
 {
-  if (len > in_vector_len) { return; }
+  kernelLaunch(addmu256_kernel, out_vector_host, in_vector_host, in_size, out_size, in_vector_len, premod);
 
   uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
 

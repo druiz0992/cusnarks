@@ -52,4 +52,23 @@
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
+typedef struct {
+   uint32_t p[NWORDS_256BIT];
+   uint32_t p_[NWORDS_256BIT];
+   uint32_t r[NWORDS_256BIT];
+   uint32_t r_[NWORDS_256BIT];
+
+}mod_info_t;
+
+/**
+ * Holds the parameters necessary to "launch" a CUDA kernel (i.e. schedule it for
+ * execution on some stream of some device).
+ */
+typedef struct {
+        int blockD;
+        int gridD;
+        int smemS;  // in bytes
+} kernel_config_t;
+
+
 #endif
