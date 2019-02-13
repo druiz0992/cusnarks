@@ -34,7 +34,7 @@
 #define _ECBN128_H_
 
 
-class ECBN128 : public U256 {
+class ECBN128 : public CUSnarks {
 
         ECBN128(const uint32_t *p, uint32_t len);
         ECBN128(const uint32_t *p, uint32_t len, uint32_t seed);

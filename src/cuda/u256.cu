@@ -43,10 +43,10 @@
 #include "types.h"
 #include "cuda.h"
 #include "rng.h"
+#include "cusnarks_kernel.h"
 #include "u256.h"
 #include "u256_device.h"
 
-#define U256_BLOCK_DIM  (256)
 
 using namespace std;
 
@@ -57,42 +57,18 @@ using namespace std;
       p : 256 bit number in 8 word uint32 array
       length : Vector length for future arithmetic operations
 */
-U256::U256 (const uint32_t *p, uint32_t device_vector_len) : in_vector_len(device_vector_len)
+U256::U256 (const uint32_t *p, uint32_t device_vector_len) : CUSnarks(p, device_vector_len,
+                                                                       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len,
+								       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len / 2, 
+								       0)
 {
-  U256(p, device_vector_len, 0);
 }
 
-U256::U256 (const uint32_t *p, uint32_t device_vector_len, uint32_t seed) : in_vector_len(device_vector_len)
+U256::U256 (const uint32_t *p, uint32_t device_vector_len, uint32_t seed) : CUSnarks(p, device_vector_len,
+                                                                                     NWORDS_256BIT * sizeof(uint32_t) * device_vector_len,
+										     NWORDS_256BIT * sizeof(uint32_t) * device_vector_len / 2, 
+										     seed)
 {
-  uint32_t in_size = NWORDS_256BIT * sizeof(uint32_t) * in_vector_len;
-  uint32_t out_size = in_size / 2;
-
-  allocateCudaResources(in_size, out_size)
-  initRNG(seed);
-}
-
-void U256::allocateCudaResources(uint32_t in_size, uint32_t out_size)
-{
-  // Allocate global memory in device for input and output
-  CCHECK(cudaMalloc((void**) &this->in_vector_device, in_size));
-
-  CCHECK(cudaMalloc((void**) &this->out_vector_device, out_size);
-
-  // Allocate global memory for modulo p
-  CCHECK(cudaMalloc((void**) &this->p, sizeof(uint32_t) * NWORDS_256BIT));
-
-  // Copy modulo p to device memory
-  CCHECK(cudaMemcpy(this->p, p, sizeof(uint32_t) * NWORDS_256BIT, cudaMemcpyHostToDevice));
-}
-void U256::initRNG(uint32_t seed)
-{
-  if (seed == 0){ rng =  _RNG::get_instance(); }
-  else { rng = _RNG::get_instance(seed); }
-}
-
-void U256::rand(uint32_t *samples, const uint32_t n_samples)
-{
-    rng->randu32(samples, n_samples * size_mul);
 }
 
 /*
@@ -197,7 +173,6 @@ void U256::mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
   blockD = U256_BLOCK_DIM;
   gridD = (len/2 + blockD - 1) / blockD;
   mulmontu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, p, np, in_vector_len, premod);
-  //mulmontu256_kernel<<<1,1>>>(out_vector_device, in_vector_device, p, np, in_vector_len, premod);
   CCHECK(cudaGetLastError());
 
   CCHECK(cudaDeviceSynchronize());
@@ -234,9 +209,3 @@ void U256::copyVectorFromDevice(uint32_t *out_vector_host, uint32_t out_size)
   CCHECK(cudaGetLastError());
 }
 
-U256::~U256()
-{
-  cudaFree(in_vector_device);
-  cudaFree(out_vector_device);
-  cudaFree(p);
-}

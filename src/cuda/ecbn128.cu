@@ -48,19 +48,19 @@
 
 using namespace std;
 
-ECBN128::ECBN128 (const uint32_t *p, uint32_t device_vector_len) : in_vector_len(device_vector_len)
+ECBN128::ECBN128 (const uint32_t *p, uint32_t device_vector_len) : CUSnarks(p, device_vector_len,
+                                                       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len * (ECPOINT_NDIMS + SCALAR_NDIMS),
+						       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len * ECPOINT_NDIMS, 
+						       0)
 {
-  ECBN128(p, device_vector_len, 0);
 }
 
-ECBN128::ECBN128 (const uint32_t *p, uint32_t device_vector_len, const uint32_t seed) : in_vector_len(device_vector_len)
+ECBN128::ECBN128 (const uint32_t *p, uint32_t device_vector_len, const uint32_t seed) :  CUSnarks(p, device_vector_len,
+                                                       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len * (ECPOINT_NDIMS + SCALAR_NDIMS),
+						       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len * ECPOINT_NDIMS, 
+						       seed)
 {
   // Scalar, EC_X[0], EC_Z[0]??
-  uint32_t in_size = sizeof(uint32_t) * in_vector_len * NWORDS_256BIT * (ECPOINT_NDIMS + SCALAR_NDIMS);
-  uint32_t out_size = sizeof(uint32_t) * in_vector_len * NWORDS_256BIT * ECPOINT_NDIMS;
-
-  allocateCudaResources(in_size, out_size);
-  initRNG(seed);
 }
 
 /*
