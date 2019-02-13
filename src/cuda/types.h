@@ -46,6 +46,8 @@
 #define ECPOINT_NDIMS  (2)
 #define ECK_NDIMS      (ECPOINT_NDIMS + U256_NDIMS)
 #define ECK_OFFSET     (ECK_NDIMS * NWORDS_256BIT)
+#define CUSNARKS_BLOCK_DIM  (256)
+#define U256_BLOCK_DIM  (256)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
