@@ -45,10 +45,12 @@ sys.path.append('../../src/python')
 
 from bigint import *
 from zutils import *
+from constants import *
 
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
-from cu_u256 import *
+from cusnarks import *
+#from cu_u256 import *
 
 sys.path.append('../../src/python')
 from bigint import *
@@ -59,7 +61,7 @@ class CUBigIntTest(unittest.TestCase):
     nsamples = 100000
     ntest_points = 1000
     u256_p = BigInt(prime).as_uint256()
-    u256 = U256(u256_p, nsamples,0)
+    u256 = U256(nsamples, seed=10)
 
     def test_0uint256(self):
 
@@ -77,25 +79,30 @@ class CUBigIntTest(unittest.TestCase):
         u256 = CUBigIntTest.u256
         ntest_points = CUBigIntTest.ntest_points
         u256_p = CUBigIntTest.u256_p
+        kernel_config = {'blockD' : U256_BLOCK_DIM }
+        kernel_params = {'midx' : MOD_FIELD ,'premod' : 1, 'length' : CUBigIntTest.nsamples, 'stride' : 1}
         for iter in xrange(CUBigIntTest.TEST_ITER):
             u256_vector = u256.rand(CUBigIntTest.nsamples)
 
             # Test mod kernel:
-            test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
+            test_points = sample(xrange(CUBigIntTest.nsamples-1), ntest_points)
 
-            result = u256.mod(u256_vector[:CUBigIntTest.nsamples/2])
+            kernel_params['length'] = CUBigIntTest.nsamples
+            kernel_params['stride'] = 1
+            result = u256.kernelLaunch(CB_U256_MOD, u256_vector, kernel_config, kernel_params )
             r_mod = BigInt.modu256(u256_vector[test_points], u256_p)
     
-            self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
+            self.assertTrue(len(result) == CUBigIntTest.nsamples)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mod)))
 
             # Test addm kernel:
             test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
-            result = u256.addm(u256_vector)
+            kernel_params['length'] = CUBigIntTest.nsamples/2
+            kernel_params['stride'] = 2
+            result = u256.kernelLaunch(CB_U256_ADDM, u256_vector, kernel_config, kernel_params )
             r_addm = BigInt.addmu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)], u256_p)
-            #r_addm,_ = BigInt.addu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
     
             self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_addm)))
@@ -104,9 +111,8 @@ class CUBigIntTest(unittest.TestCase):
             test_points = sample(xrange(CUBigIntTest.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
-            result = u256.subm(u256_vector)
+            result = u256.kernelLaunch(CB_U256_SUBM, u256_vector, kernel_config, kernel_params )
             r_subm = BigInt.submu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)], u256_p)
-            #r_subm, _ = BigInt.subu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)])
     
             self.assertTrue(len(result) == CUBigIntTest.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_subm)))

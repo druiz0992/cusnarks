@@ -33,10 +33,11 @@
 #ifndef _ECBN128_DEVICE_H_
 #define _ECBN128_DEVICE_H_
 
-__global__ void addecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
-__global__ void doublecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
-__global__ void scmulecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
-__global__ void addecc_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
-__global__ void scmulecc_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod);
+__global__ void addec_kernel(uint32_t   *out_vector_data, uint32_t *in_vector_data, kernel_params_t *params);
+__global__ void doublec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void scmulec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void addec_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void scmulec_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
+__forceinline__ __device__ void addec(uint32_t *xr, const uint32_t *x1, const uint32_t *x2, mod_t mod_idx);
 #endif

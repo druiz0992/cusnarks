@@ -50,6 +50,9 @@
 
 using namespace std;
 
+void test(vector_t  *out_vector, vector_t *in_vector, kernel_params_t *params);
+static kernel_cb u256_kernel_callbacks[] = {addmu256_kernel, submu256_kernel, modu256_kernel, mulmontu256_kernel};
+
 /*
     Constructor : Reserves device memory for vector and modulo p. 
 
@@ -57,20 +60,27 @@ using namespace std;
       p : 256 bit number in 8 word uint32 array
       length : Vector length for future arithmetic operations
 */
-U256::U256 (const uint32_t *p, uint32_t device_vector_len) : CUSnarks(p, device_vector_len,
-                                                                       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len,
-								       NWORDS_256BIT * sizeof(uint32_t) * device_vector_len / 2, 
-								       0)
+U256::U256 (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len,
+                                      len, NWORDS_256BIT * sizeof(uint32_t) * len,
+				      u256_kernel_callbacks, 0)
 {
+  printf("Callbacks %d\n", CB_U256_N);
+  for (int i=0; i < CB_U256_N; i++){
+    printf("%pF \n", u256_kernel_callbacks[i]);
+  }
 }
 
-U256::U256 (const uint32_t *p, uint32_t device_vector_len, uint32_t seed) : CUSnarks(p, device_vector_len,
-                                                                                     NWORDS_256BIT * sizeof(uint32_t) * device_vector_len,
-										     NWORDS_256BIT * sizeof(uint32_t) * device_vector_len / 2, 
-										     seed)
+U256::U256 (uint32_t len, uint32_t seed) : CUSnarks(len, NWORDS_256BIT * sizeof(uint32_t) * len,
+	                                            len, NWORDS_256BIT * sizeof(uint32_t) * len, 
+				                    u256_kernel_callbacks, seed)
 {
+  printf("Callbacks %d\n", CB_U256_N);
+  for (int i=0; i < CB_U256_N; i++){
+    printf("%pF \n", u256_kernel_callbacks[i]);
+  }
 }
 
+#if 0
 /*
     Modular addition. 
 
@@ -79,9 +89,9 @@ U256::U256 (const uint32_t *p, uint32_t device_vector_len, uint32_t seed) : CUSn
       out_vector_host : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
       len : number of elements in input vector. Cannot be greater than amount reseved during constructor
 */
-void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod)
+void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
 {
-  kernelLaunch(addmu256_kernel, out_vector_host, in_vector_host, in_size, out_size, in_vector_len, premod);
+  //kernelLaunch(addmu256_kernel, out_vector_host, in_vector_host, in_size, out_size, in_vector_len, premod);
 
   uint32_t size = len * sizeof(uint32_t) * NWORDS_256BIT;
 
@@ -91,7 +101,7 @@ void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
   int blockD, gridD;
   blockD = U256_BLOCK_DIM;
   gridD = (len/2 + blockD - 1) / blockD;
-  addmu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, p, in_vector_len, premod);
+  addmu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx, premod);
   CCHECK(cudaGetLastError());
 
   CCHECK(cudaDeviceSynchronize());
@@ -106,7 +116,7 @@ void U256::addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
       out_vector_host : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
       len : number of elements in input vector. Cannot be greater than amount reseved during constructor
 */
-void U256::mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len)
+void U256::mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx)
 {
   if (len > in_vector_len) { return; }
 
@@ -118,7 +128,7 @@ void U256::mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32
   int blockD, gridD;
   blockD = U256_BLOCK_DIM;
   gridD = (len + blockD - 1) / blockD;
-  modu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device,p, in_vector_len);
+  modu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx);
   CCHECK(cudaGetLastError());
 
   CCHECK(cudaDeviceSynchronize());
@@ -133,7 +143,7 @@ void U256::mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32
       out_vector_host : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
       len : number of elements in input vector. Cannot be greater than amount reseved during constructor
 */
-void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod)
+void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
 {
   if (len > in_vector_len) { return; }
 
@@ -145,7 +155,7 @@ void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
   int blockD, gridD;
   blockD = U256_BLOCK_DIM;
   gridD = (len/2 + blockD - 1) / blockD;
-  submu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, p, in_vector_len, premod);
+  submu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx, premod);
   CCHECK(cudaGetLastError());
 
   CCHECK(cudaDeviceSynchronize());
@@ -160,7 +170,7 @@ void U256::subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
       out_vector_host : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
       len : number of elements in input vector. Cannot be greater than amount reseved during constructor
 */
-void U256::mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t np, uint32_t premod)
+void U256::mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
 {
   if (len > in_vector_len) { return; }
 
@@ -172,40 +182,11 @@ void U256::mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint3
   int blockD, gridD;
   blockD = U256_BLOCK_DIM;
   gridD = (len/2 + blockD - 1) / blockD;
-  mulmontu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, p, np, in_vector_len, premod);
+  mulmontu256_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx, premod);
   CCHECK(cudaGetLastError());
 
   CCHECK(cudaDeviceSynchronize());
 
   copyVectorFromDevice(out_vector_host, size/2);
 }
-
-/*
-    Transfer input vector from host to device
-
-    Arguments :
-      in_vector_host : Input vector of upto N 256 bit elements X[0], X[1], X[2] ... X[N-1].
-      len : number of elements in input vector to be xferred. 
-          Cannot be greater than amount reseved during constructor, but not checked
-*/
-void U256::copyVectorToDevice(const uint32_t *in_vector_host, uint32_t size)
-{
-  // Copy input data to device memory
-  CCHECK(cudaMemcpy(in_vector_device, in_vector_host, size, cudaMemcpyHostToDevice));
-}
-
-/*
-    Transfer output vector from device to host
-
-    Arguments :
-      out_vector_host : Output vector of upto N/2 256 bit elements Y[0], Y[1], Y[2] ... Y[N/2-1].
-      len : number of elements in output vector to be xferred. 
-          Cannot be greater than half amount reseved during constructor, but not checked
-*/
-void U256::copyVectorFromDevice(uint32_t *out_vector_host, uint32_t out_size)
-{
-  // copy results from device to host
-  CCHECK(cudaMemcpy(out_vector_host, out_vector_device, out_size, cudaMemcpyDeviceToHost));
-  CCHECK(cudaGetLastError());
-}
-
+#endif

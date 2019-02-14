@@ -34,34 +34,45 @@
 #define _CUSNARKS_H_
 
 class CUSnarks {
-    private:
-        uint32_t *in_vector_device;      // pointer to device input buffer
-        uint32_t *out_vector_device;     // pointer to device output buffer
-        const uint32_t  in_vector_len;   // array len
+    protected:
+        vector_t in_vector_device;      // pointer to device input buffer
+        vector_t out_vector_device;     // pointer to device output buffer
+        kernel_params_t *params_device;
+        kernel_cb *kernel_callbacks;
         _RNG *rng;
 
-        void copyVectorToDevice(const uint32_t *in_vector_host, uint32_t in_size);
-        void copyVectorFromDevice(uint32_t *out_vector_host, uint32_t out_size);
-        void allocateCudaResources(const mod_info_t *mod_info, uint32_t in_size, uint32_t out_size);
+        CUSnarks(uint32_t in_len, uint32_t in_size, uint32_t out_len, uint32_t out_size, kernel_cb *kcb);
+        CUSnarks(uint32_t in_len, uint32_t in_size, uint32_t out_len, uint32_t out_size, kernel_cb *kcb,  uint32_t seed);
+        ~CUSnarks();
+
+        void allocateCudaResources(uint32_t in_size, uint32_t out_size);
         void initRNG(uint32_t seed);
         double elapsedTime(void);
 
     public:
 
-        CUSnarks(const mod_info_t *mod_info, uint32_t len, uint32_t in_size, uint32_t out_size);
-        CUSnarks(const mod_info_t *mod_info, uint32_t len, uint32_t in_size, uint32_t out_size, uint32_t seed);
-        ~CUSnarks();
-        void rand(uint32_t *samples, uint32_t n_samples, uint32_t size);
+        void printBigNumber(uint32_t *x);
+        void rand(uint32_t *samples, uint32_t n_samples);
+        void kernelLaunch(
+		//kernel_cb launcher,
+                uint32_t kernel_idx,
+                vector_t *out_vector_host,
+	       	vector_t *in_vector_host,
+                kernel_config_t *configuration,
+                kernel_params_t *params);
+        #if 0
         template<typename kernel_function_t, typename... kernel_parameters_t>
            void kernelLaunch(
 		const kernel_function_t& kernel_function,
 		uint32_t *out_vector_host,
 	       	const uint32_t *in_vector_host,
+                uint32_t len,
 	        uint32_t in_size,
 		uint32_t out_size,
                 kernel_config_t *configuration,
-		kernel_parameters_t... kernel_extra_params)
-        void getDeviceInfo()
+		kernel_parameters_t... kernel_extra_params);
+        #endif
+        void getDeviceInfo();
 };
 
 #endif

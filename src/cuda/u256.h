@@ -33,17 +33,16 @@
 #ifndef _U256_H_
 #define _U256_H_
 
-class U256 {
+class U256 : public CUSnarks {
 
     public:
 
-        U256(const uint32_t *p, uint32_t len);
-        U256(const uint32_t *p, uint32_t len, uint32_t seed);
-        void rand(uint32_t *samples, const uint32_t n_samples);
-        void addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod);
-        void subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t premod);
-        void mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len);
-        void mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, uint32_t np, uint32_t premod);
+        U256(uint32_t len);
+        U256(uint32_t len, uint32_t seed);
+        //void addm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod);
+        //void subm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod);
+        //void mod(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx);
+        //void mulm(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod);
 };
 
 #endif

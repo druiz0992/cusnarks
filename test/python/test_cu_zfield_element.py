@@ -76,10 +76,12 @@ class CUZFieldElTest(unittest.TestCase):
             test_points = sample(xrange(CUZFieldElTest.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
-            result = u256.mulm(u256_vector, nprime)
+            #u256_vector[0] = np.asarray([1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668], dtype=np.uint32)
+            #u256_vector[1] = np.asarray([596516649, 1189641421, 1025202362, 1350490027, 783368690, 1102520059, 2044897763, 803772102], dtype=np.uint32)
+            result = u256.mulmont(u256_vector, nprime)
             x1_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[test_points2]]
             x2_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[np.add(test_points2,1)]]
-            r_rdc = [x + y for x,y in zip(x1_rdc, x2_rdc)]
+            r_rdc = [x * y for x,y in zip(x1_rdc, x2_rdc)]
             r_mul = np.asarray([x.as_uint256() for x in r_rdc])
     
             self.assertTrue(len(result) == CUZFieldElTest.nsamples/2)

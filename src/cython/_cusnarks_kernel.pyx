@@ -19,84 +19,164 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : _u256.pyx
+// File name  : _cusnarks_kernel.pyx
 //
 // Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   U256 Integer wrapper function
+//   Cusnarks cython wrapper
 // ------------------------------------------------------------------
 
 """
 
 import numpy as np
 cimport numpy as np
-from libc.stdlib cimport malloc, free
 
 cimport _types as ct
 
-from _cusnarks_kernel cimport C_CUSnarks
+
+from _cusnarks_kernel cimport C_CUSnarks, C_U256
 from cython cimport view
 
-def get_mod(np.ndarray[ndim=1, dtype=np.uint32_t] p, np.ndarray[ndim=1, dtype=np.uint32_t] p_,
-            np.ndarray[ndim=1, dtype=np.uint32_t] r, np.ndarray[ndim=1, dtype=np.uint32_t]r_):
-
-    cdef ct.mod_info_t mod_info = ct.mod_info_t(p, p_, r, r_)
-
-    return mod_info
-
 cdef class CUSnarks:
-    cdef C_CUSnarks* g
-    cdef int dim
+    cdef C_CUSnarks* _cusnarks_ptr
+    cdef ct.uint32_t in_dim, in_size, out_dim, out_size
 
-    def __cinit__(self, ct.mod_info_t *p, ct.uint32_t vec_len, ct.uint32_t in_size, ct.uint32_t out_size, ct.uint32_t seed=0):
-        self.dim = vec_len
-    
-        cdef ct.mod_info_t mod_info
-        mod_info.p = &p->p[0]
-        mod_info.p_ = &p->p[0]
-        mod_info.r = &p->r[0]
-        mod_info.r_ = &p->r_[0]
+    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+        self.in_dim = in_len
+        if out_len == 0:
+           self.out_dim = self.in_dim
+        if in_size == 0:
+           self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
+        if out_size == 0:
+           self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
 
-        self.g = new C_CUSnarks(&mod_info, self.dim, in_size, out_size, seed)
+        #self._cusnarks_ptr = new C_CUSnarks(self.in_dim, self.in_size, self.out_dim, self.out_size, seed, 0)
 
-    def __dealloc__(self):
-        del self.g
+    #def __dealloc__(self):
+    #    del self._cusnarks_ptr
 
-    def kernelLaunch( void *func_p, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict vdim_out,  ct.kernel_config_t *config, ...):
-        """
-          vdim_out['len']
-          vdim_out['width']
-        """
-        if  in_vec.shape[0] > self.dim or out_vec_len > self.dim:
+    def kernelLaunch(self, ct.uint32_t kernel_idx, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params):
+        cdef ct.vector_t out_v
+        cdef ct.vector_t in_v
+        
+        out_v.length = params['length']
+        in_v.length  = in_vec.shape[0]
+
+        if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             return
 
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * in_vec.shape[1], dtype=np.uint32)
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(vdim_out['len'] * vdim_out['width'], dtype=np.uint32)
-        in_vec_flat = np.concatenate(in_vec)
-        self.g.kernelLaunch(func_p, &out_vec_flat[0],&in_vec_flat[0], in_size, out_size, config, ...) 
-        
-        return np.reshape(out_vec_flat,(-1,vdim_out['width']))
+        print "XXXXXXXXXXX"
+        print out_v.length, out_v.size, in_v.length, in_v.size, in_vec.shape[0], in_vec.shape[1]
 
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+        in_vec_flat = np.concatenate(in_vec)
+        out_v.data = <ct.uint32_t *>&out_vec_flat[0]
+        in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
+
+        cdef ct.kernel_config_t kconfig
+        kconfig.blockD = config['blockD']
+        if 'gridD' in config:
+            kconfig.gridD  = config.config['gridD']
+        if 'smemS' in config:
+            kconfig.smemS  = config.config['smemS']
+
+        cdef ct.kernel_params_t kparams
+        kparams.midx = params['midx']
+        kparams.length = params['length']
+        kparams.stride = params['stride']
+        if 'premod' in params:
+            kparams.premod = params['premod']
+
+        self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
+        
+        return np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
+    
     """
     def rand(self, np.ndarray[ndim=2, dtype=np.uint32_t ]samples):
         if samples.shape[1] != ct.NWORDS_256BIT:
            return
 
         cdef np.uint32_t [:] samples1d = samples.flatten()
-        self.g.rand(&samples1d[0],samples.shape[0])
+        self._cusnarks_ptr.rand(&samples1d[0],samples.shape[0])
 
         return np.asarray(samples1d, dtype=np.uint32).reshape((-1,ct.NWORDS_256BIT))
 
     """
-    def rand(self, ct.uint32_t n_samples, ct.uint32_t size):
+    def rand(self, ct.uint32_t n_samples):
+        print n_samples, ct.NWORDS_256BIT
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
-        self.g.rand(&samples[0],n_samples, size)
+        self._cusnarks_ptr.rand(&samples[0],n_samples)
 
         return samples.reshape((-1,ct.NWORDS_256BIT))
      
 
-    def getDeviceInfo():
-       self.g.getDeviceInfo()
+    def getDeviceInfo(self):
+       self._cusnarks_ptr.getDeviceInfo()
+
+cdef class U256 (CUSnarks):
+    cdef C_U256* _u256_ptr
+    #cdef C_U256* _ptr
+
+    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+        if out_len == 0:
+            out_len = in_len
+        self._u256_ptr = new C_U256(in_len,seed)
+        self._cusnarks_ptr = <C_CUSnarks *>self._u256_ptr
+
+    def __dealloc__(self):
+        del self._u256_ptr
+    
+    #def addm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.mod_t mod_idx= ct.MOD_GROUP, ct.uint32_t premod=1):
+#
+        #if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
+            #return
+#
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
+        #in_vec_flat = np.concatenate(in_vec)
+        #self._u256_ptr.addm(&out_vec_flat[0],&in_vec_flat[0], in_vec.shape[0], mod_idx, premod)
+       #
+        #return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
+#
+    #def subm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.mod_t mod_idx = ct.MOD_GROUP, ct.uint32_t premod=1):
+#
+        #if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
+            #return
+#
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
+        #in_vec_flat = np.concatenate(in_vec)
+        #self._u256_ptr.subm(&out_vec_flat[0],&in_vec_flat[0], in_vec.shape[0], mod_idx, premod)
+       #
+        #return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
+#
+    #def mod(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.mod_t mod_idx=ct.MOD_GROUP):
+#
+        #if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
+            #return
+#
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
+        #in_vec_flat = np.concatenate(in_vec)
+        #self._u256_ptr.mod(&out_vec_flat[0],&in_vec_flat[0], in_vec.shape[0], mod_idx)
+       #
+        #return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
+#
+    #def mulm(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, ct.mod_t mod_idx = ct.MOD_GROUP, ct.uint32_t premod=1):
+#
+        #if  in_vec.shape[1] != ct.NWORDS_256BIT or in_vec.shape[0] > self.dim:
+            #return
+#
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_vec.shape[0] * ct.NWORDS_256BIT, dtype=np.uint32)
+        #cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(in_vec.shape[0]/2 * ct.NWORDS_256BIT, dtype=np.uint32)
+        #in_vec_flat = np.concatenate(in_vec)
+        #self._u256_ptr.mulm(&out_vec_flat[0], &in_vec_flat[0], in_vec.shape[0], mod_idx, premod)
+       #
+        #return np.reshape(out_vec_flat,(-1,ct.NWORDS_256BIT))
+
+
+
