@@ -19,17 +19,20 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : bigint.h
+// File name  : rng.h
 //
 // Date       : 08/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Random number generator
+//   Random number generator class definition
 // ------------------------------------------------------------------
 
 */
+
+#ifndef _RNG_H_
+#define _RNG_H_
 
 #include "pcg_random.hpp"
 
@@ -48,3 +51,5 @@ class _RNG {
 	static _RNG* get_instance(uint32_t seed);
         void randu32(uint32_t *samples, uint32_t n_samples);
 };
+
+#endif

@@ -28,9 +28,6 @@
 // Description:
 //  Implementation of CUDA EC BN128 arithmetic
 //   
-// TODO
-//    - Move modulo to constant memory
-//    - Use managed memory for data
 // ------------------------------------------------------------------
 
 */

@@ -53,10 +53,5 @@ cdef extern from "../cuda/u256.h":
         C_U256(ct.uint32_t len, ct.uint32_t seed) except +
         C_U256(ct.uint32_t len) except +
 
-        #void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
-        #void addm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.mod_t mod_idx, ct.uint32_t premod)
-        #void subm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.mod_t mod_idx, ct.uint32_t premod)
-        #void mod(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.mod_t mod_idx )
-        #void mulm(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.mod_t mod_idx, ct.uint32_t premod)
 
 

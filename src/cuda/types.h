@@ -26,7 +26,7 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//   Definition of basic data types
+//   Definition of basic data types and general constants
 // ------------------------------------------------------------------
 
 */
@@ -34,7 +34,7 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
-#define NWORDS_256BIT      (8)
+#define NWORDS_256BIT           (8)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
@@ -43,16 +43,17 @@
 #define ECP_XOFFSET             (1 * NWORDS_256BIT)
 #define ECP_ZOFFSET             (2 * NWORDS_256BIT)
 #define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
-#define ECPOINT_NDIMS  (2)
-#define ECK_NDIMS      (ECPOINT_NDIMS + U256_NDIMS)
-#define ECK_OFFSET     (ECK_NDIMS * NWORDS_256BIT)
-#define CUSNARKS_BLOCK_DIM  (256)
-#define CUSNARKS_MAX_NCB = (32)
-#define U256_BLOCK_DIM  (256)
+#define ECPOINT_NDIMS           (2)
+#define ECK_NDIMS               (ECPOINT_NDIMS + U256_NDIMS)
+#define ECK_OFFSET              (ECK_NDIMS * NWORDS_256BIT)
+#define CUSNARKS_BLOCK_DIM      (256)
+#define CUSNARKS_MAX_NCB        (32)
+#define U256_BLOCK_DIM          (256)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
+// prime number info for finite fields
 typedef struct {
    uint32_t p[NWORDS_256BIT];
    uint32_t p_[NWORDS_256BIT];
@@ -72,6 +73,8 @@ typedef struct {
         int smemS;  // in bytes
 } kernel_config_t;
 
+
+// index to different primes used
 typedef enum{
    MOD_GROUP = 0,
    MOD_FIELD,
@@ -79,6 +82,7 @@ typedef enum{
 
 }mod_t;
 
+// data vector
 typedef struct{
   uint32_t *data;
   uint32_t length;
@@ -86,18 +90,23 @@ typedef struct{
 
 }vector_t;
 
+
+// kernel input parameters
 typedef struct{
-   uint32_t premod; 
-   uint32_t length;
-   uint32_t stride;
-   mod_t    midx;
+   uint32_t premod; // data requires to be mod-ded as preprocessing stage
+   uint32_t length; // input data length (number of elements)
+   uint32_t stride; // data elemements processed by thread
+   mod_t    midx;   // index to prime number to be used by kernel
 
 }kernel_params_t;
 
+
+// kernel callback defition
 typedef void (*kernel_cb)(uint32_t *out_vector_data,
                           uint32_t *in_vector_data,
                           kernel_params_t* params);
 
+// index to u256 class kernels
 typedef enum{
    CB_U256_ADDM = 0,
    CB_U256_SUBM,
@@ -107,6 +116,7 @@ typedef enum{
 
 }u256_callback_t;
 
+// index to ec128bn class kernels
 typedef enum{
    CB_EC_ADD = 0,
    CB_EC_DOUBLE,

@@ -26,7 +26,7 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Implementation of uint256 kernel and device functions
+//  Implementation of uint256 arithmetic
 // ------------------------------------------------------------------
 
 */
@@ -40,12 +40,6 @@
 /*
     Modular addition kernel
 
-    Arguments :
-      in_vector : Input vector of up to N 256 bit elements X[0], X[1], X[2] ... X[N-1].
-      out_vector : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
-      p : 256 bit module in 8 word uint32 array
-      len : number of elements in output vector to be xferred. 
-          Cannot be greater than half amount reseved during constructor, but not checked
 */
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
@@ -74,12 +68,6 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 /*
     Modular Sub kernel
 
-    Arguments :
-      in_vector : Input vector of up to N 256 bit elements X[0], X[1], X[2] ... X[N-1].
-      out_vector : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
-      p : 256 bit module in 8 word uint32 array
-      len : number of elements in output vector to be xferred. 
-          Cannot be greater than half amount reseved during constructor, but not checked
 */
 __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
@@ -108,12 +96,6 @@ __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 /*
     Modulo
 
-    Arguments :
-      in_vector : Input vector of up to N 256 bit elements X[0], X[1], X[2] ... X[N-1].
-      out_vector : Results of addition operation Y[0] = X[0] + X[1] mod p, Y[1] = X[2] + X[3] mod p...
-      p : 256 bit module in 8 word uint32 array
-      len : number of elements in output vector to be xferred. 
-          Cannot be greater than half amount reseved during constructor, but not checked
 */
 __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
@@ -132,7 +114,9 @@ __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel
     modu256(z, x, params->midx);
 }
 
-
+/*
+   Montgomery multiplication
+*/
 __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -149,6 +133,10 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
     U = (uint32_t *) &out_vector[tid * U256K_OFFSET];
    
     // ensure A, B < p 
+    // TODO : If numbers are already in Montgomery format
+    // premod operations doesn't make any sense. I leave it 
+    // for the moment as during testing I multiply random numbers without
+    // checking if they are greated than the prime number
     if (params->premod){
       modu256(A,A, params->midx);
       modu256(B,B, params->midx);
@@ -159,6 +147,8 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
    return;
 }
 
+//TODO : I should use the function defined in cusnarks_kernel.cu, or move
+// function to cuda.h (all device and host files already include cuda.h)
 __device__ void printNumber(uint32_t *n)
 {
   uint32_t i;
@@ -169,6 +159,9 @@ __device__ void printNumber(uint32_t *n)
   printf("\n");
 }
 
+/*
+   x + y for 256 bit numbers
+*/
 __forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
   // z[i] = x[i] + y[i] for 8x32 bit words
@@ -208,6 +201,9 @@ __forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t
         "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
 }
 
+/*
+   x - y for 256 bit numbers
+*/
 __forceinline__ __device__ void subu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
   // z[i] = x[i] - y[i] for 8x32 bit words
@@ -249,6 +245,9 @@ __forceinline__ __device__ void subu256(uint32_t __restrict__ *z, const uint32_t
 }
 
 
+/*
+   x == 0 for 256 bit numbers
+*/
 __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x)
 {
   if (x[0] == 0 && x[1] ==  0 && x[2] == 0 && x[3] == 0 && x[4] == 0 && x[5] == 0 && x[6] == 0 && x[7] == 0){
@@ -258,6 +257,9 @@ __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x)
   }
 }
 
+/*
+   x < y for 256 bit numbers
+*/
 __forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
    if (x[7] > y[7]) return 0;
@@ -277,6 +279,11 @@ __forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const
    else if (x[0] >= y[0]) return 0;
    else return 1;
 }
+/*
+   x + y (mod N) for 256 bit numbers
+
+   NOTE. Function requires that x, y < N
+*/
 __device__ void addmu256(uint32_t __restrict__*z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
    if (eq0u256(y)) {
@@ -298,6 +305,12 @@ __device__ void addmu256(uint32_t __restrict__*z, const uint32_t __restrict__ *x
    }
 }
 
+/*
+   x - y (mod N) for 256 bit numbers
+
+   NOTE. Function requires that x, y < N
+*/
+
 __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
 
@@ -311,6 +324,15 @@ __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
   
 }
 
+/*
+   Montgomery Multiplication(xr^(-1),y^r(-1)) = xr^(-1) * yr^(-1) * r (mod N)  for 256 bit numbers
+
+   NOTE. Function requires that x, y < N
+   NOTE. If x or y are not in Montgomery format, output is 
+    in standard format multiplication of x * y
+     ex: MontMul(xr^(-1),  y) = xr^(-1) * y * r = x * y
+
+*/
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     uint32_t i,j;
@@ -376,7 +398,9 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    return;
 }
 /*
-   Assumes p is at least 253 bits
+   x mod N
+
+   NOTE : It requires that x is at least 253 bit number
    */
 __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx)
 {
@@ -429,7 +453,7 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 }
 
 /*
-   z = x >> 1
+   x >> 1 for 256 bit number
 */
 __forceinline__ __device__ void shr1u256(const uint32_t __restrict__ *x)
 {
@@ -471,6 +495,9 @@ __forceinline__ __device__ void shr1u256(const uint32_t __restrict__ *x)
        : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
          "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 }
+/*
+   x * y for 32 bit number. Returns 64 bit number
+ */
 __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
 {
   // z[i] = x * y for 32 bit words
@@ -487,29 +514,23 @@ __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uin
 
 
 /*
-   (z,c) = x * y + a
-   z is 2 x uint32_t
-   c is carry
+   (c,s) = x + y * a for 32 bit number. Returns 32 bit number and 32 bit carry
 */
 __forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a)
 {
    // (C,S) = t[0] + a[0] * b[i] -> No carry in
    asm("{                                   \n\t"
-       //".reg .u32      %tmp;                \n\t"
-       //"mad.lo.cc.u32  %0, %3, %4, %5;      \n\t"
-       //"madc.hi.cc.u32 %1, %3, %4, 0;       \n\t"
        "mad.lo.cc.u32  %0, %2, %3, %4;      \n\t"
        "madc.hi.u32    %1, %2, %3, 0;       \n\t"
-       //"addc.u32       %tmp, %1, 0;         \n\t"
-       //"set.lt.u32.u32 %2, %1, %tmp;        \n\t"
        "}                                   \n\t"
-       //: "=r"(s[0]), "=r"(s[1]), "=r"(c[0]) 
        : "=r"(s[0]), "=r"(c[0])
        : "r"(x), "r"(y), "r"(a));
 }
+/*
+   (c.s) = x + y for 32 bit numbers. Returns 32 bit number and 1 bit carry
+*/
 __forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y)
 {
-   // (C,S) = t[0] + a[0] * b[i] -> No carry in
    asm("{                               \n\t"
        ".reg .u32          %tmp;          \n\t"
        "add.cc.u32         %tmp, %2, %3;    \n\t"
@@ -520,15 +541,15 @@ __forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, ui
        : "=r"(s[0]), "=r"(c[0]) 
        : "r"(x), "r"(y));
 }
-
+/*
+   Propagate carry bit across a 256 bit number starting in 32 bit word indexed by digit
+*/
 __forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit)
 {
    while ((digit < NWORDS_256BIT_FIOS) && (c))
    {
      asm("{                                   \n\t"
-         //".reg .u32       %cin;               \n\t"
          ".reg .u32       %tmp;               \n\t"
-         //"mov.u32         %cin, %3;           \n\t"
          "mov.u32         %tmp, %2;           \n\t"
          "add.cc.u32      %0,   %1, %tmp;   \n\t"
          "set.lt.u32.u32  %1,   %0,   %tmp;   \n\t"

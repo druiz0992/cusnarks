@@ -26,7 +26,7 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of cusnarks CUDA resources
+//  Definition of cusnarks CUDA resources management
 // ------------------------------------------------------------------
 
 */
@@ -35,14 +35,18 @@
 
 class CUSnarks {
     protected:
-        vector_t in_vector_device;      // pointer to device input buffer
-        vector_t out_vector_device;     // pointer to device output buffer
-        kernel_params_t *params_device;
-        kernel_cb *kernel_callbacks;
+        vector_t in_vector_device;      // kernel input vector (device size)
+        vector_t out_vector_device;     // kernel output vector (device side)
+        kernel_params_t *params_device; // kernel params (device side)
+
+        kernel_cb *kernel_callbacks;    // pointer to kernel callbacks
         _RNG *rng;
 
-        CUSnarks(uint32_t in_len, uint32_t in_size, uint32_t out_len, uint32_t out_size, kernel_cb *kcb);
-        CUSnarks(uint32_t in_len, uint32_t in_size, uint32_t out_len, uint32_t out_size, kernel_cb *kcb,  uint32_t seed);
+        CUSnarks(uint32_t in_len, uint32_t in_size, 
+		 uint32_t out_len, uint32_t out_size, kernel_cb *kcb);
+        CUSnarks(uint32_t in_len, uint32_t in_size, 
+		uint32_t out_len, uint32_t out_size, kernel_cb *kcb,
+	      	uint32_t seed);
         ~CUSnarks();
 
         void allocateCudaResources(uint32_t in_size, uint32_t out_size);
@@ -51,7 +55,6 @@ class CUSnarks {
 
     public:
 
-        void printBigNumber(uint32_t *x);
         void rand(uint32_t *samples, uint32_t n_samples);
         void kernelLaunch(
 		//kernel_cb launcher,
@@ -60,19 +63,8 @@ class CUSnarks {
 	       	vector_t *in_vector_host,
                 kernel_config_t *configuration,
                 kernel_params_t *params);
-        #if 0
-        template<typename kernel_function_t, typename... kernel_parameters_t>
-           void kernelLaunch(
-		const kernel_function_t& kernel_function,
-		uint32_t *out_vector_host,
-	       	const uint32_t *in_vector_host,
-                uint32_t len,
-	        uint32_t in_size,
-		uint32_t out_size,
-                kernel_config_t *configuration,
-		kernel_parameters_t... kernel_extra_params);
-        #endif
         void getDeviceInfo();
+        void printBigNumber(uint32_t *x);
 };
 
 #endif
