@@ -26,7 +26,7 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of U256 integer device functionality
+//  Definition of U256 integer arithmetic
 // ------------------------------------------------------------------
 
 */

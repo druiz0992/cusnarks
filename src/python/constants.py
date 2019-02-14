@@ -1,4 +1,39 @@
+"""
+/*
+    Copyright 2018 0kims association.
 
+    This file is part of cusnarks.
+
+    cusnarks is a free software: you can redistribute it and/or
+    modify it under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your option)
+    any later version.
+
+    cusnarks is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.
+
+    You should have received a copy of the GNU General Public License along with
+    cusnarks. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+// ------------------------------------------------------------------
+// Author     : David Ruiz
+//
+// File name  : constnts.py
+//
+// Date       : 15/02/2019
+//
+// ------------------------------------------------------------------
+//
+// Description:
+//   Constant defition for python. I am using same values as types.h
+//
+//  TODO . I need to find a way to either generate this file automatically
+//   of have python use types.h directly. Otherwise, this is a souce of pain
+//
+"""
 
 NWORDS_256BIT  =    8
 NWORDS_256BIT_FIOS = NWORDS_256BIT + 3

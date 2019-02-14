@@ -26,7 +26,8 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of CUDA specifica constants
+//  Definition of CUDA specific macros. Also, all global variables that
+//  need to be visible by GPU are declared as extern here
 // ------------------------------------------------------------------
 
 */
@@ -34,6 +35,7 @@
 #ifndef _CUDA_H_
 #define _CUDA_H_
 
+// Prime information for Finite fields is declared in constant memory
 extern __constant__ mod_info_t mod_info_ct[MOD_N];
 
 #ifndef assert

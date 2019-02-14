@@ -28,7 +28,7 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//   Test ZFieldl Element test for CUDA
+//   Test CUDA Montgomery multiplication
 //
 // TODO 
 //    incorrect format  -> once asserts substituted by exceptions,
@@ -59,7 +59,7 @@ class CUZFieldElTest(unittest.TestCase):
     nsamples = 100000
     ntest_points = 1000
     u256_p = BigInt(prime).as_uint256()
-    u256 = U256(u256_p, nsamples,0)
+    u256 = U256(u256_p, nsamples,10)
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
     reduction_data = ZField.get_reduction_data()
 
@@ -69,6 +69,8 @@ class CUZFieldElTest(unittest.TestCase):
         ntest_points = CUZFieldElTest.ntest_points
         u256_p = CUZFieldElTest.u256_p
         nprime = CUZFieldElTest.reduction_data['Pp'] & 0xFFFFFFFF
+        kernel_config = {'blockD' : U256_BLOCK_DIM }
+        kernel_params = {'midx' : MOD_FIELD ,'premod' : 1, 'length' : CUU256Test.nsamples/2, 'stride' : 2}
         for iter in xrange(CUZFieldElTest.TEST_ITER):
             u256_vector = u256.rand(CUZFieldElTest.nsamples)
 
@@ -78,7 +80,7 @@ class CUZFieldElTest(unittest.TestCase):
 
             #u256_vector[0] = np.asarray([1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668], dtype=np.uint32)
             #u256_vector[1] = np.asarray([596516649, 1189641421, 1025202362, 1350490027, 783368690, 1102520059, 2044897763, 803772102], dtype=np.uint32)
-            result = u256.mulmont(u256_vector, nprime)
+            result = u256.kernelLaunch(CB_U256_MULM, u256_vector, kernel_config, kernel_params )
             x1_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[test_points2]]
             x2_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[np.add(test_points2,1)]]
             r_rdc = [x * y for x,y in zip(x1_rdc, x2_rdc)]

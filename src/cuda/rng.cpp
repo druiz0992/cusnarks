@@ -19,14 +19,15 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : bigint.h
+// File name  : rng.cpp
 //
 // Date       : 08/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Random number generator
+//   Random number generator wrapper. Singleton implementation
+//   (only one object exists. Rest are copies of original)
 // ------------------------------------------------------------------
 
 */
@@ -74,11 +75,6 @@ _RNG* _RNG::get_instance(uint32_t seed)
   return instance;
 }
 
-//void _RNG::destroy()
-//{
-  //delete instance;
-  //instance = NULL;
-//}
 
 void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
 {

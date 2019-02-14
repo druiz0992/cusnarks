@@ -26,8 +26,10 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Implementation of Cusnarks CUDA resources management
-//   
+//  Implementation of CUDA resources management. CUSnarks is the base class
+// for all CUDA modules. Class provides functionality for GPU memory allocation
+//  and deallocation, kernel launching, time measurement, random number generation
+//
 // ------------------------------------------------------------------
 
 */
@@ -46,6 +48,11 @@
 
 using namespace std;
 
+
+// Prime information for finitie fields. Includes 3 numbers : p. p_ and r_ that 
+// follow p x p_ - r * r_ = 1 whrere r is 1^256. This is used for Montgomery reduction
+//
+// There are two different set of primes (MOD_N)
 __constant__ mod_info_t mod_info_ct[MOD_N];
 
 //  p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
@@ -82,11 +89,15 @@ static uint32_t r2n_u256[] = {1840322894, 3696992261, 3776048263,   151975337,
                               2931318109, 3357937124, 2193970460,   367786321};
 
 /*
-    Constructor : Reserves device memory for vector and modulo p. 
+    Constructor : Reserves global (vector) and constant (prime info) memory 
 
     Arguments :
-      p : 256 bit number in 8 word uint32 array
-      length : Vector length for future arithmetic operations
+      in_length : Maximum number of elements in Kernel input data
+      in_size   : Maximum size of Kernel input data (in Bytes)
+      out_length: Maximum number of elements in Kernel output  data
+      out_size  : Mamimum size of Kernel output data (in Bytes)
+      kcb       : Pointer to kernel functions (indexed by XXX_callback_t enum)
+      
 */
 CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size, 
                     uint32_t out_len, uint32_t out_size, kernel_cb *kcb) : 
@@ -106,8 +117,6 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
   out_vector_device.data = NULL;
   out_vector_device.length = out_len;
   out_vector_device.size = out_size;
-  printf("C CUSnarks init :  in_size %d, in_len %d\n", in_vector_device.size, in_vector_device.length);
-  printf("C CUSnarks init :  out_size %d, out_len %d\n", out_vector_device.size, out_vector_device.length);
 
   allocateCudaResources(in_size, out_size);
   initRNG(seed);
@@ -120,18 +129,22 @@ void CUSnarks::printBigNumber(uint32_t *x)
   }
   printf("\n");
 }
-
+/*
+   Reserve GPU memory for input and output vectors and input kernel params (global memory),
+   as well as some constant info (constant memory)
+ */
 void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
 {
   mod_info_t mod_h[MOD_N];
 
-  // Allocate global memory in device for input and output
+  // Allocate kernel input and putput data vectors in global memory 
   CCHECK(cudaMalloc((void**) &this->in_vector_device.data, in_size));
-
   CCHECK(cudaMalloc((void**) &this->out_vector_device.data, out_size));
 
+  // Allocate kernel params in global memory 
   CCHECK(cudaMalloc((void**) &this->params_device, sizeof(kernel_params_t)));
 
+  // constants -> prime info . Initialize data and copy to constant memory
   memcpy(&mod_h[MOD_GROUP].p,  p1_u256,  sizeof(uint32_t) * NWORDS_256BIT);
   memcpy(&mod_h[MOD_GROUP].p_, p1n_u256, sizeof(uint32_t) * NWORDS_256BIT);
   memcpy(&mod_h[MOD_GROUP].r_, r1n_u256, sizeof(uint32_t) * NWORDS_256BIT);
@@ -139,30 +152,36 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   memcpy(&mod_h[MOD_FIELD].p_, p2n_u256, sizeof(uint32_t) * NWORDS_256BIT);
   memcpy(&mod_h[MOD_FIELD].r_, r2n_u256, sizeof(uint32_t) * NWORDS_256BIT);
 
-  printBigNumber(mod_h[MOD_GROUP].p);
-  printBigNumber(mod_h[MOD_GROUP].p_);
-  printBigNumber(mod_h[MOD_GROUP].r_);
-  printBigNumber(mod_h[MOD_FIELD].p);
-  printBigNumber(mod_h[MOD_FIELD].p_);
-  printBigNumber(mod_h[MOD_FIELD].r_);
-
   // Copy modulo info to device constant
   CCHECK(cudaMemcpyToSymbol(mod_info_ct, mod_h, MOD_N * sizeof(mod_info_t)));
 }
+
+/*
+   Initialize PCG random number generator  
+   http://www.pcg-random.org/
+
+   IF seed is 0, random seed is taken from urand.
+
+   NOTE : when seed is 0, generator breaks
+   TODO :  Fix seed = 0
+*/
 void CUSnarks::initRNG(uint32_t seed)
 {
   if (seed == 0){ rng =  _RNG::get_instance(); }
   else { rng = _RNG::get_instance(seed); }
 }
-
+/*
+   Generate N 32 bit random samples
+*/
 void CUSnarks::rand(uint32_t *samples, uint32_t n_samples)
 {
     uint32_t size_sample = in_vector_device.size / (in_vector_device.length * sizeof(uint32_t));
-    printf("C rand: size_sampled %d, in_size %d, in_len %d\n",size_sample, in_vector_device.size, in_vector_device.length);
     rng->randu32(samples, n_samples * size_sample);
 }
 
-
+/*
+   Free memory allocated in GPU:
+*/
 CUSnarks::~CUSnarks()
 {
   cudaFree(in_vector_device.data);
@@ -170,71 +189,74 @@ CUSnarks::~CUSnarks()
   cudaFree(params_device);
 }
 
-#if 0
-template<typename kernel_function_t, typename... kernel_parameters_t>
-void CUSnarks::kernelLaunch(
-		const kernel_function_t& kernel_function,
-		uint32_t *out_vector_host,
-	       	const uint32_t *in_vector_host,
-                uint32_t len,
-	        uint32_t in_size,
-		uint32_t out_size,
-                kernel_config_t *configuration,
-		kernel_parameters_t... kernel_extra_params)
-#endif
+/*
+   Kernel launcher. This function is an attempt to hide the complexity of launching a kernel. When called,
+   the input vector is copied to global GPU memory, the kernel is launched, and when finished, kernel
+   output vector data is copied back from GPU to host.
+
+   Arguments:
+    kernel_idx : kernel number to be launched. Defined by XXX_callback_t enum types
+    out_vector_host : kernel ouput data vector (Host size)
+    in_vector_host  : kernel input data vector (host size)
+    config          : kernel configuration info (grid, block, smem,...)
+    params          : Kernel input parameters
+
+*/
 void CUSnarks::kernelLaunch(
                 uint32_t kernel_idx,
-		//kernel_cb launcher,
-		//void *launcher,
 		vector_t *out_vector_host,
 	       	vector_t *in_vector_host,
                 kernel_config_t *config,
                 kernel_params_t *params)
 {
+  // check input lengths do not exceed reserved amount
   if (in_vector_host->length > in_vector_device.length) { return; }
-  //if (in_vector_host->size > in_vector_device.size) { return; }
   if (out_vector_host->length > out_vector_device.length) { return; }
-  //if (out_vector_host->size > out_vector_device.size) { return; }
 
   in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
   out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
 
-  printf("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, in_vector_host->length, in_vector_device.size, in_vector_device.length);
-  printf("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size, out_vector_host->length, out_vector_device.size, out_vector_device.length);
-
   double start, end_copy_in, end_kernel, end_copy_out;
   int blockD, gridD;
 
-  // measure xfer time Host -> Device
+  // measure data xfer time Host -> Device
   start = elapsedTime();
   CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
   CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
-
-  for (int i=0; i< 10; i++){
-    printf("%d-%d\n",in_vector_host->data[i], out_vector_host->data[i]);
-  }
-
+ 
+  // configure kernel. Input parameter invludes block size. Grid is calculated 
+  // depending on input data length and stride (how many samples of input data are 
+  // used per thread
   blockD = config->blockD;
   config->gridD = (blockD + in_vector_host->length/params->stride - 1) / blockD;
   gridD = config->gridD;
 
-  printf("Config : blockD: %d, gridD: %d\n",config->blockD, config->gridD);
-  printf("Params : premod : %d, midx : %d, Length : %d\n",params->premod, params->midx, params->length);
 
-  // perform addition operation and leave results in device memory
+  // launch kernel
   start = elapsedTime();
-  printf("CB[%d] : %pF at address %p\n",kernel_idx,kernel_callbacks[kernel_idx], kernel_callbacks[kernel_idx]);
   kernel_callbacks[kernel_idx]<<<gridD, blockD>>>(out_vector_device.data, in_vector_device.data, params_device);
-  //kernel_callbacks[kernel_idx](&out_vector_device, &in_vector_device, params);
   CCHECK(cudaGetLastError());
   CCHECK(cudaDeviceSynchronize());
   end_kernel = elapsedTime() - start;
 
+  // retrieve kernel output data from GPU to host
   start = elapsedTime();
   CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
   end_copy_out = elapsedTime() - start;
 
+  printf("----- Info -------\n");
+  printf("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, 
+		                                        in_vector_host->length,
+						       	in_vector_device.size,
+						       	in_vector_device.length);
+
+  printf("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size,
+		                                        out_vector_host->length, 
+							out_vector_device.size,
+						       	out_vector_device.length);
+
+  printf("Params : premod : %d, midx : %d, Length : %d\n",params->premod, params->midx, params->length);
   printf("%pF <<<%d, %d>>> Time Elapsed Kernel : %f.sec\n", 
           kernel_callbacks[kernel_idx], gridD, blockD, end_kernel);
   printf("Time Elapsed Xfering in %d bytes : %f sec\n",
