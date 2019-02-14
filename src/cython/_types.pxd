@@ -37,25 +37,41 @@ cimport numpy as np
 
 cdef extern from "types.h":
   
-  #Constants 
-  cdef uint32_t NWORDS_256BIT
-
   # Types
   ctypedef unsigned int uint32_t
   ctypedef int int32_t
 
-  ctypedef struct mod_info_t
-	cdef uint32_t p[NWORDS_256BIT]
-        cdef uint32_t p_[NWORDS_256BIT]
-        cdef uint32_t r[NWORDS_256BIT]
-        cdef uint32_t r_[NWORDS_256BIT]
+  #Constants 
+  cdef uint32_t NWORDS_256BIT
 
-  ctypedef struct kernel_config_t
+  ctypedef struct kernel_config_t:
         int blockD
         int gridD
-        int smemblockD
-        int gridD
-        int smemSS
-  
+        int smemS
 
+  ctypedef struct vector_t:
+      uint32_t *data
+      uint32_t length
+      uint32_t size
+
+  ctypedef enum mod_t:
+      MOD_FIELD, MOD_GROUP, MOD_N 
+
+  ctypedef struct kernel_params_t:
+      uint32_t premod
+      uint32_t length
+      uint32_t stride
+      mod_t midx
+
+
+  ctypedef void (*kernel_cb)(uint32_t *out_vector_data,
+                             uint32_t *in_vector_data,
+                             kernel_params_t *params)
+
+  ctypedef enum u256_callback_t:
+     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_N
+
+  ctypedef enum ec_callback_t:
+   CB_EC_ADD, CB_EC_DOUBLE, CB_EC_MUL, CB_EC_ADDRED, CB_EC_MULRED, CB_EC_N
+    
 _NWORDS_256BIT = NWORDS_256BIT

@@ -25,17 +25,20 @@ CC  = c++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
 CFLAGS=-c -O2 -DLINUXINTEL64 -g -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-CUFLAGS=-std=c++11 --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -dlcm=cg --cudart shared $(GENCODE_ARCH_COMPUTE) 
+CUFLAGS=-std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE) 
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
-LIBFLAGS= --shared -o 
+LINKFLAGS= -arch=sm_60 --shared -o 
 LDFLAGS=-lm -lcudart
 NVDISASM = nvdisasm
 NVDISASM_FLAGS = --no-dataflow --print-code --print-line-info --separate-functions
 CUOBJDUMP = cuobjdump
 CUOBJDUMP_FLAGS = -ptx -sass 
 
-CUSRC = u256.cu \
-        u256_device.cu
+CUSRC = cusnarks_kernel.cu \
+        u256.cu \
+        u256_device.cu \
+        ecbn128.cu \
+        ecbn128_device.cu
 
 CSRC = rng.cpp 
 
@@ -57,7 +60,7 @@ cubin :
 
 ##################################################
 so: $(OBJ)
-	$(NVCC) $(LIBFLAGS) $(LIB_PATH)/$(CUSNARKS_LIB) $(OBJ) $(LDFLAGS)
+	$(NVCC) $(LINKFLAGS) $(LIB_PATH)/$(CUSNARKS_LIB) $(OBJ) $(LDFLAGS)
 
 ##################################################
 %.o : %.cu

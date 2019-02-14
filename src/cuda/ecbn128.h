@@ -36,14 +36,16 @@
 
 class ECBN128 : public CUSnarks {
 
-        ECBN128(const uint32_t *p, uint32_t len);
-        ECBN128(const uint32_t *p, uint32_t len, uint32_t seed);
+    public:
 
-        void add(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, uint32_t premod);
-        void doubl(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, uint32_t premod);
-        void mul(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, uint32_t premod);
-        void add_reduce(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, uint32_t premod);
-        void mul_reduce(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, int32_t len, uint32_t premod);
-;
+        ECBN128(uint32_t len);
+        ECBN128(uint32_t len, uint32_t seed);
+        
+        //void add(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod);
+        //oid doubl(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, mod_t mod_idx,  uint32_t premod);
+        //oid mul(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, mod_t mod_idx,  uint32_t premod);
+        //oid add_reduce(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod);
+        //oid mul_reduce(uint32_t *out_ec_vector_host, const uint32_t *in_ec_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod);
+};
 
 #endif

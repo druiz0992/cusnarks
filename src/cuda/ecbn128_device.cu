@@ -38,13 +38,13 @@
 #include "ecbn128_device.h"
 #include "u256_device.h"
 
-__global__ void addecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t np, uint32_t len, uint32_t premod)
+__global__ void addec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-    uint32_t *x1, *x2, *xr, *z1, *z2, *zr;
+    uint32_t __restrict__ *x1, *x2, *xr, *z1, *z2, *zr;
  
-    if(tid >= len/6) {
+    if(tid >= params->length/6) {
       return;
     }
 
@@ -56,57 +56,57 @@ __global__ void addecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const u
     xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
     //zr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_ZOFFSET];
     
-    if (premod){
-      modu256(x1,x1,p);
-      modu256(&x1[NWORDS_256BIT],&x1[NWORDS_256BIT],p);
-      //modu256(z1,z1,p);
-      modu256(x2,x2,p);
-      modu256(&x2[NWORDS_256BIT],&x2[NWORDS_256BIT],p);
-      //modu256(z2,z2,p);
+    if (params->premod){
+      modu256(x1,x1, params->midx);
+      modu256(&x1[NWORDS_256BIT],&x1[NWORDS_256BIT], params->midx);
+      //modu256(z1,z1);
+      modu256(x2,x2, params->midx);
+      modu256(&x2[NWORDS_256BIT],&x2[NWORDS_256BIT], params->midx);
+      //modu256(z2,z2);
     }
 
-    addecc(xr, x1, x2, p, np);
+    addec(xr, x1, x2, params->midx);
 
     return;
 }
-__global__ void doublecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
+__global__ void doublec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
-__global__ void scmulecc_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
+__global__ void scmulec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
-__global__ void addecc_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
+__global__ void addec_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
-__global__ void scmulecc_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector const uint32_t *p, uint32_t len, uint32_t premod)
+__global__ void scmulec_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
     
-__forceinline__ __device__ void addecc(uint32_t *xr, const uint32_t *x1, const uint32_t *x2, const uint32_t *p, const uint32_t *np)
+__forceinline__ __device__ void addec(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, const uint32_t __restrict__ *x2, mod_t midx)
 {
    // Xr = -12 Z1 * Z2 * (X1 * Z2 + X2 * Z1) + (X1 * X2)^2 
    // Zr = x * (X1 * Z2 - X2 * Z1)^2
-   const uint32_t *z1 = &x1[NWORDS_256BIT];
-   const uint32_t *z2 = &x2[NWORDS_256BIT];
-   uint32_t *zr =&zr[NWORDS_256BIT];
+   const uint32_t __restrict__ *z1 = &x1[NWORDS_256BIT];
+   const uint32_t __restrict__ *z2 = &x2[NWORDS_256BIT];
+   uint32_t __restrict__ *zr =&zr[NWORDS_256BIT];
 
    uint32_t tmp1[NWORDS_256BIT];
 
-   mulmontu256(tmp1, x2, z1, p, np);      
-   mulmontu256(xr, x1, z2, p, np);      
-   submu256(zr, xr, tmp1,  p);
-   addmu256(tmp1, tmp1, xr, p);
-   mulmontu256(tmp1, tmp1, z2, p, np);    
-   mulmontu256(tmp1, tmp1, z1, p, np);    
-   mulmontu256(xr, x1, x2, p, np);      
-   mulmontu256(xr, xr, xr, p, np);     // TODO : implement squaring
+   mulmontu256(tmp1, x2  , z1  , midx);      
+   mulmontu256(xr  , x1  , z2  , midx);      
+   submu256(   zr  , xr  , tmp1, midx);
+   addmu256(   tmp1, tmp1, xr  , midx);
+   mulmontu256(tmp1, tmp1, z2  , midx);    
+   mulmontu256(tmp1, tmp1, z1  , midx);    
+   mulmontu256(xr  , x1  , x2  , midx);      
+   mulmontu256(xr  , xr  , xr  , midx);     // TODO : implement squaring
    // TODO Multiply xr by -12
-   addmu256(xr, tmp1, xr, p);
-   mulmontu256(zr, zr, zr, p, np);     // TODO : implement squaring
+   addmu256(   xr,   tmp1, xr  , midx);
+   mulmontu256(zr,   zr  , zr  , midx);     // TODO : implement squaring
    // TODO multiply zr by x
 
   return;

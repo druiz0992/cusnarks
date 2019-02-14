@@ -34,6 +34,8 @@
 #ifndef _CUDA_H_
 #define _CUDA_H_
 
+extern __constant__ mod_info_t mod_info_ct[MOD_N];
+
 #ifndef assert
 #define assert(X)         \
   do {                    \

@@ -21,30 +21,42 @@
 //
 // File name  : _cusnarks_kernel.pxd
 //
-// Date       : 13/02/2019
+// Date       : 05/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   CUSnarks Kernel wrapper definition
+//   Cusnarks cython wrapper
 // ------------------------------------------------------------------
 
 """
 
 cimport _types as ct
+cimport _cusnarks_kernel
 
 cdef extern from "rng_cython.h":
      pass
 
 cdef extern from "../cuda/cusnarks_kernel.h":
     cdef cppclass C_CUSnarks "CUSnarks":
-        C_CUSnarks(ct.mod_info_t *p, ct.uint32_t len, ct.uint32_t in_size, ct.uint32_t out_size, 
+        C_CUSnarks(ct.uint32_t in_len, ct.uint32_t in_size, ct.uint32_t out_len, ct.uint32_t out_size, 
                         ct.uint32_t seed) except +
-        C_CUSnarks(ct.mod_info_t *p, ct.uint32_t len, ct.uint32_t in_size, ct.uint32_t out_size) except +
-        void rand(ct.uint32_t *samples, ct.uint32_t n_samples, ct.uint32_t size)
-        void kernelLaunch[kernel_function_t](kernel_function_t &kernel_function, 
-                        ct.uint32_t *out_vector_host, ct.uint32_t *in_vector_host,
-                        ct.uint32_t in_size, ct.uint32_t out_size ,
-                        ct.kernel_config_t, ct.kernel_parameters_t...)
+        C_CUSnarks(ct.uint32_t in_len, ct.uint32_t in_size, ct.uint32_t out_len, ct.uint32_t out_size) except +
+        void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
+        void kernelLaunch(ct.uint32_t kernel_idx,
+                          ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
+                          ct.kernel_config_t *config, ct.kernel_params_t *params)
         void getDeviceInfo()
+
+cdef extern from "../cuda/u256.h":
+    cdef cppclass C_U256 "U256" (C_CUSnarks) :
+        C_U256(ct.uint32_t len, ct.uint32_t seed) except +
+        C_U256(ct.uint32_t len) except +
+
+        #void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
+        #void addm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.mod_t mod_idx, ct.uint32_t premod)
+        #void subm(ct.uint32_t *out_vector, ct.uint32_t *in_vector,ct.uint32_t len, ct.mod_t mod_idx, ct.uint32_t premod)
+        #void mod(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.mod_t mod_idx )
+        #void mulm(ct.uint32_t *out_vector, ct.uint32_t *in_vector, ct.uint32_t len, ct.mod_t mod_idx, ct.uint32_t premod)
+
 

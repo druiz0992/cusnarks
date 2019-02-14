@@ -37,7 +37,6 @@
 #include "cuda.h"
 #include "u256_device.h"
 
-__device__ void printNumber(uint32_t *n);
 /*
     Modular addition kernel
 
@@ -48,15 +47,15 @@ __device__ void printNumber(uint32_t *n);
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-__global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
+__global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-    uint32_t *x;
-    uint32_t *y;
-    uint32_t *z;
- 
-    if(tid >= len/2) {
+    uint32_t __restrict__ *x;
+    uint32_t __restrict__ *y;
+    uint32_t __restrict__ *z;
+   
+    if(tid >= params->length) {
       return;
     }
 
@@ -64,12 +63,12 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const
     y = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
     z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     
-    if (premod){
-      modu256(x,x,p);
-      modu256(y,y,p);
+    if (params->premod){
+      modu256(x,x, params->midx);
+      modu256(y,y, params->midx);
     }
 
-    addmu256(z,(const uint32_t *)x, (const uint32_t *)y, p);
+    addmu256(z,(const uint32_t *)x, (const uint32_t *)y, params->midx);
 }
 
 /*
@@ -82,15 +81,15 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-__global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p, uint32_t len, uint32_t premod)
+__global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-    uint32_t *x;
-    uint32_t *y;
-    uint32_t * z;
+    uint32_t __restrict__ *x;
+    uint32_t __restrict__ *y;
+    uint32_t __restrict__ *z;
  
-    if(tid >= len/2) {
+    if(tid >= params->length) {
       return;
     }
 
@@ -98,12 +97,12 @@ __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const
     y = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
     z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     
-    if (premod){
-      modu256(x,x,p);
-      modu256(y,y,p);
+    if (params->premod){
+      modu256(x,x, params->midx);
+      modu256(y,y, params->midx);
     }
 
-    submu256(z,(const uint32_t *)x, (const uint32_t *)y, p);
+    submu256(z,(const uint32_t *)x, (const uint32_t *)y, params->midx);
 }
 
 /*
@@ -116,49 +115,46 @@ __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const
       len : number of elements in output vector to be xferred. 
           Cannot be greater than half amount reseved during constructor, but not checked
 */
-__global__ void modu256_kernel(uint32_t *out_vector, const uint32_t *in_vector, const uint32_t *p, uint32_t len)
+__global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-    const uint32_t *x;
-    uint32_t * z;
+    const uint32_t __restrict__ *x;
+    uint32_t __restrict__ *z;
  
-    if(tid >= len) {
+    if(tid >= params->length) {
       return;
     }
 
     x = (const uint32_t *) &in_vector[tid * U256K_OFFSET];
     z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     
-    modu256(z, x, p);
+    modu256(z, x, params->midx);
 }
 
 
-__global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, const uint32_t *p,  const uint32_t np, uint32_t len, uint32_t premod)
+__global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-    if(tid >= len/2) {
+    if(tid >= params->length) {
       return;
     }
 
-    uint32_t *A, *B, *U;
-    const uint32_t *P;
-    uint32_t i,j, NP;
+    uint32_t __restrict__ *A, *B, *U;
+    uint32_t i,j; 
  
     A = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_XOFFSET];
     B = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
     U = (uint32_t *) &out_vector[tid * U256K_OFFSET];
-    P = p;
-    NP = np;
    
     // ensure A, B < p 
-    if (premod){
-      modu256(A,A,p);
-      modu256(B,B,p);
+    if (params->premod){
+      modu256(A,A, params->midx);
+      modu256(B,B, params->midx);
     }
 
-    mulmontu256(U, (const uint32_t *)A, (const uint32_t *) B, P, NP);
+    mulmontu256(U, (const uint32_t *)A, (const uint32_t *) B, params->midx);
 
    return;
 }
@@ -173,7 +169,7 @@ __device__ void printNumber(uint32_t *n)
   printf("\n");
 }
 
-__forceinline__ __device__ void addu256(uint32_t *z, const uint32_t *x, const uint32_t *y)
+__forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
   // z[i] = x[i] + y[i] for 8x32 bit words
   asm("{                             \n\t"
@@ -212,7 +208,7 @@ __forceinline__ __device__ void addu256(uint32_t *z, const uint32_t *x, const ui
         "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
 }
 
-__forceinline__ __device__ void subu256(uint32_t *z, const uint32_t *x, const uint32_t *y)
+__forceinline__ __device__ void subu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
   // z[i] = x[i] - y[i] for 8x32 bit words
   asm("{                             \n\t"
@@ -253,7 +249,7 @@ __forceinline__ __device__ void subu256(uint32_t *z, const uint32_t *x, const ui
 }
 
 
-__forceinline__ __device__ uint32_t eq0u256(const uint32_t *x)
+__forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x)
 {
   if (x[0] == 0 && x[1] ==  0 && x[2] == 0 && x[3] == 0 && x[4] == 0 && x[5] == 0 && x[6] == 0 && x[7] == 0){
     return 1;
@@ -262,7 +258,7 @@ __forceinline__ __device__ uint32_t eq0u256(const uint32_t *x)
   }
 }
 
-__forceinline__ __device__ uint32_t ltu256(const uint32_t *x, const uint32_t *y)
+__forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
    if (x[7] > y[7]) return 0;
    else if (x[7] < y[7]) return 1;
@@ -281,7 +277,7 @@ __forceinline__ __device__ uint32_t ltu256(const uint32_t *x, const uint32_t *y)
    else if (x[0] >= y[0]) return 0;
    else return 1;
 }
-__forceinline__ __device__ void addmu256(uint32_t *z, const uint32_t *x, const uint32_t *y, const uint32_t *p)
+__device__ void addmu256(uint32_t __restrict__*z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
    if (eq0u256(y)) {
       //z[0] = 0; z[1] = 0; z[2] = 0; z[3] = 0; z[4] = 0; z[5] = 0; z[6] = 0; z[7] = 0;
@@ -297,15 +293,16 @@ __forceinline__ __device__ void addmu256(uint32_t *z, const uint32_t *x, const u
          "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
        :);
    } else {
-      subu256(z,p,y);
-      submu256(z,x,z,p);
+      subu256(z,mod_info_ct[midx].p,y);
+      submu256(z,x,z, midx);
    }
 }
 
-__forceinline__ __device__ void submu256(uint32_t *z, const uint32_t *x, const uint32_t *y, const uint32_t *p)
+__device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
+
   if (ltu256(x,y)){
-    subu256(z,p,y);
+    subu256(z,mod_info_ct[midx].p,y);
     addu256(z,x,z);
 
   } else {
@@ -314,11 +311,14 @@ __forceinline__ __device__ void submu256(uint32_t *z, const uint32_t *x, const u
   
 }
 
-__forceinline__ __device__ void mulmontu256(uint32_t *U, const uint32_t *A, const uint32_t *B, const uint32_t *P, const uint32_t *NP)
+__device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     uint32_t i,j;
-    uint32_t S, C=0, C1, C2, M[2], X[2];
-    uint32_t T[]={0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t S, C=0, C1, C2;
+    uint32_t __restrict__ M[2], X[2];
+    uint32_t __restrict__ T[]={0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 
     #pragma unroll
     for(i=0; i<NWORDS_256BIT; i++)
@@ -331,10 +331,10 @@ __forceinline__ __device__ void mulmontu256(uint32_t *U, const uint32_t *A, cons
 
      // m = S*n'[0] mod W, where W=2^32
      // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-     mulu32(M, S, NP);
+     mulu32(M, S, PN_u256[0]);
 
      // (C,S) = S + m*n[0], worst case 2 words
-     madcu32(&C,&S,M[0],P[0],S);
+     madcu32(&C,&S,M[0],P_u256[0],S);
 
      #pragma unroll
      for(j=1; j<NWORDS_256BIT; j++)
@@ -350,7 +350,7 @@ __forceinline__ __device__ void mulmontu256(uint32_t *U, const uint32_t *A, cons
        propcu32(T,C,j+1);
 
        // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P[j],S);
+       madcu32(&C,&S,M[0], P_u256[j],S);
 
        // t[j-1] = S
        T[j-1] = S;
@@ -367,8 +367,8 @@ __forceinline__ __device__ void mulmontu256(uint32_t *U, const uint32_t *A, cons
    }
 
    /* Step 3: if(u>=n) return u-n else return u */
-   if (ltu256(P,T)){
-      subu256(U,T,P);
+   if (ltu256(P_u256,T)){
+      subu256(U,T,P_u256);
    } else {
       memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
    }
@@ -378,8 +378,10 @@ __forceinline__ __device__ void mulmontu256(uint32_t *U, const uint32_t *A, cons
 /*
    Assumes p is at least 253 bits
    */
-__forceinline__ __device__ void modu256(uint32_t *z, const uint32_t *x, const uint32_t *p)
+__device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx)
 {
+   const uint32_t __restrict__ *p = mod_info_ct[midx].p;
+
    asm("mov.u32     %0,  %8;\n\t"
        "mov.u32     %1,  %9;\n\t"
        "mov.u32     %2,  %10;\n\t"
@@ -429,7 +431,7 @@ __forceinline__ __device__ void modu256(uint32_t *z, const uint32_t *x, const ui
 /*
    z = x >> 1
 */
-__forceinline__ __device__ void shr1u256(const uint32_t *x)
+__forceinline__ __device__ void shr1u256(const uint32_t __restrict__ *x)
 {
     
    asm("{                                    \n\t"
@@ -469,7 +471,7 @@ __forceinline__ __device__ void shr1u256(const uint32_t *x)
        : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
          "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 }
-__forceinline__ __device__ void mulu32(uint32_t *z, const uint32_t x, const uint32_t y)
+__forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
 {
   // z[i] = x * y for 32 bit words
   asm("{                                    \n\t"
@@ -537,4 +539,3 @@ __forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit
      digit++;
    }
 }
-
