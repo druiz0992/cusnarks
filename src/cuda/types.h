@@ -78,7 +78,10 @@ typedef struct {
 
 // additional constants required
 typedef struct {
-  uint32_t twelve[NWORDS_256BIT];
+  uint32_t _1[NWORDS_256BIT];
+  uint32_t _4[NWORDS_256BIT];
+  uint32_t _4b[NWORDS_256BIT];
+  uint32_t _8b[NWORDS_256BIT];
 
 }misc_const_t;
 /**
