@@ -83,6 +83,14 @@ AUX_REPOS := $(aux_repos)
 #CFLAGS = $(DEBUG_LEVEL) $(EXTRA_FLAGS) $(INCLUDE_PATH) $(DEFINES)
 #LDFLAGS = -shared
 
+# LOG LEVEL : 4 -> No Log
+#             3 -> Error
+#             2 -> Warning
+#             1 -> Info
+#             0 -> Debug
+# 
+LOG_LEVEL = 1
+
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
               'OBJECT_PATH=$(OBJECT_PATH)'     \
@@ -93,7 +101,8 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CUSRC_PATH=$(CUSRC_PATH)'       \
               'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
-              'AUX_INCLUDES=$(AUX_INCLUDES)'
+              'AUX_INCLUDES=$(AUX_INCLUDES)'  \
+              'LOG_LEVEL=$(LOG_LEVEL)'
 
 
 #all:    

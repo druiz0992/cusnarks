@@ -78,9 +78,13 @@ cdef class CUSnarks:
         kconfig.blockD = config['blockD']
         # gridD and smemS do not need to exist
         if 'gridD' in config:
-            kconfig.gridD  = config.config['gridD']
+            kconfig.gridD  = config['gridD']
+        else :
+            kconfig.gridD  = 0
         if 'smemS' in config:
-            kconfig.smemS  = config.config['smemS']
+            kconfig.smemS  = config['smemS']
+        else:
+            kconfig.smemS  = 0
 
         # create kernel params data
         cdef ct.kernel_params_t kparams
@@ -95,7 +99,6 @@ cdef class CUSnarks:
         return np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
     
     def rand(self, ct.uint32_t n_samples):
-        print n_samples, ct.NWORDS_256BIT
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
         self._cusnarks_ptr.rand(&samples[0],n_samples)
 

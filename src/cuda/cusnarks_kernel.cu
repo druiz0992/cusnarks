@@ -42,6 +42,7 @@
 
 #include "types.h"
 #include "cuda.h"
+#include "log.h"
 #include "rng.h"
 #include "cusnarks_kernel.h"
 
@@ -55,6 +56,8 @@ using namespace std;
 // There are two different set of primes (MOD_N)
 __constant__ mod_info_t mod_info_ct[MOD_N];
 
+
+// Group
 //  p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
 // 'Pp': 111032442853175714102588374283752698368366046808579839647964533820976443843465L,
 // 'R': 115792089237316195423570985008687907853269984665640564039457584007913129639936L,
@@ -64,13 +67,8 @@ __constant__ mod_info_t mod_info_ct[MOD_N];
 // 'RmodP': 6350874878119819312338956282401532409788428879151445726012394534686998597021L,
 // 'Rp': 20988524275117001072002809824448087578619730785600314334253784976379291040311
 
-static uint32_t p1_u256[]  = {3632069959, 1008765974, 1752287885, 2541841041, 
-                              2172737629, 3092268470, 3778125865,  811880050};
-static uint32_t p1n_u256[] = {3834012553, 2278688642,  516582089, 2665381221, 
-                               406051456, 3635399632, 2441645163, 4118422199};
-static uint32_t r1n_u256[] = {21690935,   3984885834,   41479672, 3944751749,
-                              3074724569, 3479431631, 1508230713,  778507633};
 
+// Field
 //p2 = 21888242871839275222246405745257275088548364400416034343698204186575808495617L
 // 'Pp': 52454480824480482120356829342366457550537710351690908576382634413609933864959L,
 // 'R': 115792089237316195423570985008687907853269984665640564039457584007913129639936L,
@@ -80,13 +78,84 @@ static uint32_t r1n_u256[] = {21690935,   3984885834,   41479672, 3944751749,
 // 'RmodP': 6350874878119819312338956282401532410528162663560392320966563075034087161851L,
 // 'Rp': 9915499612839321149637521777990102151350674507940716049588462388200839649614L}
 
+static uint32_t mod_info_init[] = {
+        3632069959, 1008765974, 1752287885, 2541841041, 2172737629, 3092268470, 3778125865,  811880050, // p_group
+        3834012553, 2278688642,  516582089, 2665381221,  406051456, 3635399632, 2441645163, 4118422199, // pp_group
+        21690935,   3984885834,   41479672, 3944751749, 3074724569, 3479431631, 1508230713,  778507633, // rp_group
 
-static uint32_t p2_u256[]  = {4026531841, 1138881939, 2042196113,  674490440,
-                              2172737629, 3092268470, 3778125865,  811880050};
-static uint32_t p2n_u256[] = {4026531839, 3269588371, 1281954227,  1703315019,
-                              2567316369, 3818559528,  226705842,  1945644829};
-static uint32_t r2n_u256[] = {1840322894, 3696992261, 3776048263,   151975337,
-                              2931318109, 3357937124, 2193970460,   367786321};
+        4026531841, 1138881939, 2042196113,  674490440, 2172737629, 3092268470, 3778125865,  811880050, // p_field
+        4026531839, 3269588371, 1281954227, 1703315019, 2567316369, 3818559528,  226705842, 1945644829, // pp_field
+        1840322894, 3696992261, 3776048263,  151975337, 2931318109, 3357937124, 2193970460,   367786321 // rp_field
+};
+
+
+
+// EC BN128 curve and params definition
+// Y^2 = X^3 + b
+// b = 3
+// Generator point G =(Gx, Gy) = (1,2)
+// Generator point G2 ([Gx1, Gx2], [Gy1, Gy2])
+//       'G1x' : 10857046999023057135944570762232829481370756359578518086990519993285655852781L,
+//       'G2x' : 8495653923123431417604973247489272438418190587263600148770280649306958101930L,
+//       'G1y' : 11559732032986387107991004021392285783925812861821192530917403151452391805634L,
+//       'G2y' : 4082367875863433681332203403145435568316851327593401208105741076214120093531L
+//
+// Assumption is that we are woking in Mongtgomery domain, so I need to transforms all these parameters
+// Also, these parameters will vary depending on prime number used. 
+
+// There are two different set of primes (MOD_N)
+__constant__ ecbn128_t ecbn128_params_ct[MOD_N];
+
+
+// Group prime
+// b = 19052624634359457937016868847204597229365286637454337178037183604060995791063L
+// Gx = 6350874878119819312338956282401532409788428879151445726012394534686998597021L
+// Gy = 12701749756239638624677912564803064819576857758302891452024789069373997194042L
+// G2x[0] = 11461925177900819176832270005713103520318409907105193817603008068482420711462L
+// G2x[1] = 18540402224736191443939503902445128293982106376239432540843647066670759668214L
+// G2y[0] = 9496696083199853777875401760424613833161720860855390556979200160215841136960L
+// G2y[1] = 6170940445994484564222204938066213705353407449799250191249554538140978927342L
+
+// Field prime
+// b = 19052624634359457937016868847204597231584487990681176962899689225102261485553L
+// Gx = 6350874878119819312338956282401532410528162663560392320966563075034087161851L
+// Gy = 12701749756239638624677912564803064821056325327120784641933126150068174323702L
+// G2x[0] = 3440318644824060289325407041038137137632482455953552081609447686580196514077L
+// G2x[1] = 15555376658169732961166172612384867299105908138835914639331977638675822381717L
+// G2y[0] = 1734729704421626988316384622007148076088981578411341419187802115428207738199L
+// G2y[1] = 7947406416180328355183476715314321281876370016171195924215639649670494139363L 
+
+static uint32_t ecbn128_params_init [] = {
+    1353525463, 2048379561, 3780452793,  527090042, 1768673924,  860613198, 3457654158,  706701124,   // g_group
+    3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,   // Gx_group
+    2334006074, 2797242139, 3951957627,  351393361, 4042427480, 3437053662,  873447006,  471134083,   // Gy group
+      45883430, 2390996433, 1232798066, 3706394933, 2541820639, 4223149639, 2945863739,  425146433,   // G2x[0] group
+    2288773622, 1637743261, 4120812408, 4269789847,  589004286, 4288551522, 2929607174,  687701739,   // G2x[1] group
+    2823577920, 2947838845, 1476581572, 1615060314, 1386229638,  166285564,  988445547,  352252035,   // G2y[0] group
+    3340261102, 1678334806,  847068347, 3696752930,  859115638, 1442395582, 2482857090,  228892902,   // G2y[1] group
+
+    4026531825,   96640084, 3726796669, 2767545280, 1768673930,  860613198, 3457654158,  706701124,  // g field
+    1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,  // Gx field
+    2684354550, 1496082488, 1052875347, 1845030187, 4042427484, 3437053662,  873447006,  471134083,  // Gy field
+    3570833693,  985424601, 3020216734, 2567113431,  703417746, 1422701227, 3337448090,  127608510,  // G2x[0] field
+    1354730133, 2060109890, 3374016652, 3251713708,  786468672, 1666612222, 3296074718,  576980987,  // G2x[1] field
+    2182790487,  762510808, 2006819228, 3200553925, 2281110735, 3404365023, 3840597178,   64344700,  // G2y[0] field
+     939242467, 1534311190, 2907306748, 1573550191,  646343074, 2690260169, 2616010917,  294785687   // G2y[1] field
+};
+
+
+// Additional constants
+__constant__ misc_const_t misc_const_ct[MOD_N];
+
+// group
+// 12 = 10545769921920006081328258153046563651372213077923877724081620732308304538503L
+// field
+// 12 => 10545769921920006081328258153046563660692858761476604820504144340681620455361L
+
+static uint32_t misc_const_init[] = {
+         3107826567,  872253024, 1275012926, 3072771639, 556482807, 2755581974, 2496239035,  391164346,    // 12 group
+         4026531777, 1264881815,  190663744,  456775210, 556482835, 2755581974, 2496239035,  391164346     // 12 field
+};
 
 /*
     Constructor : Reserves global (vector) and constant (prime info) memory 
@@ -122,13 +191,6 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
   initRNG(seed);
 }
 
-void CUSnarks::printBigNumber(uint32_t *x)
-{
-  for (int i=0; i< NWORDS_256BIT; i++){
-    printf("%u ",x[i]);
-  }
-  printf("\n");
-}
 /*
    Reserve GPU memory for input and output vectors and input kernel params (global memory),
    as well as some constant info (constant memory)
@@ -136,6 +198,8 @@ void CUSnarks::printBigNumber(uint32_t *x)
 void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
 {
   mod_info_t mod_h[MOD_N];
+  ecbn128_t ecbn128_h[MOD_N];
+  misc_const_t misc_h[MOD_N];
 
   // Allocate kernel input and putput data vectors in global memory 
   CCHECK(cudaMalloc((void**) &this->in_vector_device.data, in_size));
@@ -144,16 +208,15 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   // Allocate kernel params in global memory 
   CCHECK(cudaMalloc((void**) &this->params_device, sizeof(kernel_params_t)));
 
-  // constants -> prime info . Initialize data and copy to constant memory
-  memcpy(&mod_h[MOD_GROUP].p,  p1_u256,  sizeof(uint32_t) * NWORDS_256BIT);
-  memcpy(&mod_h[MOD_GROUP].p_, p1n_u256, sizeof(uint32_t) * NWORDS_256BIT);
-  memcpy(&mod_h[MOD_GROUP].r_, r1n_u256, sizeof(uint32_t) * NWORDS_256BIT);
-  memcpy(&mod_h[MOD_FIELD].p,  p2_u256,  sizeof(uint32_t) * NWORDS_256BIT);
-  memcpy(&mod_h[MOD_FIELD].p_, p2n_u256, sizeof(uint32_t) * NWORDS_256BIT);
-  memcpy(&mod_h[MOD_FIELD].r_, r2n_u256, sizeof(uint32_t) * NWORDS_256BIT);
+  // constants ->  Initialize data and copy to constant memory
+  memcpy(mod_h,     mod_info_init,           sizeof(mod_info_t)    * MOD_N); // prime info
+  memcpy(ecbn128_h, ecbn128_params_init,     sizeof(ecbn128_t)     * MOD_N); // ecbn128
+  memcpy(misc_h,    misc_const_init,         sizeof(misc_const_t)  * MOD_N); // misc
 
   // Copy modulo info to device constant
-  CCHECK(cudaMemcpyToSymbol(mod_info_ct, mod_h, MOD_N * sizeof(mod_info_t)));
+  CCHECK(cudaMemcpyToSymbol(mod_info_ct,       mod_h,     MOD_N * sizeof(mod_info_t)));  // prime info
+  CCHECK(cudaMemcpyToSymbol(ecbn128_params_ct, ecbn128_h, MOD_N * sizeof(ecbn128_t)));   // ecbn128
+  CCHECK(cudaMemcpyToSymbol(misc_const_ct,    misc_h,    MOD_N * sizeof(misc_const_t)));// misc
 }
 
 /*
@@ -229,7 +292,9 @@ void CUSnarks::kernelLaunch(
   // depending on input data length and stride (how many samples of input data are 
   // used per thread
   blockD = config->blockD;
-  config->gridD = (blockD + in_vector_host->length/params->stride - 1) / blockD;
+  if (config->gridD == 0){
+     config->gridD = (blockD + in_vector_host->length/params->stride - 1) / blockD;
+  }
   gridD = config->gridD;
 
 
@@ -245,23 +310,23 @@ void CUSnarks::kernelLaunch(
   CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
   end_copy_out = elapsedTime() - start;
 
-  printf("----- Info -------\n");
-  printf("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, 
+  logInfo("----- Info -------\n");
+  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, 
 		                                        in_vector_host->length,
 						       	in_vector_device.size,
 						       	in_vector_device.length);
 
-  printf("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size,
+  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size,
 		                                        out_vector_host->length, 
 							out_vector_device.size,
 						       	out_vector_device.length);
 
-  printf("Params : premod : %d, midx : %d, Length : %d\n",params->premod, params->midx, params->length);
-  printf("%pF <<<%d, %d>>> Time Elapsed Kernel : %f.sec\n", 
-          kernel_callbacks[kernel_idx], gridD, blockD, end_kernel);
-  printf("Time Elapsed Xfering in %d bytes : %f sec\n",
+  logInfo("Params : premod : %d, midx : %d, Length : %d\n",params->premod, params->midx, params->length);
+  logInfo("Kernel IDX :%d <<<%d, %d>>> Time Elapsed Kernel : %f.sec\n", 
+          kernel_idx, gridD, blockD, end_kernel);
+  logInfo("Time Elapsed Xfering in %d bytes : %f sec\n",
           in_vector_host->size, end_copy_in);
-  printf("Time Elapsed Xfering out %d bytes : %f sec\n",
+  logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
           out_vector_host->size, end_copy_out);
 }
 
@@ -284,9 +349,9 @@ void CUSnarks::getDeviceInfo(void)
    CCHECK(cudaGetDeviceCount(&deviceCount));
   
    if (deviceCount == 0) {
-      printf("There are no available device(s) that support CUDA\n");
+      logInfo("There are no available device(s) that support CUDA\n");
    } else {
-      printf("Detected %d CUDA Capable device(s)\n", deviceCount);
+      logInfo("Detected %d CUDA Capable device(s)\n", deviceCount);
    }
    int dev, driverVersion = 0, runtimeVersion = 0;
 
@@ -294,59 +359,59 @@ void CUSnarks::getDeviceInfo(void)
    cudaSetDevice(dev);
    cudaDeviceProp deviceProp;
    cudaGetDeviceProperties(&deviceProp, dev);
-   printf("Device %d: \"%s\"\n", dev, deviceProp.name);
+   logInfo("Device %d: \"%s\"\n", dev, deviceProp.name);
 
    cudaDriverGetVersion(&driverVersion);
    cudaRuntimeGetVersion(&runtimeVersion);
-   printf(" CUDA Driver Version / Runtime Version                     %d.%d / %d.%d\n",
+   logInfo(" CUDA Driver Version / Runtime Version                     %d.%d / %d.%d\n",
           driverVersion/1000, (driverVersion%100)/10,
           runtimeVersion/1000, (runtimeVersion%100)/10);
-   printf(" CUDA Capability Major/Minor version number:               %d.%d\n",
+   logInfo(" CUDA Capability Major/Minor version number:               %d.%d\n",
          deviceProp.major, deviceProp.minor);
-   printf(" Total amount of global memory:                            %.2f MBytes (%llu bytes)\n",
+   logInfo(" Total amount of global memory:                            %.2f MBytes (%llu bytes)\n",
          (float)deviceProp.totalGlobalMem/(pow(1024.0,3)),
          (unsigned long long) deviceProp.totalGlobalMem);
-   printf(" GPU Clock rate:                                           %.0f MHz (%0.2f GHz)\n",
+   logInfo(" GPU Clock rate:                                           %.0f MHz (%0.2f GHz)\n",
          deviceProp.clockRate * 1e-3f, deviceProp.clockRate * 1e-6f);
-   printf(" Memory Clock rate:                                        %.0f Mhz\n",
+   logInfo(" Memory Clock rate:                                        %.0f Mhz\n",
          deviceProp.memoryClockRate * 1e-3f);
-   printf(" Memory Bus Width:                                         %d-bit\n",
+   logInfo(" Memory Bus Width:                                         %d-bit\n",
          deviceProp.memoryBusWidth);
    if (deviceProp.l2CacheSize) {
-         printf(" L2 Cache Size:                                      %d bytes\n",
+         logInfo(" L2 Cache Size:                                      %d bytes\n",
            deviceProp.l2CacheSize);
    }
-   printf(" Max Texture Dimension Size (x,y,z)             "
+   logInfo(" Max Texture Dimension Size (x,y,z)             "
      "    1D=(%d), 2D=(%d,%d), 3D=(%d,%d,%d)\n",
             deviceProp.maxTexture1D , deviceProp.maxTexture2D[0],
             deviceProp.maxTexture2D[1], 
             deviceProp.maxTexture3D[0], deviceProp.maxTexture3D[1],
             deviceProp.maxTexture3D[2]);
-   printf(" Max Layered Texture Size (dim) x layers         "
+   logInfo(" Max Layered Texture Size (dim) x layers         "
      "   1D=(%d) x %d, 2D=(%d,%d) x %d\n",
        deviceProp.maxTexture1DLayered[0], deviceProp.maxTexture1DLayered[1],
        deviceProp.maxTexture2DLayered[0], deviceProp.maxTexture2DLayered[1],
        deviceProp.maxTexture2DLayered[2]);
 
-   printf(" Total amount of constant memory:                         %lu bytes\n",
+   logInfo(" Total amount of constant memory:                         %lu bytes\n",
       deviceProp.totalConstMem);
-   printf(" Total amount of shared memory per block:                 %lu bytes\n",
+   logInfo(" Total amount of shared memory per block:                 %lu bytes\n",
       deviceProp.sharedMemPerBlock);
-   printf(" Total number of registers available per block:           %d\n",
+   logInfo(" Total number of registers available per block:           %d\n",
       deviceProp.regsPerBlock);
-   printf(" Warp size:                                               %d\n", deviceProp.warpSize);
-   printf(" Maximum number of threads per multiprocessor:            %d\n",
+   logInfo(" Warp size:                                               %d\n", deviceProp.warpSize);
+   logInfo(" Maximum number of threads per multiprocessor:            %d\n",
       deviceProp.maxThreadsPerMultiProcessor);
-   printf(" Maximum number of threads per block:                     %d\n",
+   logInfo(" Maximum number of threads per block:                     %d\n",
       deviceProp.maxThreadsPerBlock);
-   printf(" Maximum sizes of each dimension of a block:              %d x %d x %d\n",
+   logInfo(" Maximum sizes of each dimension of a block:              %d x %d x %d\n",
       deviceProp.maxThreadsDim[0],
       deviceProp.maxThreadsDim[1],
       deviceProp.maxThreadsDim[2]);
-   printf(" Maximum sizes of each dimension of a grid:               %d x %d x %d\n",
+   logInfo(" Maximum sizes of each dimension of a grid:               %d x %d x %d\n",
       deviceProp.maxGridSize[0],
       deviceProp.maxGridSize[1],
       deviceProp.maxGridSize[2]);
-   printf(" Maximum memory pitch:                                    %lu bytes\n", 
+   logInfo(" Maximum memory pitch:                                    %lu bytes\n", 
       deviceProp.memPitch);
 }

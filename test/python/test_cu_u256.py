@@ -114,9 +114,14 @@ class CUU256Test(unittest.TestCase):
     
             self.assertTrue(len(result) == CUU256Test.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_subm)))
-             
+            
             # Test mulmont kernel:
-            test_points = sample(xrange(CUZFieldElTest.nsamples/2-2), ntest_points)
+            #u256_vector[0] = np.asarray([1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668], dtype=np.uint32)
+            #u256_vector[1] = np.asarray([596516649, 1189641421, 1025202362, 1350490027, 783368690, 1102520059, 2044897763, 803772102], dtype=np.uint32)
+            #kernel_config = {'blockD' : 1, 'gridD' : 1 }
+            #kernel_params['length'] = CUU256Test.nsamples/2
+            #kernel_params['stride'] = 2
+            test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
             result = u256.kernelLaunch(CB_U256_MULM, u256_vector, kernel_config, kernel_params )
@@ -125,7 +130,7 @@ class CUU256Test(unittest.TestCase):
             r_rdc = [x * y for x,y in zip(x1_rdc, x2_rdc)]
             r_mul = np.asarray([x.as_uint256() for x in r_rdc])
     
-            self.assertTrue(len(result) == CUZFieldElTest.nsamples/2)
+            self.assertTrue(len(result) == CUU256Test.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mul)))
 
 

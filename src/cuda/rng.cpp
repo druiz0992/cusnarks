@@ -44,41 +44,42 @@
 
 #include "types.h"
 #include "rng.h"
+#include "log.h"
 
 using namespace std;
 
 _RNG::_RNG():rng(43u)
 {
-   printf("RNG cons : no seed\n");
+   logDebug("RNG cons : no seed\n");
    this->rng.seed(pcg_extras::seed_seq_from<std::random_device>());
 }
-_RNG::_RNG(uint32_t seed) : rng(seed) { printf("RNG cons : seed : %d\n",seed); }
+_RNG::_RNG(uint32_t seed) : rng(seed) { logDebug("RNG cons : seed : %d\n",seed); }
 
 _RNG* _RNG::get_instance()
 {
   if (instance == NULL){
-     printf("Call constructor no seed\n");
+     logDebug("Call constructor no seed\n");
      instance = new _RNG();
   }
-  printf("Return instance  no seed\n");
+  logDebug("Return instance  no seed\n");
 
   return instance;
 }
 _RNG* _RNG::get_instance(uint32_t seed)
 {
   if (instance == 0){
-     printf("Call constructor seed : %d\n", seed);
+     logDebug("Call constructor seed : %d\n", seed);
      instance = new _RNG(seed);
   }
 
-     printf("Return instance  seed : %d\n", seed);
+     logDebug("Return instance  seed : %d\n", seed);
   return instance;
 }
 
 
 void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
 {
-   printf("random : %d n_samples\n", n_samples);
+   logDebug("random : %d n_samples\n", n_samples);
    for (int i =0; i < n_samples; i++){
      samples[i] = rng();
    }

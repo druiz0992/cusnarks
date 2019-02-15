@@ -19,28 +19,60 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : ecbn128.h
+// File name  : log.cpp
 //
-// Date       : 12/02/2019
+// Date       : 15/02/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of Elliptic Curve kernel processing 
+//  Definition of logging functionality
 // ------------------------------------------------------------------
 
 */
-#ifndef _ECBN128_H_
-#define _ECBN128_H_
 
 
-class ECBN128 : public CUSnarks {
+#ifndef _LOG_H
+#define _LOG_H
 
-    public:
+#define LOG_LEVEL_NOLOG   (4)
+#define LOG_LEVEL_ERROR   (3)
+#define LOG_LEVEL_WARNING (2)
+#define LOG_LEVEL_INFO    (1)
+#define LOG_LEVEL_DEBUG   (0)
 
-        ECBN128(uint32_t len);
-        ECBN128(uint32_t len, uint32_t seed);
-        
-};
+#ifndef LOG_LEVEL
+  #define LOG_LEVEL (LOG_LEVEL_NOLOG)
+#endif
+
+
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
+   #define logDebug printf
+__host__ __device__ void logDebugBigNumber(char *str, uint32_t *x);
+#else
+  #define logDebug(f,...) 
+  #define logDebugBigNumber(STR, X)
+#endif
+
+
+#if LOG_LEVEL <= LOG_LEVEL_ERROR
+   #define logError printf
+#else
+  #define logError(f,...) 
+#endif
+
+
+#if LOG_LEVEL <= LOG_LEVEL_WARNING
+   #define logWarning printf
+#else
+  #define logWarning(f,...)
+#endif
+
+#if LOG_LEVEL <= LOG_LEVEL_INFO
+   #define logInfo printf
+#else
+  #define logInfo(f,...)
+#endif
+
 
 #endif
