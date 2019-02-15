@@ -26,13 +26,13 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Implementation of 256 bit unsigned integer kernel processing for the
-// following kernels
+//  Implementation of 256 bit unsigned integer kernel processing
 // 
+//  General  Kernel input vector format:
+//     N 256 bit numbers X[0], X[1],....,X[N-1]
+//
 //  addmu256_kernel -> modular addition
 //
-//    Kernel input vector format:
-//     N 256 bit numbers X[0], X[1],....,X[N-1]
 //    Kernel output vector format:
 //     N/2 256 bit numbers X[0]+X[1], X[2]+X[3],..., X[N-2] + X[N-1]
 //    output length = 2 * input legth 
@@ -41,8 +41,6 @@
 //
 //  submu256_kernel -> modular substraction
 //
-//    Kernel input vector format:
-//     N 256 bit numbers X[0], X[1],....,X[N-1]
 //    Kernel output vector format:
 //     N/2 256 bit numbers X[0]-X[1], X[2]-X[3],..., X[N-2] - X[N-1]
 //    output length = 2 * input legth 
@@ -51,8 +49,6 @@
 //
 //  modu256_kernel -> modulo operation
 //
-//    Kernel input vector format:
-//     N 256 bit numbers X[0], X[1],....,X[N-1]
 //    Kernel output vector format:
 //     N 256 bit numbers X[0], +X[1],...X[N-1]
 //    output length = input legth 

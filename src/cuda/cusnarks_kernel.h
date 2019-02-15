@@ -64,7 +64,6 @@ class CUSnarks {
                 kernel_config_t *configuration,
                 kernel_params_t *params);
         void getDeviceInfo();
-        void printBigNumber(uint32_t *x);
 };
 
 #endif

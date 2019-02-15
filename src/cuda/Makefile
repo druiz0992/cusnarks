@@ -20,12 +20,14 @@ CUSNARKS_LIB=$(CUSNARKS_LIB)
 CUBIN_NAME=$(CUBIN_NAME)
 AUX_INCLUDES=$(AUX_INCLUDES)
 
+LOG_LEVEL=$(LOG_LEVEL)
+
 NVCC = nvcc
 CC  = c++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
 CFLAGS=-c -O2 -DLINUXINTEL64 -g -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-CUFLAGS=-std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE) 
+CUFLAGS= -DLOG_LEVEL=$(LOG_LEVEL) -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE) 
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_60 --shared -o 
 LDFLAGS=-lm -lcudart
@@ -38,7 +40,8 @@ CUSRC = cusnarks_kernel.cu \
         u256.cu \
         u256_device.cu \
         ecbn128.cu \
-        ecbn128_device.cu
+        ecbn128_device.cu \
+        log.cu
 
 CSRC = rng.cpp 
 

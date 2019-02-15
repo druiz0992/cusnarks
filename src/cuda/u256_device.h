@@ -53,6 +53,6 @@ __forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, ui
 __forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y);
 __forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit);
 
-__device__ void printNumber(uint32_t *n);
+//__device__ void printNumber(uint32_t *n);
 
 #endif

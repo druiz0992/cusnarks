@@ -80,6 +80,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 typedef unsigned int u32;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
@@ -87,6 +88,7 @@ typedef unsigned long long uint64_t;
 #define NDIGITS 8
 #define MAX_NDIGITS_FIOS   ((NDIGITS) + 3)
 #define MAX_DIGIT 0xFFFFFFFFUL
+#define NTEST 1
 
 static uint32_t N[] = {4026531841, 1138881939, 2042196113,  674490440, 2172737629,
                              3092268470, 3778125865,  811880050};
@@ -97,15 +99,16 @@ static uint32_t NPrime[] = {4026531839, 3269588371, 1281954227, 1703315019, 2567
 //static uint32_t N[] = { 216778863,0,0,0,0,0,0,0};
 //static uint32_t NPrime[] = {1782147441,0,0,0,0,0,0,0};
 
-static void MontMulFios(u32 *U, u32 *A, u32 *B,
+void MontMulFios(u32 *U, u32 *A, u32 *B,
 	u32 *N, const u32 *NPrime, int NDigits);
 
-static void mpAddWithCarryProp(u32 *A, u32 C, int SDigit, int NDigits);
+void mpAddWithCarryProp(u32 *A, u32 C, int SDigit, int NDigits);
 u32 mpAdd(u32 w[], const u32 u[], const u32 v[], size_t ndigits);
 int spMultiply(uint32_t p[2], uint32_t x, uint32_t y);
 int mpCompare(const u32 a[], const u32 b[], size_t ndigits);
 u32 mpSubtract(u32 w[], const u32 u[], const u32 v[], size_t ndigits);
 void setRandom(u32 *x, u32);
+void printNumber(u32 *x);
 
 void main()
 {
@@ -116,30 +119,44 @@ void main()
 	//uint32_t a[] = {149865143,0,0,0,0,0,0,0};
 	//uint32_t b[] = {149865143,0,0,0,0,0,0,0};
 	uint32_t r[MAX_NDIGITS_FIOS]; 
-	uint32_t a[MAX_NDIGITS_FIOS]; 
-	uint32_t b[MAX_NDIGITS_FIOS]; 
-	//uint32_t a[] = {1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668};
-        //uint32_t b[] = { 596516649, 1189641421 ,1025202362 ,1350490027 , 783368690 ,1102520059 ,2044897763 ,893772102};
+	//uint32_t a[MAX_NDIGITS_FIOS]; 
+	//uint32_t b[MAX_NDIGITS_FIOS]; 
+	uint32_t a[] = {1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668};
+        uint32_t b[] = { 596516649, 1189641421 ,1025202362 ,1350490027 , 783368690 ,1102520059 ,2044897763 ,803772102};
 
 	int i, j;
 
-	for (i=0; i < 10000; i++){
-            setRandom(a,NDIGITS);
-            setRandom(b,NDIGITS);
-	    a[NDIGITS-1] &= 0x3FFFFFFF;
-	    b[NDIGITS-1] &= 0x3FFFFFFF;
+	for (i=0; i < NTEST; i++){
+            //setRandom(a,NDIGITS);
+            //setRandom(b,NDIGITS);
+	    //a[NDIGITS-1] &= 0x3FFFFFFF;
+	    //b[NDIGITS-1] &= 0x3FFFFFFF;
 	    
 
-
+            printf("P\n");
+            printNumber(N);
+            printf("NP\n");
+            printNumber(NPrime);
+           
+            printf("A\n");
+            printNumber(a);
+            printf("B\n");
+            printNumber(b);
             MontMulFios(r, a, b, N, NPrime, NDIGITS);
 
-	    for (i=0; i < NDIGITS; i++){
-	  	printf("%u ",r[i]);
-	    }
-	    printf ("\n");
+            printf("R\n");
+            printNumber(r);
+
 	}
 
+}
 
+void printNumber(u32 *x)
+{
+	    for (u32 i=0; i < NDIGITS; i++){
+	  	printf("%u ",x[i]);
+	    }
+	    printf ("\n");
 }
 
 void setRandom(u32 *x, u32 ndigits)
@@ -175,7 +192,7 @@ void setRandom(u32 *x, u32 ndigits)
 *
 * @note		None.
 *****************************************************************************/
-static void MontMulFios(u32 *U, u32 *A, u32 *B,
+void MontMulFios(u32 *U, u32 *A, u32 *B,
 	u32 *N, const u32 *NPrime, int NDigits)
 {
 	int i, j;
@@ -191,41 +208,58 @@ static void MontMulFios(u32 *U, u32 *A, u32 *B,
 		C = mpAdd(&S, T+0, X+0, 1);	// [C,S] = t[0] + X[Lower]
 		mpAdd(&C, &C, X+1, 1);		// [~,C] = C + X[Upper], No carry
 
+                printf("0 - C : %u, S: %u\n",C,S);
+                printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
 		// ADD(t[1],C)
 		mpAddWithCarryProp(T, C, 1, NDigits+3);
+                printf("T\n");
+                printNumber(T);
 
 		// m = S*n'[0] mod W, where W=2^32
 		// Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
 		spMultiply(M, S, NPrime[0]);
+                printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
 
 		// (C,S) = S + m*n[0], worst case 2 words
 		spMultiply(X, M[0], N[0]);	// X[Upper,Lower] = m*n[0]
 		C = mpAdd(&S, &S, X+0, 1);	// [C,S] = S + X[Lower]
 		mpAdd(&C, &C, X+1, 1);		// [~,C] = C + X[Upper]
+                printf("1 - C : %u, S: %u\n",C,S);
 
 		for(j=1; j<NDigits; j++)
 		{
 			// (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
 			spMultiply(X, A[j], B[i]);	 	// X[Upper,Lower] = a[j]*b[i], double precision
 			C1 = mpAdd(&S, T+j, &C, 1);		// (C1,S) = t[j] + C
+                        printf("2 - C1 : %u, S: %u\n",C1,S);
 			C2 = mpAdd(&S, &S, X+0, 1); 	// (C2,S) = S + X[Lower]
+                        printf("3 - C2 : %u, S: %u\n",C1,S);
+                        printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
 			mpAdd(&C, &C1, X+1, 1);			// (~,C)  = C1 + X[Upper], doesn't produce carry
+                        printf("4 - C : %u\n",C);
 			mpAdd(&C, &C, &C2, 1); 			// (~,C)  = C + C2, doesn't produce carry
+                        printf("5 - C : %u\n",C);
 
 			// ADD(t[j+1],C)
 			mpAddWithCarryProp(T, C, j+1, NDigits+3);
+                        printf("T\n");
+                        printNumber(T);
 
 			// (C,S) = S + m*n[j]
 			spMultiply(X, M[0], N[j]);	// X[Upper,Lower] = m*n[j]
 			C = mpAdd(&S, &S, X+0, 1);	// [C,S] = S + X[Lower]
 			mpAdd(&C, &C, X+1, 1);		// [~,C] = C + X[Upper]
+                        printf("6 - C : %u, S: %u\n",C,S);
 
 			// t[j-1] = S
 			T[j-1] = S;
+                        printf("T\n");
+                        printNumber(T);
 		}
 
 		// (C,S) = t[s] + C
 		C = mpAdd(&S, T+NDigits, &C, 1);
+                printf("6 - C : %u, S: %u\n",C,S);
 		// t[s-1] = S
 		T[NDigits-1] = S;
 		// t[s] = t[s+1] + C
@@ -235,7 +269,7 @@ static void MontMulFios(u32 *U, u32 *A, u32 *B,
 	}
 
 	/* Step 3: if(u>=n) return u-n else return u */
-	if(mpCompare(T, N, NDigits+3) >= 0)
+	if(mpCompare(T, N, NDigits) >= 0)
 	{
 		mpSubtract(T, T, N, NDigits+3);
 	}
@@ -266,7 +300,7 @@ static void MontMulFios(u32 *U, u32 *A, u32 *B,
 *
 * @note		None.
 *****************************************************************************/
-static void mpAddWithCarryProp(u32 *A, u32 C, int SDigit, int NDigits)
+void mpAddWithCarryProp(u32 *A, u32 C, int SDigit, int NDigits)
 {
 	int i;
 	int j=0;

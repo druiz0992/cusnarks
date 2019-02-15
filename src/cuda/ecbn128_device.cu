@@ -38,7 +38,7 @@
 #include "ecbn128_device.h"
 #include "u256_device.h"
 
-__global__ void addec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -65,36 +65,40 @@ __global__ void addec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_p
       //modu256(z2,z2);
     }
 
-    addec(xr, x1, x2, params->midx);
+    addecldr(xr, x1, x2, x1, params->midx);
 
     return;
 }
-__global__ void doublec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void doublecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
-__global__ void scmulec_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void scmulecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
-__global__ void addec_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void addecldr_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
-__global__ void scmulec_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void scmulecldr_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
 }
     
-__forceinline__ __device__ void addec(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, const uint32_t __restrict__ *x2, mod_t midx)
+__forceinline__ __device__
+ void addecldr(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, 
+            const uint32_t __restrict__ *x2, const uint32_t __restrict__ *xp, mod_t midx)
 {
    // Xr = -12 Z1 * Z2 * (X1 * Z2 + X2 * Z1) + (X1 * X2)^2 
-   // Zr = x * (X1 * Z2 - X2 * Z1)^2
+   // Zr = xp * (X1 * Z2 - X2 * Z1)^2
    const uint32_t __restrict__ *z1 = &x1[NWORDS_256BIT];
    const uint32_t __restrict__ *z2 = &x2[NWORDS_256BIT];
    uint32_t __restrict__ *zr =&zr[NWORDS_256BIT];
 
    uint32_t tmp1[NWORDS_256BIT];
+   uint32_t __restrict__ *twelve = misc_const_ct[midx].twelve;
+   
 
    mulmontu256(tmp1, x2  , z1  , midx);      
    mulmontu256(xr  , x1  , z2  , midx);      
@@ -103,11 +107,18 @@ __forceinline__ __device__ void addec(uint32_t __restrict__ *xr, const uint32_t 
    mulmontu256(tmp1, tmp1, z2  , midx);    
    mulmontu256(tmp1, tmp1, z1  , midx);    
    mulmontu256(xr  , x1  , x2  , midx);      
-   mulmontu256(xr  , xr  , xr  , midx);     // TODO : implement squaring
-   // TODO Multiply xr by -12
-   addmu256(   xr,   tmp1, xr  , midx);
-   mulmontu256(zr,   zr  , zr  , midx);     // TODO : implement squaring
-   // TODO multiply zr by x
+   mulmontu256(xr  , xr  , xr  , midx);          // TODO : implement squaring
+   mulmontu256(tmp1, tmp1,twelve   ,midx);
+   submu256(   xr,   tmp1, xr      ,midx);
+   mulmontu256(zr,   zr  , zr      ,midx);     // TODO : implement squaring
+   mulmontu256(zr,   zr  , xp      ,midx);   
 
   return;
+}
+
+__forceinline__ __device__
+ void doublecldr(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx)
+{
+  // Xr = X1^4 - 24 * X1*Z1^3
+  // Zr = 4*Z1 * (X1^3 + 3*Z1^3)
 }

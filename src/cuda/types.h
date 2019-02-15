@@ -63,6 +63,24 @@ typedef struct {
 
 }mod_info_t;
 
+// BN128 curve defition : Y^2 = X^3 + b
+// Generator point G=(gx, gy) is on the curve
+// gx = 1 -> I defined it as an array because i need to conver it to Montgomery??
+// gy = 2
+typedef struct {
+  uint32_t b[NWORDS_256BIT];
+  uint32_t g1x[NWORDS_256BIT];
+  uint32_t g1y[NWORDS_256BIT];
+  uint32_t g2x[2*NWORDS_256BIT];
+  uint32_t g2y[2*NWORDS_256BIT];
+
+}ecbn128_t;
+
+// additional constants required
+typedef struct {
+  uint32_t twelve[NWORDS_256BIT];
+
+}misc_const_t;
 /**
  * Holds the parameters necessary to "launch" a CUDA kernel (i.e. schedule it for
  * execution on some stream of some device).

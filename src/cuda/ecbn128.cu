@@ -26,7 +26,18 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//  Implementation of CUDA EC BN128 arithmetic
+//  Implementation of CUDA EC Kernel processing
+//
+//
+//  General  Kernel input vector format:
+//     N groups, where each group is made of 1 256 bit scalar number
+//    and one Elliptic Point with two 256 bit coordinates
+// 
+//     X[0], PX[0], PY/Z[0], X[1], PX[1], PY/Z[1],..., X[N-1], PX[N-1], PY/Z[N-1]
+//
+//  Kernels
+// {addec_kernel, doublec_kernel, scmulec_kernel, addec_reduce_kernel, scmulec_reduce_kernel};
+//
 //   
 // ------------------------------------------------------------------
 
@@ -45,7 +56,7 @@
 
 using namespace std;
 
-static kernel_cb ecbn128_kernel_callbacks[] = {addec_kernel, doublec_kernel, scmulec_kernel, addec_reduce_kernel, scmulec_reduce_kernel};
+static kernel_cb ecbn128_kernel_callbacks[] = {addecldr_kernel, doublecldr_kernel, scmulecldr_kernel, addecldr_reduce_kernel, scmulecldr_reduce_kernel};
 
 ECBN128::ECBN128 (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len * (ECPOINT_NDIMS + U256_NDIMS),
 		                            len,  NWORDS_256BIT * sizeof(uint32_t) * len * ECPOINT_NDIMS, 
@@ -57,7 +68,6 @@ ECBN128::ECBN128 (uint32_t len, const uint32_t seed) :  CUSnarks(len, NWORDS_256
 				                                 len, NWORDS_256BIT * sizeof(uint32_t) * len * ECPOINT_NDIMS, 
 						       ecbn128_kernel_callbacks, seed)
 {
-  // Scalar, EC_X[0], EC_Z[0]??
 }
 
 #if 0
