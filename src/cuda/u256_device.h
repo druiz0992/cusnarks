@@ -46,7 +46,7 @@ extern __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restri
 extern __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 __forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x);
-__forceinline__ __device__ void shr1u256(const uint32_t __restrict__ *x);
+__forceinline__ __device__ uint32_t shr1u256(const uint32_t __restrict__ *x);
 
 __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z,  uint32_t x,  uint32_t y);
 __forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);

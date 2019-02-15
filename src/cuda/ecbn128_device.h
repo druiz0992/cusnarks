@@ -41,5 +41,6 @@ __global__ void scmulecldr_reduce_kernel(uint32_t *out_vector, uint32_t *in_vect
 
 __forceinline__ __device__ void addecldr(uint32_t *xr, const uint32_t *x1, const uint32_t *x2, const uint32_t *xp, mod_t mod_idx);
 __forceinline__ __device__ void doublecldr(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx);
+__forceinline__ __device__ void ldrstep(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, uint32_t *scl, mod_t midx);
 
 #endif

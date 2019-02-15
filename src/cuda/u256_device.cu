@@ -465,11 +465,12 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 /*
    x >> 1 for 256 bit number
 */
-__forceinline__ __device__ void shr1u256(const uint32_t __restrict__ *x)
+__forceinline__ __device__ uint32_t shr1u256(const uint32_t __restrict__ *x)
 {
-    
+   uint32_t c; 
    asm("{                                    \n\t"
        ".reg .u32          %tmp;             \n\t"
+       "and.b32            %16, %8,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
        "shr.u32            %0,   %8,  1;     \n\t"  // x[0] = x[0] >> 1
        "and.b32            %tmp, %9,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
        "shl.u32            %tmp, %tmp, 31;   \n\t"
@@ -503,7 +504,9 @@ __forceinline__ __device__ void shr1u256(const uint32_t __restrict__ *x)
        : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
          "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7])
        : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
-         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]), c);
+
+      return c;
 }
 /*
    x * y for 32 bit number. Returns 64 bit number
