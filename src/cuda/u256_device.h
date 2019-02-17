@@ -34,6 +34,7 @@
 #define _U256_DEVICE_H_
 
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
@@ -46,6 +47,7 @@ extern __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restri
 extern __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 __forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x);
+__forceinline__ __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 __forceinline__ __device__ uint32_t shr1u256(const uint32_t __restrict__ *x);
 
 __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z,  uint32_t x,  uint32_t y);

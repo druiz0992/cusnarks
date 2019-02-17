@@ -36,11 +36,23 @@
 __global__ void addecldr_kernel(uint32_t   *out_vector_data, uint32_t *in_vector_data, kernel_params_t *params);
 __global__ void doublecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void scmulecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
-__global__ void addecldr_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
-__global__ void scmulecldr_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void madecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
-__forceinline__ __device__ void addecldr(uint32_t *xr, const uint32_t *x1, const uint32_t *x2, const uint32_t *xp, mod_t mod_idx);
-__forceinline__ __device__ void doublecldr(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx);
-__forceinline__ __device__ void ldrstep(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, uint32_t *scl, mod_t midx);
+__global__ void addecjac_kernel(uint32_t   *out_vector_data, uint32_t *in_vector_data, kernel_params_t *params);
+__global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+
+__forceinline__ __device__ 
+void addecldr(uint32_t *xr, const uint32_t *x1, const uint32_t *x2, const uint32_t *xp, mod_t mod_idx);
+__forceinline__ __device__ 
+void doublecldr(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx);
+__forceinline__ __device__ 
+void ldrstep(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, uint32_t *scl, mod_t midx);
+
+__forceinline__ __device__
+void addecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, const uint32_t *x2, mod_t midx);
+__forceinline__ __device__
+void doublecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx);
 
 #endif
