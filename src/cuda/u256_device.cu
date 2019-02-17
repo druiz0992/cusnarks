@@ -67,6 +67,16 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 }
 
 /*
+    Modular addition kernel
+
+*/
+__global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    return;
+}
+
+
+/*
     Modular Sub kernel
 
 */
@@ -245,6 +255,20 @@ __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x)
     return 0;
   }
 }
+
+/*
+   x == y for 256 bit numbers
+*/
+__forceinline__ __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
+{
+  if (x[0] == y[0] && x[1] ==  y[1] && x[2] == y[2] && x[3] == y[3] &&
+		  x[4] == y[4] && x[5] == y[5] && x[6] == y[6] && x[7] == y[7]){
+    return 1;
+  } else { 
+    return 0;
+  }
+}
+
 
 /*
    x < y for 256 bit numbers
