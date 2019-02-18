@@ -79,9 +79,13 @@ typedef struct {
 // additional constants required
 typedef struct {
   uint32_t _1[NWORDS_256BIT];
+  uint32_t _2[NWORDS_256BIT];
+  uint32_t _3[NWORDS_256BIT];
   uint32_t _4[NWORDS_256BIT];
+  uint32_t _8[NWORDS_256BIT];
   uint32_t _4b[NWORDS_256BIT];
   uint32_t _8b[NWORDS_256BIT];
+  uint32_t _inf[3*NWORDS_256BIT];
 
 }misc_const_t;
 /**
@@ -115,7 +119,8 @@ typedef struct{
 // kernel input parameters
 typedef struct{
    uint32_t premod; // data requires to be mod-ded as preprocessing stage
-   uint32_t length; // input data length (number of elements)
+   uint32_t in_length; // input data length (number of elements)
+   uint32_t out_length; // output data length (number of elements)
    uint32_t stride; // data elemements processed by thread
    mod_t    midx;   // index to prime number to be used by kernel
 
@@ -133,6 +138,7 @@ typedef enum{
    CB_U256_SUBM,
    CB_U256_MOD,
    CB_U256_MULM,
+   CB_U256_ADDM_REDUCE,
    CB_U256_N
 
 }u256_callback_t;

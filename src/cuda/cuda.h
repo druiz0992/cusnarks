@@ -40,6 +40,7 @@ extern __constant__ mod_info_t mod_info_ct[MOD_N];
 extern __constant__ ecbn128_t ecbn128_params_ct[MOD_N];
 extern __constant__ misc_const_t misc_const_ct[MOD_N];
 
+
 #ifndef assert
 #define assert(X)         \
   do {                    \

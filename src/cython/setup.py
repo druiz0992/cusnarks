@@ -146,7 +146,7 @@ except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
 
-ext = [ Extension('cusnarks',
+ext = [ Extension('pycusnarks',
                     sources = ['_cusnarks_kernel.pyx'],
                     library_dirs = [CUDA['lib64']],
                     libraries = ['cudart','cusnarks'],

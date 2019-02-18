@@ -55,4 +55,6 @@ void addecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, const 
 __forceinline__ __device__
 void doublecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx);
 
+__forceinline__ __device__
+void scmulecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, uint32_t *scl, mod_t midx);
 #endif

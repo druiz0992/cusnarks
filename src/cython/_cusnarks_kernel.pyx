@@ -59,7 +59,7 @@ cdef class CUSnarks:
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
         
-        out_v.length = params['length']
+        out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
@@ -89,7 +89,8 @@ cdef class CUSnarks:
         # create kernel params data
         cdef ct.kernel_params_t kparams
         kparams.midx = params['midx']
-        kparams.length = params['length']
+        kparams.in_length = params['in_length']
+        kparams.out_length = params['out_length']
         kparams.stride = params['stride']
         if 'premod' in params:
             kparams.premod = params['premod']

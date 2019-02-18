@@ -37,7 +37,11 @@
 #include "log.h"
 
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
+   #ifdef __CUDACC__
 __host__ __device__ void logDebugBigNumber(char *str, uint32_t *n)
+#else
+void logDebugBigNumber(char *str, uint32_t *n)
+#endif
 {
   uint32_t i;
   char buf[500];
@@ -51,3 +55,21 @@ __host__ __device__ void logDebugBigNumber(char *str, uint32_t *n)
 }
 #endif
 
+#if LOG_LEVEL <= LOG_LEVEL_INFO
+   #ifdef __CUDACC__
+__host__ __device__ void logInfoBigNumber(char *str, uint32_t *n)
+#else
+void logInfoBigNumber(char *str, uint32_t *n)
+#endif
+{
+  uint32_t i;
+  char buf[500];
+  memset(buf,0, 500*sizeof(char));
+  logInfo("%s",str);
+  
+  for (i=0; i < NWORDS_256BIT; i++){
+    logInfo("%u ",n[i]);
+  }
+  logInfo("\n");
+}
+#endif

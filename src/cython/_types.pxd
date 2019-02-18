@@ -59,7 +59,8 @@ cdef extern from "types.h":
 
   ctypedef struct kernel_params_t:
       uint32_t premod
-      uint32_t length
+      uint32_t in_length
+      uint32_t out_length
       uint32_t stride
       mod_t midx
 
@@ -69,7 +70,7 @@ cdef extern from "types.h":
                              kernel_params_t *params)
 
   ctypedef enum u256_callback_t:
-     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_N
+     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_ADDM_REDUCE, CB_U256_N
 
   ctypedef enum ec_callback_t:
    CB_EC_ADD, CB_EC_DOUBLE, CB_EC_MUL, CB_EC_ADDRED, CB_EC_MULRED, CB_EC_N

@@ -47,7 +47,7 @@ from constants import *
 
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
-from cusnarks import *
+from pycusnarks import *
 
 sys.path.append('../../src/python')
 from bigint import *
@@ -78,15 +78,19 @@ class CUU256Test(unittest.TestCase):
         ntest_points = CUU256Test.ntest_points
         u256_p = CUU256Test.u256_p
         kernel_config = {'blockD' : U256_BLOCK_DIM }
-        kernel_params = {'midx' : MOD_FIELD ,'premod' : 1, 'length' : CUU256Test.nsamples, 'stride' : 1}
+        kernel_params = {'midx' : MOD_FIELD ,'premod' : 1, 'in_length' : CUU256Test.nsamples, 'stride' : 1, 'out_length' : CUU256Test.nsamples}
         for iter in xrange(CUU256Test.TEST_ITER):
-            u256_vector = u256.rand(CUU256Test.nsamples)
+            #u256_vector = u256.rand(CUU256Test.nsamples)
+            u256_vector = np.tile(np.ones(8,dtype=np.uint32),(CUU256Test.nsamples,1))
 
             # Test mod kernel:
             test_points = sample(xrange(CUU256Test.nsamples-1), ntest_points)
 
-            kernel_params['length'] = CUU256Test.nsamples
+            kernel_params['in_length'] = CUU256Test.nsamples
+            kernel_params['out_length'] = CUU256Test.nsamples
             kernel_params['stride'] = 1
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = U256_BLOCK_DIM 
             result = u256.kernelLaunch(CB_U256_MOD, u256_vector, kernel_config, kernel_params )
             r_mod = BigInt.modu256(u256_vector[test_points], u256_p)
     
@@ -97,8 +101,11 @@ class CUU256Test(unittest.TestCase):
             test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
-            kernel_params['length'] = CUU256Test.nsamples/2
+            kernel_params['in_length'] = CUU256Test.nsamples
+            kernel_params['out_length'] = CUU256Test.nsamples/2
             kernel_params['stride'] = 2
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = U256_BLOCK_DIM 
             result = u256.kernelLaunch(CB_U256_ADDM, u256_vector, kernel_config, kernel_params )
             r_addm = BigInt.addmu256(u256_vector[test_points2], u256_vector[np.add(test_points2,1)], u256_p)
     
@@ -106,6 +113,11 @@ class CUU256Test(unittest.TestCase):
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_addm)))
 
             # Test subm kernel:
+            kernel_params['in_length'] = CUU256Test.nsamples
+            kernel_params['out_length'] = CUU256Test.nsamples/2
+            kernel_params['stride'] = 2
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = U256_BLOCK_DIM 
             test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
@@ -116,6 +128,11 @@ class CUU256Test(unittest.TestCase):
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_subm)))
             
             # Test mulmont kernel:
+            kernel_params['in_length'] = CUU256Test.nsamples
+            kernel_params['out_length'] = CUU256Test.nsamples/2
+            kernel_params['stride'] = 2
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = U256_BLOCK_DIM 
             #u256_vector[0] = np.asarray([1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 576018668], dtype=np.uint32)
             #u256_vector[1] = np.asarray([596516649, 1189641421, 1025202362, 1350490027, 783368690, 1102520059, 2044897763, 803772102], dtype=np.uint32)
             #kernel_config = {'blockD' : 1, 'gridD' : 1 }
@@ -132,6 +149,27 @@ class CUU256Test(unittest.TestCase):
     
             self.assertTrue(len(result) == CUU256Test.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mul)))
+
+            # Test addm_reduce kernel:
+            # First iteration : Reduce by blockSize * stride => 
+            r_addm_reduce = BigInt.addmu256_reduce(u256_vector[::2], u256_vector[1::2], u256_p)
+
+            kernel_params['in_length'] = CUU256Test.nsamples
+            kernel_params['stride'] = 4
+            kernel_config['blockD'] = U256_BLOCK_DIM 
+            kernel_params['out_length'] = (CUU256Test.nsamples + (kernel_config['blockD']*kernel_params['stride']) -1) / (kernel_config['blockD']*kernel_params['stride'])
+            kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * 4 
+            result = u256.kernelLaunch(CB_U256_ADDM_REDUCE, u256_vector, kernel_config, kernel_params )
+
+            kernel_params['in_length'] = kernel_params['out_length']
+            kernel_params['stride'] = 2
+            kernel_params['out_length'] = 1
+            kernel_config['blockD'] = 64
+            kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * 4 
+            result = u256.kernelLaunch(CB_U256_ADDM_REDUCE, result, kernel_config, kernel_params )
+    
+            self.assertTrue(len(result) == CUU256Test.nsamples/2)
+            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_subm)))
 
 
 if __name__ == "__main__":
