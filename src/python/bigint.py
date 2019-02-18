@@ -438,12 +438,16 @@ class BigInt(object):
         return z2,c
     
     @classmethod
-    def addmu256(cls, x, y, p):
+    def addmu256(cls, x, y, p, premod=True):
        """
           Modular addition 2 numbers 256 bit
        """
-       x_ = BigInt.modu256(x,p)
-       y_ = BigInt.modu256(y,p)
+       if premod:
+           x_ = BigInt.modu256(x,p)
+           y_ = BigInt.modu256(y,p)
+       else :
+           x_ = np.copy(x)
+           y_ = np.copy(y)
        p_ = np.tile(p,(y.shape[0],1))
 
        # return submu256(x,p-y,p)
@@ -457,6 +461,25 @@ class BigInt(object):
        return z
 
     @classmethod
+    def addmu256_reduce(cls, x, y, p):
+       """
+          Modular addition 2 numbers 256 bit
+       """
+       x_ = np.copy(x)
+       y_ = np.copy(y)
+       z = []
+       do_premod = True
+       while len(z) != 1:
+           z = BigInt.addmu256(x_,y_,p, do_premod)
+           do_premod = False
+           x_ = z[0::2] 
+           y_ = z[1::2] 
+           if len(z)%2 == 1:
+              y_ = np.concatenate((y_, np.zeros((1,BigInt.WORDS_IN_256BN), dtype=np.uint32)),axis=0)
+               
+
+       return z
+    @classmethod
     def eq0u256(cls,x):
         """
 
@@ -467,12 +490,16 @@ class BigInt(object):
         return np.sum(x2,axis=1) == 0
 
     @classmethod
-    def submu256(cls, x, y, p):
+    def submu256(cls, x, y, p, premod=True):
        """
           Modular sub 2 numbers 256 bit
        """
-       x_ = BigInt.modu256(x,p)
-       y_ = BigInt.modu256(y,p)
+       if premod:
+           x_ = BigInt.modu256(x,p)
+           y_ = BigInt.modu256(y,p)
+       else :
+           x_ = np.copy(x)
+           y_ = np.copy(y)
        z, _ =  BigInt.subu256(x_,y_)
        z2, _ =  BigInt.subu256(np.tile(p,(y_.shape[0],1)),y_)
        z2, _ =  BigInt.addu256(z2,x_)

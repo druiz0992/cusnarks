@@ -48,7 +48,11 @@
 
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
    #define logDebug printf
-__host__ __device__ void logDebugBigNumber(char *str, uint32_t *x);
+   #ifdef __CUDACC__
+   __host__ __device__ void logDebugBigNumber(char *str, uint32_t *x);
+   #else
+   void logDebugBigNumber(char *str, uint32_t *x);
+   #endif
 #else
   #define logDebug(f,...) 
   #define logDebugBigNumber(STR, X)
@@ -57,6 +61,11 @@ __host__ __device__ void logDebugBigNumber(char *str, uint32_t *x);
 
 #if LOG_LEVEL <= LOG_LEVEL_ERROR
    #define logError printf
+   #ifdef __CUDACC__
+   __host__ __device__ void logInfoBigNumber(char *str, uint32_t *x);
+   #else
+   void logInfoBigNumber(char *str, uint32_t *x);
+   #endif
 #else
   #define logError(f,...) 
 #endif

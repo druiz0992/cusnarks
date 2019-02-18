@@ -56,7 +56,7 @@
 
 using namespace std;
 
-static kernel_cb ecbn128_kernel_callbacks[] = {addecldr_kernel, doublecldr_kernel, scmulecldr_kernel, addecldr_reduce_kernel, scmulecldr_reduce_kernel};
+static kernel_cb ecbn128_kernel_callbacks[] = {addecldr_kernel, doublecldr_kernel, scmulecldr_kernel};
 
 ECBN128::ECBN128 (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len * (ECPOINT_NDIMS + U256_NDIMS),
 		                            len,  NWORDS_256BIT * sizeof(uint32_t) * len * ECPOINT_NDIMS, 
