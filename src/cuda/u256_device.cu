@@ -67,18 +67,29 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 }
 
 /*
-    Modular addition kernel
-
+    Modular addition/reduction kernel 
+    Reduction : 
+      In : x[N]   
+      Out :z[N/(blockDim * stride)] 
+         z[0] = x[0] + x[1] + .. + x[stride-1] + 
+	        x[blockDim/2] + x[1 +BlockDim/2] + ... + x[stride-1+BlockDim/2] +
+		X[blockDim/4] + ...
+    
+    In vector x : N elements
+    1) add smem[i] = x[i]+x[i+1]+..+x[i+stride-1] for 0 <= i <= N/stride 
+    2) add smem[i] = smem[i + blockSize/2], for 64 <= blockSize <= 1024
+    3) add smem[i] = smsm[i + 32/16/8/4/2/1]
 */
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
     uint32_t i;
+
     uint32_t debug_idx = 134;
 
     extern __shared__ uint32_t smem[];
-    uint32_t *smem_ptr = &smem[tid*NWORDS_256BIT];
+    uint32_t *smem_ptr = &smem[tid*NWORDS_256BIT];  // 0 .. blockDim
     //uint32_t smem_ptr[128*NWORDS_256BIT];
 
     uint32_t __restrict__ *x;
@@ -88,8 +99,8 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
       return;
     }
 
-    x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET + U256_XOFFSET];
-    z = (uint32_t *) &out_vector[idx * U256K_OFFSET];
+    x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET + U256_XOFFSET]; // 0 .. N-1
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];  // 
     memset(smem, 0, blockDim.x * NWORDS_256BIT);
     //memset(smem_ptr, 0, blockDim.x * NWORDS_256BIT);
     
@@ -215,7 +226,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
         }
 
         if (tid==0) {
-         memcpy(z, &smem[tid*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT);
+         memcpy(z, &smem[tid*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT * params->out_length);
         }
     }
 
