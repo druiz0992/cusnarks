@@ -37,7 +37,7 @@ cimport numpy as np
 cimport _types as ct
 
 
-from _cusnarks_kernel cimport C_CUSnarks, C_U256
+from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128
 from cython cimport view
 
 
@@ -122,5 +122,17 @@ cdef class U256 (CUSnarks):
     def __dealloc__(self):
         del self._u256_ptr
     
+# CUECBN128 class cython wrapper
+cdef class ECBN128 (CUSnarks):
+    cdef C_ECBN128* _ecbn128_ptr
+
+    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+        if out_len == 0:
+            out_len = in_len
+        self._ecbn128_ptr = new C_ECBN128(in_len,seed)
+        self._cusnarks_ptr = <C_CUSnarks *>self._ecbn128_ptr
+
+    def __dealloc__(self):
+        del self._ecbn128_ptr
 
 

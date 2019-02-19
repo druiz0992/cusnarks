@@ -60,6 +60,7 @@
 """
 
 from abc import ABCMeta, abstractmethod
+from random import randint, sample
 
 from zfield import *
 from z2field_element import *
@@ -83,6 +84,8 @@ class ECC(object):
 
     a = [None, None]
     b = [None, None]
+    Gx = None
+    Gy = None
 
     def __init__(self, p, curve=None):
         """
@@ -121,7 +124,7 @@ class ECC(object):
             elif not isinstance(curve['b'],int) and not isinstance(curve['b'],long):
                 assert False, "Unexpected curve parameters"
             else:
-                self.init_curve(curve['a'], curve['b'])
+                self.init_curve(curve)
 
         # p can be a list of int, long, BigInt
         if isinstance(p_l[ECC.X], Z2FieldEl) or type(p_l[ECC.X]) is list:
@@ -147,7 +150,7 @@ class ECC(object):
     def init(cls, curve_params):
         if not ZField.is_init():
             assert False, "Field not initialized"
-        ECC.init_curve(curve_params['a'], curve_params['b'])
+        ECC.init_curve(curve_params)
         ECC.init_constants()
 
     @classmethod
@@ -162,9 +165,11 @@ class ECC(object):
          ECC.constants_init = True
 
     @classmethod
-    def init_curve(cls, a, b):
-        ECC.a = [ZFieldElExt(a), ZFieldElExt(a).reduce()]
-        ECC.b = [ZFieldElExt(b), ZFieldElExt(b).reduce()]
+    def init_curve(cls, curve_params):
+        ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
+        ECC.b = [ZFieldElExt(curve_params['b']), ZFieldElExt(curve_params['b']).reduce()]
+        ECC.Gx = curve_params['Gx']
+        ECC.Gy = curve_params['Gy']
 
     @classmethod
     def p_zero(cls, ext_field=False):
@@ -360,6 +365,32 @@ class ECC(object):
         """
         pass
 
+    @staticmethod
+    def rand(n,ectype=0):
+      """
+       generate random point on curve
+         n : n random points
+         ectype = 0 -> projective, 1 -> jacobian, 2 -> affine
+      """
+      p = ZField.get_extended_p().as_long()
+
+      P = []
+      for i in xrange(n):
+         k = randint(1,p-1)  # generate random number between 1 and p-1
+
+         if ectype == 0:
+             P1 = ECCProjective([ECC.Gx,ECC.Gy, 1])
+         elif ectype == 1:
+             P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+         elif ectype == 2:
+              P1 = ECCAffine([ECC.Gx,ECC.Gy, 1])
+         else :
+              assert False, "Unexpected type"
+       
+         P.append(k * P1)
+
+      return P
+
     @abstractmethod
     def is_on_curve(self):
         """
@@ -451,7 +482,8 @@ class ECCAffine(ECC):
                (self.P[ECC.Y] * self.P[ECC.Y]) == \
                (self.P[ECC.X] * self.P[ECC.X] * self.P[ECC.X]) + \
                (ECC.a[self.FIDX] * self.P[ECC.X]) + ECC.b[self.FIDX]
-
+ 
+      
     # Arithmetic operators
     # +, - , neg, *
     def __add__(self, P2):

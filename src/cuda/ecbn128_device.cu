@@ -51,10 +51,10 @@ __global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
       return;
     }
 
-    x1 = (uint32_t *) &in_vector[tid * 2 * ECK_OFFSET + ECP_XOFFSET];
-    x2 = (uint32_t *) &in_vector[(tid * 2 + 1) * ECK_OFFSET + ECP_XOFFSET];
+    x1 = (uint32_t *) &in_vector[tid * 2 * ECK_LDR_INOFFSET + ECP_LDR_INXOFFSET];
+    x2 = (uint32_t *) &in_vector[(tid * 2 + 1) * ECK_LDR_INOFFSET + ECP_LDR_INXOFFSET];
 
-    xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+    xr = (uint32_t *) &out_vector[tid * ECK_LDR_OUTOFFSET + ECP_LDR_OUTXOFFSET];
     
     addecldr(xr, x1, x2, x1, params->midx);
 
@@ -70,15 +70,10 @@ __global__ void doublecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
       return;
     }
 
-    x1 = (uint32_t *) &in_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+    x1 = (uint32_t *) &in_vector[tid * ECK_LDR_INOFFSET + ECP_LDR_INXOFFSET];
 
-    xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+    xr = (uint32_t *) &out_vector[tid * ECK_LDR_OUTOFFSET + ECP_LDR_OUTXOFFSET];
     
-    if (params->premod){
-      modu256(x1,x1, params->midx);
-      modu256(&x1[NWORDS_256BIT],&x1[NWORDS_256BIT], params->midx);
-    }
-
     doublecldr(xr, x1, params->midx);
 
   return;
@@ -93,10 +88,11 @@ __global__ void scmulecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
      return;
    }
 
-   x1  = (uint32_t *) &in_vector[tid * ECK_OFFSET + ECP_XOFFSET];
-   scl = (uint32_t *) &in_vector[tid * ECK_OFFSET + ECP_SCLOFFSET];
+   x1  = (uint32_t *) &in_vector[tid * ECK_LDR_INOFFSET + ECP_LDR_INXOFFSET];
+   scl = (uint32_t *) &in_vector[tid * ECK_LDR_INOFFSET + ECP_SCLOFFSET];
 
-   xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+   xr = (uint32_t *) &out_vector[tid * ECK_LDR_OUTOFFSET + ECP_LDR_OUTXOFFSET];
+
    
    ldrstep(xr, x1, scl,  params->midx);
 
@@ -109,7 +105,10 @@ __global__ void madecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 }
 
 
-
+/* 
+  in_vector : k[0], px[0], py[0], k[1], px[1], py[1],...  Input EC points in Affine coordinates
+  out vecto : px[0], py[0], pz[0], px[1], py[1],pz[1],...              Output EC points in Jacobian coordinates
+*/
 __global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -119,11 +118,10 @@ __global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, ker
     if(tid >= params->in_length/6) {
       return;
     }
-
-    x1 = (uint32_t *) &in_vector[tid * 2 * ECK_OFFSET + ECP_XOFFSET];
-    x2 = (uint32_t *) &in_vector[(tid * 2 + 1) * ECK_OFFSET + ECP_XOFFSET];
-
-    xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+    // x1 points to inPx[i]. x2 points to inPx[i+1]. xr points to outPx[i]
+    x1 = (uint32_t *) &in_vector[tid * 2 * ECK_JAC_INOFFSET + ECP_JAC_INXOFFSET];
+    x2 = (uint32_t *) &in_vector[(tid * 2 + 1) * ECK_JAC_INOFFSET + ECP_JAC_INXOFFSET];
+    xr = (uint32_t *) &out_vector[tid * ECK_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET];
     
     addecjac(xr, x1, x2, params->midx);
 
@@ -137,13 +135,13 @@ __global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
 
     uint32_t __restrict__ *x1,*xr, *z1,*zr;
  
+    // x1 points to inPx[i].  xr points to outPx[i]
     if(tid >= params->in_length/3) {
       return;
     }
 
-    x1 = (uint32_t *) &in_vector[tid * ECK_OFFSET + ECP_XOFFSET];
-
-    xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+    x1 = (uint32_t *) &in_vector[tid * ECK_JAC_INOFFSET + ECP_JAC_INXOFFSET];
+    xr = (uint32_t *) &out_vector[tid * ECK_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET];
     
     if (params->premod){
       modu256(x1,x1, params->midx);
@@ -284,6 +282,29 @@ __forceinline__ __device__
   return;
 }
 
+/*
+  EC point addition
+  
+  Algorithm (https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates):
+  IN : P1(X1,Y1,Z1), P2(X2,Y2,Z2)
+  OUT: P3(X3,Y3,Z3)
+
+    U1 = X1*Z2^2
+    U2 = X2*Z1^2
+    S1 = Y1*Z2^3
+    S2 = Y2*Z1^3
+    if (U1 == U2)
+      if (S1 != S2)
+        return POINT_AT_INFINITY
+      else 
+        return POINT_DOUBLE(X1, Y1, Z1)
+    H = U2 - U1
+    R = S2 - S1
+    X3 = R^2 - H^3 - 2*U1*H^2
+    Y3 = R*(U1*H^2 - X3) - S1*H^3
+    Z3 = H*Z1*Z2
+    return (X3, Y3, Z3)
+*/
 __forceinline__ __device__
  void addecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, const uint32_t *x2, mod_t midx)
 {
@@ -298,7 +319,7 @@ __forceinline__ __device__
  
   uint32_t __restrict__ tmp1[NWORDS_256BIT], tmp2[NWORDS_256BIT], tmp3[NWORDS_256BIT], tmp4[NWORDS_256BIT];
 
-  mulmontu256(xr, z1, z1, midx);  // xr = z1sq -> double
+  mulmontu256(xr, z1, z1, midx);  // xr = z1sq 
   mulmontu256(zr, xr, x2, midx);  // zr = u2 = x2 * z1sq
   mulmontu256(xr, xr, z1, midx);  // xr = z1cube
   mulmontu256(xr, xr, y2, midx);  // xr = s2 = z1cube * y2
@@ -308,7 +329,7 @@ __forceinline__ __device__
   mulmontu256(yr, yr, y1, midx);  // yr = s1 = z2cube * y1
 
   // TODO Check if I can call add to compute x + x (instead of double)
-  //  if not, I should call doublw below. I don't to avoid warp divergnce
+  //  if not, I should call double below. I don't want to to avoid warp divergnce
   if (equ256((const uint32_t *)tmp1, (const uint32_t *)zr) &&   // u1 == u2
        !equ256( (const uint32_t *) yr, (const uint32_t *) xr)){  // s1 != s2
           memcpy(xr, _inf, 3 * NWORDS_256BIT * sizeof(uint32_t));
@@ -317,13 +338,13 @@ __forceinline__ __device__
 
   submu256(tmp2, zr, tmp1, midx);     // H = tmp2 = u2 - u1
   mulmontu256(zr, z1, z2, midx);      // zr = z1 * z2
-  mulmontu256(zr, zr, z1, midx);       // zr = z1 * z2  * h
+  mulmontu256(zr, zr, tmp2, midx);       // zr = z1 * z2  * h
 
   mulmontu256(tmp3, tmp2, tmp2, midx);     // Hsq = tmp3 = H * H 
   mulmontu256(tmp2, tmp3, tmp2, midx);     // Hcube = tmp2 = Hsq * H 
   mulmontu256(tmp1, tmp1, tmp3, midx);     // tmp1 = u1 * Hsq
 
-  submu256(tmp3, xr, zr, midx);        // R = tmp3 = S2 - S1 tmp1=u1*Hsq, tmp2=Hcube, xr=free, yr=s1, zr=zr
+  submu256(tmp3, xr, yr, midx);        // R = tmp3 = S2 - S1 tmp1=u1*Hsq, tmp2=Hcube, xr=free, yr=s1, zr=zr
   mulmontu256(yr, yr, tmp2, midx);     // yr = Hcube * s1
   mulmontu256(xr, tmp3, tmp3, midx);     // xr = R * R
   submu256(xr, xr, tmp2, midx);        // xr = x3= (R*R)-Hcube, yr = Hcube * S1, zr=zr, tmp1=u1*Hsq, tmp2 = Hcube, tmp3 = R
@@ -333,9 +354,24 @@ __forceinline__ __device__
   submu256(tmp1, tmp1, xr, midx);       // tmp1 = u1*hs1 - x3
   mulmontu256(tmp1, tmp1, tmp3, midx);  // tmp1 = r * (u1 * hsq - x3)
   submu256(yr, tmp1, yr, midx);
-
 }
 
+/*
+  EC point addition
+  
+  Algorithm (https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates):
+  IN : P1(X1,Y1,Z1)
+  OUT: P'(X',Y',Z')
+
+   if (Y == 0)
+      return POINT_AT_INFINITY
+   S = 4*X*Y^2
+   M = 3*X^2 + a*Z^4
+   X' = M^2 - 2*S
+   Y' = M*(S - X') - 8*Y^4
+   Z' = 2*Y*Z
+   return (X', Y', Z')
+*/
 __forceinline__ __device__
  void doublecjac(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, mod_t midx)
 {
@@ -350,6 +386,10 @@ __forceinline__ __device__
  
   uint32_t __restrict__ tmp1[NWORDS_256BIT], tmp2[NWORDS_256BIT];
 
+  if (eq0u256(y1)){ 
+      memcpy(xr, _inf, 3 * NWORDS_256BIT * sizeof(uint32_t));
+      return;  
+  }
   mulmontu256(zr, y1, y1, midx);  // zr = ysq
   mulmontu256(yr, zr, zr, midx);  // yr = ysqsq
   mulmontu256(yr, yr, _8, midx);  // yr = ysqsq *_8

@@ -39,6 +39,7 @@
 
 # from future.utils import iteritems
 import os
+import sys
 from os.path import join as pjoin
 from setuptools import setup
 from distutils.extension import Extension
@@ -136,8 +137,10 @@ class custom_build_ext(build_ext):
         build_ext.build_extensions(self)
 
 
-
-CUDA = locate_cuda()
+try:
+    CUDA = locate_cuda()
+except EnvironmentError:
+     sys.exit(1)
 
 # Obtain the numpy include directory. This logic works across numpy versions.
 try:

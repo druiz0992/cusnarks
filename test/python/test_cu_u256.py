@@ -97,6 +97,19 @@ class CUU256Test(unittest.TestCase):
             self.assertTrue(len(result) == CUU256Test.nsamples)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mod)))
 
+            #Test shl kernel:
+            test_points = sample(xrange(CUU256Test.nsamples-1), ntest_points)
+
+            kernel_params['in_length'] = CUU256Test.nsamples
+            kernel_params['out_length'] = CUU256Test.nsamples
+            kernel_params['stride'] = 1
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = U256_BLOCK_DIM 
+            result = u256.kernelLaunch(CB_U256_SHL1, u256_vector, kernel_config, kernel_params )
+            r_shl = u256_vector[test_points]
+    
+            self.assertTrue(len(result) == CUU256Test.nsamples)
+            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_shl)))
             # Test addm kernel:
             test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)

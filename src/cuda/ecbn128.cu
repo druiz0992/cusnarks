@@ -56,127 +56,43 @@
 
 using namespace std;
 
-static kernel_cb ecbn128_kernel_callbacks[] = {addecldr_kernel, doublecldr_kernel, scmulecldr_kernel};
+static kernel_cb ecbn128_kernel_callbacks[] = {addecldr_kernel, doublecldr_kernel, scmulecldr_kernel, madecldr_kernel,
+                                               addecjac_kernel, doublecjac_kernel, scmulecjac_kernel, madecjac_kernel};
 
-ECBN128::ECBN128 (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len * (ECPOINT_NDIMS + U256_NDIMS),
-		                            len,  NWORDS_256BIT * sizeof(uint32_t) * len * ECPOINT_NDIMS, 
+ECBN128::ECBN128 (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len *  ECK_JAC_INDIMS,
+		                            len,  NWORDS_256BIT * sizeof(uint32_t) * len * ECK_JAC_OUTDIMS, 
                                             ecbn128_kernel_callbacks, 0)
 {
 }
 
-ECBN128::ECBN128 (uint32_t len, const uint32_t seed) :  CUSnarks(len, NWORDS_256BIT * sizeof(uint32_t) * len * (ECPOINT_NDIMS + U256_NDIMS),
-				                                 len, NWORDS_256BIT * sizeof(uint32_t) * len * ECPOINT_NDIMS, 
+ECBN128::ECBN128 (uint32_t len, const uint32_t seed) :  CUSnarks(len, NWORDS_256BIT * sizeof(uint32_t) * len * ECK_JAC_INDIMS,
+				                                 len, NWORDS_256BIT * sizeof(uint32_t) * len * ECK_JAC_OUTDIMS,
 						       ecbn128_kernel_callbacks, seed)
 {
 }
 
 #if 0
-/*
-*/
-void ECBN128::add(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
+// samples[n] = k[0], Px[0], Py[0],...,k[N-1], Px[N-1], Py[N-1]
+void ECBN128::rand(uint32_t *samples, uint32_t n_samples)
 {
-  if (len > in_vector_len) { return; }
+  // TODO : Implement random EC point. Problem is that 
+  // i need to compute random scalar 256 bits (OK), and 
+  // and one additional random scalar 256 bits K (OK).
+  // EC Point = K * G(Gx,Gy) => For this, I need to 
+  // call kernel to compute operation and convert point
+  // back to affine coordinates (implement inverse). Instead of doing this, I will
+  // generate random points in python for now
 
-  uint32_t in_size = sizeof(uint32_t) * len * NWORDS_256BIT * (ECPOINT_NDIMS + U256_NDIMS);
-  uint32_t out_size = sizeof(uint32_t) * len/2 * NWORDS_256BIT * ECPOINT_NDIMS;
+  uint32_t *k = new uint32_t[n_samples];
+  CUSnarks::rand(k, n_samples);
 
-  copyVectorToDevice(in_vector_host, in_size);
+  CUSnarks::kernelLaunch();
 
-  // perform addition operation and leave results in device memory
-  int blockD, gridD;
-  blockD = U256_BLOCK_DIM;
-  gridD = (len/6 + blockD - 1) / blockD;
-  addec_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx, premod);
-  CCHECK(cudaGetLastError());
-
-  CCHECK(cudaDeviceSynchronize());
-
-  copyVectorFromDevice(out_vector_host, out_size);
-}
-
-void ECBN128::doubl(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
-{
-  if (len > in_vector_len) { return; }
-
-  uint32_t in_size = sizeof(uint32_t) * len * NWORDS_256BIT * (ECPOINT_NDIMS + U256_NDIMS);
-  uint32_t out_size = sizeof(uint32_t) * len * NWORDS_256BIT * ECPOINT_NDIMS;
-
-  copyVectorToDevice(in_vector_host, in_size);
-
-  // perform addition operation and leave results in device memory
-  int blockD, gridD;
-  blockD = U256_BLOCK_DIM;
-  gridD = (len/3 + blockD - 1) / blockD;
-  doublec_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx, premod);
-  CCHECK(cudaGetLastError());
-
-  CCHECK(cudaDeviceSynchronize());
-
-  copyVectorFromDevice(out_vector_host, out_size);
-}
-
-void ECBN128::mul(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
-{
-  if (len > in_vector_len) { return; }
-
-  uint32_t in_size = sizeof(uint32_t) * len * NWORDS_256BIT * (ECPOINT_NDIMS + U256_NDIMS);
-  uint32_t out_size = sizeof(uint32_t) * len * NWORDS_256BIT * ECPOINT_NDIMS;
-
-  copyVectorToDevice(in_vector_host, in_size);
-
-  // perform addition operation and leave results in device memory
-  int blockD, gridD;
-  blockD = U256_BLOCK_DIM;
-  gridD = (len/3 + blockD - 1) / blockD;
-  scmulec_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device,in_vector_len, mod_idx, premod);
-  CCHECK(cudaGetLastError());
-
-  CCHECK(cudaDeviceSynchronize());
-
-  copyVectorFromDevice(out_vector_host, out_size);
-}
-
-/*
-*/
-void ECBN128::add_reduce(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx, uint32_t premod)
-{
-  if (len > in_vector_len) { return; }
-
-  uint32_t in_size = sizeof(uint32_t) * len * NWORDS_256BIT * (ECPOINT_NDIMS + U256_NDIMS);
-  uint32_t out_size = sizeof(uint32_t) * NWORDS_256BIT * ECPOINT_NDIMS;
-
-  copyVectorToDevice(in_vector_host, in_size);
-
-  // perform addition operation and leave results in device memory
-  int blockD, gridD;
-  blockD = U256_BLOCK_DIM;
-  gridD = (len/6 + blockD - 1) / blockD;
-  addec_reduce_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx,  premod);
-  CCHECK(cudaGetLastError());
-
-  CCHECK(cudaDeviceSynchronize());
-
-  copyVectorFromDevice(out_vector_host, out_size);
-}
-
-void ECBN128::mul_reduce(uint32_t *out_vector_host, const uint32_t *in_vector_host, uint32_t len, mod_t mod_idx,  uint32_t premod)
-{
-  if (len > in_vector_len) { return; }
-
-  uint32_t in_size = sizeof(uint32_t) * len * NWORDS_256BIT * (ECPOINT_NDIMS + U256_NDIMS);
-  uint32_t out_size = sizeof(uint32_t) * NWORDS_256BIT * ECPOINT_NDIMS;
-
-  copyVectorToDevice(in_vector_host, in_size);
-
-  // perform addition operation and leave results in device memory
-  int blockD, gridD;
-  blockD = U256_BLOCK_DIM;
-  gridD = (len/3 + blockD - 1) / blockD;
-  scmulec_reduce_kernel<<<gridD, blockD>>>(out_vector_device, in_vector_device, in_vector_len, mod_idx, premod);
-  CCHECK(cudaGetLastError());
-
-  CCHECK(cudaDeviceSynchronize());
-
-  copyVectorFromDevice(out_vector_host, out_size);
+  for (uint32_t i=0; i < 0; i++){
+    memcpy(&samples[i*ECK_INDIMS*NWORDS_256BIT + ECP_SCLOFFSET] , k[i], sizeof(uint32_t) * NWORDS_256BIT);
+    memcpy(&samples[i*ECK_INDIMS*NWORDS_256BIT + ECP_JAC_INXOFFSET], , sizeof(uint32_t) * NWORDS_256BIT);
+    memcpy(&samples[i*ECK_INDIMS*NWORDS_256BIT + ECP_JAC_INYOFFSET], , sizeof(uint32_t) * NWORDS_256BIT);
+  }
+  delete [] k;
 }
 #endif

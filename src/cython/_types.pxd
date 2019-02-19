@@ -70,9 +70,9 @@ cdef extern from "types.h":
                              kernel_params_t *params)
 
   ctypedef enum u256_callback_t:
-     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_ADDM_REDUCE, CB_U256_N
+     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_ADDM_REDUCE,  CB_U256_SHL1, CB_U256_N
 
   ctypedef enum ec_callback_t:
-   CB_EC_ADD, CB_EC_DOUBLE, CB_EC_MUL, CB_EC_ADDRED, CB_EC_MULRED, CB_EC_N
+   CB_EC_LDR_ADD, CB_EC_LDR_DOUBLE, CB_EC_LDR_MUL, CB_EC_LDR_MAD, CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MAD, CB_EC_N
     
 _NWORDS_256BIT = NWORDS_256BIT

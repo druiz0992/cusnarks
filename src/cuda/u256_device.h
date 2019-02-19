@@ -38,6 +38,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
 __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
 __forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t  __restrict__ *x, const uint32_t __restrict__ *y);
 extern __device__ void subu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);

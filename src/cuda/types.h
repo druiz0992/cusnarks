@@ -40,15 +40,39 @@
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
 #define U256_NDIMS              (1)
 #define U256K_OFFSET            (U256_NDIMS * NWORDS_256BIT)
-#define ECP_XOFFSET             (1 * NWORDS_256BIT)
-#define ECP_ZOFFSET             (2 * NWORDS_256BIT)
+
 #define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
-#define ECPOINT_NDIMS           (2)
-#define ECK_NDIMS               (ECPOINT_NDIMS + U256_NDIMS)
-#define ECK_OFFSET              (ECK_NDIMS * NWORDS_256BIT)
+#define ECK_INDIMS               (3)
+// Montgomery ladder
+#define ECP_LDR_INDIMS                (2)
+#define ECP_LDR_OUTDIMS               (2)
+#define ECP_LDR_INXOFFSET             (1 * NWORDS_256BIT)
+#define ECP_LDR_INZOFFSET             (2 * NWORDS_256BIT)
+#define ECP_LDR_OUTXOFFSET            (0 * NWORDS_256BIT)
+#define ECP_LDR_OUTZOFFSET             (1 * NWORDS_256BIT)
+
+#define ECK_LDR_INDIMS               (ECP_LDR_INDIMS  + U256_NDIMS)
+#define ECK_LDR_OUTDIMS              (ECP_LDR_OUTDIMS)
+#define ECK_LDR_INOFFSET             (ECK_LDR_INDIMS * NWORDS_256BIT)
+#define ECK_LDR_OUTOFFSET            (ECK_LDR_OUTDIMS * NWORDS_256BIT)
+// Jacobian
+#define ECP_JAC_INDIMS                (2) // X, Y
+#define ECP_JAC_OUTDIMS               (3) // X, Y, Z
+#define ECP_JAC_INXOFFSET             (1 * NWORDS_256BIT)
+#define ECP_JAC_INYOFFSET             (2 * NWORDS_256BIT)
+#define ECP_JAC_OUTXOFFSET            (0 * NWORDS_256BIT)
+#define ECP_JAC_OUTYOFFSET            (1 * NWORDS_256BIT)
+#define ECP_JAC_OUTZOFFSET            (2 * NWORDS_256BIT)
+
+#define ECK_JAC_INDIMS               (ECP_JAC_INDIMS  + U256_NDIMS)
+#define ECK_JAC_OUTDIMS              (ECP_JAC_OUTDIMS)
+#define ECK_JAC_INOFFSET             (ECK_JAC_INDIMS * NWORDS_256BIT)
+#define ECK_JAC_OUTOFFSET            (ECK_JAC_OUTDIMS * NWORDS_256BIT)
+
 #define CUSNARKS_BLOCK_DIM      (256)
 #define CUSNARKS_MAX_NCB        (32)
 #define U256_BLOCK_DIM          (256)
+#define ECBN128_BLOCK_DIM          (256)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
@@ -139,17 +163,21 @@ typedef enum{
    CB_U256_MOD,
    CB_U256_MULM,
    CB_U256_ADDM_REDUCE,
+   CB_U256_SHL1,
    CB_U256_N
 
 }u256_callback_t;
 
 // index to ec128bn class kernels
 typedef enum{
-   CB_EC_ADD = 0,
-   CB_EC_DOUBLE,
-   CB_EC_MUL,
-   CB_EC_ADDRED,
-   CB_EC_MULRED,
+   CB_EC_LDR_ADD = 0,
+   CB_EC_LDR_DOUBLE,
+   CB_EC_LDR_MUL,
+   CB_EC_LDR_MAD,
+   CB_EC_JAC_ADD,
+   CB_EC_JAC_DOUBLE,
+   CB_EC_JAC_MUL,
+   CB_EC_JAC_MAD,
    CB_EC_N
 
 }ec_callback_t;
