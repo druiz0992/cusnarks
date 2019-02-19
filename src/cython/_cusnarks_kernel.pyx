@@ -58,10 +58,11 @@ cdef class CUSnarks:
     def kernelLaunch(self, ct.uint32_t kernel_idx, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params):
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
-        
+       
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
+        print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             return
 

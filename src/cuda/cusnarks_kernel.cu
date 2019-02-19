@@ -342,12 +342,12 @@ void CUSnarks::kernelLaunch(
   end_copy_out = elapsedTime() - start;
 
   logInfo("----- Info -------\n");
-  logDebug("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, 
+  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, 
 		                                        in_vector_host->length,
 						       	in_vector_device.size,
 						       	in_vector_device.length);
 
-  logDebug("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size,
+  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size,
 		                                        out_vector_host->length, 
 							out_vector_device.size,
 						       	out_vector_device.length);

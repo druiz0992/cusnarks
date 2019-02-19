@@ -55,7 +55,7 @@ from bigint import *
 class CUU256Test(unittest.TestCase):
     TEST_ITER = 1000
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
-    nsamples = 100000
+    nsamples = 141074
     ntest_points = 1000
     u256_p = BigInt(prime).as_uint256()
     u256 = U256(nsamples, seed=10)
@@ -177,7 +177,7 @@ class CUU256Test(unittest.TestCase):
             kernel_params['in_length'] = kernel_params['out_length']
             kernel_params['stride'] = 2
             kernel_params['out_length'] = 1
-            kernel_config['blockD'] = 64
+            kernel_config['blockD'] = 128
             kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * 4 
             result = u256.kernelLaunch(CB_U256_ADDM_REDUCE, result, kernel_config, kernel_params )
     
