@@ -163,10 +163,10 @@ __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
      return;
    }
 
-   x1  = (uint32_t *) &in_vector[tid * ECK_OFFSET + ECP_XOFFSET];
-   scl = (uint32_t *) &in_vector[tid * ECK_OFFSET + ECP_SCLOFFSET];
+   x1  = (uint32_t *) &in_vector[tid * ECK_JAC_INOFFSET + ECP_JAC_INXOFFSET];
+   scl = (uint32_t *) &in_vector[tid * ECK_JAC_INOFFSET + ECP_SCLOFFSET];
 
-   xr = (uint32_t *) &out_vector[tid * ECK_OFFSET + ECP_XOFFSET];
+   xr = (uint32_t *) &out_vector[tid * ECK_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET];
    
    scmulecjac(xr, x1, scl,  params->midx);
 
@@ -379,6 +379,7 @@ __forceinline__ __device__
   const uint32_t __restrict__ *z1 = &x1[NWORDS_256BIT*2];
   uint32_t __restrict__ *yr = &xr[NWORDS_256BIT];
   uint32_t __restrict__ *zr = &xr[NWORDS_256BIT*2];
+  uint32_t __restrict__ *_inf = misc_const_ct[midx]._inf;
   uint32_t __restrict__ *_8 = misc_const_ct[midx]._8;
   uint32_t __restrict__ *_4 = misc_const_ct[midx]._4;
   uint32_t __restrict__ *_3 = misc_const_ct[midx]._3;

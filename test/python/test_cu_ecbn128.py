@@ -70,10 +70,10 @@ class CUECTest(unittest.TestCase):
     ZField(prime, curve_data['curve'])
     ECC.init(curve_data['curve_params'])
 
-    if use_pycusnarks:
-       ecbn128_scalars = ecbn128.rand(nsamples)
-    else :
-        ecbn128_scalars = [BigInt(randint(1,prime-1)).as_uint256() for x in xrange(nsamples)]
+    #if use_pycusnarks:
+     #  ecbn128_scalars = ecbn128.rand(nsamples)
+    #else :
+    ecbn128_scalars = [BigInt(randint(1,prime-1)).as_uint256() for x in xrange(nsamples)]
     ## generate  N ec points in affine coordinates
     ecbn128_pt_ec  = np.asarray(ECC.rand(nsamples, ectype = 2))
     ecbn128_pt_u256 = np.asarray([[x.get_P()[0].as_uint256(),

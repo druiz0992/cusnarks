@@ -154,7 +154,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     unsigned int tid = threadIdx.x;
     uint32_t i;
 
-    uint32_t debug_idx = 134;
+    uint32_t debug_idx = 0;
 
     extern __shared__ uint32_t smem[];
     uint32_t *smem_ptr = &smem[tid*NWORDS_256BIT];  // 0 .. blockDim
@@ -168,7 +168,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     }
 
     x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET + U256_XOFFSET]; // 0 .. N-1
-    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];  // 
+    z = (uint32_t *) &out_vector[blockIdx.x * U256K_OFFSET];  // 
     memset(smem, 0, blockDim.x * NWORDS_256BIT);
     //memset(smem_ptr, 0, blockDim.x * NWORDS_256BIT);
     
@@ -217,7 +217,8 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+512)*NWORDS_256BIT], params->midx);
       if (idx == debug_idx){
-        logInfoBigNumber("smem[1024]\n",smem_ptr);
+        logInfoBigNumber("smem[0]\n",smem_ptr);
+        logInfoBigNumber("smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
       }
     }
     __syncthreads();
@@ -227,7 +228,8 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+256)*NWORDS_256BIT], params->midx);
       if (idx == debug_idx){
-        logInfoBigNumber("smem[512]\n",smem_ptr);
+        logInfoBigNumber("smem[0]\n",smem_ptr);
+        logInfoBigNumber("smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
       }
     }
     __syncthreads();
@@ -237,7 +239,8 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+128)*NWORDS_256BIT], params->midx);
        if (idx == debug_idx){
-         logInfoBigNumber("smem[256]\n",smem_ptr);
+         logInfoBigNumber("smem[0]\n",smem_ptr);
+        logInfoBigNumber("smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
        }
     }
     __syncthreads();
@@ -247,7 +250,8 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+64)*NWORDS_256BIT], params->midx);
       if (idx == debug_idx){
-        logInfoBigNumber("smem[128]\n",smem_ptr);
+        logInfoBigNumber("smem[0]\n",smem_ptr);
+        logInfoBigNumber("smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
       }
     }
     __syncthreads();
@@ -259,42 +263,48 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
         addmu256((uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+32)*NWORDS_256BIT], params->midx);
-        if (idx == 4){
-          logInfoBigNumber("smem[32]\n",(uint32_t *)vsmem);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+16)*NWORDS_256BIT], params->midx);
-        if (idx == 4){
-          logInfoBigNumber("smem[16]\n",(uint32_t *)vsmem);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+8)*NWORDS_256BIT], params->midx);
-        if (idx == 4){
-          logInfoBigNumber("smem[8]\n",(uint32_t *)vsmem);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *) &vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+4)*NWORDS_256BIT], params->midx);
-        if (idx == 4){
-          logInfoBigNumber("smem[4]\n",(uint32_t *)vsmem);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+2)*NWORDS_256BIT], params->midx);
-        if (idx == 4){
-          logInfoBigNumber("smem[2]\n",(uint32_t *)vsmem);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+1)*NWORDS_256BIT], params->midx);
-        if (idx == 4){
-          logInfoBigNumber("smem[1]\n",(uint32_t *)vsmem);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
         }
 
         if (tid==0) {
-         memcpy(z, &smem[tid*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT * params->out_length);
+           memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
         }
     }
 
@@ -403,9 +413,9 @@ __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     memset(z, 0, NWORDS_256BIT*sizeof(uint32_t));
  
     #pragma unroll
-    for (i=0; i< NWORDS_256BIT*8; i++){   
+    for (i=0; i< NWORDS_256BIT*32; i++){   
       b_shifted = shr1u256((const uint32_t *)x);
-      z[i/NWORDS_256BIT] |= (b_shifted << (i % 32));
+      z[i/32] |= (b_shifted << (i % 32));
     }
 }
 /*
@@ -736,41 +746,41 @@ __device__ uint32_t shr1u256(const uint32_t __restrict__ *x)
    uint32_t c; 
    asm("{                                    \n\t"
        ".reg .u32          %tmp;             \n\t"
-       "and.b32            %16, %8,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
-       "shr.u32            %0,   %8,  1;     \n\t"  // x[0] = x[0] >> 1
-       "and.b32            %tmp, %9,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
+       "and.b32            %8, %9,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
+       "shr.u32            %0,   %9,  1;     \n\t"  // x[0] = x[0] >> 1
+       "and.b32            %tmp, %10,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %0,   %0,  %tmp;  \n\t"
-       "shr.u32            %1,   %9,   1;     \n\t"  // x[1] = x[1] >> 1
-       "and.b32            %tmp, %10,  1;     \n\t"  // x[1] |= (x[2] & 1) << 31
+       "shr.u32            %1,   %10,   1;     \n\t"  // x[1] = x[1] >> 1
+       "and.b32            %tmp, %11,  1;     \n\t"  // x[1] |= (x[2] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %1,   %1,  %tmp;   \n\t"
-       "shr.u32            %2,   %10,  1;     \n\t"  // x[2] = x[2] >> 1
-       "and.b32            %tmp, %11,  1;     \n\t"  // x[2] |= (x[3] & 1) << 31
+       "shr.u32            %2,   %11,  1;     \n\t"  // x[2] = x[2] >> 1
+       "and.b32            %tmp, %12,  1;     \n\t"  // x[2] |= (x[3] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %2,   %2,  %tmp;   \n\t"
-       "shr.u32            %3,   %11,  1;     \n\t"  // x[3] = x[3] >> 1
-       "and.b32            %tmp, %12,  1;     \n\t"  // x[3] |= (x[4] & 1) << 31
+       "shr.u32            %3,   %12,  1;     \n\t"  // x[3] = x[3] >> 1
+       "and.b32            %tmp, %13,  1;     \n\t"  // x[3] |= (x[4] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %3,   %3,  %tmp;   \n\t"
-       "shr.u32            %4,   %12,  1;     \n\t"  // x[4] = x[4] >> 1
-       "and.b32            %tmp, %13,  1;     \n\t"  // x[4] |= (x[5] & 1) << 31
+       "shr.u32            %4,   %13,  1;     \n\t"  // x[4] = x[4] >> 1
+       "and.b32            %tmp, %14,  1;     \n\t"  // x[4] |= (x[5] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %4,   %4,  %tmp;   \n\t"
-       "shr.u32            %5,   %13,  1;     \n\t"  // x[5] = x[5] >> 1
-       "and.b32            %tmp, %14,  1;     \n\t"  // x[5] |= (x[6] & 1) << 31
+       "shr.u32            %5,   %14,  1;     \n\t"  // x[5] = x[5] >> 1
+       "and.b32            %tmp, %15,  1;     \n\t"  // x[5] |= (x[6] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %5,   %5,  %tmp;   \n\t"
-       "shr.u32            %6,   %14,  1;     \n\t"  // x[6] = x[6] >> 1
-       "and.b32            %tmp, %15,  1;     \n\t"  // x[6] |= (x[7] & 1) << 31
+       "shr.u32            %6,   %15,  1;     \n\t"  // x[6] = x[6] >> 1
+       "and.b32            %tmp, %16,  1;     \n\t"  // x[6] |= (x[7] & 1) << 31
        "shl.b32            %tmp, %tmp, 31;   \n\t"
        "or.b32             %6,   %6,  %tmp;   \n\t"
-       "shr.u32            %7,   %15,  1;     \n\t"  // x[7] = x[7] >> 1
+       "shr.u32            %7,   %16,  1;     \n\t"  // x[7] = x[7] >> 1
        "}                               \n\t"
        : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
-         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7])
+         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7]), "=r"(c)
        : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
-         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]), "r"(c));
+         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 
       return c;
 }
