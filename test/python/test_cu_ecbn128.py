@@ -58,6 +58,8 @@ except ImportError:
 sys.path.append('../../src/python')
 from bigint import *
 
+ECBN128_datafile = './aux_data/ecbn128_data.npz'
+
 class CUECTest(unittest.TestCase):
     TEST_ITER = 1000
     curve_data = ZUtils.CURVE_DATA['BN128']
@@ -66,24 +68,31 @@ class CUECTest(unittest.TestCase):
     ntest_points = 6
     u256_p = BigInt(prime).as_uint256()
     if use_pycusnarks:
-       ecbn128 = ECBN128(nsamples, seed=10)
+       ecbn128 = ECBN128(nsamples, seed=1)
     ZField(prime, curve_data['curve'])
     ECC.init(curve_data['curve_params'])
 
     #if use_pycusnarks:
      #  ecbn128_scalars = ecbn128.rand(nsamples)
     #else :
-    ecbn128_scalars = [BigInt(randint(1,prime-1)).as_uint256() for x in xrange(nsamples)]
-    ## generate  N ec points in affine coordinates
-    ecbn128_pt_ec  = np.asarray(ECC.rand(nsamples, ectype = 2))
-    ecbn128_pt_u256 = np.asarray([[x.get_P()[0].as_uint256(),
+    if os.path.exists(ECBN128_datafile):
+        npzfile = np.load(ECBN128_datafile)
+        ecbn128_pt_ec = npzfile['affine_v']
+        ecbn128_vector = npzfile['u256_v']
+    else:
+        ecbn128_scalars = [BigInt(randint(1,prime-1)).as_uint256() for x in xrange(nsamples)]
+        ## generate  N ec points in affine coordinates
+        ecbn128_pt_ec  = np.asarray(ECC.rand(nsamples, ectype = 2))
+        ecbn128_pt_u256 = np.asarray([[x.get_P()[0].as_uint256(),
                         x.get_P()[1].as_uint256(),
                         x.get_P()[2].as_uint256()] for x in ecbn128_pt_ec])
 
-    ecbn128_vector = np.zeros((3*nsamples,NWORDS_256BIT), dtype=np.uint32)
-    ecbn128_vector[::3] = ecbn128_scalars
-    ecbn128_vector[1::3] = ecbn128_pt_u256[:,::3].reshape((-1,NWORDS_256BIT))
-    ecbn128_vector[2::3] = ecbn128_pt_u256[:,1::3].reshape((-1,NWORDS_256BIT))
+        ecbn128_vector = np.zeros((3*nsamples,NWORDS_256BIT), dtype=np.uint32)
+        ecbn128_vector[::3] = ecbn128_scalars
+        ecbn128_vector[1::3] = ecbn128_pt_u256[:,::3].reshape((-1,NWORDS_256BIT))
+        ecbn128_vector[2::3] = ecbn128_pt_u256[:,1::3].reshape((-1,NWORDS_256BIT))
+        
+        np.savez(ECBN128_datafile, u256_v=ecbn128_vector, affine_v=ecbn128_pt_ec)
 
     def test_0is_on_curve(self):
   
@@ -111,8 +120,8 @@ class CUECTest(unittest.TestCase):
             ecbn128_pt_ec_vector1 = ecbn128_pt_ec[test_points2]
             ecbn128_pt_ec_vector2 = ecbn128_pt_ec[test_points2+1]
 
-            kernel_params['in_length'] = nsamples
-            kernel_params['out_length']= nsamples/2
+            kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
+            kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)/2
             kernel_params['stride'] = 2
             kernel_config['smemS'] = 0
             kernel_config['blockD'] = ECBN128_BLOCK_DIM

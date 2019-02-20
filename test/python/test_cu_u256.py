@@ -179,10 +179,18 @@ class CUU256Test(unittest.TestCase):
             kernel_params['out_length'] = 1
             kernel_config['blockD'] = 128
             kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * 4 
+            min_length = kernel_config['blockD'] * kernel_params['stride']
+            if kernel_params['in_length'] < min_length:
+               min_length = 512
+               kernel_params['stride'] = 4
+               zeros = np.zeros((min_length - kernel_params['in_length'],NWORDS_256BIT), dtype=np.uint32)
+               result = np.concatenate((result,zeros))
+               kernel_params['in_length'] = min_length
+
             result = u256.kernelLaunch(CB_U256_ADDM_REDUCE, result, kernel_config, kernel_params )
     
-            self.assertTrue(len(result) == CUU256Test.nsamples/2)
-            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_subm)))
+            self.assertTrue(len(result) == kernel_params['out_length'])
+            self.assertTrue(np.concatenate(result == r_addm_reduce))
 
 
 if __name__ == "__main__":
