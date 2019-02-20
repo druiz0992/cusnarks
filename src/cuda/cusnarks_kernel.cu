@@ -303,6 +303,16 @@ void CUSnarks::kernelLaunch(
                 kernel_config_t *config,
                 kernel_params_t *params)
 {
+  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
+		                                        in_vector_host->length,
+						       	in_vector_device.size,
+						       	in_vector_device.length);
+
+  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
+		                                        out_vector_host->length, 
+							out_vector_device.size,
+						       	out_vector_device.length);
+
   // check input lengths do not exceed reserved amount
   if (in_vector_host->length > in_vector_device.length) { return; }
   if (out_vector_host->length > out_vector_device.length) { return; }
@@ -312,6 +322,16 @@ void CUSnarks::kernelLaunch(
 
   double start, end_copy_in, end_kernel, end_copy_out;
   int blockD, gridD;
+
+  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
+		                                        in_vector_host->length,
+						       	in_vector_device.size,
+						       	in_vector_device.length);
+
+  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
+		                                        out_vector_host->length, 
+							out_vector_device.size,
+						       	out_vector_device.length);
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
@@ -342,12 +362,12 @@ void CUSnarks::kernelLaunch(
   end_copy_out = elapsedTime() - start;
 
   logInfo("----- Info -------\n");
-  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IDDL : %d\n",in_vector_host->size, 
+  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
 		                                        in_vector_host->length,
 						       	in_vector_device.size,
 						       	in_vector_device.length);
 
-  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, ODDL : %d\n",out_vector_host->size,
+  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
 		                                        out_vector_host->length, 
 							out_vector_device.size,
 						       	out_vector_device.length);

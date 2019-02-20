@@ -212,46 +212,58 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
       }
 
     // reduction global mem
-    if (blockDim.x >= 1024 && tid < 512){
+    if (blockDim.x >= 1024 && tid < 512 && params->in_length/params->stride ){
+      if (idx == debug_idx){
+        logInfoBigNumber("+smem[0]\n",smem_ptr);
+        logInfoBigNumber("+smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
+      }
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+512)*NWORDS_256BIT], params->midx);
       if (idx == debug_idx){
         logInfoBigNumber("smem[0]\n",smem_ptr);
-        logInfoBigNumber("smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
       }
     }
     __syncthreads();
 
     if (blockDim.x >= 512 && tid < 256){
+      if (idx == debug_idx){
+        logInfoBigNumber("+smem[0]\n",smem_ptr);
+        logInfoBigNumber("+smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
+      }
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+256)*NWORDS_256BIT], params->midx);
       if (idx == debug_idx){
-        logInfoBigNumber("smem[0]\n",smem_ptr);
-        logInfoBigNumber("smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
+        logInfoBigNumber("smem[=256]\n",smem_ptr);
       }
     }
     __syncthreads();
 
     if (blockDim.x >= 256 && tid < 128){
+       if (idx == debug_idx){
+         logInfoBigNumber("+smem[0]\n",smem_ptr);
+        logInfoBigNumber("+smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
+       }
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+128)*NWORDS_256BIT], params->midx);
        if (idx == debug_idx){
-         logInfoBigNumber("smem[0]\n",smem_ptr);
-        logInfoBigNumber("smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
+         logInfoBigNumber("smem[=128+0]\n",smem_ptr);
        }
     }
     __syncthreads();
 
     if (blockDim.x >= 128 && tid < 64){
+      if (idx == debug_idx){
+        logInfoBigNumber("+smem[0]\n",smem_ptr);
+        logInfoBigNumber("+smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
+      }
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+64)*NWORDS_256BIT], params->midx);
       if (idx == debug_idx){
-        logInfoBigNumber("smem[0]\n",smem_ptr);
-        logInfoBigNumber("smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
+        logInfoBigNumber("smem[=64+0]\n",smem_ptr);
       }
     }
     __syncthreads();
@@ -260,47 +272,65 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     if (tid < 32)
     {
         volatile uint32_t *vsmem = smem;
+        if (idx == debug_idx){
+          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
+        }
         addmu256((uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+32)*NWORDS_256BIT], params->midx);
         if (idx == debug_idx){
-          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
+        logInfoBigNumber("smem[=32+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+16)*NWORDS_256BIT], params->midx);
         if (idx == debug_idx){
-          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
+        logInfoBigNumber("smem[=16+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+8)*NWORDS_256BIT], params->midx);
         if (idx == debug_idx){
+          logInfoBigNumber("smem[=8+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
           logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
+        logInfoBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *) &vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+4)*NWORDS_256BIT], params->midx);
         if (idx == debug_idx){
-          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
+          logInfoBigNumber("smem[=4+0]\n",(uint32_t *)vsmem);
         }
-        addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
-                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
-                 (const uint32_t *)&vsmem[(tid+2)*NWORDS_256BIT], params->midx);
         if (idx == debug_idx){
           logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
         logInfoBigNumber("smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
         }
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
-                 (const uint32_t *)&vsmem[(tid+1)*NWORDS_256BIT], params->midx);
+                 (const uint32_t *)&vsmem[(tid+2)*NWORDS_256BIT], params->midx);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[=2+0]\n",(uint32_t *)vsmem);
+        }
         if (idx == debug_idx){
           logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
         logInfoBigNumber("smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
+        }
+        addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+1)*NWORDS_256BIT], params->midx);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[=0+1]\n",(uint32_t *)vsmem);
         }
 
         if (tid==0) {
