@@ -65,6 +65,7 @@ from random import randint, sample
 from zfield import *
 from z2field_element import *
 
+import sys
 
 class ECC(object):
     __metaclass__ = ABCMeta
@@ -398,15 +399,16 @@ class ECC(object):
         return P_
 
     @staticmethod
-    def rand(n,ectype=0, reduce=False):
+    def rand(n,ectype=0, reduce=False, verbose=""):
       """
        generate random point on curve
          n : n random points
          ectype = 0 -> projective, 1 -> jacobian, 2 -> affine
       """
       p = ZField.get_extended_p().as_long()
-
+      ct = 0
       P = []
+      P_rdc = []
       for i in xrange(n):
          k = randint(1,p-1)  # generate random number between 1 and p-1
 
@@ -421,11 +423,16 @@ class ECC(object):
 
          P1 = k * P1
          if  reduce:
-             P.append(P1.reduce())
-         else:
-             P.append(k * P1)
+             P_rdc.append(P1.reduce())
 
-      return P
+         P.append(P1)
+         if verbose is not None:
+             if ct%10 == 0:
+                print verbose+str(ct)+"\r",
+                sys.stdout.flush()
+             ct+=1
+
+      return P, P_rdc
 
     @abstractmethod
     def is_on_curve(self):
