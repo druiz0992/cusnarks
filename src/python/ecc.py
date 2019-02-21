@@ -366,7 +366,39 @@ class ECC(object):
         pass
 
     @staticmethod
-    def rand(n,ectype=0):
+    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False):
+        """
+
+        :param x:
+        :return:
+        """
+        if reduced:
+            P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+        else:
+            P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x],(-1,3)))
+
+        if in_ectype == 0:
+            P_ = [ECCProjective(x_.tolist()) for x_ in P]
+        elif in_ectype == 1:
+            P_ = [ECCJacobian(x_.tolist()) for x_ in P]
+        elif in_ectype == 2:
+            P_ = [ECCAffine(x_.tolist()) for x_ in P]
+        else:
+            assert False, "Unexpected type"
+
+        if out_ectype == 0:
+            P_ = [x_.to_projective() for x_ in P_]
+        elif out_ectype == 1:
+            P_ = [x_.to_jacobian() for x_ in P_]
+        elif out_ectype == 2:
+            P_ = [x_.to_affine() for x_ in P_]
+        else:
+            assert False, "Unexpected type"
+
+        return P_
+
+    @staticmethod
+    def rand(n,ectype=0, reduce=False):
       """
        generate random point on curve
          n : n random points
@@ -386,8 +418,12 @@ class ECC(object):
               P1 = ECCAffine([ECC.Gx,ECC.Gy, 1])
          else :
               assert False, "Unexpected type"
-       
-         P.append(k * P1)
+
+         P1 = k * P1
+         if  reduce:
+             P.append(P1.reduce())
+         else:
+             P.append(k * P1)
 
       return P
 
@@ -872,7 +908,7 @@ class ECCJacobian(ECC):
             else:
                 return self.double()
 
-        H = U2 - U1   
+        H = U2 - U1
         R = S2 - S1   
         Hsq = H * H
         Hcube = Hsq * H

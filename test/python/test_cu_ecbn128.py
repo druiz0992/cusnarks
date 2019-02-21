@@ -64,7 +64,7 @@ class CUECTest(unittest.TestCase):
     TEST_ITER = 1000
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = curve_data['prime_r']
-    nsamples = 20
+    nsamples = 1024*128
     ntest_points = 6
     u256_p = BigInt(prime).as_uint256()
     if use_pycusnarks:
@@ -77,22 +77,27 @@ class CUECTest(unittest.TestCase):
     #else :
     if os.path.exists(ECBN128_datafile):
         npzfile = np.load(ECBN128_datafile)
-        ecbn128_pt_ec = npzfile['affine_v']
-        ecbn128_vector = npzfile['u256_v']
+        ecbn128_scl   = npzfile['scl']
+        ecbn128_ecaff = npzfile['ecaff']
+        ecbn128_ecjac = npzfile['ecjac']
+        ecbn128_vector_u256 = npzfile['ecv_256']
     else:
-        ecbn128_scalars = [BigInt(randint(1,prime-1)).as_uint256() for x in xrange(nsamples)]
-        ## generate  N ec points in affine coordinates
-        ecbn128_pt_ec  = np.asarray(ECC.rand(nsamples, ectype = 2))
-        ecbn128_pt_u256 = np.asarray([[x.get_P()[0].as_uint256(),
-                        x.get_P()[1].as_uint256(),
-                        x.get_P()[2].as_uint256()] for x in ecbn128_pt_ec])
 
-        ecbn128_vector = np.zeros((3*nsamples,NWORDS_256BIT), dtype=np.uint32)
-        ecbn128_vector[::3] = ecbn128_scalars
-        ecbn128_vector[1::3] = ecbn128_pt_u256[:,::3].reshape((-1,NWORDS_256BIT))
-        ecbn128_vector[2::3] = ecbn128_pt_u256[:,1::3].reshape((-1,NWORDS_256BIT))
-        
-        np.savez(ECBN128_datafile, u256_v=ecbn128_vector, affine_v=ecbn128_pt_ec)
+        ecbn128_scl =      [randint(1,prime-1) for x in xrange(nsamples)]
+        ecbn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
+
+        ecbn128_ecaff      = np.asarray(ECC.rand(nsamples, ectype = 2, reduce=True))
+        ecbn128_ecjac      = np.asarray([x.to_jacobian() for x in ecbn128_ecaff])
+
+        ecbn128_ecaff_u256 = np.asarray([[x.get_P()[0].as_uint256(),
+                                          x.get_P()[1].as_uint256(),
+                                          x.get_P()[2].as_uint256()] for x in ecbn128_ecaff])
+        ecbn128_vector_u256 = np.zeros((3*nsamples,NWORDS_256BIT), dtype=np.uint32)
+        ecbn128_vector_u256[::3] = ecbn128_scl_u256
+        ecbn128_vector_u256[1::3] = ecbn128_ecaff_u256[:,::3].reshape((-1,NWORDS_256BIT))
+        ecbn128_vector_u256[2::3] = ecbn128_ecaff_u256[:,1::3].reshape((-1,NWORDS_256BIT))
+
+        np.savez(ECBN128_datafile, scl=ecbn128_scl, ecaff=ecbn128_ecaff, ecjac=ecbn128_ecjac, ecv_u256=ecbn128_vector_u256)
 
     def test_0is_on_curve(self):
   
@@ -119,21 +124,89 @@ class CUECTest(unittest.TestCase):
             test_points2 = np.multiply(test_points,2)
             ecbn128_pt_ec_vector1 = ecbn128_pt_ec[test_points2]
             ecbn128_pt_ec_vector2 = ecbn128_pt_ec[test_points2+1]
+            #ecbn128_pt_ec_vector1 = ecbn128_pt_ec[::2]
+            #ecbn128_pt_ec_vector2 = ecbn128_pt_ec[1::2]
 
             kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
             kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)/2
             kernel_params['stride'] = 2
             kernel_config['smemS'] = 0
             kernel_config['blockD'] = ECBN128_BLOCK_DIM
-            r_add = [(x + y).to_jacobian() for x,y in zip(ecbn128_pt_ec_vector1, ecbn128_pt_ec_vector2)]
-            result = ecbn128.kernelLaunch(CB_EC_JAC_ADD, ecbn128_vector, kernel_config, kernel_params )
 
-            self.assertTrue(len(result) == CUECTest.nsamples/2)
-            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_add)))
+            result = ecbn128.kernelLaunch(CB_EC_JAC_ADD, ecbn128_vector, kernel_config, kernel_params )
+            result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
+            r_add = [(x.to_jacobian() + y.to_jacobian()) for x, y in zip(ecbn128_pt_ec_vector1, ecbn128_pt_ec_vector2)]
+            self.assertTrue(len(result_ec) == CUECTest.nsamples/2)
+            self.assertTrue(all(np.asarray(result_ec)[test_points] == r_add))
 
             # Test double jac
+            test_points = sample(xrange(nsamples-1), ntest_points)
+            ecbn128_pt_ec_vector = ecbn128_pt_ec[test_points]
+            #ecbn128_pt_ec_vector = ecbn128_pt_ec
+            kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
+            kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)
+            kernel_params['stride'] = 1
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = ECBN128_BLOCK_DIM
+
+            result = ecbn128.kernelLaunch(CB_EC_JAC_DOUBLE, ecbn128_vector, kernel_config, kernel_params )
+            result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
+            r_double = [x.to_jacobian().double() for x in ecbn128_pt_ec_vector]
+            self.assertTrue(len(result_ec) == CUECTest.nsamples)
+            self.assertTrue(all(np.asarray(result_ec)[test_points] == r_double))
+
             # Test sc mul jac
+            test_points = sample(xrange(nsamples-1), ntest_points)
+            ecbn128_pt_ec_vector = ecbn128_pt_ec[test_points]
+            scl_vector = ecbn128_vector[::3][test_points]
+            #ecbn128_pt_ec_vector = ecbn128_pt_ec
+            #scl_vector = ecbn128_vector[::3]
+            #ecbn128_pt_ec_vector[0] = ecbn128_pt_ec_vector[1]
+            #scl_vector[1] = scl_vector[1]
+            #ecbn128_vector[0:3] = ecbn128_vector[3:6]
+
+            kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
+            kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)
+            kernel_params['stride'] = 1
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = ECBN128_BLOCK_DIM
+
+            result = ecbn128.kernelLaunch(CB_EC_JAC_MUL, ecbn128_vector, kernel_config, kernel_params )
+            result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
+            r_mul = [x.to_jacobian() * BigInt.from_uint256(scl).as_long() for x,scl in zip(ecbn128_pt_ec_vector,scl_vector)]
+            self.assertTrue(len(result_ec) == CUECTest.nsamples)
+            self.assertTrue(all(np.asarray(result_ec)[test_points] == r_mul))
+
+
             # Test mac jac
+            test_points = sample(xrange(nsamples-1), ntest_points)
+            ecbn128_pt_ec_vector = ecbn128_pt_ec[test_points]
+            scl_vector = ecbn128_vector[::3][test_points]
+            r_mad = [x.to_jacobian() * BigInt.from_uint256(scl).as_long() for x,scl in zip(ecbn128_pt_ec_vector,scl_vector)]
+            r_mad = [x + x for x in r_mad]
+            kernel_params['in_length'] = nsamples
+            kernel_params['stride'] = 4
+            kernel_config['blockD'] = ECBN128_BLOCK_DIM 
+            kernel_params['out_length'] = (nsamples + (kernel_config['blockD']*kernel_params['stride']) -1) / (kernel_config['blockD']*kernel_params['stride'])
+            kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 
+            result = ecbn128.kernelLaunch(CB_EC_JAC_MAD, ecbn128_vector, kernel_config, kernel_params )
+
+            kernel_params['in_length'] = kernel_params['out_length']
+            kernel_params['stride'] = 2
+            kernel_params['out_length'] = 1
+            kernel_config['blockD'] = 64
+            kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 
+            min_length = kernel_config['blockD'] * kernel_params['stride']
+            if kernel_params['in_length'] < min_length:
+               zeros = np.zeros((min_length - kernel_params['in_length'],NWORDS_256BIT * ECK_JAC_OUTDIMS), dtype=np.uint32)
+               result = np.concatenate((result,zeros))
+               kernel_params['in_length'] = min_length
+
+            result = ecbn128.kernelLaunch(CB_EC_JAC_MAD, result, kernel_config, kernel_params )
+    
+            self.assertTrue(len(result) == kernel_params['out_length'])
+            self.assertTrue(all(np.concatenate(result == r_mad)))
+
 
 if __name__ == "__main__":
     unittest.main()
