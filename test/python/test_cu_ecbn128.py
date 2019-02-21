@@ -78,26 +78,75 @@ class CUECTest(unittest.TestCase):
     if os.path.exists(ECBN128_datafile):
         npzfile = np.load(ECBN128_datafile)
         ecbn128_scl   = npzfile['scl']
-        ecbn128_ecaff = npzfile['ecaff']
         ecbn128_ecjac = npzfile['ecjac']
-        ecbn128_vector_u256 = npzfile['ecv_256']
+        ecbn128_ecjac_rdc = npzfile['ecjac_rdc']
+        ecbn128_vector_u256 = npzfile['ecv_u256']
+        ecbn128_vector_u256_rdc = npzfile['ecv_u256_rdc']
+        
+        r_add = npzfile['radd']
+        r_add_rdc = npzfile['radd_rdc']
+        r_double = npzfile['rdouble']
+        r_double_rdc = npzfile['rdouble_rdc']
+        r_mul = npzfile['rmul']
+        r_mul_rdc = npzfile['rmul_rdc']
+        r_mad = npzfile['rmad']
+        r_mad_rdc = npzfile['rmad_rdc']
     else:
 
+        print "Generating Random scalars....",
         ecbn128_scl =      [randint(1,prime-1) for x in xrange(nsamples)]
+        print "Done\n"
+        print "Converring Random scalars to u256...",
         ecbn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
+        print "Done\n"
 
-        ecbn128_ecaff      = np.asarray(ECC.rand(nsamples, ectype = 2, reduce=True))
-        ecbn128_ecjac      = np.asarray([x.to_jacobian() for x in ecbn128_ecaff])
-
-        ecbn128_ecaff_u256 = np.asarray([[x.get_P()[0].as_uint256(),
+        ecbn128_ecjac, ecbn128_ecjac_rdc  = np.asarray(ECC.rand(nsamples, ectype = 1, reduce=True, verbose="Generating Random EC points...\t"))
+        print "Done\n"
+         
+        print "Forming vector...",
+        ecbn128_ecjac_u256 = np.asarray([[x.get_P()[0].as_uint256(),
                                           x.get_P()[1].as_uint256(),
-                                          x.get_P()[2].as_uint256()] for x in ecbn128_ecaff])
+                                          x.get_P()[2].as_uint256()] for x in ecbn128_ecjac])
+        ecbn128_ecjac_u256_rdc = np.asarray([[x.get_P()[0].as_uint256(),
+                                          x.get_P()[1].as_uint256(),
+                                          x.get_P()[2].as_uint256()] for x in ecbn128_ecjac_rdc])
+
         ecbn128_vector_u256 = np.zeros((3*nsamples,NWORDS_256BIT), dtype=np.uint32)
         ecbn128_vector_u256[::3] = ecbn128_scl_u256
-        ecbn128_vector_u256[1::3] = ecbn128_ecaff_u256[:,::3].reshape((-1,NWORDS_256BIT))
-        ecbn128_vector_u256[2::3] = ecbn128_ecaff_u256[:,1::3].reshape((-1,NWORDS_256BIT))
+        ecbn128_vector_u256[1::3] = ecbn128_ecjac_u256[:,::3].reshape((-1,NWORDS_256BIT))
+        ecbn128_vector_u256[2::3] = ecbn128_ecjac_u256[:,1::3].reshape((-1,NWORDS_256BIT))
 
-        np.savez(ECBN128_datafile, scl=ecbn128_scl, ecaff=ecbn128_ecaff, ecjac=ecbn128_ecjac, ecv_u256=ecbn128_vector_u256)
+        ecbn128_vector_u256_rdc = np.zeros((3*nsamples,NWORDS_256BIT), dtype=np.uint32)
+        ecbn128_vector_u256_rdc[::3] = ecbn128_scl_u256
+        ecbn128_vector_u256_rdc[1::3] = ecbn128_ecjac_u256_rdc[:,::3].reshape((-1,NWORDS_256BIT))
+        ecbn128_vector_u256_rdc[2::3] = ecbn128_ecjac_u256_rdc[:,1::3].reshape((-1,NWORDS_256BIT))
+        print "Done\n"
+
+        print "Adding EC points...",
+        r_add     = [(x + y) for x, y in zip(ecbn128_ecjac[::2], ecbn128_ecjac[1::2])]
+        r_add_rdc = [(x + y) for x, y in zip(ecbn128_ecjac_rdc[::2], ecbn128_ecjac_rdc[1::2])]
+        print "Done\n"
+
+        print "Doubling EC points...",
+        r_double = [x.double() for x in ecbn128_ecjac]
+        r_double_rdc = [x.double() for x in ecbn128_ecjac_rdc]
+        print "Done\n"
+
+        print "Multiplying EC points by scalar...",
+        r_mul = [x * scl for x,scl in zip(ecbn128_ecjac,ecbn128_scl)]
+        r_mul_rdc = [x * scl for x,scl in zip(ecbn128_ecjac_rdc,ecbn128_scl)]
+        print "Done\n"
+
+        print "Multiplying/Add EC points...",
+        r_mad     = [x1 + x2 for x1,x2 in zip(r_mul[::2], r_mul[1::2])]
+        r_mad_rdc = [x1 + x2 for x1,x2 in zip(r_mul_rdc[::2], r_mul_rdc[1::2])]
+
+        print "Saving data...\n",
+        np.savez_compressed(ECBN128_datafile, scl=ecbn128_scl, ecjac=ecbn128_ecjac, ecjac_rdc=ecbn128_ecjac_rdc,
+                                   ecv_u256=ecbn128_vector_u256, ecv_u256_rdc=ecbn128_vector_u256_rdc,
+                                   radd=r_add, radd_rdc=r_add_rdc, rdouble=r_double, rdouble_rdc=r_double_rdc,
+                                   rmul=r_mul, rmul_rdc=r_mul_rdc, rmad=r_mad, rmad_rdc=r_mad_rdc)
+        print "Done\n"
 
     def test_0is_on_curve(self):
   
