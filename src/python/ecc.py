@@ -387,14 +387,15 @@ class ECC(object):
         else:
             assert False, "Unexpected type"
 
-        if out_ectype == 0:
-            P_ = [x_.to_projective() for x_ in P_]
-        elif out_ectype == 1:
-            P_ = [x_.to_jacobian() for x_ in P_]
-        elif out_ectype == 2:
-            P_ = [x_.to_affine() for x_ in P_]
-        else:
-            assert False, "Unexpected type"
+        if in_ectype != out_ectype:
+            if out_ectype == 0:
+                P_ = [x_.to_projective() for x_ in P_]
+            elif out_ectype == 1:
+                P_ = [x_.to_jacobian() for x_ in P_]
+            elif out_ectype == 2:
+                P_ = [x_.to_affine() for x_ in P_]
+            else:
+                assert False, "Unexpected type"
 
         return P_
 
@@ -412,16 +413,20 @@ class ECC(object):
       for i in xrange(n):
          k = randint(1,p-1)  # generate random number between 1 and p-1
 
+         P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+         P1 = k * P1
+         P1 = P1.to_affine()
+
+         
          if ectype == 0:
-             P1 = ECCProjective([ECC.Gx,ECC.Gy, 1])
+             P1 = P1.to_projective()
          elif ectype == 1:
-             P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+             P1 = P1.to_jacobian()
          elif ectype == 2:
-              P1 = ECCAffine([ECC.Gx,ECC.Gy, 1])
+              P1 = P1.to_affine()
          else :
               assert False, "Unexpected type"
 
-         P1 = k * P1
          if  reduce:
              P_rdc.append(P1.reduce())
 
