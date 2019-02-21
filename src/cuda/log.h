@@ -59,15 +59,15 @@
 #endif
 
 
-#if LOG_LEVEL <= LOG_LEVEL_ERROR
-   #define logError printf
+#if LOG_LEVEL <= LOG_LEVEL_INFO
+   #define logInfo printf
    #ifdef __CUDACC__
    __host__ __device__ void logInfoBigNumber(char *str, uint32_t *x);
    #else
    void logInfoBigNumber(char *str, uint32_t *x);
    #endif
 #else
-  #define logError(f,...) 
+  #define logInfo(f,...) 
 #endif
 
 
@@ -77,10 +77,10 @@
   #define logWarning(f,...)
 #endif
 
-#if LOG_LEVEL <= LOG_LEVEL_INFO
-   #define logInfo printf
+#if LOG_LEVEL <= LOG_LEVEL_ERROR
+   #define logError printf
 #else
-  #define logInfo(f,...)
+  #define logError(f,...)
 #endif
 
 

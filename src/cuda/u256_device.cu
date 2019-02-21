@@ -85,66 +85,29 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
                       | x[2]+x[3]      | x[6]+x[7]      |...| x[34]+x[35]    |...| x[66]+x[67]    |...| x[130]+x[131]  |...| x[258]+x[259]  |...|  x[510]+x[511]  |  
                       |                |                |...|                |...|                |...|                |...|                |...|                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-         2)           | Z[0]+Z[64]     |  Z[1]+Z[65]    |...| Z[8]+Z[72]     |...| Z[16]+Z[80]    |...| Z[32]+Z[96]    |...|  ->Z[0]        |   |   -> Z[63]      |
+         2)           | Z[64k]         |  Z[64k+1]      |...| Z[64k+8]       |...| Z[64k+16]      |...| Z[64k+32]      |...|  ->Z[0]        |   |   -> Z[63]      |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
                       | x[0]+x[1]+     | x[4]+x[5]+     |...| x[32]+x[33]+   |...| x[64]+x[65]+   |...| x[128]+x[129]+ |...|                |...|                 |
                       | x[2]+x[3]+     | x[6]+x[7]+     |...| x[34]+x[35]+   |...| x[66]+x[67]+   |...| x[130]+x[131]+ |...|  ..........    |...| ..........      |
                       | x[256]+x[257]+ | x[260]+x[261]+ |...| x[288]+x[289]+ |...| x[320]+x[321]+ |...| x[384]+x[385]+ |...|                |...|                 |
                       | x[258]+x[259]  | x[262]+x[263]  |...| x[290]+x[291]  |...| x[322]+x[323]  |...| x[386]+x[387]+ |...|                |...|                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-         3)           | Z[0]+Z[64]+    |  Z[1]+Z[65]+   |...| Z[8]+Z[72]+    |...| Z[16]+Z[80]+   |...|  ->Z[0]        |...|                |   |                 |
-                      | Z[32]+Z[96]    |  Z[33]+Z[97]   |...| Z[40]+Z[104]   |...| Z[48]+Z[112]   |...|
+         3)           | Z[32k]         |  Z[32k+1]      |...| Z[32k+8]       |...| Z[32k+16]      |...|  ->Z[0]        |...|                |   |                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-                      | x[0]+x[1]+     | x[4]+x[5]+     |...| x[32]+x[33]+   |...| x[64]+x[65]+   |...|                |...|                |...|                 |
-                      | x[2]+x[3]+     | x[6]+x[7]+     |...| x[34]+x[35]+   |...| x[66]+x[67]+   |...|  .........     |...|  ..........    |...| ..........      |
-                      | x[256]+x[257]+ | x[260]+x[261]+ |...| x[288]+x[289]+ |...| x[320]+x[321]+ |...|                |...|                |...|                 |
-                      | x[258]+x[259]+ | x[262]+x[263]+ |...| x[290]+x[291]+ |...| x[322]+x[323]+ |...|                |...|                |...|                 |
-                      | x[128]+x[129]+ | x[132]+x[133]+ |...| x[160]+x[161]+ |...| x[192]+x[193]+ |...|                |...|                |...|                 |
-                      | x[130]+x[131]+ | x[134]+x[135]+ |...| x[162]+x[163]+ |...| x[194]+x[195]+ |...|                |...|                |...|                 |
-                      | x[384]+x[385]+ | x[388]+x[389]+ |...| x[416]+x[417]+ |...| x[448]+x[449]+ |...|                |...|                |...|                 |
-                      | x[386]+x[387]  | x[390]+x[391]  |...| x[418]+x[419]  |...| x[450]+x[451]  |...|                |...|                |...|                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-         4)           | Z[0]+Z[64]+    |  Z[1]+Z[65]+   |...| Z[8]+Z[72]+    |...|    -> Z[0]     |...|                |...|                |   |                 |
-                      | Z[32]+Z[96]+   |  Z[33]+Z[97]+  |...| Z[40]+Z[104]+  |...|                |...|                |...|                |...|                 |                
-                      | Z[16]+Z[80]+   |  Z[17]+Z[81]+  |...| Z[24]+Z[88]+   |...|                |...|                |...|                |...|                 |                
-                      | Z[48]+Z[112]   |  Z[49]+Z[113]  |...| Z[56]+Z[120]   |...|                |...|                |...|                |...|                 |
+         4)           | Z[16k]         |  Z[16k+1]      |...| Z[16k+8]       |...|    -> Z[0]     |...|                |...|                |   |                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-                      | x[0]+x[1]+     | x[4]+x[5]+     |...| x[32]+x[33]+   |...|                |...|                |...|                |...|                 |
-                      | x[2]+x[3]+     | x[6]+x[7]+     |...| x[34]+x[35]+   |...| ..........     |...|  .........     |...|  ..........    |...| ..........      |
-                      | x[256]+x[257]+ | x[260]+x[261]+ |...| x[288]+x[289]+ |...|                |...|                |...|                |...|                 |
-                      | x[258]+x[259]+ | x[262]+x[263]+ |...| x[290]+x[291]+ |...|                |...|                |...|                |...|                 |
-                      | x[128]+x[129]+ | x[132]+x[133]+ |...| x[160]+x[161]+ |...|                |...|                |...|                |...|                 |
-                      | x[130]+x[131]+ | x[134]+x[135]+ |...| x[162]+x[163]+ |...|                |...|                |...|                |...|                 |
-                      | x[384]+x[385]+ | x[388]+x[389]+ |...| x[416]+x[417]+ |...|                |...|                |...|                |...|                 |
-                      | x[386]+x[387]  | x[390]+x[391]  |...| x[418]+x[419]  |...|                |...|                |...|                |...|                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-         5)           | Z[0]+Z[64]+    |  Z[1]+Z[65]+   |...|  ->Z[0]        |...| .........      |...|                |...|                |   |                 |
-                      | Z[32]+Z[96]+   |  Z[33]+Z[97]+  |...|                |...|                |...|                |...|                |...|                 |                
-                      | Z[16]+Z[80]+   |  Z[17]+Z[81]+  |...|                |...|                |...|                |...|                |...|                 |                
-                      | Z[48]+Z[112]+  |  Z[49]+Z[113]  |...|                |...|                |...|                |...|                |...|                 |
-                      | Z[8]+Z[72]+    |  Z[9]+Z[66]+   |...|                |...|                |...|                |...|                |...|                 |    
-                      | Z[40]+Z[104]+  |  Z[41]+Z[105]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | Z[24]+Z[88] +  |  Z[25]+Z[89] + |...|                |...|                |...|                |...|                |...|                 |
-                      | Z[56]+Z[120]   |  Z[57]+Z[121]  |...|                |...|                |...|                |...|                |...|                 |
+         5)           | Z[8k]          |  Z[8k+1]       |...|  ->Z[0]        |...| .........      |...|                |...|                |   |                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-                      | x[0]+x[1]+     | x[4]+x[5]+     |...|                |...|                |...|                |...|                |...|                 |
-                      | x[2]+x[3]+     | x[6]+x[7]+     |...| .........      |...| ..........     |...|  .........     |...|  ..........    |...| ..........      |
-                      | x[256]+x[257]+ | x[260]+x[261]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[258]+x[259]+ | x[262]+x[263]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[128]+x[129]+ | x[132]+x[133]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[130]+x[131]+ | x[134]+x[135]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[384]+x[385]+ | x[388]+x[389]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[386]+x[387]+ | x[390]+x[391]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[32]+x[33]+   | x[36]+x[37]+   |...|                |...|                |...|                |...|                |...|                 |  
-                      | x[34]+x[35]+   | x[38]+x[39]+   |...|                |...|                |...|                |...|                |...|                 |
-                      | x[288]+x[289]+ | x[292]+x[293]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[290]+x[291]+ | x[294]+x[295]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[160]+x[161]+ | x[164]+x[165]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[162]+x[163]+ | x[166]+x[167]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[416]+x[417]+ | x[420]+x[421]+ |...|                |...|                |...|                |...|                |...|                 |
-                      | x[418]+x[419]  | x[422]+x[423]  |...|                |...|                |...|                |...|                |...|                 |
                       ---------------------------------------------------------------------------------------------------------------------------------------------
-        ...8)         | Z[0]+...+Z[127]|  -> Z[0]       |...|                |...|                |...|                |...|                |...|                 |
+         6)           | Z[4k]          |  Z[4k+1]       |...| ..........     |...| .........      |...|                |...|                |   |                 |
+                      ---------------------------------------------------------------------------------------------------------------------------------------------
+                      ---------------------------------------------------------------------------------------------------------------------------------------------
+         7)           | Z[2k]          |  Z[2k+1]       |...| ..........     |...| .........      |...|                |...|                |   |                 |
+                      ---------------------------------------------------------------------------------------------------------------------------------------------
+                      ---------------------------------------------------------------------------------------------------------------------------------------------
+         8)           | Z[k]           |  -> Z[0]       |...|                |...|                |...|                |...|                |...|                 |
 
 
 */
@@ -170,101 +133,116 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET + U256_XOFFSET]; // 0 .. N-1
     z = (uint32_t *) &out_vector[blockIdx.x * U256K_OFFSET];  // 
     memset(smem, 0, blockDim.x * NWORDS_256BIT);
-    //memset(smem_ptr, 0, blockDim.x * NWORDS_256BIT);
     
+    /*
     if (idx == debug_idx){
-       logInfoBigNumber("smem[0]\n",smem_ptr);
+       logDebugBigNumber("smem[0]\n",smem_ptr);
       for (i =0; i < params->stride; i++){
-       logInfoBigNumber("X[0]\n",&x[i * U256K_OFFSET]);
+       logDebugBigNumber("X[0]\n",&x[i * U256K_OFFSET]);
       }
     }
+    */
     if (params->premod){
       #pragma unroll
       for (i =0; i < params->stride; i++){
         modu256(&x[i*U256K_OFFSET],&x[i*U256K_OFFSET], params->midx);
-        //modu256(&x[1*U256K_OFFSET],&x[1*U256K_OFFSET], params->midx);
-        //modu256(&x[2*U256K_OFFSET],&x[2*U256K_OFFSET], params->midx);
-        //modu256(&x[3*U256K_OFFSET],&x[3*U256K_OFFSET], params->midx);
-        //modu256(&x[4*U256K_OFFSET],&x[4*U256K_OFFSET], params->midx);
-        //modu256(&x[5*U256K_OFFSET],&x[5*U256K_OFFSET], params->midx);
-        //modu256(&x[6*U256K_OFFSET],&x[6*U256K_OFFSET], params->midx);
-        //modu256(&x[7*U256K_OFFSET],&x[7*U256K_OFFSET], params->midx);
       }
     }
 
     addmu256(smem_ptr, (const uint32_t *)x, (const uint32_t *)&x[U256K_OFFSET], params->midx);
+    /*
     if (idx == debug_idx){
-       logInfoBigNumber("smem\n",smem_ptr);
+       logDebugBigNumber("smem\n",smem_ptr);
     }
+    */
 
     #pragma unroll
     for (i =0; i < params->stride-2; i++){
       addmu256(smem_ptr, (const uint32_t *)smem_ptr, (const uint32_t *)&x[(i+2)*U256K_OFFSET], params->midx);
+      /*
       if (idx == debug_idx){
-        logInfo("idx:%d, %d\n",idx,i);
-        logInfoBigNumber("smem[i]\n",smem_ptr);
+        logDebug("idx:%d, %d\n",idx,i);
+        logDebugBigNumber("smem[i]\n",smem_ptr);
       }
+      */
     }
     __syncthreads();
 
-      if (idx == debug_idx){
-        logInfoBigNumber("smem[i]\n",smem_ptr);
-      }
-
+    /*
+    if (idx == debug_idx){
+       logDebugBigNumber("smem[i]\n",smem_ptr);
+    }
+    */
     // reduction global mem
     if (blockDim.x >= 1024 && tid < 512 && params->in_length/params->stride ){
+      /*
       if (idx == debug_idx){
-        logInfoBigNumber("+smem[0]\n",smem_ptr);
-        logInfoBigNumber("+smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
+        logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
       }
+      */
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+512)*NWORDS_256BIT], params->midx);
+      /*
       if (idx == debug_idx){
-        logInfoBigNumber("smem[0]\n",smem_ptr);
+        logDebugBigNumber("smem[0]\n",smem_ptr);
       }
+      */
     }
     __syncthreads();
 
     if (blockDim.x >= 512 && tid < 256){
+      /*
       if (idx == debug_idx){
-        logInfoBigNumber("+smem[0]\n",smem_ptr);
-        logInfoBigNumber("+smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
+        logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
       }
+       */
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+256)*NWORDS_256BIT], params->midx);
+       /*
       if (idx == debug_idx){
-        logInfoBigNumber("smem[=256]\n",smem_ptr);
+        logDebugBigNumber("smem[=256]\n",smem_ptr);
       }
+      */
     }
     __syncthreads();
 
     if (blockDim.x >= 256 && tid < 128){
+       /*
        if (idx == debug_idx){
-         logInfoBigNumber("+smem[0]\n",smem_ptr);
-        logInfoBigNumber("+smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
+         logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
        }
+       */
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+128)*NWORDS_256BIT], params->midx);
+       /*
        if (idx == debug_idx){
-         logInfoBigNumber("smem[=128+0]\n",smem_ptr);
+         logDebugBigNumber("smem[=128+0]\n",smem_ptr);
        }
+       */
     }
     __syncthreads();
 
     if (blockDim.x >= 128 && tid < 64){
+      /*
       if (idx == debug_idx){
-        logInfoBigNumber("+smem[0]\n",smem_ptr);
-        logInfoBigNumber("+smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
+        logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
       }
+      */
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+64)*NWORDS_256BIT], params->midx);
+      /*
       if (idx == debug_idx){
-        logInfoBigNumber("smem[=64+0]\n",smem_ptr);
+        logDebugBigNumber("smem[=64+0]\n",smem_ptr);
       }
+      */
     }
     __syncthreads();
       
@@ -272,66 +250,81 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     if (tid < 32)
     {
         volatile uint32_t *vsmem = smem;
+        /*
         if (idx == debug_idx){
-          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
+          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
         }
+        */
         addmu256((uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+32)*NWORDS_256BIT], params->midx);
+        /*
         if (idx == debug_idx){
-        logInfoBigNumber("smem[=32+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[=32+0]\n",(uint32_t *)vsmem);
         }
+       
         if (idx == debug_idx){
-          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
+          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
         }
+        */
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+16)*NWORDS_256BIT], params->midx);
+        /*
         if (idx == debug_idx){
-        logInfoBigNumber("smem[=16+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[=16+0]\n",(uint32_t *)vsmem);
         }
         if (idx == debug_idx){
-          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
+          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
         }
+        */
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+8)*NWORDS_256BIT], params->midx);
+        /*
         if (idx == debug_idx){
-          logInfoBigNumber("smem[=8+0]\n",(uint32_t *)vsmem);
+          logDebugBigNumber("smem[=8+0]\n",(uint32_t *)vsmem);
         }
         if (idx == debug_idx){
-          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
+          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
         }
+        */
         addmu256((uint32_t *) &vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+4)*NWORDS_256BIT], params->midx);
+        /*
         if (idx == debug_idx){
-          logInfoBigNumber("smem[=4+0]\n",(uint32_t *)vsmem);
+          logDebugBigNumber("smem[=4+0]\n",(uint32_t *)vsmem);
         }
         if (idx == debug_idx){
-          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
+          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
         }
+        */
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+2)*NWORDS_256BIT], params->midx);
+        /*
         if (idx == debug_idx){
-          logInfoBigNumber("smem[=2+0]\n",(uint32_t *)vsmem);
+          logDebugBigNumber("smem[=2+0]\n",(uint32_t *)vsmem);
         }
         if (idx == debug_idx){
-          logInfoBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumber("smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
+          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
         }
+        */
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+1)*NWORDS_256BIT], params->midx);
+        /*
         if (idx == debug_idx){
-          logInfoBigNumber("smem[=0+1]\n",(uint32_t *)vsmem);
+          logDebugBigNumber("smem[=0+1]\n",(uint32_t *)vsmem);
         }
+        */
 
         if (tid==0) {
            memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);

@@ -55,7 +55,8 @@ from bigint import *
 class CUU256Test(unittest.TestCase):
     TEST_ITER = 1000
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
-    nsamples = 141074
+    nsamples = 141072
+    nsamples = 1024*128
     ntest_points = 1000
     u256_p = BigInt(prime).as_uint256()
     u256 = U256(nsamples, seed=10)
@@ -80,9 +81,9 @@ class CUU256Test(unittest.TestCase):
         kernel_config = {'blockD' : U256_BLOCK_DIM }
         kernel_params = {'midx' : MOD_FIELD ,'premod' : 1, 'in_length' : CUU256Test.nsamples, 'stride' : 1, 'out_length' : CUU256Test.nsamples}
         for iter in xrange(CUU256Test.TEST_ITER):
-            #u256_vector = u256.rand(CUU256Test.nsamples)
-            u256_vector = np.tile(np.ones(8,dtype=np.uint32),(CUU256Test.nsamples,1))
-
+            u256_vector = u256.rand(CUU256Test.nsamples)
+            #u256_vector = np.tile(np.ones(8,dtype=np.uint32)*44444444,(CUU256Test.nsamples,1))
+            
             # Test mod kernel:
             test_points = sample(xrange(CUU256Test.nsamples-1), ntest_points)
 
@@ -177,12 +178,10 @@ class CUU256Test(unittest.TestCase):
             kernel_params['in_length'] = kernel_params['out_length']
             kernel_params['stride'] = 2
             kernel_params['out_length'] = 1
-            kernel_config['blockD'] = 128
+            kernel_config['blockD'] = 64
             kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * 4 
             min_length = kernel_config['blockD'] * kernel_params['stride']
             if kernel_params['in_length'] < min_length:
-               min_length = 512
-               kernel_params['stride'] = 4
                zeros = np.zeros((min_length - kernel_params['in_length'],NWORDS_256BIT), dtype=np.uint32)
                result = np.concatenate((result,zeros))
                kernel_params['in_length'] = min_length
@@ -190,7 +189,7 @@ class CUU256Test(unittest.TestCase):
             result = u256.kernelLaunch(CB_U256_ADDM_REDUCE, result, kernel_config, kernel_params )
     
             self.assertTrue(len(result) == kernel_params['out_length'])
-            self.assertTrue(np.concatenate(result == r_addm_reduce))
+            self.assertTrue(all(np.concatenate(result == r_addm_reduce)))
 
 
 if __name__ == "__main__":
