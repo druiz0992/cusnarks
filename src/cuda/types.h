@@ -142,7 +142,8 @@ typedef struct{
 
 // kernel input parameters
 typedef struct{
-   uint32_t premod; // data requires to be mod-ded as preprocessing stage
+   uint32_t premod; // data requires to be mod-ded as preprocessing stage  
+   uint32_t premul;
    uint32_t in_length; // input data length (number of elements)
    uint32_t out_length; // output data length (number of elements)
    uint32_t stride; // data elemements processed by thread

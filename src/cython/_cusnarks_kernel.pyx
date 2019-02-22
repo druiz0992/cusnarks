@@ -97,6 +97,8 @@ cdef class CUSnarks:
         kparams.stride = params['stride']
         if 'premod' in params:
             kparams.premod = params['premod']
+        if 'premul' in params:
+            kparams.premul = params['premul']
 
         self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
         
@@ -138,6 +140,9 @@ cdef class ECBN128 (CUSnarks):
         self.out_dim = self.out_dim  * 3
         self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
         self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+   
+        print "PYX :"
+        print self.in_dim, self.out_dim, self.in_size, self.out_size
 
     def __dealloc__(self):
         del self._ecbn128_ptr

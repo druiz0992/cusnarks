@@ -132,7 +132,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
 
     x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET + U256_XOFFSET]; // 0 .. N-1
     z = (uint32_t *) &out_vector[blockIdx.x * U256K_OFFSET];  // 
-    memset(smem, 0, blockDim.x * NWORDS_256BIT);
+    //memset(smem, 0, blockDim.x * NWORDS_256BIT * sizeof(uint32_t));
     
     /*
     if (idx == debug_idx){
@@ -174,7 +174,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     }
     */
     // reduction global mem
-    if (blockDim.x >= 1024 && tid < 512 && params->in_length/params->stride ){
+    if (blockDim.x >= 1024 && tid < 512){
       /*
       if (idx == debug_idx){
         logDebugBigNumber("+smem[0]\n",smem_ptr);

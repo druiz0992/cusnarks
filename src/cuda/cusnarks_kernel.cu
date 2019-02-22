@@ -218,6 +218,12 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
   out_vector_device.length = out_len;
   out_vector_device.size = out_size;
 
+  logInfo("Init\n");
+  logInfo("IVDS : %d, IVDL : %d\n", in_vector_device.size,
+				       	in_vector_device.length);
+
+  logInfo("OVDS : %d, OVDL : %d\n", out_vector_device.size,
+						       	out_vector_device.length);
   allocateCudaResources(in_size, out_size);
   initRNG(seed);
 }
@@ -350,6 +356,8 @@ void CUSnarks::kernelLaunch(
 
 
   // launch kernel
+  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",params->premod, params->midx, params->in_length, params->out_length, params->stride);
+  logInfo("Kernel IDX :%d <<<%d, %d, %d>>>\n", kernel_idx, gridD, blockD, config->smemS);
   start = elapsedTime();
   kernel_callbacks[kernel_idx]<<<gridD, blockD, config->smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
   CCHECK(cudaGetLastError());
@@ -372,7 +380,7 @@ void CUSnarks::kernelLaunch(
 							out_vector_device.size,
 						       	out_vector_device.length);
 
-  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d\n",params->premod, params->midx, params->in_length, params->out_length);
+  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",params->premod, params->midx, params->in_length, params->out_length, params->stride);
   logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
           kernel_idx, gridD, blockD, config->smemS,end_kernel);
   logInfo("Time Elapsed Xfering in %d bytes : %f sec\n",

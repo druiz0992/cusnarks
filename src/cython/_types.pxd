@@ -59,6 +59,7 @@ cdef extern from "types.h":
 
   ctypedef struct kernel_params_t:
       uint32_t premod
+      uint32_t premul
       uint32_t in_length
       uint32_t out_length
       uint32_t stride
