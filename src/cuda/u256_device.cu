@@ -45,25 +45,32 @@
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
 
     uint32_t __restrict__ *x;
     uint32_t __restrict__ *y;
     uint32_t __restrict__ *z;
    
-    if(tid >= params->in_length/2) {
+    if(tid >= params->in_length/params->stride) {
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_XOFFSET];
-    y = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
-    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+    x = (uint32_t *) &in_vector[tid * params->stride * U256K_OFFSET + U256_XOFFSET * params->stride/2];
+    y = (uint32_t *) &in_vector[tid * params->stride * U256K_OFFSET + U256_YOFFSET * params->stride/2];
+    z = (uint32_t *) &out_vector[tid * params->stride/2 * U256K_OFFSET];
     
     if (params->premod){
-      modu256(x,x, params->midx);
-      modu256(y,y, params->midx);
+      #pragma unroll
+      for (i=0; i< params->stride/2-1; i++){
+        modu256(&x[i*NWORDS_256BIT],&x[i*NWORDS_256BIT], params->midx);
+        modu256(&y[i*NWORDS_256BIT],&y[i*NWORDS_256BIT], params->midx);
+      }
     }
 
-    addmu256(z,(const uint32_t *)x, (const uint32_t *)y, params->midx);
+   #pragma unroll
+   for (i=0; i< params->stride/2-1; i++){
+      addmu256(&z[i*NWORDS_256BIT],(const uint32_t *)&x[i*NWORDS_256BIT], (const uint32_t *)&y[i*NWORDS_256BIT], params->midx);
+   }   
 }
 
 /*
@@ -342,27 +349,33 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
 __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
 
     uint32_t __restrict__ *x;
     uint32_t __restrict__ *y;
     uint32_t __restrict__ *z;
- 
-    if(tid >= params->in_length/2) {
+   
+    if(tid >= params->in_length/params->stride) {
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_XOFFSET];
-    y = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
-    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+    x = (uint32_t *) &in_vector[tid * params->stride * U256K_OFFSET + U256_XOFFSET * params->stride/2];
+    y = (uint32_t *) &in_vector[tid * params->stride * U256K_OFFSET + U256_YOFFSET * params->stride/2];
+    z = (uint32_t *) &out_vector[tid * params->stride/2 * U256K_OFFSET];
     
     if (params->premod){
-      modu256(x,x, params->midx);
-      modu256(y,y, params->midx);
+      #pragma unroll
+      for (i=0; i< params->stride/2-1; i++){
+        modu256(&x[i*NWORDS_256BIT],&x[i*NWORDS_256BIT], params->midx);
+        modu256(&y[i*NWORDS_256BIT],&y[i*NWORDS_256BIT], params->midx);
+      }
     }
 
-    submu256(z,(const uint32_t *)x, (const uint32_t *)y, params->midx);
-}
-
+   #pragma unroll
+   for (i=0; i< params->stride/2-1; i++){
+      submu256(&z[i*NWORDS_256BIT],(const uint32_t *)&x[i*NWORDS_256BIT], (const uint32_t *)&y[i*NWORDS_256BIT], params->midx);
+   }   
+} 
 /*
     Modulo
 
@@ -416,6 +429,39 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
 
    return;
 }
+
+__global__ void mulmontu256_2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if(tid >= params->in_length/4) {
+      return;
+    }
+
+    uint32_t __restrict__ *A, *B, *U;
+    uint32_t i,j; 
+ 
+    A = (uint32_t *) &in_vector[tid * 4 * U256K_OFFSET + U256_XOFFSET];
+    B = (uint32_t *) &in_vector[tid * 4 * U256K_OFFSET + U256_YOFFSET];
+    U = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+   
+    // ensure A, B < p 
+    // TODO : If numbers are already in Montgomery format
+    // premod operations doesn't make any sense. I leave it 
+    // for the moment as during testing I multiply random numbers without
+    // checking if they are greated than the prime number
+    if (params->premod){
+      modu256(A,A, params->midx);
+      modu256(B,B, params->midx);
+      modu256(&A[2*NWORDS_256BIT],&A[2*NWORDS_256BIT], params->midx);
+      modu256(&B[2*NWORDS_256BIT],&B[2*NWORDS_256BIT], params->midx);
+    }
+
+    mulmontu256_2(U, (const uint32_t *)A, (const uint32_t *) B, params->midx);
+
+   return;
+}
+
 
 __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
@@ -482,6 +528,50 @@ __forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t
         "r"(x[4]), "r"(y[4]), "r"(x[5]), "r"(y[5]),
         "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
 }
+
+/*
+   z(288 bits) = x(288 bits) + y(256 bits)
+   TODO : pending
+*/
+__forceinline__ __device__ void addu288(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
+{
+  // z[i] = x[i] + y[i] for 8x32 bit words
+  asm("{                             \n\t"
+      ".reg .u32         %x_;        \n\t"
+      ".reg .u32         %y_;        \n\t"
+      "mov.u32           %x_,%8;     \n\t"
+      "mov.u32           %y_,%9;     \n\t"
+      "add.cc.u32        %0, %x_, %y_;\n\t"             // sum with carry out
+      "mov.u32           %x_,%10;     \n\t"
+      "mov.u32           %y_,%11;     \n\t"
+      "addc.cc.u32       %1, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%12;     \n\t"
+      "mov.u32           %y_,%13;     \n\t"
+      "addc.cc.u32       %2, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%14;     \n\t"
+      "mov.u32           %y_,%15;     \n\t"
+      "addc.cc.u32       %3, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%16;     \n\t"
+      "mov.u32           %y_,%17;     \n\t"
+      "addc.cc.u32       %4, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%18;     \n\t"
+      "mov.u32           %y_,%19;     \n\t"
+      "addc.cc.u32       %5, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%20;     \n\t"
+      "mov.u32           %y_,%21;     \n\t"
+      "addc.cc.u32       %6, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%22;     \n\t"
+      "mov.u32           %y_,%23;     \n\t"
+      "addc.u32          %7, %x_, %y_;\n\t"             // sum with carry in 
+      "}                             \n\n"
+      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7]), "=r"(z[8])
+      : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
+        "r"(x[2]), "r"(y[2]), "r"(x[3]), "r"(y[3]),
+        "r"(x[4]), "r"(y[4]), "r"(x[5]), "r"(y[5]),
+        "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]),"r"(x[8]));
+}
+
 
 /*
    x - y for 256 bit numbers
@@ -612,13 +702,93 @@ __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
   
 }
 
+// multiply by small constant (<= 32) 
+__device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ k, mod_t midx)
+{
+  uint32_t i;
+  uint32_t tmp[NWORDS_256BIT+1];  //288 bits. I can multiply by up to 32
+  memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
+
+  assert(k < U256_MAX_SMALLK)
+
+  addu288(z,x,x); 
+
+  #pragma unroll
+  for (i=0; i<k-1; i++){
+    addu288(z,z,x); 
+  }
+
+  // TODO
+  // modulo p and return
+}
+	
+
+/*
+   aA = X[0] * Y[0]
+   bB = X[1] * Y[1]
+   Z[0] = aA + bB * residue
+   Z[1] = (X[0] + X[1]) * (Y[0] + Y[1]) - aA - bB
+*/
+__device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
+{
+    uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
+    uint32_t tmp1[NWORDS_256BIT], tmp2[NWORDS_256BIT];
+
+    addmu256(tmp1, A, &A[NWORDS_256BIT], midx);                // tmp1 = X[0] + X[1]
+    addmu256(tmp2, B, &B[NWORDS_256BIT], midx);                // tmp2 = Y[0] + Y[1]
+     
+    mulmontu256(tmp1,tmp1,tmp2,midx);                          // tmp1 = tmp1 * tmp2  
+    mulmontu256(tmp2,A,B,midx);                                // tmp2 = aA = X[0] * Y[0] 
+    mulmontu256(U,&A[NWORDS_256BIT],&B[NWORDS_256BIT],midx);   // Z[0] = bB = X[1] * Y[1]
+
+    submu256(&U[NWORDS_256BIT], tmp1, tmp2, midx);             //Z[1] = tmp1 - aA
+    submu256(&U[NWORDS_256BIT], &U[NWORDS_256BIT], U, midx);   //Z[1] = tmp1 - aA - bB
+    
+    mulmontu256(U,U,nonres,midx);                                    // Z[0] = bB * non_residue
+    addmu256(U,U,tmp2, midx);                                  // Z[0] = Z[0] + aA
+}
+
+/*
+   ab =  X[0] * X[1]
+   t1 =  X[0] + nonres * X[1] 
+   a2  = X[0] + X[1]
+   Z[0] = t1 * a2 - ab + nonres * ab
+   Z[1] = ab + ab
+*/
+__device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
+{
+    uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
+    uint32_t tmp1[NWORDS_256BIT], tmp2[NWORDS_256BIT];
+
+    mulmontu256(tmp1, A, &A[NWORDS_256BIT], midx);             // tmp1 = ab = X[0] * X[1]
+    mulmontu256(tmp2, nonres, &A[NWORDS_256BIT], midx);       //  tmp2 = nonres * X[1]
+    addmu256(tmp2, tmp2,A, midx);                             //  tmp2 = t1 
+
+    mulmontu256(tmp2, tmp2,A, midx);                          //  tmp2 = t1 * X[0]
+    mulmontu256(tmp2, tmp2,&A[NWORDS_256BIT], midx);          //  tmp2 = t1 * a2
+    submu256(tmp2, tmp2, tmp1, midx);                         //  tmp2 = t1 * a2 - ab
+    addmu256(&U[NWORDS_256BIT],tmp1, tmp1,midx);               // Z[1] = ab + ab
+    submu256(tmp1, tmp1, nonres, midx);                       //  tmp1 = nonres * ab
+
+
+    addmu256(&U[NWORDS_256BIT],tmp1, tmp2,midx);              // Z[2] = t1 * a2 - ab + nonres * ab
+}
+
+
 /*
    Montgomery Multiplication(xr^(-1),y^r(-1)) = xr^(-1) * yr^(-1) * r (mod N)  for 256 bit numbers
+     FIOS implementatin
 
    NOTE. Function requires that x, y < N
    NOTE. If x or y are not in Montgomery format, output is 
     in standard format multiplication of x * y
      ex: MontMul(xr^(-1),  y) = xr^(-1) * y * r = x * y
+
+   NOTE : According to Tolg Acar's thesis*:
+      SOS   2s^2+s MUL, 4s^2+4s+2 ADD 
+      FIOS  2s^2+s MUL, 5s^2+3s+2 ADD
+
+   * www.microsoft.com/en-us/research/wp-content/uploads/1998/06/97Acar.pdf
 
 */
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
@@ -706,10 +876,16 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
 
    return;
 }
+__device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
+{
+   //TODO : implement proper squaring
+   mulmontu256(U,A,A,mid);
+}
 /*
    x mod N
 
-   NOTE : It requires that x is at least 253 bit number
+   NOTE : It requires that prime is at least 253 bit number. In reality is 254 bits the prime
+    i am using
    */
 __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx)
 {

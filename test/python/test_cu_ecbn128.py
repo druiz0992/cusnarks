@@ -58,7 +58,7 @@ except ImportError:
 sys.path.append('../../src/python')
 from bigint import *
 
-ECBN128_datafile = './aux_data/ecbn128_data.npz'
+ECBN128_datafile = './aux_data/ecbn128_data_217.npz'
 
 class CUECTest(unittest.TestCase):
     TEST_ITER = 1000
@@ -87,6 +87,28 @@ class CUECTest(unittest.TestCase):
         r_mad = npzfile['rmad']
         r_mad_rdc = npzfile['rmad_rdc']
         nsamples = len(ecbn128_scl)
+
+        """
+        TODO : prepare LUT computing all combinations of Sum Pi, for a window
+        ex : w = 5 => P1, P2, P3, P4, P5
+         LUT : idx 00000      0
+                   00001      P1
+                   00010      P2
+                   00011      P1 + P2
+                   00100      P2
+                   00101      P1 + P2
+                   ....
+                   11111      P1 + P2 + P3 + P4 + P5
+        lut_dim = 5
+        lut_ec = np.range((1<<lut_dim)-1)
+        for i in range(lut_dim):
+           lut_ec[(1<<i)-1] = ecbn128_ecjac_rdca[i<<1]
+        for i in range(1,1<<lut_dim):
+           lut_ec[i] = ecbn128_ecjac_rdca[a] + ecbn128_ecjac_rdca[b]
+
+        """
+
+
     else:
 
         print "Generating Random scalars....",

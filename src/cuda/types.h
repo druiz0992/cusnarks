@@ -82,6 +82,7 @@ typedef struct {
    uint32_t p[NWORDS_256BIT];
    uint32_t p_[NWORDS_256BIT];
    uint32_t r_[NWORDS_256BIT];
+   uint32_t nonres[NWORDS_256BIT];
    // r =  1 << 256
    // p * p_ - r * r_ = 1 
 
@@ -182,5 +183,15 @@ typedef enum{
    CB_EC_N
 
 }ec_callback_t;
+
+// index to ec128bn class kernels
+typedef enum{
+   CB_EC2_JAC_ADD = =,
+   CB_EC2_JAC_DOUBLE,
+   CB_EC2_JAC_MUL,
+   CB_EC2_JAC_MAD,
+   CB_EC2_N
+
+}ec2_callback_t;
 
 #endif
