@@ -33,19 +33,27 @@
 #ifndef _U256_DEVICE_H_
 #define _U256_DEVICE_H_
 
+#define U256_MAX_SMALLK (32)
+
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void mulmontu256_2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
 __forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t  __restrict__ *x, const uint32_t __restrict__ *y);
+__forceinline__ __device__ void addu288(uint32_t __restrict__ *z, const uint32_t  __restrict__ *x, const uint32_t __restrict__ *y);
 extern __device__ void subu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 extern __device__ void addmu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx);
 extern __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx);
 extern __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx);
 extern __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
+extern __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
+extern __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ k, mod_t midx);
+extern __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
+extern __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
 extern __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 extern __device__ uint32_t eq0u256(const uint32_t __restrict__ *x);
 extern __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);

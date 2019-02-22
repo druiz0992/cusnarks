@@ -58,5 +58,10 @@ cdef extern from "../cuda/ecbn128.h":
         C_ECBN128(ct.uint32_t len, ct.uint32_t seed) except +
         C_ECBN128(ct.uint32_t len) except +
 
+cdef extern from "../cuda/ecbn128_2.h":
+    cdef cppclass C_ECBN128_2 "ECBN128_2" (C_CUSnarks) :
+        C_ECBN128_2(ct.uint32_t len, ct.uint32_t seed) except +
+        C_ECBN128_2(ct.uint32_t len) except +
+
 
 

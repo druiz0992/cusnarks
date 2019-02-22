@@ -141,10 +141,28 @@ cdef class ECBN128 (CUSnarks):
         self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
         self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
    
-        print "PYX :"
-        print self.in_dim, self.out_dim, self.in_size, self.out_size
-
     def __dealloc__(self):
         del self._ecbn128_ptr
+
+
+# CUECBN128 class cython wrapper
+cdef class ECBN128_2 (CUSnarks):
+    cdef C_ECBN128_2* _ecbn128_2_ptr
+
+    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+        if out_len == 0:
+            out_len = in_len
+        self._ecbn128_2_ptr = new C_ECBN128_2( in_len,seed)
+        self._cusnarks_ptr = <C_CUSnarks *>self._ecbn128_2_ptr
+        # TODO : add correct dimension
+        self.in_dim = self.in_dim * 3
+        self.out_dim = self.out_dim  * 3
+        self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+        self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+   
+    def __dealloc__(self):
+        del self._ecbn128_2_ptr
+
+
 
 
