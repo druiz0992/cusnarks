@@ -437,6 +437,9 @@ class ECC(object):
                 sys.stdout.flush()
              ct+=1
 
+      if verbose is not None:
+          print "\n",
+
       return P, P_rdc
 
     @abstractmethod

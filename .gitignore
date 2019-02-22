@@ -48,3 +48,4 @@ data/public.json
 .bin
 venv/
 third_party_libs/
+*.npz
