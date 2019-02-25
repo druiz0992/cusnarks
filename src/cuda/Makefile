@@ -41,6 +41,8 @@ CUSRC = cusnarks_kernel.cu \
         u256_device.cu \
         ecbn128.cu \
         ecbn128_device.cu \
+        ecbn128_2.cu \
+        ecbn128_2_device.cu \
         log.cu
 
 CSRC = rng.cpp 

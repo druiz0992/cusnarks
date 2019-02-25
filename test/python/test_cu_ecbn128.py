@@ -216,7 +216,7 @@ class CUECTest(unittest.TestCase):
             kernel_config['smemS'] = 0
             kernel_config['blockD'] = ECBN128_BLOCK_DIM
 
-            result = ecbn128.kernelLaunch(CB_EC_JAC_ADD, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_ADD, ecbn128_vector, kernel_config, kernel_params )
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples/2)
             self.assertTrue(all(np.concatenate(result == r_add)))
 
@@ -227,7 +227,7 @@ class CUECTest(unittest.TestCase):
             kernel_config['smemS'] = 0
             kernel_config['blockD'] = ECBN128_BLOCK_DIM
 
-            result = ecbn128.kernelLaunch(CB_EC_JAC_DOUBLE, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_DOUBLE, ecbn128_vector, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples)
             self.assertTrue(all(np.concatenate(result == r_double)))
@@ -239,7 +239,7 @@ class CUECTest(unittest.TestCase):
             kernel_config['smemS'] = 0
             kernel_config['blockD'] = ECBN128_BLOCK_DIM
 
-            result = ecbn128.kernelLaunch(CB_EC_JAC_MUL, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_MUL, ecbn128_vector, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples)
             self.assertTrue(all(np.concatenate(result == r_mul)))
@@ -252,7 +252,7 @@ class CUECTest(unittest.TestCase):
             kernel_params['premul'] = 1
             kernel_params['out_length'] = ECK_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD']*kernel_params['stride']) -1) / (kernel_config['blockD']*kernel_params['stride']))
             kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 
-            result = ecbn128.kernelLaunch(CB_EC_JAC_MAD, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_MAD, ecbn128_vector, kernel_config, kernel_params )
 
             
             result_ec = np.zeros(ecbn128_vector.shape, dtype=np.uint32)
@@ -310,7 +310,7 @@ class CUECTest(unittest.TestCase):
                kernel_params['in_length'] = min_length
 
             tt = ECC.from_uint256(result,in_ectype=1, out_ectype=1, reduced=True)
-            result = ecbn128.kernelLaunch(CB_EC_JAC_MAD, result, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_MAD, result, kernel_config, kernel_params )
    
 
             # stride reduction

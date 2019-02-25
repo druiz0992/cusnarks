@@ -904,7 +904,7 @@ __forceinline__ __device__
   }
   */
 
-  sqmontu256(xr, x1, x1, midx);  // M1 = xr = x * x
+  sqmontu256(xr, x1, midx);  // M1 = xr = x * x
   // TODO muluk256
   mulmontu256(tmp1, xr, _3, midx);  // M = tmp1 = M1 * _3
 
@@ -914,7 +914,7 @@ __forceinline__ __device__
     logInfoBigNumber("M\n",(uint32_t *)tmp1);
   }
   */
-  sqmontu256(xr, tmp1, tmp1, midx);  // X3 = xr = M * M,  tmp_y = Ysqsq * _8, zr = S; tmp1 = M
+  sqmontu256(xr, tmp1, midx);  // X3 = xr = M * M,  tmp_y = Ysqsq * _8, zr = S; tmp1 = M
   // TODO muluk256
   mulmontu256(tmp2, zr, _2, midx);   // tmp2 = S * _2
   
