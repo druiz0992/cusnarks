@@ -43,7 +43,7 @@ cdef extern from "../cuda/cusnarks_kernel.h":
                         ct.uint32_t seed) except +
         C_CUSnarks(ct.uint32_t in_len, ct.uint32_t in_size, ct.uint32_t out_len, ct.uint32_t out_size) except +
         void rand(ct.uint32_t *samples, ct.uint32_t n_samples)
-        void kernelLaunch(ct.uint32_t kernel_idx,
+        double kernelLaunch(ct.uint32_t kernel_idx,
                           ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
                           ct.kernel_config_t *config, ct.kernel_params_t *params)
         void getDeviceInfo()

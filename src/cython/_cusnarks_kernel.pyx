@@ -37,7 +37,7 @@ cimport numpy as np
 cimport _types as ct
 
 
-from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128
+from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_ECBN128_2
 from cython cimport view
 from constants import *
 
@@ -66,7 +66,7 @@ cdef class CUSnarks:
         print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
-            return
+            return 0.0
 
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
@@ -100,9 +100,9 @@ cdef class CUSnarks:
         if 'premul' in params:
             kparams.premul = params['premul']
 
-        self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
+        exec_time = self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
         
-        return np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
+        return np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
     
     def rand(self, ct.uint32_t n_samples):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
