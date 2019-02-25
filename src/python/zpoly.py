@@ -220,6 +220,9 @@ class ZPoly(object):
         """
         assert False, "Operation not supported"
 
+    def as_list(self):
+        if type(self.zcoeff) == list:
+            return [x.as_long() for x in self.zcoeff]
 
     def get_degree(self):
         """
@@ -397,6 +400,101 @@ class ZPoly(object):
         self._intt(inv_roots_slice[:dt/2 + 1])
         self.expand_to_degree(dtp,self)
 
+    @classmethod
+    def printM(cls,M):
+        for i in xrange(M.shape[0]):
+            for j in xrange(M.shape[1]):
+                print M[i,j].as_long(),
+            print "\n"
+
+    def ntt_parallel2D(self,nrows,ncols):
+        """
+           Parallel N point FFT
+             1) Decompose N points into a n1xn2 matrix, filling it in column order
+             2) Perform n1 FFT of n2 points each and put results in n1xn2 matrix
+             3) Multiply resulting matrix elements Ajk by root+-j*k (+ FFT/- IFFT)
+             4) Transpose matrix to n2xn1
+             5) Perform n2 FFT of n1 points
+        """
+        roots, _ = ZField.get_roots()
+
+        dt = nrows*ncols-1
+        self.expand_to_degree(dt, self)
+
+        M = np.asarray(self.zcoeff).reshape((nrows, ncols), order='F')
+
+        roots_Mslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
+        roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
+
+        for i,rows in enumerate(M):
+            newP = ZPoly(rows.tolist())
+            newP._ntt(roots_Nslice[:ncols/2+1])
+            for k,c in enumerate(newP.get_coeff()):
+                M[i,k] = c * roots_Mslice[i*k]
+
+        M = M.transpose()
+
+        roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
+
+        for i,rows in enumerate(M):
+            newP = ZPoly(rows.tolist())
+            newP._ntt(roots_Nslice[:nrows/2+1])
+            M[i] = newP.get_coeff()
+
+        self.zcoeff = np.reshape(M,-1,order='F').tolist()
+
+    
+    def ntt_parallel3D(self,nrows,depthr,ncols,depthc):
+        """
+           Parallel N point FFT
+             1) Decompose N points into a n1xn2 matrix, filling it in column order
+             2) Perform n1 FFT of n2 points each and put results in n1xn2 matrix
+             3) Multiply resulting matrix elements Ajk by root+-j*k (+ FFT/- IFFT)
+             4) Transpose matrix to n2xn1
+             5) Perform n2 FFT of n1 points
+        """
+        roots, _ = ZField.get_roots()
+
+        dt = nrows*ncols*depthc*depthr-1
+        self.expand_to_degree(dt, self)
+
+        M = np.asarray(self.zcoeff).reshape((nrows*depthr, ncols*depthc), order='F')
+
+        roots_Mslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
+        if depthc != 1:
+            for i,rows in enumerate(M):
+                newP = ZPoly(rows.tolist())
+                newP.ntt_parallel2D(ncols,depthc)
+    
+                for k,c in enumerate(newP.get_coeff()):
+                    M[i,k] = c * roots_Mslice[i*k]
+        else:
+            roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
+            for i,rows in enumerate(M):
+                newP = ZPoly(rows.tolist())
+                newP._ntt(roots_Nslice[:ncols/2+1])
+    
+                for k,c in enumerate(newP.get_coeff()):
+                    M[i,k] = c * roots_Mslice[i*k]
+
+        M = M.transpose()
+
+        if depthr != 1:
+            for i,rows in enumerate(M):
+                newP = ZPoly(rows.tolist())
+                newP.ntt_parallel2D(nrows,depthr)
+                M[i] = newP.get_coeff()
+        else:
+            roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
+            for i,rows in enumerate(M):
+                newP = ZPoly(rows.tolist())
+                newP._ntt(roots_Nslice[:nrows/2+1])
+                M[i] = newP.get_coeff()
+
+        self.zcoeff = np.reshape(M,-1,order='F').tolist()
+
     def ntt(self): 
         """
           FFT
@@ -417,6 +515,27 @@ class ZPoly(object):
 
         self._ntt(roots_slice[:dt/2 + 1])
 
+    def ntt2(self): 
+        """
+          FFT
+        """
+        roots,_ = ZField.get_roots()
+
+        d1 = self.get_degree()
+        dtp = d1
+        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+
+        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
+        # Recompute roots in case nroots changed or format.
+        #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
+        #    roots, _ = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+
+        self.expand_to_degree(dt, self)
+
+        self._ntt2(roots_slice[:dt/2 + 1])
+
+  
     def intt(self): 
         """
           IFFT
@@ -438,6 +557,99 @@ class ZPoly(object):
         self.expand_to_degree(dt, self)
         self._intt(inv_roots_slice[:dt/2 + 1])
 
+    def intt2(self): 
+        """
+          IFFT
+        """
+
+        _,inv_roots = ZField.get_roots()
+
+        d1 = self.get_degree()
+        dtp = d1
+        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
+        # Recompute roots in case nroots changed or format.
+        #TODO
+        #if len(inv_roots) != dt+1 or not isinstance(inv_roots[0],type(self.zcoeff[0])):
+        #    _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
+
+        self.expand_to_degree(dt, self)
+        self._intt2(inv_roots_slice[:dt/2 + 1])
+
+
+
+    def _ntt2(self, powtable):
+        """
+         Computes the forward number-theoretic transform of the given vector in place,
+         with respect to the given primitive nth root of unity under the given modulus.
+         The length of the vector must be a power of 2.
+
+         Powtable is table with nth root roots of unity where n is the number of points in NTT
+         Only N/2 roots of unity are needed
+
+         NOTE https://www.nayuki.io/page/number-theoretic-transform-integer-dft
+        """
+        vector = self.zcoeff
+        n = len(vector)
+        levels = n.bit_length() - 1
+        if 1 << levels != n:
+            raise ValueError("Length is not a power of 2")
+
+        size = 2
+        while size <= n:
+            halfsize = size // 2
+            tablestep = n // size
+            for i in range(0, n, size):
+                k = 0
+                for j in range(i, i + halfsize):
+                    l = j + halfsize
+                    left = vector[j]
+                    right = vector[l] 
+                    vector[j] = left + right
+                    vector[l] = left - right * powtable[k]
+                    k += tablestep
+            size *= 2
+
+    def _intt2(self, powtable):
+        """
+         Computes the inverse number-theoretic transform of the given vector in place,
+         with respect to the given primitive nth root of unity under the given modulus.
+         The length of the vector must be a power of 2.
+
+         Powtable is table with nth root roots of unity where n is the number of points in NTT
+         Only N/2 roots of unity are needed
+        """
+        vector = self.zcoeff
+        n = len(vector)
+        levels = n.bit_length() - 1
+        if 1 << levels != n:
+            raise ValueError("Length is not a power of 2")
+
+        size = 2
+        while size <= n:
+            halfsize = size // 2
+            tablestep = n // size
+            for i in range(0, n, size):
+                k = 0
+                for j in range(i, i + halfsize):
+                    l = j + halfsize
+                    left = vector[j]
+                    right = vector[l] * powtable[k]
+                    vector[j] = left + right
+                    vector[l] = left - right
+                    k += tablestep
+            size *= 2
+
+        nroots = ZFieldElExt(len(powtable)*2)
+        if self.FIDX == ZUtils.FEXT:
+           scaler = nroots.inv()
+        else:
+           scaler = nroots.inv().reduce()
+
+        self.zcoeff = [c * scaler for c in self.get_coeff()]
+ 
     def _ntt(self, powtable):
         """
          Computes the forward number-theoretic transform of the given vector in place,

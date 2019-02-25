@@ -202,7 +202,6 @@ class GrothSnarks(object):
         nVars = self.vk_proof['nVars']
         nPublic = self.vk_proof['nPublic']
 
-        
         self.pi_a_eccf1  += np.sum(np.multiply(self.A_eccf1[:nVars], self.witness_scl[:nVars]))
         self.pi_b_eccf2  += np.sum(np.multiply(self.B2_eccf2[:nVars], self.witness_scl[:nVars]))
         pib1_eccf1       += np.sum(np.multiply(self.B1_eccf1[:nVars], self.witness_scl[:nVars]))
