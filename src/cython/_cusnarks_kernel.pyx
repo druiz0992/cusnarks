@@ -165,4 +165,16 @@ cdef class ECBN128_2 (CUSnarks):
 
 
 
+# CUPoly class cython wrapper
+cdef class ZPoly (CUSnarks):
+    cdef C_ZPoly* _zpoly_ptr
+
+    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+        if out_len == 0:
+            out_len = in_len
+        self._zpoly_ptr = new C_ZPoly(in_len,seed)
+        self._cusnarks_ptr = <C_CUSnarks *>self._zpoly_ptr
+
+    def __dealloc__(self):
+        del self._zpoly_ptr
 

@@ -186,12 +186,19 @@ typedef enum{
 
 // index to ec128bn class kernels
 typedef enum{
-   CB_EC2_JAC_ADD = =,
+   CB_EC2_JAC_ADD = 0,
    CB_EC2_JAC_DOUBLE,
    CB_EC2_JAC_MUL,
    CB_EC2_JAC_MAD,
    CB_EC2_N
 
 }ec2_callback_t;
+
+typedef enum{
+   CB_ZPOLY_FFT = 0,
+   CB_ZPOLY_IFFT,
+   CB_ZPOLY_N
+
+}zpoly_callback_t
 
 #endif
