@@ -68,6 +68,7 @@
    #endif
 #else
   #define logInfo(f,...) 
+  #define logInfoBigNumber(STR, X)
 #endif
 
 

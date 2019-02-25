@@ -61,14 +61,14 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     
     if (params->premod){
       #pragma unroll
-      for (i=0; i< params->stride/2-1; i++){
+      for (i=0; i< params->stride/2; i++){
         modu256(&x[i*NWORDS_256BIT],&x[i*NWORDS_256BIT], params->midx);
         modu256(&y[i*NWORDS_256BIT],&y[i*NWORDS_256BIT], params->midx);
       }
     }
 
    #pragma unroll
-   for (i=0; i< params->stride/2-1; i++){
+   for (i=0; i< params->stride/2; i++){
       addmu256(&z[i*NWORDS_256BIT],(const uint32_t *)&x[i*NWORDS_256BIT], (const uint32_t *)&y[i*NWORDS_256BIT], params->midx);
    }   
 }
@@ -159,7 +159,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     addmu256(smem_ptr, (const uint32_t *)x, (const uint32_t *)&x[U256K_OFFSET], params->midx);
     /*
     if (idx == debug_idx){
-       logDebugBigNumber("smem\n",smem_ptr);
+       logInfoBigNumber("smem\n",smem_ptr);
     }
     */
 
@@ -168,18 +168,16 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
       addmu256(smem_ptr, (const uint32_t *)smem_ptr, (const uint32_t *)&x[(i+2)*U256K_OFFSET], params->midx);
       /*
       if (idx == debug_idx){
-        logDebug("idx:%d, %d\n",idx,i);
-        logDebugBigNumber("smem[i]\n",smem_ptr);
+        logInfo("idx:%d, %d\n",idx,i);
+        logInfoBigNumber("smem[i]\n",smem_ptr);
       }
       */
     }
     __syncthreads();
 
-    /*
     if (idx == debug_idx){
-       logDebugBigNumber("smem[i]\n",smem_ptr);
+       logInfoBigNumber("smem[i]\n",smem_ptr);
     }
-    */
     // reduction global mem
     if (blockDim.x >= 1024 && tid < 512){
       /*
@@ -245,11 +243,9 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
       addmu256(smem_ptr,
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+64)*NWORDS_256BIT], params->midx);
-      /*
       if (idx == debug_idx){
-        logDebugBigNumber("smem[=64+0]\n",smem_ptr);
+        logInfoBigNumber("smem[=64+0]\n",smem_ptr);
       }
-      */
     }
     __syncthreads();
       
@@ -257,20 +253,19 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
     if (tid < 32)
     {
         volatile uint32_t *vsmem = smem;
-        /*
+          /*
         if (idx == debug_idx){
-          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
+          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+          logInfoBigNumber("+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
         }
-        */
+         */
         addmu256((uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid * NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+32)*NWORDS_256BIT], params->midx);
-        /*
+       /*
         if (idx == debug_idx){
-        logDebugBigNumber("smem[=32+0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("smem[=32+0]\n",(uint32_t *)vsmem);
         }
-       
         if (idx == debug_idx){
           logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
         logDebugBigNumber("+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
@@ -327,11 +322,229 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
         addmu256((uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
                  (const uint32_t *)&vsmem[(tid+1)*NWORDS_256BIT], params->midx);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem[=0+1]\n",(uint32_t *)vsmem);
+        }
+
+        if (tid==0) {
+           memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
+        }
+    }
+
+      
+}
+
+
+__global__ void addmu256_reduce_kernel2(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    unsigned int tid = threadIdx.x;
+    uint32_t i;
+
+    uint32_t debug_idx = 0;
+
+    extern __shared__ uint32_t smem[];
+    uint32_t *smem_ptr = &smem[tid*NWORDS_256BIT];  // 0 .. blockDim
+    //uint32_t smem_ptr[128*NWORDS_256BIT];
+
+    uint32_t __restrict__ *x;
+    uint32_t __restrict__ *z;
+   
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET + U256_XOFFSET]; // 0 .. N-1
+    z = (uint32_t *) &out_vector[blockIdx.x * U256K_OFFSET];  // 
+    //memset(smem, 0, blockDim.x * NWORDS_256BIT * sizeof(uint32_t));
+    
+    /*
+    if (idx == debug_idx){
+       logDebugBigNumber("smem[0]\n",smem_ptr);
+      for (i =0; i < params->stride; i++){
+       logDebugBigNumber("X[0]\n",&x[i * U256K_OFFSET]);
+      }
+    }
+    */
+    if (params->premod){
+      #pragma unroll
+      for (i =0; i < params->stride; i++){
+        modu256(&x[i*U256K_OFFSET],&x[i*U256K_OFFSET], params->midx);
+      }
+    }
+
+    addmu256_2(smem_ptr, (const uint32_t *)x, (const uint32_t *)&x[U256K_OFFSET], params->midx);
+  /*
+    if (idx == debug_idx){
+       logInfoBigNumber("smem2\n",smem_ptr);
+    }
+  */
+
+    #pragma unroll
+    for (i =0; i < params->stride-2; i++){
+      addmu256_2(smem_ptr, (const uint32_t *)smem_ptr, (const uint32_t *)&x[(i+2)*U256K_OFFSET], params->midx);
+/*
+      if (idx == debug_idx){
+        logDebug("idx:%d, %d\n",idx,i);
+        logInfoBigNumber("smem2[i]\n",smem_ptr);
+      }
+*/
+    }
+    __syncthreads();
+
+    
+    if (idx == debug_idx){
+       logInfoBigNumber("smem2[i]\n",smem_ptr);
+    }
+    
+    // reduction global mem
+    if (blockDim.x >= 1024 && tid < 512){
+      /*
+      if (idx == debug_idx){
+        logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
+      }
+      */
+      addmu256_2(smem_ptr,
+               (const uint32_t *)smem_ptr,
+               (const uint32_t *)&smem[(tid+512)*NWORDS_256BIT], params->midx);
+      /*
+      if (idx == debug_idx){
+        logDebugBigNumber("smem[0]\n",smem_ptr);
+      }
+      */
+    }
+    __syncthreads();
+
+    if (blockDim.x >= 512 && tid < 256){
+      /*
+      if (idx == debug_idx){
+        logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
+      }
+       */
+      addmu256_2(smem_ptr,
+               (const uint32_t *)smem_ptr,
+               (const uint32_t *)&smem[(tid+256)*NWORDS_256BIT], params->midx);
+       /*
+      if (idx == debug_idx){
+        logDebugBigNumber("smem[=256]\n",smem_ptr);
+      }
+      */
+    }
+    __syncthreads();
+
+    if (blockDim.x >= 256 && tid < 128){
+       /*
+       if (idx == debug_idx){
+         logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
+       }
+       */
+      addmu256_2(smem_ptr,
+               (const uint32_t *)smem_ptr,
+               (const uint32_t *)&smem[(tid+128)*NWORDS_256BIT], params->midx);
+       /*
+       if (idx == debug_idx){
+         logDebugBigNumber("smem[=128+0]\n",smem_ptr);
+       }
+       */
+    }
+    __syncthreads();
+
+    if (blockDim.x >= 128 && tid < 64){
+      /*
+      if (idx == debug_idx){
+        logDebugBigNumber("+smem[0]\n",smem_ptr);
+        logDebugBigNumber("+smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
+      }
+      */
+      addmu256_2(smem_ptr,
+               (const uint32_t *)smem_ptr,
+               (const uint32_t *)&smem[(tid+64)*NWORDS_256BIT], params->midx);
+      if (idx == debug_idx){
+        logInfoBigNumber("smem2[=64+0]\n",smem_ptr);
+      }
+    }
+    __syncthreads();
+      
+    // unrolling warp
+    if (tid < 32)
+    {
+        volatile uint32_t *vsmem = smem;
         /*
         if (idx == debug_idx){
-          logDebugBigNumber("smem[=0+1]\n",(uint32_t *)vsmem);
+          logInfoBigNumber("+smem2[0]\n",(uint32_t *)vsmem);
+        logInfoBigNumber("+smem2[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
         }
         */
+        addmu256_2((uint32_t *)&vsmem[tid * NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid * NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+32)*NWORDS_256BIT], params->midx);
+        
+         /*
+        if (idx == debug_idx){
+        logInfoBigNumber("smem2[=32+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logInfoBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
+        }
+        */
+        addmu256_2((uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+16)*NWORDS_256BIT], params->midx);
+        /*
+        if (idx == debug_idx){
+        logDebugBigNumber("smem[=16+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
+        }
+        */
+        addmu256_2((uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+8)*NWORDS_256BIT], params->midx);
+        /*
+        if (idx == debug_idx){
+          logDebugBigNumber("smem[=8+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
+        }
+        */
+        addmu256_2((uint32_t *) &vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+4)*NWORDS_256BIT], params->midx);
+        /*
+        if (idx == debug_idx){
+          logDebugBigNumber("smem[=4+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
+        }
+        */
+        addmu256_2((uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+2)*NWORDS_256BIT], params->midx);
+        /*
+        if (idx == debug_idx){
+          logDebugBigNumber("smem[=2+0]\n",(uint32_t *)vsmem);
+        }
+        if (idx == debug_idx){
+          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumber("smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
+        }
+        */
+        addmu256_2((uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[tid*NWORDS_256BIT],
+                 (const uint32_t *)&vsmem[(tid+1)*NWORDS_256BIT], params->midx);
+        if (idx == debug_idx){
+          logInfoBigNumber("smem2[=0+1]\n",(uint32_t *)vsmem);
+        }
 
         if (tid==0) {
            memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
@@ -365,14 +578,14 @@ __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     
     if (params->premod){
       #pragma unroll
-      for (i=0; i< params->stride/2-1; i++){
+      for (i=0; i< params->stride/2; i++){
         modu256(&x[i*NWORDS_256BIT],&x[i*NWORDS_256BIT], params->midx);
         modu256(&y[i*NWORDS_256BIT],&y[i*NWORDS_256BIT], params->midx);
       }
     }
 
    #pragma unroll
-   for (i=0; i< params->stride/2-1; i++){
+   for (i=0; i< params->stride/2; i++){
       submu256(&z[i*NWORDS_256BIT],(const uint32_t *)&x[i*NWORDS_256BIT], (const uint32_t *)&y[i*NWORDS_256BIT], params->midx);
    }   
 } 
@@ -537,32 +750,32 @@ __forceinline__ __device__ void addu288(uint32_t __restrict__ *z, const uint32_t
 {
   // z[i] = x[i] + y[i] for 8x32 bit words
   asm("{                             \n\t"
-      ".reg .u32         %x_;        \n\t"
-      ".reg .u32         %y_;        \n\t"
-      "mov.u32           %x_,%8;     \n\t"
-      "mov.u32           %y_,%9;     \n\t"
-      "add.cc.u32        %0, %x_, %y_;\n\t"             // sum with carry out
-      "mov.u32           %x_,%10;     \n\t"
-      "mov.u32           %y_,%11;     \n\t"
-      "addc.cc.u32       %1, %x_, %y_;\n\t"             // sum with carry in and carry out
-      "mov.u32           %x_,%12;     \n\t"
-      "mov.u32           %y_,%13;     \n\t"
-      "addc.cc.u32       %2, %x_, %y_;\n\t"             // sum with carry in and carry out
-      "mov.u32           %x_,%14;     \n\t"
-      "mov.u32           %y_,%15;     \n\t"
-      "addc.cc.u32       %3, %x_, %y_;\n\t"             // sum with carry in and carry out
-      "mov.u32           %x_,%16;     \n\t"
-      "mov.u32           %y_,%17;     \n\t"
-      "addc.cc.u32       %4, %x_, %y_;\n\t"             // sum with carry in and carry out
-      "mov.u32           %x_,%18;     \n\t"
-      "mov.u32           %y_,%19;     \n\t"
-      "addc.cc.u32       %5, %x_, %y_;\n\t"             // sum with carry in and carry out
-      "mov.u32           %x_,%20;     \n\t"
-      "mov.u32           %y_,%21;     \n\t"
-      "addc.cc.u32       %6, %x_, %y_;\n\t"             // sum with carry in and carry out
-      "mov.u32           %x_,%22;     \n\t"
-      "mov.u32           %y_,%23;     \n\t"
-      "addc.u32          %7, %x_, %y_;\n\t"             // sum with carry in 
+      //".reg .u32         %x_;        \n\t"
+      //".reg .u32         %y_;        \n\t"
+      //"mov.u32           %x_,%8;     \n\t"
+      //"mov.u32           %y_,%9;     \n\t"
+      "add.cc.u32        %0, %8, %9;\n\t"             // sum with carry out
+      //"mov.u32           %x_,%10;     \n\t"
+      //"mov.u32           %y_,%11;     \n\t"
+      "addc.cc.u32       %1, %10, %11;\n\t"             // sum with carry in and carry out
+      //"mov.u32           %x_,%12;     \n\t"
+      //"mov.u32           %y_,%13;     \n\t"
+      "addc.cc.u32       %2, %12, %13;\n\t"             // sum with carry in and carry out
+      //"mov.u32           %x_,%14;     \n\t"
+      //"mov.u32           %y_,%15;     \n\t"
+      "addc.cc.u32       %3, %14, %15;\n\t"             // sum with carry in and carry out
+      //"mov.u32           %x_,%16;     \n\t"
+      //"mov.u32           %y_,%17;     \n\t"
+      "addc.cc.u32       %4, %16, 17;\n\t"             // sum with carry in and carry out
+      //"mov.u32           %x_,%18;     \n\t"
+      //"mov.u32           %y_,%19;     \n\t"
+      "addc.cc.u32       %5, %18, %19;\n\t"             // sum with carry in and carry out
+      //"mov.u32           %x_,%20;     \n\t"
+      //"mov.u32           %y_,%21;     \n\t"
+      "addc.cc.u32       %6, %20, %21;\n\t"             // sum with carry in and carry out
+      //"mov.u32           %x_,%22;     \n\t"
+      //"mov.u32           %y_,%23;     \n\t"
+      "addc.u32          %7, %22, %23;\n\t"             // sum with carry in 
       "}                             \n\n"
       : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
         "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7]), "=r"(z[8])
@@ -672,14 +885,79 @@ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __rest
 */
 __device__ void addmu256(uint32_t __restrict__*z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
-   uint32_t tmp[NWORDS_256BIT];
+  uint32_t const __restrict__ *p = mod_info_ct[midx].p;
+  uint32_t tmp[NWORDS_256BIT];
+
+   addu256(tmp,x,y);
+   //if (tmp[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
+    if (ltu256(p,tmp)){
+      subu256(tmp,tmp,p);
+   } 
+   asm("mov.u32     %0,  %8;\n\t"
+       "mov.u32     %1,  %9;\n\t"
+       "mov.u32     %2,  %10;\n\t"
+       "mov.u32     %3,  %11;\n\t"
+       "mov.u32     %4,  %12;\n\t"
+       "mov.u32     %5,  %13;\n\t"
+       "mov.u32     %6,  %14;\n\t"
+       "mov.u32     %7,  %15;\n\t"
+    : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+      "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+    : "r"(tmp[0]), "r"(tmp[1]), "r"(tmp[2]), "r"(tmp[3]),
+      "r"(tmp[4]), "r"(tmp[5]), "r"(tmp[6]), "r"(tmp[7]));
+#if 0
+  // if (ltu256(p,z)) {
    if (eq0u256(y)) {
-      memcpy(z,x,NWORDS_256BIT * sizeof(uint32_t));
+   asm("mov.u32     %0,  %8;\n\t"
+       "mov.u32     %1,  %9;\n\t"
+       "mov.u32     %2,  %10;\n\t"
+       "mov.u32     %3,  %11;\n\t"
+       "mov.u32     %4,  %12;\n\t"
+       "mov.u32     %5,  %13;\n\t"
+       "mov.u32     %6,  %14;\n\t"
+       "mov.u32     %7,  %15;\n\t"
+    : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+      "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+    : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]),
+      "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+      //memcpy(z,x,NWORDS_256BIT * sizeof(uint32_t));
 
    } else {
+      //subu256(tmp,p,y);
       subu256(tmp,mod_info_ct[midx].p,y);
       submu256(z,x,tmp, midx);
    }
+
+#endif
+  
+}
+__device__ void addmu256_2(uint32_t __restrict__*z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
+{
+  uint32_t const __restrict__ *p = mod_info_ct[midx].p;
+  uint32_t tmp[NWORDS_256BIT];
+  // if (ltu256(p,z)) {
+   if (eq0u256(y)) {
+   asm("mov.u32     %0,  %8;\n\t"
+       "mov.u32     %1,  %9;\n\t"
+       "mov.u32     %2,  %10;\n\t"
+       "mov.u32     %3,  %11;\n\t"
+       "mov.u32     %4,  %12;\n\t"
+       "mov.u32     %5,  %13;\n\t"
+       "mov.u32     %6,  %14;\n\t"
+       "mov.u32     %7,  %15;\n\t"
+    : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+      "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+    : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]),
+      "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+      //memcpy(z,x,NWORDS_256BIT * sizeof(uint32_t));
+
+   } else {
+      //subu256(tmp,p,y);
+      subu256(tmp,mod_info_ct[midx].p,y);
+      submu256(z,x,tmp, midx);
+
+   }
+
 }
 
 /*
@@ -709,7 +987,7 @@ __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
   uint32_t tmp[NWORDS_256BIT+1];  //288 bits. I can multiply by up to 32
   memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
 
-  assert(k < U256_MAX_SMALLK)
+  assert(k < U256_MAX_SMALLK);
 
   addu288(z,x,x); 
 
@@ -866,11 +1144,25 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    }
 
    logDebugBigNumber("T before mod\n",T);
+  
    /* Step 3: if(u>=n) return u-n else return u */
-   if (ltu256(P_u256,T)){
+   //if (ltu256(P_u256,T)){
+   if (P_u256[NWORDS_256BIT-1] < T[NWORDS_256BIT-1]){
       subu256(U,T,P_u256);
    } else {
-      memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
+      //memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
+   asm("mov.u32     %0,  %8;\n\t"
+       "mov.u32     %1,  %9;\n\t"
+       "mov.u32     %2,  %10;\n\t"
+       "mov.u32     %3,  %11;\n\t"
+       "mov.u32     %4,  %12;\n\t"
+       "mov.u32     %5,  %13;\n\t"
+       "mov.u32     %6,  %14;\n\t"
+       "mov.u32     %7,  %15;\n\t"
+    : "=r"(U[0]), "=r"(U[1]), "=r"(U[2]), "=r"(U[3]),
+      "=r"(U[4]), "=r"(U[5]), "=r"(U[6]), "=r"(U[7])
+    : "r"(T[0]), "r"(T[1]), "r"(T[2]), "r"(T[3]),
+      "r"(T[4]), "r"(T[5]), "r"(T[6]), "r"(T[7]));
    }
    logDebugBigNumber("U after mod\n",U);
 
@@ -879,7 +1171,7 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
 __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
 {
    //TODO : implement proper squaring
-   mulmontu256(U,A,A,mid);
+   mulmontu256(U,A,A,midx);
 }
 /*
    x mod N
@@ -906,29 +1198,36 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 
   // x(255 bit number worst case) - p (253 bit number) = z (255 bit number) : ex 31(5 b) - 4(3 b) =27 (5 b) 
   if (!ltu256(z,p)){
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
      subu256(z,z,p);
   } else { return; }
   // x(255 bit ) - p (253 bit number) = z (255 bit number) : ex 27(5 b) - 4(3 b) =23 (5 b) 
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   if (!ltu256(z,p)){
      subu256(z,z,p);
   } else { return; }
   // x(255 bit ) - p (253 bit number) = z (255 bit number) : ex 23(5 b) - 4(3 b) = 19 (5 b) 
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   if (!ltu256(z,p)){
      subu256(z,z,p);
   } else { return; }
   // x(255 bit ) - p (253 bit number) = z (254 bit number) : ex 19(5 b) - 4(3 b) = 15 (4 b) 
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   if (!ltu256(z,p)){
      subu256(z,z,p);
   } else { return; }
   // x(254 bit ) - p (253 bit number) = z (254 bit number) : ex 15(5 b) - 4(3 b) = 11 (4 b) 
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   if (!ltu256(z,p)){
      subu256(z,z,p);
   } else { return; }
   // x(254 bit ) - p (253 bit number) = z (254 bit number) : ex 11(5 b) - 4(3 b) = 7 (3 b) 
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   if (!ltu256(z,p)){
      subu256(z,z,p);
   } else { return; }
   // x(254 bit ) - p (253 bit number) = z (254 bit number) : ex 7(5 b) - 4(3 b) = 3 (3 b) 
+  //if (z[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   if (!ltu256(z,p)){
      subu256(z,z,p);
   } else { return; }
@@ -1004,9 +1303,9 @@ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
 /*
    (c,s) = x + y * a for 32 bit number. Returns 32 bit number and 32 bit carry
 */
-__device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a)
+__forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a)
 {
-   // (C,S) = t[0] + a[0] * b[i] -> No carry in
+   // (C,S) =  x * y + a -> No carry in
    asm("{                                   \n\t"
        "mad.lo.cc.u32  %0, %2, %3, %4;      \n\t"
        "madc.hi.u32    %1, %2, %3, 0;       \n\t"
@@ -1017,13 +1316,11 @@ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32
 /*
    (c.s) = x + y for 32 bit numbers. Returns 32 bit number and 1 bit carry
 */
-__device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y)
+__forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y)
 {
    asm("{                               \n\t"
-       ".reg .u32          %tmp;          \n\t"
-       "add.cc.u32         %tmp, %2, %3;    \n\t"
-       "set.lt.u32.u32     %1, %tmp, %2; \n\t"
-       "mov.u32            %0, %tmp;        \n\t"
+       "add.cc.u32         %0, %2, %3;    \n\t"
+       "set.lt.u32.u32     %1, %0, %2; \n\t"
        "and.b32            %1, %1,1;     \n\t" 
        "}                               \n\t"
        : "=r"(s[0]), "=r"(c[0]) 
@@ -1032,19 +1329,17 @@ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y)
 /*
    Propagate carry bit across a 256 bit number starting in 32 bit word indexed by digit
 */
-__device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit)
+__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit)
 {
-   while ((digit < NWORDS_256BIT_FIOS) && (c))
+   #pragma unroll
+   for (; digit < NWORDS_256BIT_FIOS-1 ; digit++)
    {
      asm("{                                   \n\t"
-         ".reg .u32       %tmp;               \n\t"
-         "mov.u32         %tmp, %2;           \n\t"
-         "add.cc.u32      %0,   %1, %tmp;   \n\t"
-         "set.lt.u32.u32  %1,   %0,   %tmp;   \n\t"
-         "and.b32         %1,   %1,   1;      \n\t"
+         "add.cc.u32      %0,   %3, %2;   \n\t"
+         "set.lt.u32.u32  %1,   %0, %2;   \n\t"
+         "and.b32         %1,   %1,  1;      \n\t"
          "}                                   \n\t"
          : "=r"(x[digit]), "=r"(c) 
          : "r"(x[digit]), "r"(c));
-     digit++;
    }
 }

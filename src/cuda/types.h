@@ -36,6 +36,7 @@
 
 #define NWORDS_256BIT           (8)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
+#define PRIME_BASE              (30)
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
 #define U256_NDIMS              (1)
@@ -68,6 +69,18 @@
 #define ECK_JAC_OUTDIMS              (ECP_JAC_OUTDIMS)
 #define ECK_JAC_INOFFSET             (ECK_JAC_INDIMS * NWORDS_256BIT)
 #define ECK_JAC_OUTOFFSET            (ECK_JAC_OUTDIMS * NWORDS_256BIT)
+
+#define ECP2_AFF_INOFFSET            (ECP2_AFF_INDIMS * NWORDS_256BIT)
+#define ECP2_AFF_INXOFFSET           (0 * NWORDS_256BIT)
+#define ECP2_AFF_INYOFFSET           (2 * NWORDS_256BIT)
+#define ECP2_AFF_INZOFFSET           (4 * NWORDS_256BIT)
+#define ECP2_AFF_INDIMS             (6)               
+
+#define ECP2_JAC_OUTOFFSET           (ECP_JAC_OUTDIMS * NWORDS_256BIT)
+#define ECP2_JAC_OUTXOFFSET          (0 * NWORDS_256BIT)
+#define ECP2_JAC_OUTYOFFSET          (2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTDIMS              (4)  //x0,x1, y0,y1
+#define ECK2_JAC_OUTDIMS              (ECP2_JAC_OUTDIMS)
 
 #define CUSNARKS_BLOCK_DIM      (256)
 #define CUSNARKS_MAX_NCB        (32)
