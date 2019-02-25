@@ -55,6 +55,11 @@ class ZPolyTest(unittest.TestCase):
     TEST_ITER = 10
     MAX_POLY_DEGREE = 200
     SHIFT_SCALAR = 70
+    MAX_FFT_NROWS = 3
+    MAX_FFT_NROWS_W = 3
+    MAX_FFT_NCOLS = 3
+    MAX_FFT_NCOLS_W = 3
+    FFT_PARALLEL_N = 4
 
     def test_0init_ext(self):
         c = ZUtils.CURVE_DATA['BN128']
@@ -856,6 +861,41 @@ class ZPolyTest(unittest.TestCase):
             self.assertTrue(p3_sps_ext.to_dense() == r3_dense_ext)
             self.assertTrue(rext_f == ZUtils.FEXT)
             self.assertTrue(isinstance(p3_sps_ext, ZPolySparse))
+
+    def test_5parallel_fft(self):
+        c = ZUtils.CURVE_DATA['BN128']
+        prime = c['prime_r']
+        ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
+        ZPoly(1,force_init=True)
+
+        ZUtils.NROOTS=  ZPolyTest.FFT_PARALLEL_N ** 2 * \
+              (1 << (ZPolyTest.MAX_FFT_NCOLS_W + ZPolyTest.MAX_FFT_NCOLS + ZPolyTest.MAX_FFT_NROWS_W + ZPolyTest.MAX_FFT_NROWS))
+        roots_ext, inv_roots_ext = ZField.find_roots(ZUtils.NROOTS, rformat_ext=True)
+        roots_rdc = [r.reduce() for r in roots_ext]
+        inv_roots_rdc = [r.reduce() for r in inv_roots_ext]
+
+        # *, + , - , /, inv, scalar mul
+        for i in xrange(ZPolyTest.TEST_ITER):
+            nr = 1 << randint(0, ZPolyTest.MAX_FFT_NROWS)
+            nwr = 1 << randint(0, ZPolyTest.MAX_FFT_NROWS_W)
+            nc =  1 << randint(0, ZPolyTest.MAX_FFT_NCOLS)
+            nwc = 1 << randint(0, ZPolyTest.MAX_FFT_NCOLS_W)
+            p_d = (ZPolyTest.FFT_PARALLEL_N * nr * nwr * ZPolyTest.FFT_PARALLEL_N * nc * nwc) - 1
+
+            poly_ext = ZPoly(p_d)
+
+            poly_rdc = poly_ext.reduce()
+
+            # *
+            p_rdc = ZPoly(poly_rdc)
+            r_rdc = ZPoly(poly_rdc)
+
+            ZField.roots[0] = roots_rdc
+            ZField.inv_roots[0] = inv_roots_rdc
+            p_rdc.ntt_parallel3D(ZPolyTest.FFT_PARALLEL_N * nr , nwr, ZPolyTest.FFT_PARALLEL_N * nc, nwc)
+            r_rdc.ntt()
+
+            self.assertTrue(p_rdc == r_rdc)
 
 if __name__ == "__main__":
     unittest.main()
