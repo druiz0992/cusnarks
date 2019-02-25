@@ -33,6 +33,7 @@
 #ifndef _ZPOLY_DEVICE_H_
 #define _ZPOLY_DEVICE_H_
 
+#define ZPOLY_FFT_N (5)
 
 __global__ void fft_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void ifft_kernel_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
