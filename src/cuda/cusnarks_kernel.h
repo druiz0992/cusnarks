@@ -56,7 +56,7 @@ class CUSnarks {
     public:
 
         void rand(uint32_t *samples, uint32_t n_samples);
-        void kernelLaunch(
+        double kernelLaunch(
 		//kernel_cb launcher,
                 uint32_t kernel_idx,
                 vector_t *out_vector_host,

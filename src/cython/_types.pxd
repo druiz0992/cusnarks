@@ -76,4 +76,6 @@ cdef extern from "types.h":
   ctypedef enum ec_callback_t:
    CB_EC_LDR_ADD, CB_EC_LDR_DOUBLE, CB_EC_LDR_MUL, CB_EC_LDR_MAD, CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MAD, CB_EC_N
     
+  ctypedef enum ec2_callback_t:
+   CB_EC2_JAC_ADD, CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MAD, CB_EC2_N
 _NWORDS_256BIT = NWORDS_256BIT

@@ -88,7 +88,7 @@ static uint32_t mod_info_init[] = {
 
         4026531841, 1138881939, 2042196113,  674490440, 2172737629, 3092268470, 3778125865,  811880050, // p_field
         4026531839, 3269588371, 1281954227, 1703315019, 2567316369, 3818559528,  226705842, 1945644829, // pp_field
-        1840322894, 3696992261, 3776048263,  151975337, 2931318109, 3357937124, 2193970460,  367786321 // rp_field
+        1840322894, 3696992261, 3776048263,  151975337, 2931318109, 3357937124, 2193970460,  367786321, // rp_field
         4026531840, 1138881939, 2042196113,  674490440, 2172737629, 3092268470, 3778125865,  811880050, // nonres_field
 };
 
@@ -222,12 +222,6 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
   out_vector_device.length = out_len;
   out_vector_device.size = out_size;
 
-  logInfo("Init\n");
-  logInfo("IVDS : %d, IVDL : %d\n", in_vector_device.size,
-				       	in_vector_device.length);
-
-  logInfo("OVDS : %d, OVDL : %d\n", out_vector_device.size,
-						       	out_vector_device.length);
   allocateCudaResources(in_size, out_size);
   initRNG(seed);
 }
@@ -306,42 +300,22 @@ CUSnarks::~CUSnarks()
     params          : Kernel input parameters
 
 */
-void CUSnarks::kernelLaunch(
+double CUSnarks::kernelLaunch(
                 uint32_t kernel_idx,
 		vector_t *out_vector_host,
 	       	vector_t *in_vector_host,
                 kernel_config_t *config,
                 kernel_params_t *params)
 {
-  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
-		                                        in_vector_host->length,
-						       	in_vector_device.size,
-						       	in_vector_device.length);
-
-  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
-		                                        out_vector_host->length, 
-							out_vector_device.size,
-						       	out_vector_device.length);
-
   // check input lengths do not exceed reserved amount
-  if (in_vector_host->length > in_vector_device.length) { return; }
-  if (out_vector_host->length > out_vector_device.length) { return; }
+  if (in_vector_host->length > in_vector_device.length) { return 0.0; }
+  if (out_vector_host->length > out_vector_device.length) { return 0.0; }
 
   in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
   out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
 
   double start, end_copy_in, end_kernel, end_copy_out;
   int blockD, gridD;
-
-  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
-		                                        in_vector_host->length,
-						       	in_vector_device.size,
-						       	in_vector_device.length);
-
-  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
-		                                        out_vector_host->length, 
-							out_vector_device.size,
-						       	out_vector_device.length);
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
@@ -360,8 +334,6 @@ void CUSnarks::kernelLaunch(
 
 
   // launch kernel
-  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",params->premod, params->midx, params->in_length, params->out_length, params->stride);
-  logInfo("Kernel IDX :%d <<<%d, %d, %d>>>\n", kernel_idx, gridD, blockD, config->smemS);
   start = elapsedTime();
   kernel_callbacks[kernel_idx]<<<gridD, blockD, config->smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
   CCHECK(cudaGetLastError());
@@ -391,6 +363,8 @@ void CUSnarks::kernelLaunch(
           in_vector_host->size, end_copy_in);
   logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
           out_vector_host->size, end_copy_out);
+
+  return end_kernel;
 }
 
 /*
