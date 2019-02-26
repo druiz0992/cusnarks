@@ -56,6 +56,7 @@
 """
 import math
 from random import randint
+import numpy as np
 
 from zfield import *
 
@@ -582,35 +583,30 @@ class ZPoly(object):
 
     def _ntt2(self, powtable):
         """
-         Computes the forward number-theoretic transform of the given vector in place,
+         Computes the forward number-theoretic transform of the given vector in place ,
          with respect to the given primitive nth root of unity under the given modulus.
          The length of the vector must be a power of 2.
+         INput is ordered. Output is unordered
 
          Powtable is table with nth root roots of unity where n is the number of points in NTT
          Only N/2 roots of unity are needed
-
-         NOTE https://www.nayuki.io/page/number-theoretic-transform-integer-dft
         """
         vector = self.zcoeff
-        n = len(vector)
-        levels = n.bit_length() - 1
-        if 1 << levels != n:
-            raise ValueError("Length is not a power of 2")
-
-        size = 2
-        while size <= n:
-            halfsize = size // 2
-            tablestep = n // size
-            for i in range(0, n, size):
-                k = 0
-                for j in range(i, i + halfsize):
-                    l = j + halfsize
-                    left = vector[j]
-                    right = vector[l] 
-                    vector[j] = left + right
-                    vector[l] = left - right * powtable[k]
-                    k += tablestep
-            size *= 2
+        n = len(vector).bit_length()-1
+   
+        for i in range(n):
+             for j in range(2**i):
+                 for k in range(2**(n-i-1)):
+                     s = j*2**(n-i) + k
+                     t = s + 2 ** (n-i-1)
+                     left = vector[s]
+                     right = vector[t] 
+                     vector[s] = left + right
+                     vector[t] = (left - right) * powtable[k]
+                     print "L:" + str(i)
+                     print "s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256())
+                     print "t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256())
+                     print "k:" + str(k) + " root " +str(powtable[k].as_uint256())
 
     def _intt2(self, powtable):
         """
@@ -948,6 +944,19 @@ class ZPoly(object):
         else :
           l =  self.dict_to_list()
           print [c.as_long() for c in l]
+
+    def as_uint256(self):
+        if type(self.get_coeff()) is list:
+            return np.asarray([c.as_uint256() for c in self.get_coeff()])
+
+    @staticmethod
+    def from_uint256(x,reduced=False):
+        if reduced:
+            P = ZPoly([ZFieldElRedc(BigInt.from_uint256(x_)) for x_ in x])
+        else:
+            P = ZPoly([ZFieldElExt(BigInt.from_uint256(x_)) for x_ in x])
+
+        return P
 
 
 class ZPolySparse(ZPoly):

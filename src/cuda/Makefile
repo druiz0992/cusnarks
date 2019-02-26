@@ -42,7 +42,7 @@ CUSRC = cusnarks_kernel.cu \
         ecbn128.cu \
         ecbn128_device.cu \
 	ecbn128_2.cu \
-	ecbn128_device.cu \
+        ecbn128_2_device.cu \
 	zpoly.cu \
 	zpoly_device.cu \
         log.cu

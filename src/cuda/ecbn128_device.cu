@@ -39,8 +39,9 @@
 #include "types.h"
 #include "cuda.h"
 #include "log.h"
-#include "ecbn128_device.h"
+#include "utils_device.h"
 #include "u256_device.h"
+#include "ecbn128_device.h"
 
 __global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {

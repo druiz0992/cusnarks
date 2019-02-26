@@ -33,12 +33,12 @@
 #ifndef _ZPOLY_H
 #define _ZPOLY_H
 
-class ZPoly : public CUSnarks {
+class ZCUPoly : public CUSnarks {
 
     public:
 
-        ZPoly(uint32_t len);
-        ZPoly(uint32_t len, uint32_t seed);
+        ZCUPoly(uint32_t len);
+        ZCUPoly(uint32_t len, uint32_t seed);
 };
 
 #endif
