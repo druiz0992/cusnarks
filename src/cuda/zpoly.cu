@@ -51,7 +51,7 @@
 using namespace std;
 
 // kernel callbacks indexed by XXX_callback_t enum type
-static kernel_cb zpoly_kernel_callbacks[] = {fft_kernel, ifft_kernll};
+static kernel_cb zpoly_kernel_callbacks[] = {fft32_kernel, ifft32_kernel};
 
 /*
     Constructor : Reserves GPU memory and data initialization.

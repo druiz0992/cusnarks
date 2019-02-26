@@ -35,7 +35,10 @@
 
 #define ZPOLY_FFT_N (5)
 
-__global__ void fft_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
-__global__ void ifft_kernel_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void fft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void ifft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
+__device__ void fft32(uint32_t *x, mod_t midx);
+__device__ void ifft32(uint32_t *x, mod_t midx);
+__forceinline__ __device__ void fft_butterfly(uint32_t *d_out, uint32_t *d_in, uint32_t srcLane );
 #endif
