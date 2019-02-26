@@ -1,4 +1,3 @@
-#!/usr/bin/python2.7
 """
 /*
     Copyright 2018 0kims association.

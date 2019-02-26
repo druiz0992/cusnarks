@@ -56,16 +56,16 @@ extern __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __res
 extern __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ k, mod_t midx);
 extern __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 extern __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
-extern __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
-extern __device__ uint32_t eq0u256(const uint32_t __restrict__ *x);
-extern __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+//extern __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+//extern __device__ uint32_t eq0u256(const uint32_t __restrict__ *x);
+//extern __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 extern __device__ uint32_t shr1u256(const uint32_t __restrict__ *x);
 
-extern __device__ void mulu32(uint32_t __restrict__ *z,  uint32_t x,  uint32_t y);
-__forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);
-__forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y);
-__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit);
-__forceinline__ __device__ void addu256_32(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, uint32_t c);
+//__device__ void movu256(uint32_t __restrict__ *d_out, uint32_t __restrict__ *d_in)
+//extern __device__ void mulu32(uint32_t __restrict__ *z,  uint32_t x,  uint32_t y);
+//__forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);
+//__forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y);
+//__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit);
 
 //__device__ void printNumber(uint32_t *n);
 
