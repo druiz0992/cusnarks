@@ -59,13 +59,13 @@ static kernel_cb zpoly_kernel_callbacks[] = {fft32_kernel, ifft32_kernel};
 
     Arguments :
 */
-ZPoly::ZPoly (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len,
+ZCUPoly::ZCUPoly (uint32_t len) : CUSnarks( len, NWORDS_256BIT * sizeof(uint32_t) * len,
                                       len, NWORDS_256BIT * sizeof(uint32_t) * len,
 				      zpoly_kernel_callbacks, 0)
 {
 }
 
-ZPoly::Zpoly (uint32_t len, uint32_t seed) : CUSnarks(len, NWORDS_256BIT * sizeof(uint32_t) * len,
+ZCUPoly::ZCUPoly (uint32_t len, uint32_t seed) : CUSnarks(len, NWORDS_256BIT * sizeof(uint32_t) * len,
 	                                            len, NWORDS_256BIT * sizeof(uint32_t) * len, 
 				                    zpoly_kernel_callbacks, seed)
 {

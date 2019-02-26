@@ -33,12 +33,12 @@
 #ifndef _ECBN128_DEVICE_H_
 #define _ECBN128_DEVICE_H_
 
-__global__ void addecldr_kernel(uint32_t   *out_vector_data, uint32_t *in_vector_data, kernel_params_t *params);
+__global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void doublecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void scmulecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
-__global__ void addecjac_kernel(uint32_t   *out_vector_data, uint32_t *in_vector_data, kernel_params_t *params);
+__global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);

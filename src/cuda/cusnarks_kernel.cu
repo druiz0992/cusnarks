@@ -211,7 +211,7 @@ static uint32_t misc_const_init[] = {
 //14: 1884313618740866241758905828412908890553358798399578056779203882743340049521L,
 //15: 9841396785537381856564969674971451141489211418471679732638463192434711953212L,
 
-__constant__ uin32_t W32_ct[NWORDS_256BIT * 16];
+__constant__ uint32_t W32_ct[NWORDS_256BIT * 16];
 
 static uint32_t W32_roots[] = {
    1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // 0
@@ -251,7 +251,7 @@ static uint32_t W32_roots[] = {
 //14:  2045636844352702374206793797384653410244077599338878048873294280913162434483L,
 //15:  12618451901183418283185544717086974652256501941966615233121506426518205531347L,
 
-__constant__ uin32_t IW32_ct[NWORDS_256BIT * 16];
+__constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
 
 static uint32_t IW32_roots[] = {
         1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,
@@ -338,9 +338,9 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   CCHECK(cudaMemcpyToSymbol(mod_info_ct,       mod_h,     MOD_N * sizeof(mod_info_t)));  // prime info
   CCHECK(cudaMemcpyToSymbol(ecbn128_params_ct, ecbn128_h, MOD_N * sizeof(ecbn128_t)));   // ecbn128
   CCHECK(cudaMemcpyToSymbol(misc_const_ct,    misc_h,    MOD_N * sizeof(misc_const_t)));// misc
-  CCHECK(cudaMemcpyToSymbol(W32_ct,           W32_roots, sizeof(uin32_t) * NWORDS_256BIT * 16);// W32roots
-  CCHECK(cudaMemcpyToSymbol(IW32_ct,          IW32_roots, sizeof(uin32_t) * NWORDS_256BIT * 16);// IW32roots
-  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   IW32_nroots, sizeof(uin32_t) * NWORDS_256BIT );// inverse 32
+  CCHECK(cudaMemcpyToSymbol(W32_ct,           W32_roots, sizeof(uint32_t) * NWORDS_256BIT * 16));// W32roots
+  CCHECK(cudaMemcpyToSymbol(IW32_ct,          IW32_roots, sizeof(uint32_t) * NWORDS_256BIT * 16));// IW32roots
+  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   IW32_nroots, sizeof(uint32_t) * NWORDS_256BIT ));// inverse 32
 }
 
 /*

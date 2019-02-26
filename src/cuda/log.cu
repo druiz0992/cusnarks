@@ -68,7 +68,7 @@ void logInfoBigNumber(char *str, uint32_t *n)
   logInfo("%s",str);
   
   for (i=0; i < NWORDS_256BIT; i++){
-    logInfo("%x ",n[i]);
+    logInfo("%u ",n[i]);
   }
   logInfo("\n");
 }

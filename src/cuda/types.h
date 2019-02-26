@@ -212,6 +212,6 @@ typedef enum{
    CB_ZPOLY_IFFT,
    CB_ZPOLY_N
 
-}zpoly_callback_t
+}zpoly_callback_t;
 
 #endif

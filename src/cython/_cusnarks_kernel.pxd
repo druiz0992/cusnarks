@@ -64,9 +64,9 @@ cdef extern from "../cuda/ecbn128_2.h":
         C_ECBN128_2(ct.uint32_t len) except +
 
 cdef extern from "../cuda/zpoly.h":
-    cdef cppclass C_ZPoly "ZPoly" (C_CUSnarks) :
-        C_ZPoly(ct.uint32_t len, ct.uint32_t seed) except +
-        C_ZPoly(ct.uint32_t len) except +
+    cdef cppclass C_ZCUPoly "ZCUPoly" (C_CUSnarks) :
+        C_ZCUPoly(ct.uint32_t len, ct.uint32_t seed) except +
+        C_ZCUPoly(ct.uint32_t len) except +
 
 
 

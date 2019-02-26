@@ -93,10 +93,10 @@ __forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t _
        "mov.u32     %5,  %13;\n\t"
        "mov.u32     %6,  %14;\n\t"
        "mov.u32     %7,  %15;\n\t"
-    : "=r"(out[0]), "=r"(out[1]), "=r"(out[2]), "=r"(out[3]),
-      "=r"(out[4]), "=r"(out[5]), "=r"(out[6]), "=r"(out[7])
-    : "r"(in[0]), "r"(in[1]), "r"(in[2]), "r"(in[3]),
-      "r"(in[4]), "r"(in[5]), "r"(in[6]), "r"(in[7]));
+    : "=r"(d_out[0]), "=r"(d_out[1]), "=r"(d_out[2]), "=r"(d_out[3]),
+      "=r"(d_out[4]), "=r"(d_out[5]), "=r"(d_out[6]), "=r"(d_out[7])
+    : "r"(d_in[0]), "r"(d_in[1]), "r"(d_in[2]), "r"(d_in[3]),
+      "r"(d_in[4]), "r"(d_in[5]), "r"(d_in[6]), "r"(d_in[7]));
 
   #if 0
     for (uint32_t i=0; i< NWORDS_256BIT; i+=2){
@@ -108,7 +108,7 @@ __forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t _
 /*
    x * y for 32 bit number. Returns 64 bit number
  */
-__device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
+__forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
 {
   // z[i] = x * y for 32 bit words
   asm("{                                    \n\t"
