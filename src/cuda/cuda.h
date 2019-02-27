@@ -41,7 +41,7 @@ extern __constant__ ecbn128_t ecbn128_params_ct[MOD_N];
 extern __constant__ misc_const_t misc_const_ct[MOD_N];
 extern __constant__ uint32_t W32_ct[NWORDS_256BIT * 16];
 extern __constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
-extern __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT];
+extern __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * 5];
 
 
 #ifndef assert

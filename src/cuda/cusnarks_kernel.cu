@@ -273,10 +273,20 @@ static uint32_t IW32_roots[] = {
 };
 
 // During IFFT, I need to scale by inv(32). Below is the representation of 32 in Mongtgomery
-//32 : 3618502788666131106986593281521497120414687020801267626233049500247285301248L => in 256 is (1 << 251 )
-__constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT];
+//2 : 14119558874979547267292681013829403749538263531988213332332383630804947828734L
+//4 : 7059779437489773633646340506914701874769131765994106666166191815402473914367L
+//8 : 14474011154664524427946373126085988481658748083205070504932198000989141204992L
+//16: 7237005577332262213973186563042994240829374041602535252466099000494570602496L
+//32: 3618502788666131106986593281521497120414687020801267626233049500247285301248L => in 256 is (1 << 251 )
+__constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * 5];
 
-static uint32_t IW32_nroots[] = { 0,0,0,0,0,0,0,0x8000000};
+static uint32_t IW32_nroots[] = { 
+    536870910, 2017203416,  210575069, 2945986415, 4244459333, 2405397650, 1033682860,  523723546,   // inv 2
+    268435455, 3156085356, 2252771182, 3620476855, 2122229666, 1202698825,  516841430,  261861773,   // inv 4
+            0,          0,          0,          0,          0,          0,          0,  0x20000000,   // inv 8             
+            0,          0,          0,          0,          0,          0,          0,  0x10000000,   // inv 16
+            0,          0,          0,          0,          0,          0,          0,  0x08000000    // inv 32
+};   
 
 /*
     Constructor : Reserves global (vector) and constant (prime info) memory 
@@ -340,7 +350,7 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   CCHECK(cudaMemcpyToSymbol(misc_const_ct,    misc_h,    MOD_N * sizeof(misc_const_t)));// misc
   CCHECK(cudaMemcpyToSymbol(W32_ct,           W32_roots, sizeof(uint32_t) * NWORDS_256BIT * 16));// W32roots
   CCHECK(cudaMemcpyToSymbol(IW32_ct,          IW32_roots, sizeof(uint32_t) * NWORDS_256BIT * 16));// IW32roots
-  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   IW32_nroots, sizeof(uint32_t) * NWORDS_256BIT ));// inverse 32
+  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   IW32_nroots, sizeof(uint32_t) * NWORDS_256BIT * 5 ));// inverse 2,4,8,16,32
 }
 
 /*
