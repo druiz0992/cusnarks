@@ -516,7 +516,7 @@ class ZPoly(object):
 
         self._ntt(roots_slice[:dt/2 + 1])
 
-    def ntt2(self): 
+    def ntt_DIF(self): 
         """
           FFT
         """
@@ -534,7 +534,7 @@ class ZPoly(object):
 
         self.expand_to_degree(dt, self)
 
-        self._ntt2(roots_slice[:dt/2 + 1])
+        self._ntt_DIF(roots_slice[:dt/2 + 1])
 
   
     def intt(self): 
@@ -558,7 +558,7 @@ class ZPoly(object):
         self.expand_to_degree(dt, self)
         self._intt(inv_roots_slice[:dt/2 + 1])
 
-    def intt2(self): 
+    def intt_DIT(self): 
         """
           IFFT
         """
@@ -577,11 +577,11 @@ class ZPoly(object):
         #    _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
-        self._intt2(inv_roots_slice[:dt/2 + 1])
+        self._intt_DIT(inv_roots_slice[:dt/2 + 1])
 
 
 
-    def _ntt2(self, powtable):
+    def _ntt_DIF(self, powtable):
         """
          Computes the forward number-theoretic transform of the given vector in place ,
          with respect to the given primitive nth root of unity under the given modulus.
@@ -602,13 +602,13 @@ class ZPoly(object):
                      left = vector[s]
                      right = vector[t] 
                      vector[s] = left + right
-                     vector[t] = (left - right) * powtable[k]
-                     print "L:" + str(i)
-                     print "s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256())
-                     print "t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256())
-                     print "k:" + str(k) + " root " +str(powtable[k].as_uint256())
+                     vector[t] = (left - right) * powtable[(2**i)*k]
+                     #print "L:" + str(i)
+                     #print "s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256())
+                     #print "t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256())
+                     #print "k:" + str((2**i)*k) + " root " +str(powtable[(2**i)*k].as_uint256())
 
-    def _intt2(self, powtable):
+    def _intt_DIT(self, powtable):
         """
          Computes the inverse number-theoretic transform of the given vector in place,
          with respect to the given primitive nth root of unity under the given modulus.
@@ -618,25 +618,21 @@ class ZPoly(object):
          Only N/2 roots of unity are needed
         """
         vector = self.zcoeff
-        n = len(vector)
-        levels = n.bit_length() - 1
-        if 1 << levels != n:
-            raise ValueError("Length is not a power of 2")
-
-        size = 2
-        while size <= n:
-            halfsize = size // 2
-            tablestep = n // size
-            for i in range(0, n, size):
-                k = 0
-                for j in range(i, i + halfsize):
-                    l = j + halfsize
-                    left = vector[j]
-                    right = vector[l] * powtable[k]
-                    vector[j] = left + right
-                    vector[l] = left - right
-                    k += tablestep
-            size *= 2
+        n = len(vector).bit_length()-1
+   
+        for i in range(n-1,-1,-1):
+             for j in range(2**i):
+                 for k in range(2**(n-i-1)):
+                     s = j*2**(n-i) + k
+                     t = s + 2 ** (n-i-1)
+                     left = vector[s]
+                     right = vector[t] 
+                     vector[s] = left + right * powtable[(2**i)*k]
+                     vector[t] = left - right * powtable[(2**i)*k]
+                     #print "L:" + str(i)
+                     #print "s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256())
+                     #print "t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256())
+                     #print "k:" + str((2**i)*k) + " root " +str(powtable[(2**i)*k].as_uint256())
 
         nroots = ZFieldElExt(len(powtable)*2)
         if self.FIDX == ZUtils.FEXT:

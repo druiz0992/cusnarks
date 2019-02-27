@@ -153,6 +153,16 @@ typedef struct{
 
 }vector_t;
 
+typedef enum{
+  FFT_SIZE_2 = 1,
+  FFT_SIZE_4,
+  FFT_SIZE_8,
+  FFT_SIZE_16,
+  FFT_SIZE_32,
+  FFT_SIZE_N
+
+}fft_size_t;
+  
 
 // kernel input parameters
 typedef struct{
@@ -161,10 +171,13 @@ typedef struct{
    uint32_t in_length; // input data length (number of elements)
    uint32_t out_length; // output data length (number of elements)
    uint32_t stride; // data elemements processed by thread
+   fft_size_t fft_Nx;
+   fft_size_t N_fftx;
+   fft_size_t fft_Ny;
+   fft_size_t N_ffty;
    mod_t    midx;   // index to prime number to be used by kernel
 
 }kernel_params_t;
-
 
 // kernel callback defition
 typedef void (*kernel_cb)(uint32_t *out_vector_data,
@@ -208,8 +221,12 @@ typedef enum{
 }ec2_callback_t;
 
 typedef enum{
-   CB_ZPOLY_FFT = 0,
-   CB_ZPOLY_IFFT,
+   CB_ZPOLY_FFT32 = 0,
+   CB_ZPOLY_IFFT32,
+   CB_ZPOLY_MUL32,
+   CB_ZPOLY_FFTN, 
+   CB_ZPOLY_IFFTN,
+   CB_ZPOLY_MULN,
    CB_ZPOLY_N
 
 }zpoly_callback_t;

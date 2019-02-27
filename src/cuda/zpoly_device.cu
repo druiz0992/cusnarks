@@ -44,13 +44,12 @@
     Modular addition kernel
 
 */
-__global__ void fft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void zpoly_fft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     uint32_t i;
 
-    uint32_t __restrict__ *x;
-    uint32_t __restrict__ *z;
+    uint32_t *x, *z;
    
     if(tid >= (params->in_length)) {
       return;
@@ -63,150 +62,362 @@ __global__ void fft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_p
        modu256(x,x, params->midx);
     }
 
+    /*
     if (tid == 0){
         logInfo("len : %d\n",params->in_length);
         for (uint32_t i=0; i< 32; i++){
            logInfoBigNumber("x[i]: \n",&x[i*NWORDS_256BIT]);
         }
     }
-    fft32(x, params->midx);
-    memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
+    */
+    fft32_dif(z,x, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
 }
 
-__global__ void ifft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void zpoly_ifft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     uint32_t i;
 
-    uint32_t __restrict__ *x;
-    uint32_t __restrict__ *z;
+    uint32_t *x, *z;
    
-    if(tid >= (params->in_length >> 5)) {
+    if(tid >= params->in_length) {
       return;
     }
 
-    x = (uint32_t *) &in_vector[ (tid * U256K_OFFSET) << 5];
-    z = (uint32_t *) &out_vector[(tid * U256K_OFFSET) << 5]; 
+    x = (uint32_t *) &in_vector[ tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET]; 
 
-    
     if (params->premod){
-      #pragma unroll
-      for (i=0; i< 32; i++){
-        modu256(&x[i*NWORDS_256BIT],&x[i*NWORDS_256BIT], params->midx);
-      }
+      modu256(x,x, params->midx);
     }
-    ifft32(x, params->midx);
-    memcpy(z, x , sizeof(uint32_t) * 32 * NWORDS_256BIT);
+
+    ifft32_dit(z, x, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
+}
+
+__global__ void zpoly_mul32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
+
+    uint32_t *x, *y, *z;
+   
+    if(tid >= params->in_length/2) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[ tid * U256K_OFFSET];
+    y = (uint32_t *) &in_vector[ params->in_length/2 + tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET]; 
+
+    if (params->premod){
+      modu256(x,x, params->midx);
+    }
+
+    fft32_dif(x, x, params->midx);
+    fft32_dif(y, y, params->midx);
+    mul_poly(z,x,y, 31, params->midx);
+    ifft32_dit(z,z, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
 }
 
 /*
+    Modular addition kernel
+
+*/
+__global__ void zpoly_fftN_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
+
+    uint32_t *x, *z;
+    uint32_t N = params->fft_Nx;
+   
+    if(tid >= (params->in_length)) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+
+    /*
+    if (tid == 0){
+        logInfo("len : %d\n",params->in_length);
+        for (uint32_t i=0; i< 32; i++){
+           logInfoBigNumber("x[i]: \n",&x[i*NWORDS_256BIT]);
+        }
+    }
+    */
+    fftN_dif(z,x, N, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
+}
+
+__global__ void zpoly_ifftN_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
+
+    uint32_t *x, *z;
+    uint32_t N = params->fft_Nx;
+   
+    if(tid >= params->in_length) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[ tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET]; 
+
+    if (params->premod){
+      modu256(x,x, params->midx);
+    }
+
+    ifftN_dit(z, x, N, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
+}
+
+__global__ void zpoly_mulN_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
+
+    uint32_t *x, *y, *z;
+    uint32_t N = params->fft_Nx;
+   
+    if(tid >= params->in_length/2) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[ tid * U256K_OFFSET];
+    y = (uint32_t *) &in_vector[ params->in_length/2 + tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET]; 
+
+    if (params->premod){
+      modu256(x,x, params->midx);
+    }
+
+    fftN_dif(x, x,N, params->midx);
+    fftN_dif(y, y,N, params->midx);
+    mul_poly(z,x,y, (1<<N)-1, params->midx);
+    ifftN_dit(z,z,N, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
+}
+
+
+__global__ void fft2D_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    uint32_t Nx = params->fft_Nx;
+    uint32_t Ny = params->fft_Ny;
+    int iy = blockIdx.y * blockDim.y + threadIdx.y
+    int ix = blockIdx.x;
+    int tid = ix*Ny + iy
+
+    uint32_t *x, *z;
+   
+    if(ix > Nx || iy > Ny){
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[tid * U256K_OFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+
+    /*
+    if (tid == 0){
+        logInfo("len : %d\n",params->in_length);
+        for (uint32_t i=0; i< 32; i++){
+           logInfoBigNumber("x[i]: \n",&x[i*NWORDS_256BIT]);
+        }
+    }
+    */
+    fft2D_dif(z,x, Nx, Ny, params->midx);
+    //memcpy(z, x , sizeof(uint32_t) * NWORDS_256BIT);
+}
+
+
+__global__ void fft3D_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+}
+
+/*
+  Input : X[0], X[1],....,X[Nx*Ny-1], for Nx,Ny = 1,2,4,8,16,32. Min Nx*Ny = 32
+
+  Output : Z[0], Z[1],...Z[(Nx*Ny-1], where Z[i] are the FFT coefficients. FFt is done in place and results unordered
+
+  Steps
+    1) Store results in 2D matrix, filling it by column  X[0]     X[Ny]    X[2Ny]   ....  X[(Nx-1) * Ny]
+                                                         X[1]     X[Ny+1]  X[2Ny+1] ..... X[(Nx-1) * Ny + 1]
+                                                         ..........................................
+                                                         X[Ny-1]  X[2Ny-1] X[3Ny-1] ..... X[Nx     * Ny - 1]
+
+    2) Perform Ny x Nx point FFt (FFT of rows), and store results same matrix
+    3) Mulitiply matrix elements Aik by root[j*k]
+    4) Perform Nx x Ny point FFT (FFT of columns)
+    5) Convert to 1D verctor, filling it by row
+*/
+__device__ void fft2S_dif(uint32_t *z, uint32_t *x, uint32_t Nx, uint32_t Ny, mod_t midx)
+{
+  // FFT rows (Every Ny points)
+
+  // FFT columns (Every point)
+}
+/*
+  Multiply 2 poly of degre d
+*/
+__device__ void mul_poly(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t d, mod_t midx)
+{
+  uint32_t i, coeff_idx;
+
+  #pragma unroll
+  for (i=0; i<= d; i++) {
+    coeff_idx = i * NWORDS_256BIT;
+    mulmontu256(&z[coeff_idx],&x[coeff_idx],&y[coeff_idx],midx);
+  }
+}
+/*
    32Point DIF FFT inplace. Input samples are ordered. Output samples are unordered
 */
-__device__ void fft32(uint32_t *x, mod_t midx)
+__device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx)
 {
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
   uint32_t otherX[] = {0,0,0,0,0,0,0,0};
+  uint32_t thisX[] =  {0,0,0,0,0,0,0,0};
   uint32_t const *W32 = W32_ct;
   uint32_t lane = threadIdx.x % warpSize;
-  uint32_t i, size;
+  uint32_t i, size, root_idx;
+
+  movu256(thisX,x);
 
   #pragma unroll
-  for (i=ZPOLY_FFT_N-1; i>=1 ; i--){
+  for (i=ZPOLY_FFT_32-1; i>=1 ; i--){
     size = 1 << i;
-    if (tid == 16){
+
+    /*
+    if (tid == 2){
       logInfoBigNumber("PreB OtherX :\n",otherX);
-      logInfoBigNumber("PreB X :\n",x);
+      logInfoBigNumber("PreB X :\n",thisX);
       logInfo("size : %d\n",size);
     }
+    */
 
-    fft_butterfly(otherX, x, size);
+    fft_butterfly(otherX, thisX, size);
 
-    if (tid == 16){
+    /*
+    if (tid == 2){
       logInfoBigNumber("AfterB OtherX :\n",otherX);
     }
+    */
 
+    root_idx = (1<< (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT;
     if (lane%(size<<1) < size){  //  It 0: 0-15      W0,W1,...,W15
                                  //  It 1: 0-7, 16-23    W0,W2,W4,..W14
                                  //  It 2: 0-3, 8-11, 16-19, 24-27  W0, W4, W8, W12
                                  //  It 3: 0-1, 4-5, 8-9, 12-13,...  W0, W8
 
-      addmu256(x, x, otherX, midx);
-      if (tid == 16){ 
-        logInfo("Op : x + otherX : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
-      }
+      addmu256(thisX, thisX, otherX, midx);
+      /*
+        if (tid == 2){ 
+          logInfo("Op : x + otherX : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
+        }
+      */
     } else {
-      submu256(x,otherX, x,  midx);
-      mulmontu256(x, x, &W32[ (1<< (ZPOLY_FFT_N-i+1)) * (lane%size)], midx);
-      if (tid == 16){ 
+      submu256(thisX, otherX, thisX,  midx);
+      mulmontu256(thisX, thisX, &W32[ root_idx], midx);
+      /*
+      if (tid == 2){ 
         logInfo("Op : otherX - x : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
       }
+      */
     }
-    if (tid == 16){
-      logInfoBigNumber("AfterB x:\n",x);
-      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_N-i+1)) * (lane%size)]);
-      logInfo("idx : %d\n",(1 << (ZPOLY_FFT_N-i+1)) * (lane % size));
+    /*
+    if (tid == 2){
+      logInfoBigNumber("AfterB x:\n",thisX);
+      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ root_idx]);
+      logInfo("idx : %d\n", root_idx / NWORDS_256BIT);
     }
+    */
   }
-  // I can skip mulypliying by 1 in the last iteration
-  //  It 4: 0,2,4,6,...    W0
-    if (tid == 16){
+    /*
+    if (tid == 2){
       logInfoBigNumber("PreB OtherX :\n",otherX);
-      logInfoBigNumber("PreB X :\n",x);
+      logInfoBigNumber("PreB X :\n",thisX);
       logInfo("size : %d\n",size);
     }
-  fft_butterfly(otherX, x, 1);
-    if (tid == 16){
+    */
+  // I can skip mulypliying by 1 in the last iteration
+  //  It 4: 0,2,4,6,...    W0
+  fft_butterfly(otherX, thisX, 1);
+    /*
+    if (tid == 2){
       logInfoBigNumber("AfterB OtherX :\n",otherX);
     }
+    */
   if (lane % 2 == 0){  
-      addmu256(x, x, otherX, midx);
-      if (tid == 16){ 
+      addmu256(z, thisX, otherX, midx);
+      /*
+      if (tid == 2){ 
         logInfo("Op : x + otherX : lane%(size>>1) : %d\n", lane%2);
       }
+      */
   } else {
-      submu256(x, otherX, x, midx);
-      if (tid == 16){ 
+      submu256(z, otherX, x, midx);
+       /*
+      if (tid == 2){ 
         logInfo("Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
       }
+      */
   }
-    if (tid == 16){
-      logInfoBigNumber("AfterB x:\n",x);
-      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_N-i+1)) * (lane%size)]);
-      logInfo("idx : %d\n",(1 << (ZPOLY_FFT_N-i+1)) * (lane % size));
+    /*
+    if (tid == 2){
+      logInfoBigNumber("AfterB x:\n",z);
+      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT]);
+      logInfo("idx : %d\n",(1 << (ZPOLY_FFT_32-i-1)) * (lane % size));
     }
+    */
 }
 
 /*
-   32Point DIT FFT inplace. Input samples are unordered. Output samples are ordered
+   I32Point DIT FFT inplace. Input samples are unordered. Output samples are ordered
 */
-__device__ void ifft32(uint32_t *x, mod_t midx)
+__device__ void ifft32_dit(uint32_t *z, uint32_t *x, mod_t midx)
 {
   uint32_t otherX[] = {0,0,0,0,0,0,0,0};
+  uint32_t thisX[] = {0,0,0,0,0,0,0,0};
   uint32_t const *IW32 = IW32_ct;
   uint32_t const *inv_scaler = IW32_nroots_ct;
   uint32_t lane = threadIdx.x % warpSize;
-  uint32_t i, size;
+  uint32_t i, size, root_idx;
+
+  movu256(thisX,x);
 
   //  It 0: 0,2,4,6,...    W0
-  fft_butterfly(otherX, x, 1);
-  if (lane % 2){
-    addmu256(x, x, otherX, midx);
+  fft_butterfly(otherX, thisX, 1);
+  if (lane % 2 == 0){
+    addmu256(thisX, thisX, otherX, midx);
   } else {
-    submu256(x, x, otherX, midx);
+    submu256(thisX, otherX, thisX, midx);
   }
 
   #pragma unroll
-  for (i=1; i < ZPOLY_FFT_N ; i++){
+  for (i=1; i < ZPOLY_FFT_32 ; i++){
     size = 1 << i;    // size = 2,4,8,16
+    root_idx = (1 << (ZPOLY_FFT_32 - 1 - i)) * (lane%size) * NWORDS_256BIT;
 
-    if (lane % (size >> 1) >= size){  
-    mulmontu256(x, x, &IW32[ (1 >> (ZPOLY_FFT_N - 1 - i)) * lane%size], midx);
+    if (lane % (size << 1) >= size){  
+       mulmontu256(thisX, thisX, &IW32[root_idx], midx);
     }
-    fft_butterfly(otherX, x, size);
-    if (lane % (size >> 1) < size){
-      addmu256(x, x, otherX, midx);
+    fft_butterfly(otherX, thisX, size);
+    if (lane % (size << 1) < size){
+      addmu256(thisX, thisX, otherX, midx);
     } else {
-      submu256(x, x, otherX, midx);
+      submu256(thisX, otherX, thisX, midx);
     }
  }
 
@@ -216,9 +427,157 @@ __device__ void ifft32(uint32_t *x, mod_t midx)
   //     Scaler = 32. Inv Scaler 21204235282094297871551205565717985242031228012903033270457635305745314480129L
   // If X is Montgomery, W is Mongtgomery => Result is montgomery and scaler can be normal or Montgomery
   //    Scaler =.  Inv Scaler = 3618502788666131106986593281521497120414687020801267626233049500247285301248L => 1<< 251
- mulmontu256(x,x,inv_scaler, midx);
+ mulmontu256(x,thisX,inv_scaler, midx);
 }
 
+/*
+   N-Point DIF FFT inplace. Input samples are ordered. Output samples are unordered
+*/
+__device__ void fftN_dif(uint32_t *z, uint32_t *x, uint32_t N, mod_t midx)
+{
+  int tid = threadIdx.x + blockDim.x * blockIdx.x;
+  uint32_t otherX[] = {0,0,0,0,0,0,0,0};
+  uint32_t thisX[] =  {0,0,0,0,0,0,0,0};
+  uint32_t const *W32 = W32_ct;
+  uint32_t lane = threadIdx.x % warpSize;
+  uint32_t i, size, root_idx;
+
+  movu256(thisX,x);
+
+  #pragma unroll
+  for (i=N-1; i>=1 ; i--){
+    size = 1 << i;
+
+    /*
+    if (tid == 2){
+      logInfoBigNumber("PreB OtherX :\n",otherX);
+      logInfoBigNumber("PreB X :\n",thisX);
+      logInfo("size : %d\n",size);
+    }
+    */
+
+    fft_butterfly(otherX, thisX, size);
+
+    /*
+    if (tid == 2){
+      logInfoBigNumber("AfterB OtherX :\n",otherX);
+    }
+    */
+
+    root_idx = ((1<< (N-i-1)) * (lane%size) * NWORDS_256BIT) >> (ZPOLY_FFT_32 - N);
+    if (lane%(size<<1) < size){  //  It 0: 0-15      W0,W1,...,W15
+                                 //  It 1: 0-7, 16-23    W0,W2,W4,..W14
+                                 //  It 2: 0-3, 8-11, 16-19, 24-27  W0, W4, W8, W12
+                                 //  It 3: 0-1, 4-5, 8-9, 12-13,...  W0, W8
+
+      addmu256(thisX, thisX, otherX, midx);
+      /*
+        if (tid == 2){ 
+          logInfo("Op : x + otherX : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
+        }
+      */
+    } else {
+      submu256(thisX, otherX, thisX,  midx);
+      mulmontu256(thisX, thisX, &W32[ root_idx], midx);
+      /*
+      if (tid == 2){ 
+        logInfo("Op : otherX - x : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
+      }
+      */
+    }
+    /*
+    if (tid == 2){
+      logInfoBigNumber("AfterB x:\n",thisX);
+      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ root_idx]);
+      logInfo("idx : %d\n", root_idx / NWORDS_256BIT);
+    }
+    */
+  }
+    /*
+    if (tid == 2){
+      logInfoBigNumber("PreB OtherX :\n",otherX);
+      logInfoBigNumber("PreB X :\n",thisX);
+      logInfo("size : %d\n",size);
+    }
+    */
+  // I can skip mulypliying by 1 in the last iteration
+  //  It 4: 0,2,4,6,...    W0
+  fft_butterfly(otherX, thisX, 1);
+    /*
+    if (tid == 2){
+      logInfoBigNumber("AfterB OtherX :\n",otherX);
+    }
+    */
+  if (lane % 2 == 0){  
+      addmu256(z, thisX, otherX, midx);
+      /*
+      if (tid == 2){ 
+        logInfo("Op : x + otherX : lane%(size>>1) : %d\n", lane%2);
+      }
+      */
+  } else {
+      submu256(z, otherX, x, midx);
+       /*
+      if (tid == 2){ 
+        logInfo("Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
+      }
+      */
+  }
+    /*
+    if (tid == 2){
+      logInfoBigNumber("AfterB x:\n",z);
+      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT]);
+      logInfo("idx : %d\n",(1 << (ZPOLY_FFT_32-i-1)) * (lane % size));
+    }
+    */
+}
+
+/*
+   I32Point DIT FFT inplace. Input samples are unordered. Output samples are ordered
+*/
+__device__ void ifftN_dit(uint32_t *z, uint32_t *x, uint32_t N, mod_t midx)
+{
+  uint32_t otherX[] = {0,0,0,0,0,0,0,0};
+  uint32_t thisX[] = {0,0,0,0,0,0,0,0};
+  uint32_t const *IW32 = IW32_ct;
+  uint32_t const *inv_scaler = &IW32_nroots_ct[(N-1)*NWORDS_256BIT];
+  uint32_t lane = threadIdx.x % warpSize;
+  uint32_t i, size, root_idx;
+
+  movu256(thisX,x);
+
+  //  It 0: 0,2,4,6,...    W0
+  fft_butterfly(otherX, thisX, 1);
+  if (lane % 2 == 0){
+    addmu256(thisX, thisX, otherX, midx);
+  } else {
+    submu256(thisX, otherX, thisX, midx);
+  }
+
+  #pragma unroll
+  for (i=1; i < N ; i++){
+    size = 1 << i;    // size = 2,4,8,16
+    root_idx = ((1<< (N-i-1)) * (lane%size) * NWORDS_256BIT) >> (ZPOLY_FFT_32 - N);
+
+    if (lane % (size << 1) >= size){  
+       mulmontu256(thisX, thisX, &IW32[root_idx], midx);
+    }
+    fft_butterfly(otherX, thisX, size);
+    if (lane % (size << 1) < size){
+      addmu256(thisX, thisX, otherX, midx);
+    } else {
+      submu256(thisX, otherX, thisX, midx);
+    }
+ }
+
+  // TODO . For now, I will use scaler in montgomery assuming that everything is in mongomery. Althugh this is going to change
+  // depending on the format of input data, scaler must be in Montgomery or normal format.
+  // If X is normal, W is montgomery => result is normal and scaler must be normal. 
+  //     Scaler = 32. Inv Scaler 21204235282094297871551205565717985242031228012903033270457635305745314480129L
+  // If X is Montgomery, W is Mongtgomery => Result is montgomery and scaler can be normal or Montgomery
+  //    Scaler =.  Inv Scaler = 3618502788666131106986593281521497120414687020801267626233049500247285301248L => 1<< 251
+ mulmontu256(x,thisX,inv_scaler, midx);
+}
 
 __forceinline__ __device__ void fft_butterfly(uint32_t *d_out, uint32_t *d_in, uint32_t srcLane )
 {

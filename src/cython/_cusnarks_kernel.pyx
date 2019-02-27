@@ -99,6 +99,14 @@ cdef class CUSnarks:
             kparams.premod = params['premod']
         if 'premul' in params:
             kparams.premul = params['premul']
+        if 'fft_Nx' in params:
+            kparams.premul = params['fft_Nx']
+        if 'fft_Ny' in params:
+            kparams.premul = params['fft_Ny']
+        if 'N_fftx' in params:
+            kparams.premul = params['N_fftx']
+        if 'N_ffty' in params:
+            kparams.premul = params['N_ffty']
 
         exec_time = self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
         

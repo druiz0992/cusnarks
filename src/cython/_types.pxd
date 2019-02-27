@@ -57,18 +57,26 @@ cdef extern from "types.h":
   ctypedef enum mod_t:
       MOD_FIELD, MOD_GROUP, MOD_N 
 
+  ctypedef enum fft_size_t:
+     FFT_SIZE_2 = 1, FFT_SIZE_4, FFT_SIZE_8, FFT_SIZE_16, FFT_SIZE_32, FFT_SIZE_N
+
   ctypedef struct kernel_params_t:
       uint32_t premod
       uint32_t premul
       uint32_t in_length
       uint32_t out_length
       uint32_t stride
+      fft_size_t fft_Nx
+      fft_size_t N_fftx
+      fft_size_t fft_Ny
+      fft_size_t N_ffty
       mod_t midx
 
 
   ctypedef void (*kernel_cb)(uint32_t *out_vector_data,
                              uint32_t *in_vector_data,
                              kernel_params_t *params)
+
 
   ctypedef enum u256_callback_t:
      CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_ADDM_REDUCE,  CB_U256_SHL1, CB_U256_N
@@ -80,6 +88,6 @@ cdef extern from "types.h":
    CB_EC2_JAC_ADD , CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MAD, CB_EC2_N
       
   ctypedef enum zpoly_callback_t:
-   CB_ZPOLY_FFT, CB_ZPOLY_IFFT, CB_ZPOLY_N
+   CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_POLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_POLY_MULN, CB_ZPOLY_N
 
 _NWORDS_256BIT = NWORDS_256BIT
