@@ -134,6 +134,7 @@ typedef struct {
         int blockD;
         int gridD;
         int smemS;  // in bytes
+        int output;
 } kernel_config_t;
 
 
@@ -227,6 +228,9 @@ typedef enum{
    CB_ZPOLY_FFTN, 
    CB_ZPOLY_IFFTN,
    CB_ZPOLY_MULN,
+   CB_ZPOLY_FFT2DX,
+   CB_ZPOLY_FFT2DY,
+   CB_ZPOLY_FFT3D,
    CB_ZPOLY_N
 
 }zpoly_callback_t;

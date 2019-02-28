@@ -430,7 +430,7 @@ class ZPoly(object):
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
-            newP._ntt(roots_Nslice[:ncols/2+1])
+            newP._ntt_DIF(roots_Nslice[:ncols/2+1])
             for k,c in enumerate(newP.get_coeff()):
                 M[i,k] = c * roots_Mslice[i*k]
 
@@ -440,7 +440,9 @@ class ZPoly(object):
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
-            newP._ntt(roots_Nslice[:nrows/2+1])
+            print "IN ROW" +str(i) +": " + str(newP.as_uint256())
+            newP._ntt_DIF(roots_Nslice[:nrows/2+1])
+            print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
             M[i] = newP.get_coeff()
 
         self.zcoeff = np.reshape(M,-1,order='F').tolist()
@@ -475,7 +477,7 @@ class ZPoly(object):
             roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
             for i,rows in enumerate(M):
                 newP = ZPoly(rows.tolist())
-                newP._ntt(roots_Nslice[:ncols/2+1])
+                newP._ntt_DIF(roots_Nslice[:ncols/2+1])
     
                 for k,c in enumerate(newP.get_coeff()):
                     M[i,k] = c * roots_Mslice[i*k]
@@ -491,7 +493,7 @@ class ZPoly(object):
             roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
             for i,rows in enumerate(M):
                 newP = ZPoly(rows.tolist())
-                newP._ntt(roots_Nslice[:nrows/2+1])
+                newP._ntt_DIF(roots_Nslice[:nrows/2+1])
                 M[i] = newP.get_coeff()
 
         self.zcoeff = np.reshape(M,-1,order='F').tolist()

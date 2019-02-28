@@ -418,8 +418,10 @@ double CUSnarks::kernelLaunch(
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
-  CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
-  CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
+  if (in_vector_host->size){
+     CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+     CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
+  }
   end_copy_in = elapsedTime() - start;
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
@@ -441,7 +443,9 @@ double CUSnarks::kernelLaunch(
 
   // retrieve kernel output data from GPU to host
   start = elapsedTime();
-  CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  if (config->output){
+    CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  }
   end_copy_out = elapsedTime() - start;
 
   logInfo("----- Info -------\n");
