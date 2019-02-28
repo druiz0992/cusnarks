@@ -85,6 +85,7 @@ __forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const
 
 __forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t __restrict__ *d_in)
 {
+  #if 0
    asm("mov.u32     %0,  %8;\n\t"
        "mov.u32     %1,  %9;\n\t"
        "mov.u32     %2,  %10;\n\t"
@@ -97,12 +98,14 @@ __forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t _
       "=r"(d_out[4]), "=r"(d_out[5]), "=r"(d_out[6]), "=r"(d_out[7])
     : "r"(d_in[0]), "r"(d_in[1]), "r"(d_in[2]), "r"(d_in[3]),
       "r"(d_in[4]), "r"(d_in[5]), "r"(d_in[6]), "r"(d_in[7]));
-
-  #if 0
-    for (uint32_t i=0; i< NWORDS_256BIT; i+=2){
-      reinterpret_cast <ulonglong4 *>(d_out)[i] = reinterpret_cast <ulonglong4 *>(d_in)[i];
-    }
   #endif
+
+    ulonglong4 *out = (ulonglong4 *)d_out;
+    ulonglong4 *in =  (ulonglong4 *)d_in;
+    out->x = in->x;
+    out->y = in->y;
+    out->z = in->z;
+    out->w = in->w;
 }
 
 /*

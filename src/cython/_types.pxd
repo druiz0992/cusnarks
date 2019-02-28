@@ -48,6 +48,7 @@ cdef extern from "types.h":
         int blockD
         int gridD
         int smemS
+        int output
 
   ctypedef struct vector_t:
       uint32_t *data
@@ -88,6 +89,6 @@ cdef extern from "types.h":
    CB_EC2_JAC_ADD , CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MAD, CB_EC2_N
       
   ctypedef enum zpoly_callback_t:
-   CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_POLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_POLY_MULN, CB_ZPOLY_N
+   CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_POLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_POLY_MULN, CB_POLY_FFT2DX, CB_POLY_FFT2DY, CB_POLY_FFT3D, CB_ZPOLY_N
 
 _NWORDS_256BIT = NWORDS_256BIT
