@@ -430,7 +430,8 @@ class ZPoly(object):
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
-            newP._ntt_DIF(roots_Nslice[:ncols/2+1])
+            #newP._ntt_DIF(roots_Nslice[:ncols/2+1])
+            newP._ntt(roots_Nslice[:ncols/2+1])
             for k,c in enumerate(newP.get_coeff()):
                 M[i,k] = c * roots_Mslice[i*k]
 
@@ -440,12 +441,58 @@ class ZPoly(object):
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
-            print "IN ROW" +str(i) +": " + str(newP.as_uint256())
-            newP._ntt_DIF(roots_Nslice[:nrows/2+1])
-            print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
+            #print "IN ROW" +str(i) +": " + str(newP.as_uint256())
+            #newP._ntt_DIF(roots_Nslice[:nrows/2+1])
+            newP._ntt(roots_Nslice[:nrows/2+1])
+            #print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
             M[i] = newP.get_coeff()
 
         self.zcoeff = np.reshape(M,-1,order='F').tolist()
+
+    def intt_parallel2D(self,nrows,ncols):
+        """
+           Parallel N point FFT
+             1) Decompose N points into a n1xn2 matrix, filling it in column order
+             2) Perform n1 FFT of n2 points each and put results in n1xn2 matrix
+             3) Multiply resulting matrix elements Ajk by root+-j*k (+ FFT/- IFFT)
+             4) Transpose matrix to n2xn1
+             5) Perform n2 FFT of n1 points
+        """
+        _,  inv_roots = ZField.get_roots()
+
+        dt = nrows*ncols-1
+        self.expand_to_degree(dt, self)
+
+        M = np.asarray(self.zcoeff).reshape((nrows, ncols), order='F')
+
+        inv_roots_Mslice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+
+        inv_roots_Nslice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
+        scaler = ZFieldElExt(len(inv_roots_Mslice)).inv().reduce()
+
+        for i,rows in enumerate(M):
+            newP = ZPoly(rows.tolist())
+            #newP._ntt_DIF(inv_roots_Nslice[:ncols/2+1])
+            newP._ntt(inv_roots_Nslice[:ncols/2+1])
+            for k,c in enumerate(newP.get_coeff()):
+                M[i,k] = c * inv_roots_Mslice[i*k]
+
+        M = M.transpose()
+
+        inv_roots_Nslice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
+
+        for i,rows in enumerate(M):
+            newP = ZPoly(rows.tolist())
+            #print "IN ROW" +str(i) +": " + str(newP.as_uint256())
+            #newP._ntt_DIF(inv_roots_Nslice[:nrows/2+1])
+            newP._ntt(inv_roots_Nslice[:nrows/2+1])
+            #print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
+            for k,c in enumerate(newP.get_coeff()):
+                M[i,k] = c * scaler
+            #M[i] = newP.get_coeff()
+
+        self.zcoeff = np.reshape(M,-1,order='F').tolist()
+
 
     
     def ntt_parallel3D(self,nrows,depthr,ncols,depthc):

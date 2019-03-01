@@ -303,12 +303,11 @@ class CUZPolyTest(unittest.TestCase):
             kernel_config['smemS'] = 0
             kernel_config['blockD'] = 256
             kernel_config['gridD'] = 0
-            kernel_config['output'] = 0
+            kernel_config['output'] = 1
             zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
             result_fft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DX, zpoly_vector1, kernel_config, kernel_params )
 
-
-            kernel_params['in_length'] = 0
+            kernel_params['in_length'] = nsamples
             kernel_params['out_length'] = CUZPolyTest.nsamples
             kernel_params['stride'] = 2
             kernel_params['premod'] = 0
@@ -318,13 +317,17 @@ class CUZPolyTest(unittest.TestCase):
             kernel_config['blockD'] = 256
             kernel_config['gridD'] = (kernel_config['blockD'] + nsamples-1)/kernel_config['blockD']
             kernel_config['output'] = 1
-            result_fft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DY, zpoly_vector1, kernel_config, kernel_params )
+            #result_fft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DY, zpoly_vector1, kernel_config, kernel_params )
+            result_fft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DY, result_fft2d, kernel_config, kernel_params )
 
             p_rdc = ZPoly.from_uint256(zpoly_vector, reduced=True)
-            zpoly_fft2d = []
-            for i in range(32): 
-               zpoly_fft2d.append(ZPoly.from_uint256(result_fft2d[i*32:i*32+32], reduced=True))
+            #zpoly_fft2d = []
+            #for i in range(32): 
+               #zpoly_fft2d.append(ZPoly.from_uint256(result_fft2d[i*32:i*32+32], reduced=True))
             p_rdc.ntt_parallel2D(1<<5,1<<5)
+            #p_rdc.intt_parallel2D(1<<5,1<<5)
+            self.assertTrue(p_rdc == ZPoly.from_uint256(result_fft2d, reduced=True))
+            
             #p_rdc.ntt_DIF()
             #self.assertTrue(p_rdc == zpoly_fft2d)
             #p_rdc.intt_DIT()
