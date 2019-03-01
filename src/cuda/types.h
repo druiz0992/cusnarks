@@ -160,6 +160,7 @@ typedef enum{
   FFT_SIZE_8,
   FFT_SIZE_16,
   FFT_SIZE_32,
+  FFT_SIZE_1024,
   FFT_SIZE_N
 
 }fft_size_t;
@@ -176,6 +177,7 @@ typedef struct{
    fft_size_t N_fftx;
    fft_size_t fft_Ny;
    fft_size_t N_ffty;
+   uint32_t forward;
    mod_t    midx;   // index to prime number to be used by kernel
 
 }kernel_params_t;
