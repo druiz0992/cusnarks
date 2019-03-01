@@ -46,6 +46,9 @@ cdef extern from "../cuda/cusnarks_kernel.h":
         double kernelLaunch(ct.uint32_t kernel_idx,
                           ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
                           ct.kernel_config_t *config, ct.kernel_params_t *params)
+        double kernelMultipleLaunch(ct.uint32_t kernel_idx,
+                          ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
+                          ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t n_kernel)
         void getDeviceInfo()
 
 cdef extern from "../cuda/u256.h":

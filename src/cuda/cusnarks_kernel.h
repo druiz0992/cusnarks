@@ -63,6 +63,14 @@ class CUSnarks {
 	       	vector_t *in_vector_host,
                 kernel_config_t *configuration,
                 kernel_params_t *params);
+
+        double kernelMultipleLaunch(
+                uint32_t kernel_idx,
+		vector_t *out_vector_host,
+	       	vector_t *in_vector_host,
+                kernel_config_t *config,
+                kernel_params_t *params,
+                uint32_t n_kernel);
         void getDeviceInfo();
 };
 

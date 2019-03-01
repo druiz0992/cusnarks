@@ -265,7 +265,7 @@ class CUZPolyTest(unittest.TestCase):
                self.assertTrue(p1_rdc == zpoly_mul)
     """
 
-    def test_00fft2D_1024(self):
+    def test_4fft2D_1024(self):
 
         cu_zpoly = CUZPolyTest.cu_zpoly
         u256 = CUZPolyTest.u256
@@ -327,6 +327,77 @@ class CUZPolyTest(unittest.TestCase):
             p_rdc.ntt_parallel2D(1<<5,1<<5)
             #p_rdc.intt_parallel2D(1<<5,1<<5)
             self.assertTrue(p_rdc == ZPoly.from_uint256(result_fft2d, reduced=True))
+            
+            #p_rdc.ntt_DIF()
+            #self.assertTrue(p_rdc == zpoly_fft2d)
+            #p_rdc.intt_DIT()
+            #zpoly_ifft = ZPoly.from_uint256(result_ifft[i*32:i*32+32], reduced=True)
+            #self.assertTrue(p_rdc == zpoly_ifft)
+
+   def test_5ifft2D_1024(self):
+
+        cu_zpoly = CUZPolyTest.cu_zpoly
+        u256 = CUZPolyTest.u256
+        ntest_points = CUZPolyTest.ntest_points
+        roots_rdc = CUZPolyTest.roots_rdc
+        inv_roots_rdc = CUZPolyTest.inv_roots_rdc
+        ZField.roots[0] = roots_rdc
+        ZField.inv_roots[0] = inv_roots_rdc
+        CUZPolyTest.nsamples = 1024 
+        nsamples = CUZPolyTest.nsamples
+        roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc[::ZUtils.NROOTS/1024]])
+        inv_roots_rdc_u256 = np.asarray([x.as_uint256() for x in inv_roots_rdc[::ZUtils.NROOTS/1024]])
+
+        kernel_config = {'blockD' : 256 }
+        kernel_params = {'midx' : MOD_FIELD ,'premod' : 0, 'in_length' : CUZPolyTest.nsamples, 'stride' : 1, 'out_length' : CUZPolyTest.nsamples}
+
+        for iter in xrange(CUZPolyTest.TEST_ITER):
+            zpoly_vector = cu_zpoly.rand(CUZPolyTest.nsamples)
+            # do mod operatio
+            kernel_config['gridD'] = 0
+            kernel_params['in_length'] = CUZPolyTest.nsamples
+            kernel_params['out_length'] = CUZPolyTest.nsamples
+            kernel_params['stride'] = 1
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = U256_BLOCK_DIM 
+            zpoly_vector,_ = u256.kernelLaunch(CB_U256_MOD, zpoly_vector, kernel_config, kernel_params )
+
+            # Test FFT kernel:
+            kernel_params['in_length'] = 2*CUZPolyTest.nsamples 
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = 2
+            kernel_params['premod'] = 0
+            kernel_params['fft_Nx'] = 5
+            kernel_params['fft_Ny'] = 5
+            kernel_params['forward'] = 0
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = 256
+            kernel_config['gridD'] = 0
+            kernel_config['output'] = 1
+            zpoly_vector1 = np.concatenate((zpoly_vector, inv_roots_rdc_u256))
+            result_ifft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DX, zpoly_vector1, kernel_config, kernel_params )
+
+            kernel_params['in_length'] = nsamples
+            kernel_params['out_length'] = CUZPolyTest.nsamples
+            kernel_params['stride'] = 2
+            kernel_params['premod'] = 0
+            kernel_params['fft_Nx'] = 5
+            kernel_params['fft_Ny'] = 5
+            kernel_params['forward'] = 0
+            kernel_config['smemS'] = 0
+            kernel_config['blockD'] = 256
+            kernel_config['gridD'] = (kernel_config['blockD'] + nsamples-1)/kernel_config['blockD']
+            kernel_config['output'] = 1
+            #result_fft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DY, zpoly_vector1, kernel_config, kernel_params )
+            result_ifft2d,_ = cu_zpoly.kernelLaunch(CB_ZPOLY_FFT2DY, result_ifft2d, kernel_config, kernel_params )
+
+            p_rdc = ZPoly.from_uint256(zpoly_vector, reduced=True)
+            #zpoly_fft2d = []
+            #for i in range(32): 
+               #zpoly_fft2d.append(ZPoly.from_uint256(result_fft2d[i*32:i*32+32], reduced=True))
+            p_rdc.intt_parallel2D(1<<5,1<<5)
+            #p_rdc.intt_parallel2D(1<<5,1<<5)
+            self.assertTrue(p_rdc == ZPoly.from_uint256(result_ifft2d, reduced=True))
             
             #p_rdc.ntt_DIF()
             #self.assertTrue(p_rdc == zpoly_fft2d)

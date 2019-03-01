@@ -303,11 +303,9 @@ __global__ void zpoly_fft2DY_kernel(uint32_t *out_vector, uint32_t *in_vector, k
         }
     }
     */
-    fft2Dy_dif(out_vector,in_vector, Nx, Ny, params->midx);
+    fft2Dy_dif(out_vector,in_vector, Nx, Ny, params->midx, params->forward);
  
 }
-
-
 __global__ void zpoly_fft3D_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
   return;
@@ -362,7 +360,7 @@ __device__ void fft2Dx_dif(uint32_t *z, uint32_t *x, uint32_t Nx, uint32_t Ny, m
     }
    */
 }
-__device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, uint32_t Nx, uint32_t Ny, mod_t midx)
+__device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, uint32_t Nx, uint32_t Ny, mod_t midx, uint32_t forward)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   uint32_t new_ridx = (tid << Ny) & ((1 << (Nx + Ny))-1);
@@ -370,6 +368,7 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, uint32_t Nx, uint32_t Ny, m
   uint32_t new_cidx2, new_ridx2;
   uint32_t reverse_idx;
   uint32_t *roots = &x[(1<<(Nx+Ny)) * U256K_OFFSET];
+  uint32_t const *inv_scaler = &IW32_nroots_ct[(FFT_SIZE_1024-1)*NWORDS_256BIT];
 
   /*
     if (tid == 0){
@@ -387,7 +386,11 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, uint32_t Nx, uint32_t Ny, m
   // FFT columns (Every point)
   reverse_idx = (((( ((new_ridx/32) % 32) * 0x802 & 0x22110) | ( ((new_ridx/32) % 32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)*32;
   fftN_dif(&z[(reverse_idx + new_cidx)*U256K_OFFSET], &z[(new_cidx + new_ridx) * U256K_OFFSET],Ny,midx);
+  if (!forward){
+    mulmontu256( &z[(reverse_idx + new_cidx)*U256K_OFFSET],&z[(reverse_idx + new_cidx)*U256K_OFFSET],inv_scaler ,midx);
+  }
 }
+
 /*
   Multiply 2 poly of degre d
 */

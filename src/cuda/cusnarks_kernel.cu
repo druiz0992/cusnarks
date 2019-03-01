@@ -278,6 +278,7 @@ static uint32_t IW32_roots[] = {
 //8 : 14474011154664524427946373126085988481658748083205070504932198000989141204992L
 //16: 7237005577332262213973186563042994240829374041602535252466099000494570602496L
 //32: 3618502788666131106986593281521497120414687020801267626233049500247285301248L => in 256 is (1 << 251 )
+//1024 : 113078212145816597093331040047546785012958969400039613319782796882727665664L
 __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * 5];
 
 static uint32_t IW32_nroots[] = { 
@@ -285,8 +286,18 @@ static uint32_t IW32_nroots[] = {
     268435455, 3156085356, 2252771182, 3620476855, 2122229666, 1202698825,  516841430,  261861773,   // inv 4
             0,          0,          0,          0,          0,          0,          0,  0x20000000,   // inv 8             
             0,          0,          0,          0,          0,          0,          0,  0x10000000,   // inv 16
-            0,          0,          0,          0,          0,          0,          0,  0x08000000    // inv 32
+            0,          0,          0,          0,          0,          0,          0,  0x08000000,   // inv 32
+            0,          0,          0,          0,          0,          0,          0,  4194304       // inv 1024
 };   
+
+
+
+
+#if 0
+__device__ uint32_t *in_vector_d;
+__device__ uint32_t *out_vector_d;
+__device__ kernel_params_t *params_d;
+#endif
 
 /*
     Constructor : Reserves global (vector) and constant (prime info) memory 
@@ -335,9 +346,15 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   // Allocate kernel input and putput data vectors in global memory 
   CCHECK(cudaMalloc((void**) &this->in_vector_device.data, in_size));
   CCHECK(cudaMalloc((void**) &this->out_vector_device.data, out_size));
+  //CCHECK(cudaMalloc((void**) &in_vector_d, in_size));
+  //CCHECK(cudaMalloc((void**) &out_vector_d, out_size));
+  //this->in_vector_device.data = in_vector_d;
+  //this->out_vector_device.data = out_vector_d;
 
   // Allocate kernel params in global memory 
   CCHECK(cudaMalloc((void**) &this->params_device, sizeof(kernel_params_t)));
+  //CCHECK(cudaMalloc((void**) &params_d, sizeof(kernel_params_t)));
+  //this->params_device = params_d;
 
   // constants ->  Initialize data and copy to constant memory
   memcpy(mod_h,     mod_info_init,           sizeof(mod_info_t)    * MOD_N); // prime info
@@ -381,6 +398,7 @@ void CUSnarks::rand(uint32_t *samples, uint32_t n_samples)
 */
 CUSnarks::~CUSnarks()
 {
+  logInfo("Releaser resources\n");
   cudaFree(in_vector_device.data);
   cudaFree(out_vector_device.data);
   cudaFree(params_device);
@@ -469,6 +487,79 @@ double CUSnarks::kernelLaunch(
 
   return end_kernel;
 }
+
+double CUSnarks::kernelMultipleLaunch(
+                uint32_t kernel_idx,
+		vector_t *out_vector_host,
+	       	vector_t *in_vector_host,
+                kernel_config_t *config,
+                kernel_params_t *params,
+                uint32_t n_kernel=1)
+{
+  // check input lengths do not exceed reserved amount
+  if (in_vector_host->length > in_vector_device.length) { return 0.0; }
+  if (out_vector_host->length > out_vector_device.length) { return 0.0; }
+
+  in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
+  out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
+
+  double start, end_copy_in, end_kernel, end_copy_out;
+  int blockD, gridD;
+
+  // measure data xfer time Host -> Device
+  start = elapsedTime();
+  if (in_vector_host->size){
+     CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+     CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
+  }
+  end_copy_in = elapsedTime() - start;
+ 
+  // configure kernel. Input parameter invludes block size. Grid is calculated 
+  // depending on input data length and stride (how many samples of input data are 
+  // used per thread
+  blockD = config->blockD;
+  if (config->gridD == 0){
+     config->gridD = (blockD + in_vector_host->length/params->stride - 1) / blockD;
+  }
+  gridD = config->gridD;
+
+
+  // launch kernel
+  start = elapsedTime();
+  kernel_callbacks[kernel_idx]<<<gridD, blockD, config->smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
+  CCHECK(cudaGetLastError());
+  CCHECK(cudaDeviceSynchronize());
+  end_kernel = elapsedTime() - start;
+
+  // retrieve kernel output data from GPU to host
+  start = elapsedTime();
+  if (config->output){
+    CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  }
+  end_copy_out = elapsedTime() - start;
+
+  logInfo("----- Info -------\n");
+  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
+		                                        in_vector_host->length,
+						       	in_vector_device.size,
+						       	in_vector_device.length);
+
+  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
+		                                        out_vector_host->length, 
+							out_vector_device.size,
+						       	out_vector_device.length);
+
+  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",params->premod, params->midx, params->in_length, params->out_length, params->stride);
+  logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
+          kernel_idx, gridD, blockD, config->smemS,end_kernel);
+  logInfo("Time Elapsed Xfering in %d bytes : %f sec\n",
+          in_vector_host->size, end_copy_in);
+  logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
+          out_vector_host->size, end_copy_out);
+
+  return end_kernel;
+}
+
 
 /*
   Professional CUDA C Programming by John Cheng, Max Grossman, Ty McKercher
