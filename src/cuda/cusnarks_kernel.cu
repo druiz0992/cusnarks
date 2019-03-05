@@ -279,7 +279,8 @@ static uint32_t IW32_roots[] = {
 //16: 7237005577332262213973186563042994240829374041602535252466099000494570602496L
 //32: 3618502788666131106986593281521497120414687020801267626233049500247285301248L => in 256 is (1 << 251 )
 //1024 : 113078212145816597093331040047546785012958969400039613319782796882727665664L
-__constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * 5];
+//1024^2 : 110427941548649020598956093796432407239217743554726184882600387580788736L
+__constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];
 
 static uint32_t IW32_nroots[] = { 
     536870910, 2017203416,  210575069, 2945986415, 4244459333, 2405397650, 1033682860,  523723546,   // inv 2
@@ -287,7 +288,8 @@ static uint32_t IW32_nroots[] = {
             0,          0,          0,          0,          0,          0,          0,  0x20000000,   // inv 8             
             0,          0,          0,          0,          0,          0,          0,  0x10000000,   // inv 16
             0,          0,          0,          0,          0,          0,          0,  0x08000000,   // inv 32
-            0,          0,          0,          0,          0,          0,          0,  4194304       // inv 1024
+            0,          0,          0,          0,          0,          0,          0,  4194304,       // inv 1024
+            0,          0,          0,          0,          0,          0,          0,  4096         // inv 1024**2
 };   
 
 
@@ -367,7 +369,7 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   CCHECK(cudaMemcpyToSymbol(misc_const_ct,    misc_h,    MOD_N * sizeof(misc_const_t)));// misc
   CCHECK(cudaMemcpyToSymbol(W32_ct,           W32_roots, sizeof(uint32_t) * NWORDS_256BIT * 16));// W32roots
   CCHECK(cudaMemcpyToSymbol(IW32_ct,          IW32_roots, sizeof(uint32_t) * NWORDS_256BIT * 16));// IW32roots
-  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   IW32_nroots, sizeof(uint32_t) * NWORDS_256BIT * 5 ));// inverse 2,4,8,16,32
+  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   IW32_nroots, sizeof(uint32_t) * NWORDS_256BIT * (FFT_SIZE_N -1) ));// inverse 2,4,8,16,32
 }
 
 /*
@@ -436,10 +438,8 @@ double CUSnarks::kernelLaunch(
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
-  if (in_vector_host->size){
-     CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
-     CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
-  }
+  CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
@@ -461,9 +461,7 @@ double CUSnarks::kernelLaunch(
 
   // retrieve kernel output data from GPU to host
   start = elapsedTime();
-  if (config->output){
-    CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
-  }
+  CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
   end_copy_out = elapsedTime() - start;
 
   logInfo("----- Info -------\n");
@@ -489,13 +487,13 @@ double CUSnarks::kernelLaunch(
 }
 
 double CUSnarks::kernelMultipleLaunch(
-                uint32_t kernel_idx,
 		vector_t *out_vector_host,
 	       	vector_t *in_vector_host,
                 kernel_config_t *config,
                 kernel_params_t *params,
                 uint32_t n_kernel=1)
 {
+  uint32_t i;
   // check input lengths do not exceed reserved amount
   if (in_vector_host->length > in_vector_device.length) { return 0.0; }
   if (out_vector_host->length > out_vector_device.length) { return 0.0; }
@@ -504,38 +502,46 @@ double CUSnarks::kernelMultipleLaunch(
   out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
 
   double start, end_copy_in, end_kernel, end_copy_out;
-  int blockD, gridD;
+  int blockD, gridD, smemS, kernel_idx;
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
-  if (in_vector_host->size){
-     CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
-     CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
-  }
+  CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
   // depending on input data length and stride (how many samples of input data are 
   // used per thread
-  blockD = config->blockD;
-  if (config->gridD == 0){
-     config->gridD = (blockD + in_vector_host->length/params->stride - 1) / blockD;
+  for (i=0; i < n_kernel; i++){
+    start = elapsedTime();
+    CCHECK(cudaMemcpy(params_device, &params[i], sizeof(kernel_params_t), cudaMemcpyHostToDevice));
+    end_copy_in = +(elapsedTime() - start);
+    blockD = config[i].blockD;
+    if (config[i].gridD == 0){
+       config[i].gridD = (blockD + in_vector_host->length/params[i].stride - 1) / blockD;
+    }
+    gridD = config[i].gridD;
+    smemS = config[i].smemS;
+    kernel_idx = config[i].kernel_idx;
+
+
+    // launch kernel
+    start = elapsedTime();
+    kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
+    CCHECK(cudaGetLastError());
+    CCHECK(cudaDeviceSynchronize());
+    end_kernel = elapsedTime() - start;
+
+    logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",
+        params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride);
+    logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
+          kernel_idx, gridD, blockD, smemS,end_kernel);
   }
-  gridD = config->gridD;
-
-
-  // launch kernel
+  
+    // retrieve kernel output data from GPU to host
   start = elapsedTime();
-  kernel_callbacks[kernel_idx]<<<gridD, blockD, config->smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
-  CCHECK(cudaGetLastError());
-  CCHECK(cudaDeviceSynchronize());
-  end_kernel = elapsedTime() - start;
-
-  // retrieve kernel output data from GPU to host
-  start = elapsedTime();
-  if (config->output){
-    CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
-  }
+  CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+ 
   end_copy_out = elapsedTime() - start;
 
   logInfo("----- Info -------\n");
@@ -549,9 +555,6 @@ double CUSnarks::kernelMultipleLaunch(
 							out_vector_device.size,
 						       	out_vector_device.length);
 
-  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",params->premod, params->midx, params->in_length, params->out_length, params->stride);
-  logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
-          kernel_idx, gridD, blockD, config->smemS,end_kernel);
   logInfo("Time Elapsed Xfering in %d bytes : %f sec\n",
           in_vector_host->size, end_copy_in);
   logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",

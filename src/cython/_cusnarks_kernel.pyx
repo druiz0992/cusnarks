@@ -83,19 +83,13 @@ cdef class CUSnarks:
             kconfig.smemS  = config['smemS']
         else:
             kconfig.smemS  = 0
-        if 'output' in config:
-            kconfig.output  = config['output']
-        else:
-            kconfig.output  = 1
 
-        if in_v.length:
-           in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-           in_vec_flat = np.concatenate(in_vec)
-           in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
+        in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+        in_vec_flat = np.concatenate(in_vec)
+        in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
 
-        if kconfig.output:
-           out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-           out_v.data = <ct.uint32_t *>&out_vec_flat[0]
+        out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+        out_v.data = <ct.uint32_t *>&out_vec_flat[0]
 
         # TODO :I am trying to represent input data as ndarray. I don't
         # know how other way to do this but to overwrite ndarray with input data
@@ -125,12 +119,9 @@ cdef class CUSnarks:
 
         exec_time = self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
         
-        if kconfig.output:
-           return np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
-        else:
-           return None, exec_time
+        return np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
    
-    def kernelMultipleLaunch(self, ct.uint32_t kernel_idx, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel):
+    def kernelMultipleLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel):
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
        
@@ -150,6 +141,7 @@ cdef class CUSnarks:
 
         for i in range(n_kernel):
            kconfig[i].blockD = config['blockD'][i]
+           kconfig[i].kernel_idx = config['kernel_idx'][i]
            # gridD and smemS do not need to exist
            if 'gridD' in config:
                kconfig[i].gridD  = config['gridD'][i]
@@ -159,19 +151,13 @@ cdef class CUSnarks:
                kconfig[i].smemS  = config['smemS'][i]
            else:
                kconfig[i].smemS  = 0
-           if 'output' in config:
-               kconfig[i].output  = config['output'][i]
-           else:
-               kconfig[i].output  = 1
 
-        if in_v.length:
-           in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-           in_vec_flat = np.concatenate(in_vec)
-           in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
+        in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+        in_vec_flat = np.concatenate(in_vec)
+        in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
 
-        if kconfig[0].output:
-           out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-           out_v.data = <ct.uint32_t *>&out_vec_flat[0]
+        out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+        out_v.data = <ct.uint32_t *>&out_vec_flat[0]
 
         # TODO :I am trying to represent input data as ndarray. I don't
         # know how other way to do this but to overwrite ndarray with input data
@@ -181,7 +167,7 @@ cdef class CUSnarks:
         for i in range(n_kernel):
           kparams[i].midx = params['midx'][i]
           kparams[i].in_length = params['in_length'][i]
-          kparams[i].out_length = params['out_length'][i]
+          kparams[i].out_length = params['out_length']
           kparams[i].stride = params['stride'][i]
           if 'premod' in params:
             kparams[i].premod = params['premod'][i]
@@ -200,11 +186,9 @@ cdef class CUSnarks:
           else:
             kparams[i].forward = 1
 
-        exec_time = self._cusnarks_ptr.kernelMultipleLaunch(kernel_idx, &out_v, &in_v, kconfig, kparams, n_kernel) 
+        exec_time = self._cusnarks_ptr.kernelMultipleLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
        
-        kdata = None
-        if kconfig.output:
-           kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
+        kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
 
         free(kconfig)
         free(kparams)

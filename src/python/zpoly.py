@@ -431,10 +431,12 @@ class ZPoly(object):
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
             #newP._ntt_DIF(roots_Nslice[:ncols/2+1])
+            #print "IN ROW" +str(i) +": " + str(newP.as_uint256())
             newP._ntt(roots_Nslice[:ncols/2+1])
+            #print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
             for k,c in enumerate(newP.get_coeff()):
                 M[i,k] = c * roots_Mslice[i*k]
-
+        
         M = M.transpose()
 
         roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
