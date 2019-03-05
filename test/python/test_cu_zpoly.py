@@ -63,8 +63,9 @@ class CUZPolyTest(unittest.TestCase):
     nsamples = 32 * 1024   # 1024 FFT 32 points
     ntest_points = 100 
     u256_p = BigInt(prime).as_uint256()
-    cu_zpoly = ZCUPoly(nsamples, seed=560)
-    u256 = U256(nsamples, seed=560)
+    if use_pycusnarks:
+      cu_zpoly = ZCUPoly(nsamples, seed=560)
+      u256 = U256(nsamples, seed=560)
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
     ZPoly(1,force_init=True)
     roots_ext, inv_roots_ext = ZField.find_roots(ZUtils.NROOTS, rformat_ext=True)
@@ -391,10 +392,8 @@ class CUZPolyTest(unittest.TestCase):
 
     def test_00fft2D_1M(self):
 
-        cu_zpoly = CUZPolyTest.cu_zpoly
-        u256 = CUZPolyTest.u256
         ntest_points = CUZPolyTest.ntest_points
-        CUZPolyTest.nsamples = 1 << 10
+        CUZPolyTest.nsamples = 1 << 20
         nsamples = CUZPolyTest.nsamples
         ZUtils.NROOTS = CUZPolyTest.nsamples
 
@@ -424,6 +423,8 @@ class CUZPolyTest(unittest.TestCase):
 
         kernel_config = {}
         kernel_params = {}
+        cu_zpoly = CUZPolyTest.cu_zpoly
+        u256 = CUZPolyTest.u256
 
         for iter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.rand(CUZPolyTest.nsamples)
