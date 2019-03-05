@@ -134,7 +134,7 @@ typedef struct {
         int blockD;
         int gridD;
         int smemS;  // in bytes
-        int output;
+        int kernel_idx;
 } kernel_config_t;
 
 
@@ -161,6 +161,7 @@ typedef enum{
   FFT_SIZE_16,
   FFT_SIZE_32,
   FFT_SIZE_1024,
+  FFT_SIZE_1M,
   FFT_SIZE_N
 
 }fft_size_t;
@@ -232,7 +233,8 @@ typedef enum{
    CB_ZPOLY_MULN,
    CB_ZPOLY_FFT2DX,
    CB_ZPOLY_FFT2DY,
-   CB_ZPOLY_FFT3D,
+   CB_ZPOLY_FFT3DX,
+   CB_ZPOLY_FFT3DY,
    CB_ZPOLY_N
 
 }zpoly_callback_t;

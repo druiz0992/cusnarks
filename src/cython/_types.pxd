@@ -48,7 +48,7 @@ cdef extern from "types.h":
         int blockD
         int gridD
         int smemS
-        int output
+        int kernel_idx
 
   ctypedef struct vector_t:
       uint32_t *data
@@ -59,7 +59,7 @@ cdef extern from "types.h":
       MOD_FIELD, MOD_GROUP, MOD_N 
 
   ctypedef enum fft_size_t:
-     FFT_SIZE_2 = 1, FFT_SIZE_4, FFT_SIZE_8, FFT_SIZE_16, FFT_SIZE_32, FFT_SIZE_1024, FFT_SIZE_N
+     FFT_SIZE_2 = 1, FFT_SIZE_4, FFT_SIZE_8, FFT_SIZE_16, FFT_SIZE_32, FFT_SIZE_1024, FFT_SIZE_1M, FFT_SIZE_N
 
   ctypedef struct kernel_params_t:
       uint32_t premod
@@ -91,6 +91,6 @@ cdef extern from "types.h":
       
   ctypedef enum zpoly_callback_t:
    CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_ZPOLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_ZPOLY_MULN, 
-   CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY, CB_ZPOLY_FFT3D, CB_ZPOLY_N
+   CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY, CB_ZPOLY_FFT3DX, CB_ZPOLY_FFT3DY, CB_ZPOLY_N
 
 _NWORDS_256BIT = NWORDS_256BIT
