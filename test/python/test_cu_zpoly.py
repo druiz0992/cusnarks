@@ -394,7 +394,7 @@ class CUZPolyTest(unittest.TestCase):
         cu_zpoly = CUZPolyTest.cu_zpoly
         u256 = CUZPolyTest.u256
         ntest_points = CUZPolyTest.ntest_points
-        CUZPolyTest.nsamples = 1 << 10
+        CUZPolyTest.nsamples = 1 << 20
         nsamples = CUZPolyTest.nsamples
         ZUtils.NROOTS = CUZPolyTest.nsamples
 

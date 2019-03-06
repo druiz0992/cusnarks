@@ -88,8 +88,8 @@ typedef unsigned long long uint64_t;
 #define NDIGITS 8
 #define MAX_NDIGITS_FIOS   ((NDIGITS) + 3)
 #define MAX_DIGIT 0xFFFFFFFFUL
-#define NTEST 100
 #define NROOTS 128
+#define MAX(X,Y)  ((X)>=(Y) ? (X) : (Y))
 
 static uint32_t N[] = {
       3632069959, 1008765974, 1752287885, 2541841041, 2172737629, 3092268470, 3778125865,  811880050, // p_group
@@ -106,7 +106,7 @@ static uint32_t _1[] = {
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041    // 1 field
 };
 
-#if 0
+#ifdef UTILS_DEBUG
 static uint32_t p_root128[] = {
   3202964282, 1415263009, 1631761676, 2375868442,  876590776, 1603946946, 2412717293,  401158326  // 128
 };
@@ -844,8 +844,9 @@ uint32_t reverse(uint32_t x, uint32_t bits);
 inline void swap(uint32_t *x, uint32_t *y);
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
+void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 
-#if 0
+#ifdef UTILS_DEBUG
 void setRandom(uint32_t *x, uint32_t);
 void printNumber(uint32_t *x);
 
@@ -984,6 +985,61 @@ uint32_t reverse(uint32_t x, uint32_t bits)
      x >>= 1;
   }
   return y;
+}
+
+void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_ncols)
+{
+  uint32_t i,j,k;
+
+  for (i=0; i<in_nrows; i++){
+    for(j=0; j<in_ncols; j++){
+      for (k=0; k<NDIGITS; k++){
+        mout[(j*in_nrows+i)*NDIGITS+k] = min[(i*in_ncols+j)*NDIGITS+k];
+      }
+    }
+  }
+
+
+}
+void parallel_ntt_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
+{
+  uint32_t Anrows = (1<<Nrows);
+  uint32_t Ancols = (1<<Ncols);
+  uint32_t Mnrows = Ancols;
+  uint32_t Mncols = Anrows;
+  uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NDIGITS * sizeof(uint32_t));
+  uint32_t *reducedR = (uint32_t *) malloc (MAX(Mncols,Mnrows) * NDIGITS * sizeof(uint32_t));
+  uint32_t i,j;
+  
+
+  transpose_h(M,A,Anrows, Ancols);
+
+  for(i=0;i<Mncols;i++){
+    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mnrows],sizeof(uint32_t)*NDIGITS);
+  }
+
+  for (i=0;i < Mnrows; i++){
+    ntt_h(&M[i*NDIGITS*Mncols], reducedR, Nrows, pidx);
+    for (j=0;j < Mncols; j++){   
+        montmult_h(&M[i*NDIGITS*Mncols+j], &M[i*NDIGITS*Mncols+j], &roots[i*j*NDIGITS], pidx);
+    }
+  }
+
+  transpose_h(A,M,Mnrows, Mncols);
+
+  for(i=0;i<Mnrows;i++){
+    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mncols],sizeof(uint32_t)*NDIGITS);
+  }
+
+  for (i=0;i < Anrows; i++){
+    ntt_h(&A[i*NDIGITS*Ancols], reducedR, Ncols, pidx);
+  }
+
+  transpose_h(M,A,Anrows, Ancols);
+  memcpy(A,M,Ancols * Anrows * NDIGITS * sizeof(uint32_t));
+
+  free(M);
+  free(reducedR);
 }
 
 inline void swap(uint32_t *x, uint32_t *y)
@@ -1216,7 +1272,7 @@ uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t
 }
 
 
-#if 0
+#ifdef UTILS_DEBUG
 void test_mul(void)
 {
   	uint32_t r[NDIGITS]; 
@@ -1300,11 +1356,45 @@ void test_ntt(void)
 
 }
 
+void test_parallel_ntt(void)
+{
+	int i,j;
+        int pidx=1;
+        int n_errors=0;
+        int nroots = sizeof(roots_128_test)/(sizeof(uint32_t)*NDIGITS);
+        int levels=0;
+        int Nrows, Ncols;
+        int tmp = nroots;
+
+        while(tmp !=0 ){
+           tmp >>=1;
+           levels++;
+        }
+        levels--;
+
+        Ncols = levels/2;
+        Nrows = levels - Ncols;
+        parallel_ntt_h(poly_fft_in_test, roots_128_test, Ncols, Nrows, pidx);
+
+        for (j=0;j<nroots; j++){
+           if (mpCompare(&poly_fft_in_test[j*NDIGITS],&poly_fft_out_test[j*NDIGITS],NDIGITS)){
+                printf("Error in poly coeff %d\n",j);
+                printf("Expected\n");
+                printNumber(&poly_fft_out_test[j*NDIGITS]);
+                printf("Obtained\n");
+                printNumber(&poly_fft_in_test[j*NDIGITS]);
+                n_errors++;
+           }
+	}
+        printf("N errors(FFT) : %d/%d\n",n_errors, j);
+
+}
 int main()
 {
         test_mul();
         test_findroots();
         test_ntt();
+        test_parallel_ntt();
 
   return 1;
 
