@@ -269,3 +269,15 @@ cdef class ZCUPoly (CUSnarks):
     def __dealloc__(self):
         del self._zpoly_ptr
 
+def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef ct.vector_t out_v, in_va, in_vb
+
+        in_va.data  = <ct.uint32_t *>&in_veca[0]
+        in_vb.data  = <ct.uint32_t *>&in_vecb[0]
+
+        cdef out_vec = np.zeros(length(in_veca), dtype=np.uint32)
+        out_v.data = <ct.uint32_t *>&out_vec[0]
+
+        montmult_h(&out_v.data, &in_va.data, &in_vb.data, pidx)
+  
+        return out_v.data
