@@ -70,8 +70,3 @@ cdef extern from "../cuda/zpoly.h":
         C_ZCUPoly(ct.uint32_t len, ct.uint32_t seed) except +
         C_ZCUPoly(ct.uint32_t len) except +
 
-
-cdef extern from "../cuda/utils_host.h":
-    void montmult_h(ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
-    void ntt_h(ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t L, ct.uint32_t pidx);
-    void find_roots_h(ct.uint32_t *roots, ct.uint32_t *primitive_root, ct.uint32_t nroots, ct.uint32_t pidx);
