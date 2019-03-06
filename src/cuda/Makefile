@@ -47,7 +47,8 @@ CUSRC = cusnarks_kernel.cu \
 	zpoly_device.cu \
         log.cu
 
-CSRC = rng.cpp 
+CSRC = rng.cpp \
+       utils_host.cpp 
 
 NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
 CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
