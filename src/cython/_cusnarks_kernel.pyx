@@ -35,7 +35,7 @@ import numpy as np
 cimport numpy as np
 
 cimport _types as ct
-
+cimport _utils_host as uh
 
 from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_ECBN128_2, C_ZCUPoly
 from cython cimport view
@@ -269,15 +269,34 @@ cdef class ZCUPoly (CUSnarks):
     def __dealloc__(self):
         del self._zpoly_ptr
 
-def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
-        cdef ct.vector_t out_v, in_va, in_vb
 
-        in_va.data  = <ct.uint32_t *>&in_veca[0]
-        in_vb.data  = <ct.uint32_t *>&in_vecb[0]
+def montmult(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
-        cdef out_vec = np.zeros(length(in_veca), dtype=np.uint32)
-        out_v.data = <ct.uint32_t *>&out_vec[0]
-
-        montmult_h(&out_v.data, &in_va.data, &in_vb.data, pidx)
+        uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
   
-        return out_v.data
+        return out_vec.data
+
+
+def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
+
+      cdef ct.uint32_t n = in_A.shape[1]
+      cdef ct.uint32_t L = int(np.log2(len(in_roots)))
+
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_A_flat = np.zeros(in_A.shape[0] * in_A.shape[1], dtype=np.uint32)
+
+      in_roots_flat = np.concatenate(in_roots)
+      in_A_flat = np.concatenate(in_A)
+
+      uh.cntt_h(&in_A_flat[0], &in_roots_flat[0], L, pidx)
+
+      return np.reshape(in_A_flat,(-1,n))
+
+def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nroots, ct.uint32_t pidx):
+ 
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_roots_flat = np.zeros(nroots * len(in_proot), dtype=np.uint32)
+      uh.cfind_roots_h(&out_roots_flat[0], &in_proot[0], nroots, pidx)
+
+      return np.reshape(out_roots_flat,(-1, len(in_prot)))
