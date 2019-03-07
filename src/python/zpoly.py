@@ -428,6 +428,8 @@ class ZPoly(object):
 
         roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
 
+        print M.shape
+        print ZPoly(roots_Nslice).as_uint256()
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
             #newP._ntt_DIF(roots_Nslice[:ncols/2+1])
