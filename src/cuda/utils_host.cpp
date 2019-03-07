@@ -846,7 +846,6 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 
-#ifdef UTILS_DEBUG
 void setRandom(uint32_t *x, uint32_t);
 void printNumber(uint32_t *x);
 
@@ -866,7 +865,6 @@ void setRandom(uint32_t *x, uint32_t ndigits)
 		x[i] = rand(); 
 	}
 }
-#endif
 
 /****************************************************************************/
 /**
@@ -994,6 +992,7 @@ void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_n
   for (i=0; i<in_nrows; i++){
     for(j=0; j<in_ncols; j++){
       for (k=0; k<NDIGITS; k++){
+        //printf("OUT: %d, IN : %d\n",(j*in_nrows+i)*NDIGITS+k, (i*in_ncols+j)*NDIGITS+k);
         mout[(j*in_nrows+i)*NDIGITS+k] = min[(i*in_ncols+j)*NDIGITS+k];
       }
     }
@@ -1001,7 +1000,7 @@ void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_n
 
 
 }
-void parallel_ntt_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
+void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
 {
   uint32_t Anrows = (1<<Nrows);
   uint32_t Ancols = (1<<Ncols);
@@ -1021,7 +1020,7 @@ void parallel_ntt_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols
   for (i=0;i < Mnrows; i++){
     ntt_h(&M[i*NDIGITS*Mncols], reducedR, Nrows, pidx);
     for (j=0;j < Mncols; j++){   
-        montmult_h(&M[i*NDIGITS*Mncols+j], &M[i*NDIGITS*Mncols+j], &roots[i*j*NDIGITS], pidx);
+        montmult_h(&M[i*NDIGITS*Mncols+j*NDIGITS], &M[i*NDIGITS*Mncols+j*NDIGITS], &roots[i*j*NDIGITS], pidx);
     }
   }
 
@@ -1356,7 +1355,7 @@ void test_ntt(void)
 
 }
 
-void test_parallel_ntt(void)
+void test_ntt_parallel(void)
 {
 	int i,j;
         int pidx=1;
@@ -1374,7 +1373,7 @@ void test_parallel_ntt(void)
 
         Ncols = levels/2;
         Nrows = levels - Ncols;
-        parallel_ntt_h(poly_fft_in_test, roots_128_test, Ncols, Nrows, pidx);
+        ntt_parallel_h(poly_fft_in_test, roots_128_test, Ncols, Nrows, pidx);
 
         for (j=0;j<nroots; j++){
            if (mpCompare(&poly_fft_in_test[j*NDIGITS],&poly_fft_out_test[j*NDIGITS],NDIGITS)){
@@ -1394,7 +1393,7 @@ int main()
         test_mul();
         test_findroots();
         test_ntt();
-        test_parallel_ntt();
+        test_ntt_parallel();
 
   return 1;
 

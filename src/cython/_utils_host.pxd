@@ -1,4 +1,4 @@
-/*
+"""
     Copyright 2018 0kims association.
 
     This file is part of cusnarks.
@@ -19,22 +19,21 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : utils_host.h
+// File name  : _utila_host.pxd
 //
 // Date       : 06/03/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//  Implementation of small utils functions for host
+//   utils_host cython wrapper
 // ------------------------------------------------------------------
 
-*/
-#ifndef _UTILS_HOST_H_
-#define _UTILS_HOST_H_
+"""
+cimport _types as ct
 
-void montmult_h(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx);
-void ntt_h(uint32_t *A, uint32_t *roots, uint32_t L, uint32_t pidx);
-void find_roots_h(uint32_t *roots, uint32_t *primitive_root, uint32_t nroots, uint32_t pidx);
-void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx);
-#endif
+cdef extern from "../cuda/utils_host.h":
+    void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
+    void cntt_h "ntt_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t L, ct.uint32_t pidx)
+    void cfind_roots_h "find_roots_h" (ct.uint32_t *roots, ct.uint32_t *primitive_root, ct.uint32_t nroots, ct.uint32_t pidx)
+    void cntt_parallel_h "ntt_parallel_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx)

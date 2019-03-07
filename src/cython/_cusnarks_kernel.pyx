@@ -300,3 +300,18 @@ def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nr
       uh.cfind_roots_h(&out_roots_flat[0], &in_proot[0], nroots, pidx)
 
       return np.reshape(out_roots_flat,(-1, len(in_prot)))
+
+def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx):
+
+      cdef ct.uint32_t n = in_A.shape[1]
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_A_flat = np.zeros(in_A.shape[0] * in_A.shape[1], dtype=np.uint32)
+
+      in_roots_flat = np.concatenate(in_roots)
+      in_A_flat = np.concatenate(in_A)
+
+      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, pidx)
+
+      return np.reshape(in_A_flat,(-1,n))
+
