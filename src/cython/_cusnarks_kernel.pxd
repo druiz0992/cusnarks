@@ -70,5 +70,3 @@ cdef extern from "../cuda/zpoly.h":
         C_ZCUPoly(ct.uint32_t len, ct.uint32_t seed) except +
         C_ZCUPoly(ct.uint32_t len) except +
 
-
-
