@@ -488,13 +488,15 @@ double CUSnarks::kernelLaunch(
   in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
   out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
 
-  double start, end_copy_in, end_kernel, end_copy_out;
+  double start, end_copy_in, end_kernel, end_copy_out, total_kernel;
   int blockD, gridD, smemS, kernel_idx;
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
   CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
+
+  total_kernel = 0.0;
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
   // depending on input data length and stride (how many samples of input data are 
@@ -518,6 +520,7 @@ double CUSnarks::kernelLaunch(
     CCHECK(cudaGetLastError());
     CCHECK(cudaDeviceSynchronize());
     end_kernel = elapsedTime() - start;
+    total_kernel +=end_kernel;
 
     logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",
         params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride);
@@ -547,7 +550,7 @@ double CUSnarks::kernelLaunch(
   logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
           out_vector_host->size, end_copy_out);
 
-  return end_kernel;
+  return total_kernel;
 }
 
 
