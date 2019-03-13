@@ -169,5 +169,23 @@ __forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit
          : "r"(x[digit]), "r"(c));
    }
 }
+/*
+   Propagate carry bit across a 256 bit number starting in 32 bit word indexed by digit
+*/
+__forceinline__ __device__ void propcu32_extend(uint32_t *x, uint32_t c)
+{
+   #pragma unroll
+   for (uint32_t digit = NWORDS_256BIT; digit < NWORDS_256BIT_FIOS-1 ; digit++)
+   {
+     asm("{                                   \n\t"
+         "add.cc.u32      %0,   %3, %2;   \n\t"
+         "set.lt.u32.u32  %1,   %0, %2;   \n\t"
+         "and.b32         %1,   %1,  1;      \n\t"
+         "}                                   \n\t"
+         : "=r"(x[digit]), "=r"(c) 
+         : "r"(x[digit]), "r"(c));
+   }
+}
+
 
 #endif

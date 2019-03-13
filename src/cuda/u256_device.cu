@@ -847,6 +847,9 @@ __device__ void addmu256(uint32_t __restrict__*z, const uint32_t __restrict__ *x
     if (ltu256(p,tmp)){
       subu256(tmp,tmp,p);
    } 
+   movu256(z,tmp);
+
+#if 0
    asm("mov.u32     %0,  %8;\n\t"
        "mov.u32     %1,  %9;\n\t"
        "mov.u32     %2,  %10;\n\t"
@@ -859,7 +862,6 @@ __device__ void addmu256(uint32_t __restrict__*z, const uint32_t __restrict__ *x
       "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
     : "r"(tmp[0]), "r"(tmp[1]), "r"(tmp[2]), "r"(tmp[3]),
       "r"(tmp[4]), "r"(tmp[5]), "r"(tmp[6]), "r"(tmp[7]));
-#if 0
   // if (ltu256(p,z)) {
    if (eq0u256(y)) {
    asm("mov.u32     %0,  %8;\n\t"
@@ -923,6 +925,17 @@ __device__ void addmu256_2(uint32_t __restrict__*z, const uint32_t __restrict__ 
 __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
 
+  uint32_t const __restrict__ *p = mod_info_ct[midx].p;
+  uint32_t tmp[NWORDS_256BIT];
+
+  subu256(tmp,x,y);
+  //if (tmp[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
+  if (ltu256(p,tmp)){
+      addu256(tmp,tmp,p);
+  } 
+  movu256(z,tmp);
+
+#if 0
   uint32_t tmp[NWORDS_256BIT];
   if (ltu256(x,y)){
     subu256(tmp,mod_info_ct[midx].p,y);
@@ -931,7 +944,7 @@ __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
   } else {
     subu256(z,x,y);
   }
-  
+#endif  
 }
 
 // multiply by small constant (<= 32) 
@@ -1026,7 +1039,7 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     uint32_t i,j;
-    uint32_t S, C=0, C1, C2;
+    uint32_t S, C=0, C1, C2,C3;
     uint32_t __restrict__ M[2], X[2];
     uint32_t __restrict__ T[]={0,0,0,0,0,0,0,0,0,0,0};
     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
@@ -1046,77 +1059,82 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
       logDebug("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
 
       // ADD(t[1],C)
-      propcu32(T, C, 1);
+      //propcu32(T, C, 1);
+      addcu32(&C3, &T[1], T[1], C);
       logDebugBigNumber("T\n",T);
 
-     // m = S*n'[0] mod W, where W=2^32
-     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-     mulu32(M, S, PN_u256[0]);
-     logDebug("M[0] : %u, M[1] : %u\n",M[0], M[1]);
+       // m = S*n'[0] mod W, where W=2^32
+       // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+       mulu32(M, S, PN_u256[0]);
+       logDebug("M[0] : %u, M[1] : %u\n",M[0], M[1]);
 
-     // (C,S) = S + m*n[0], worst case 2 words
-     madcu32(&C,&S,M[0],P_u256[0],S);
-     logDebug("1 - C : %u, S: %u\n",C,S);
+       // (C,S) = S + m*n[0], worst case 2 words
+       madcu32(&C,&S,M[0],P_u256[0],S);
+       logDebug("1 - C : %u, S: %u\n",C,S);
+  
+       #pragma unroll
+       for(j=1; j<NWORDS_256BIT; j++)
+       {
+         // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+         mulu32(X, A[j], B[i]);
+         addcu32(&C1, &S, T[j], C);
+         logDebug("2 - C1 : %u, S: %u\n",C1,S);
+         addcu32(&C2, &S, S, X[0]);
+         logDebug("3 - C2 : %u, S: %u\n",C2,S);
+         logDebug("X[0] : %u, X[1]: %u\n",X[0], X[1]);
+         addcu32(&X[0], &C, C1, X[1]);
+         logDebug("4 - C : %u\n",C);
+         addcu32(&X[0], &C, C, C2);
+         logDebug("5 - C : %u\n",C);
+  
+         // ADD(t[j+1],C)
+         C +=C3;
+         addcu32(&C3, &T[j+1], T[j+1], C);
+         //propcu32(T,C,j+1);
+         logDebugBigNumber("T\n",T);
+  
+         // (C,S) = S + m*n[j]
+         madcu32(&C,&S,M[0], P_u256[j],S);
+         logDebug("6 - C : %u, S: %u\n",C,S);
+  
+         // t[j-1] = S
+         T[j-1] = S;
+         logDebugBigNumber("T\n",T);
+       }
 
-     #pragma unroll
-     for(j=1; j<NWORDS_256BIT; j++)
-     {
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, A[j], B[i]);
-       addcu32(&C1, &S, T[j], C);
-       logDebug("2 - C1 : %u, S: %u\n",C1,S);
-       addcu32(&C2, &S, S, X[0]);
-       logDebug("3 - C2 : %u, S: %u\n",C2,S);
-       logDebug("X[0] : %u, X[1]: %u\n",X[0], X[1]);
-       addcu32(&X[0], &C, C1, X[1]);
-       logDebug("4 - C : %u\n",C);
-       addcu32(&X[0], &C, C, C2);
-       logDebug("5 - C : %u\n",C);
-
-       // ADD(t[j+1],C)
-       propcu32(T,C,j+1);
-       logDebugBigNumber("T\n",T);
-
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[j],S);
+       propcu32_extend(T,C3);
+       // (C,S) = t[s] + C
+       addcu32(&C,&S, T[NWORDS_256BIT], C);
        logDebug("6 - C : %u, S: %u\n",C,S);
-
-       // t[j-1] = S
-       T[j-1] = S;
-       logDebugBigNumber("T\n",T);
-     }
-
-     // (C,S) = t[s] + C
-     addcu32(&C,&S, T[NWORDS_256BIT], C);
-     logDebug("6 - C : %u, S: %u\n",C,S);
-     // t[s-1] = S
-     T[NWORDS_256BIT-1] = S;
-     // t[s] = t[s+1] + C
-     addcu32(&X[0],&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
-     // t[s+1] = 0
-     T[NWORDS_256BIT+1] = 0;
+       // t[s-1] = S
+       T[NWORDS_256BIT-1] = S;
+       // t[s] = t[s+1] + C
+       addcu32(&X[0],&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
+       // t[s+1] = 0
+       T[NWORDS_256BIT+1] = 0;
    }
 
    logDebugBigNumber("T before mod\n",T);
   
    /* Step 3: if(u>=n) return u-n else return u */
-   //if (ltu256(P_u256,T)){
-   if (P_u256[NWORDS_256BIT-1] < T[NWORDS_256BIT-1]){
+   if (ltu256(P_u256,T)){
+   //if (P_u256[NWORDS_256BIT-1] < T[NWORDS_256BIT-1]){
       subu256(U,T,P_u256);
    } else {
+       movu256(U,T);
       //memcpy(U, T, sizeof(uint32_t) * NWORDS_256BIT);
-   asm("mov.u32     %0,  %8;\n\t"
-       "mov.u32     %1,  %9;\n\t"
-       "mov.u32     %2,  %10;\n\t"
-       "mov.u32     %3,  %11;\n\t"
-       "mov.u32     %4,  %12;\n\t"
-       "mov.u32     %5,  %13;\n\t"
-       "mov.u32     %6,  %14;\n\t"
-       "mov.u32     %7,  %15;\n\t"
-    : "=r"(U[0]), "=r"(U[1]), "=r"(U[2]), "=r"(U[3]),
-      "=r"(U[4]), "=r"(U[5]), "=r"(U[6]), "=r"(U[7])
-    : "r"(T[0]), "r"(T[1]), "r"(T[2]), "r"(T[3]),
-      "r"(T[4]), "r"(T[5]), "r"(T[6]), "r"(T[7]));
+   //asm("mov.u32     %0,  %8;\n\t"
+       //"mov.u32     %1,  %9;\n\t"
+       //"mov.u32     %2,  %10;\n\t"
+       //"mov.u32     %3,  %11;\n\t"
+       //"mov.u32     %4,  %12;\n\t"
+       //"mov.u32     %5,  %13;\n\t"
+       //"mov.u32     %6,  %14;\n\t"
+       //"mov.u32     %7,  %15;\n\t"
+    //: "=r"(U[0]), "=r"(U[1]), "=r"(U[2]), "=r"(U[3]),
+      //"=r"(U[4]), "=r"(U[5]), "=r"(U[6]), "=r"(U[7])
+    //: "r"(T[0]), "r"(T[1]), "r"(T[2]), "r"(T[3]),
+      //"r"(T[4]), "r"(T[5]), "r"(T[6]), "r"(T[7]));
    }
    logDebugBigNumber("U after mod\n",U);
 
@@ -1138,6 +1156,8 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 {
    const uint32_t __restrict__ *p = mod_info_ct[midx].p;
 
+   movu256(z,x);
+   #if 0
    asm("mov.u32     %0,  %8;\n\t"
        "mov.u32     %1,  %9;\n\t"
        "mov.u32     %2,  %10;\n\t"
@@ -1150,6 +1170,7 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
       "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
     : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]),
       "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+  #endif
 
   // x(255 bit number worst case) - p (253 bit number) = z (255 bit number) : ex 31(5 b) - 4(3 b) =27 (5 b) 
   if (!ltu256(z,p)){
