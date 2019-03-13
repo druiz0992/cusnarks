@@ -34,6 +34,7 @@
 #define _UTILS_HOST_H_
 
 void montmult_h(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx);
+void montmult_h2(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx);
 void ntt_h(uint32_t *A, uint32_t *roots, uint32_t L, uint32_t pidx);
 void find_roots_h(uint32_t *roots, uint32_t *primitive_root, uint32_t nroots, uint32_t pidx);
 void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx);

@@ -293,14 +293,6 @@ static uint32_t IW32_nroots[] = {
 };   
 
 
-
-
-#if 0
-__device__ uint32_t *in_vector_d;
-__device__ uint32_t *out_vector_d;
-__device__ kernel_params_t *params_d;
-#endif
-
 /*
     Constructor : Reserves global (vector) and constant (prime info) memory 
 
@@ -348,15 +340,9 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
   // Allocate kernel input and putput data vectors in global memory 
   CCHECK(cudaMalloc((void**) &this->in_vector_device.data, in_size));
   CCHECK(cudaMalloc((void**) &this->out_vector_device.data, out_size));
-  //CCHECK(cudaMalloc((void**) &in_vector_d, in_size));
-  //CCHECK(cudaMalloc((void**) &out_vector_d, out_size));
-  //this->in_vector_device.data = in_vector_d;
-  //this->out_vector_device.data = out_vector_d;
 
   // Allocate kernel params in global memory 
   CCHECK(cudaMalloc((void**) &this->params_device, sizeof(kernel_params_t)));
-  //CCHECK(cudaMalloc((void**) &params_d, sizeof(kernel_params_t)));
-  //this->params_device = params_d;
 
   // constants ->  Initialize data and copy to constant memory
   memcpy(mod_h,     mod_info_init,           sizeof(mod_info_t)    * MOD_N); // prime info
@@ -419,6 +405,7 @@ CUSnarks::~CUSnarks()
     params          : Kernel input parameters
 
 */
+#if 0
 double CUSnarks::kernelLaunch(
                 uint32_t kernel_idx,
 		vector_t *out_vector_host,
@@ -485,8 +472,8 @@ double CUSnarks::kernelLaunch(
 
   return end_kernel;
 }
-
-double CUSnarks::kernelMultipleLaunch(
+#endif
+double CUSnarks::kernelLaunch(
 		vector_t *out_vector_host,
 	       	vector_t *in_vector_host,
                 kernel_config_t *config,

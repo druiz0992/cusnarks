@@ -43,12 +43,6 @@ extern __constant__ uint32_t W32_ct[NWORDS_256BIT * 16];
 extern __constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
 extern __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];
 
-#if 0
-extern __device__ uint32_t *in_vector_d;
-extern __device__ uint32_t *out_vector_d;
-extern __device__ kernel_params_t *params_d;
-#endif
-
 #ifndef assert
 #define assert(X)         \
   do {                    \

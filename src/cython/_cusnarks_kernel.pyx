@@ -56,6 +56,7 @@ cdef class CUSnarks:
         if out_size == 0:
            self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
 
+    """
     def kernelLaunch(self, ct.uint32_t kernel_idx, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params):
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
@@ -120,8 +121,9 @@ cdef class CUSnarks:
         exec_time = self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
         
         return np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
-   
-    def kernelMultipleLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel):
+    """
+
+    def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel):
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
        
