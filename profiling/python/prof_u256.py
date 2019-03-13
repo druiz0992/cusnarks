@@ -62,18 +62,18 @@ def profile_u256():
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
     nsamples = 1<<22
 
-    kernel_params = {'midx' : MOD_FIELD ,'premod' : 0, 'in_length' :nsamples, 'stride' : 2, 'out_length' : nsamples/2}
-    kernel_config = {'blockD' : 256, 'smemS' : 0}
+    kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' :[nsamples], 'stride' : [2], 'out_length' : nsamples/2}
+    kernel_config = {'blockD' : [256], 'smemS' : [0]}
 
 
     u256 = U256(nsamples, seed=10)
     u256_vector = u256.rand(nsamples)
             
+    kernel_config['kernel_idx'] = [CB_U256_MOD]
 
     for i in range(niter):
        u256 = U256(nsamples, seed=10)
-       #_, kernel_time = u256.kernelLaunch(CB_U256_MULM, u256_vector, kernel_config, kernel_params )
-       _, kernel_time = u256.kernelLaunch(CB_U256_ADDM, u256_vector, kernel_config, kernel_params )
+       _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params )
        if i :
            kernel_stats.append(kernel_time)
 

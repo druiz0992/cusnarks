@@ -386,7 +386,7 @@ void CUSnarks::rand(uint32_t *samples, uint32_t n_samples)
 */
 CUSnarks::~CUSnarks()
 {
-  logInfo("Releaser resources\n");
+  logInfo("Release resources\n");
   cudaFree(in_vector_device.data);
   cudaFree(out_vector_device.data);
   cudaFree(params_device);

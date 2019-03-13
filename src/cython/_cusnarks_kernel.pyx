@@ -123,14 +123,14 @@ cdef class CUSnarks:
         return np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
     """
 
-    def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel):
+    def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel=1):
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
        
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
-        print in_v.length, self.in_dim, out_v.length, self.out_dim
+        #print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
             return 0.0
@@ -188,7 +188,7 @@ cdef class CUSnarks:
           else:
             kparams[i].forward = 1
 
-        exec_time = self._cusnarks_ptr.kernelMultipleLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
+        exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
        
         kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
 

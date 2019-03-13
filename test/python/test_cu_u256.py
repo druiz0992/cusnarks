@@ -175,8 +175,8 @@ class CUU256Test(unittest.TestCase):
             kernel_params['in_length'] = [CUU256Test.nsamples]
             kernel_params['stride'] = [4]
             kernel_config['blockD'] = [64]
-            kernel_params['out_length'] = (CUU256Test.nsamples + (kernel_config['blockD']*kernel_params['stride']) -1) / (kernel_config['blockD']*kernel_params['stride'])
-            kernel_config['smemS'] = [kernel_config['blockD'] * NWORDS_256BIT * 4 ]
+            kernel_params['out_length'] = (CUU256Test.nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]) -1) / (kernel_config['blockD'][0]*kernel_params['stride'][0])
+            kernel_config['smemS'] = [kernel_config['blockD'][0] * NWORDS_256BIT * 4 ]
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
             result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params )
             #result2,_ = u256.kernelLaunch(6, u256_vector, kernel_config, kernel_params )
@@ -185,11 +185,11 @@ class CUU256Test(unittest.TestCase):
             kernel_params['stride'] = [2]
             kernel_params['out_length'] = 1
             kernel_config['blockD'] = [64]
-            kernel_config['smemS'] = [kernel_config['blockD'] * NWORDS_256BIT * 4 ]
+            kernel_config['smemS'] = [kernel_config['blockD'][0] * NWORDS_256BIT * 4 ]
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
-            min_length = kernel_config['blockD'] * kernel_params['stride']
-            if kernel_params['in_length'] < min_length:
-               zeros = np.zeros((min_length - kernel_params['in_length'],NWORDS_256BIT), dtype=np.uint32)
+            min_length = kernel_config['blockD'][0] * kernel_params['stride'][0]
+            if kernel_params['in_length'][0] < min_length:
+               zeros = np.zeros((min_length - kernel_params['in_length'][0],NWORDS_256BIT), dtype=np.uint32)
                result = np.concatenate((result,zeros))
                kernel_params['in_length'] = [min_length]
 
