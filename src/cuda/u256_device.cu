@@ -1156,7 +1156,7 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 {
    const uint32_t __restrict__ *p = mod_info_ct[midx].p;
 
-   movu256(z,x);
+   movu256(z,(uint32_t *)x);
    #if 0
    asm("mov.u32     %0,  %8;\n\t"
        "mov.u32     %1,  %9;\n\t"

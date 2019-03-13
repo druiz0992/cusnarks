@@ -78,7 +78,7 @@ def profile_u256():
            kernel_stats.append(kernel_time)
 
     
-    logging.info("Max : %s [ms], Min : %s [ms], Mean : %s[ms]" % (np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
+    logging.info("Max : %s [s], Min : %s [s], Mean : %s[s]" % (np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
 
 if __name__ == "__main__":
     profile_u256()
