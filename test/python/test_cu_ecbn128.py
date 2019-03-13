@@ -204,55 +204,59 @@ class CUECTest(unittest.TestCase):
         r_mad = CUECTest.r_mad_rdc
         ecbn128 = ECBN128(nsamples, seed=1)
 
-        kernel_config = {'blockD' : ECBN128_BLOCK_DIM }
-        kernel_params = {'midx' : MOD_FIELD ,'premod' : 1, 'in_length' : nsamples, 'stride' : 1, 'out_length' : nsamples}
+        kernel_config = {'blockD' : [ECBN128_BLOCK_DIM] }
+        kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [1], 'in_length' : [nsamples], 'stride' : [1], 'out_length' : nsamples}
         for iter in xrange(CUECTest.TEST_ITER):
 
             # Test add jac
 
-            kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
+            kernel_params['in_length'] = [nsamples  * ECK_JAC_INDIMS]
             kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)/2
-            kernel_params['stride'] = 2
-            kernel_config['smemS'] = 0
-            kernel_config['blockD'] = ECBN128_BLOCK_DIM
+            kernel_params['stride'] = [2]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_ADD]
 
-            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_ADD, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples/2)
             self.assertTrue(all(np.concatenate(result == r_add)))
 
             # Test double jac
-            kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
+            kernel_params['in_length'] = [nsamples  * ECK_JAC_INDIMS]
             kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)
-            kernel_params['stride'] = 1
-            kernel_config['smemS'] = 0
-            kernel_config['blockD'] = ECBN128_BLOCK_DIM
+            kernel_params['stride'] = [1]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+            kernel_config['kerneld_idx'] = [CB_EC_JAC_DOUBLE]
 
-            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_DOUBLE, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples)
             self.assertTrue(all(np.concatenate(result == r_double)))
 
             # Test sc mul jac
-            kernel_params['in_length'] = nsamples  * ECK_JAC_INDIMS
+            kernel_params['in_length'] = [nsamples  * ECK_JAC_INDIMS]
             kernel_params['out_length']= (nsamples * ECK_JAC_OUTDIMS)
-            kernel_params['stride'] = 1
-            kernel_config['smemS'] = 0
-            kernel_config['blockD'] = ECBN128_BLOCK_DIM
+            kernel_params['stride'] = [1]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_MUL]
 
-            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_MUL, ecbn128_vector, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples)
             self.assertTrue(all(np.concatenate(result == r_mul)))
 
 
             # Test mad jac
-            kernel_params['in_length'] = nsamples * ECK_JAC_INDIMS
-            kernel_params['stride'] = 2
-            kernel_config['blockD'] = 64
-            kernel_params['premul'] = 1
+            kernel_params['in_length'] = [nsamples * ECK_JAC_INDIMS]
+            kernel_params['stride'] = [2]
+            kernel_config['blockD'] = [64]
+            kernel_params['premul'] = [1]
             kernel_params['out_length'] = ECK_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD']*kernel_params['stride']) -1) / (kernel_config['blockD']*kernel_params['stride']))
-            kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 
-            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_MAD, ecbn128_vector, kernel_config, kernel_params )
+            kernel_config['smemS'] = [kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 ]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_MAD]
+            result,_ = ecbn128.kernelLaunch(ec b n128_vector, kernel_config, kernel_params )
 
             
             result_ec = np.zeros(ecbn128_vector.shape, dtype=np.uint32)
@@ -297,20 +301,21 @@ class CUECTest(unittest.TestCase):
 
 
 
-            kernel_params['in_length'] = kernel_params['out_length']
-            kernel_params['stride'] = 2
-            kernel_params['premul'] = 0
+            kernel_params['in_length'] = [kernel_params['out_length']]
+            kernel_params['stride'] = [2]
+            kernel_params['premul'] = [0]
             kernel_params['out_length'] = 1 * ECK_JAC_OUTDIMS
-            kernel_config['blockD'] = 64
-            kernel_config['smemS'] = kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 
+            kernel_config['blockD'] = [64]
+            kernel_config['smemS'] = [kernel_config['blockD'] * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 ]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_MAD]
             min_length = kernel_config['blockD'] * kernel_params['stride'] * ECK_JAC_OUTDIMS
             if kernel_params['in_length'] < min_length:
                zeros = np.zeros((min_length - kernel_params['in_length'],NWORDS_256BIT), dtype=np.uint32)
                result = np.concatenate((result,zeros))
-               kernel_params['in_length'] = min_length
+               kernel_params['in_length'] = [min_length]
 
             tt = ECC.from_uint256(result,in_ectype=1, out_ectype=1, reduced=True)
-            result,_ = ecbn128.kernelLaunch(CB_EC_JAC_MAD, result, kernel_config, kernel_params )
+            result,_ = ecbn128.kernelLaunch(result, kernel_config, kernel_params )
    
 
             # stride reduction

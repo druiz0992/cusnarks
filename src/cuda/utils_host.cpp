@@ -976,6 +976,95 @@ void montmult_h(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
 	memcpy(U, T, 4*NDIGITS);
 }
 
+void montmult_h2(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
+{
+	int i, j;
+	uint32_t S, C, C1, C2, M[2], X[2], carry;
+	uint32_t T[MAX_NDIGITS_FIOS];
+
+	memset(T, 0, 4*(NDIGITS+3));
+
+	for(i=0; i<NDIGITS; i++)
+	{
+		// (C,S) = t[0] + a[0]*b[i], worst case 2 words
+		spMultiply(X, A[0], B[i]);	// X[Upper,Lower] = a[0]*b[i]
+		C = mpAdd(&S, T+0, X+0, 1);	// [C,S] = t[0] + X[Lower]
+		mpAdd(&C, &C, X+1, 1);		// [~,C] = C + X[Upper], No carry
+
+                //printf("0 - C : %u, S: %u\n",C,S);
+                //printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
+		// ADD(t[1],C)
+		//mpAddWithCarryProp(T, C, 1);
+		carry = mpAdd(&T[1], &T[1], &C, 1);	
+                //printf("T\n");
+                //printNumber(T);
+
+		// m = S*n'[0] mod W, where W=2^32
+		// Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+		spMultiply(M, S, NPrime[pidx*NDIGITS]);
+                //printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
+
+		// (C,S) = S + m*n[0], worst case 2 words
+		spMultiply(X, M[0], N[pidx*NDIGITS]);	// X[Upper,Lower] = m*n[0]
+		C = mpAdd(&S, &S, X+0, 1);	// [C,S] = S + X[Lower]
+		mpAdd(&C, &C, X+1, 1);		// [~,C] = C + X[Upper]
+                //printf("1 - C : %u, S: %u\n",C,S);
+
+		for(j=1; j<NDIGITS; j++)
+		{
+			// (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+			spMultiply(X, A[j], B[i]);	 	// X[Upper,Lower] = a[j]*b[i], double precision
+			C1 = mpAdd(&S, T+j, &C, 1);		// (C1,S) = t[j] + C
+                        //printf("2 - C1 : %u, S: %u\n",C1,S);
+			C2 = mpAdd(&S, &S, X+0, 1); 	// (C2,S) = S + X[Lower]
+                        //printf("3 - C2 : %u, S: %u\n",C1,S);
+                        //printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
+			mpAdd(&C, &C1, X+1, 1);			// (~,C)  = C1 + X[Upper], doesn't produce carry
+                        //printf("4 - C : %u\n",C);
+			mpAdd(&C, &C, &C2, 1); 			// (~,C)  = C + C2, doesn't produce carry
+                        //printf("5 - C : %u\n",C);
+
+			// ADD(t[j+1],C)
+                        C += carry;
+		        carry = mpAdd(&T[j+1], &T[j+1], &C, 1);	
+			//mpAddWithCarryProp(T, C, j+1);
+                        //printf("T\n");
+                        //printNumber(T);
+
+			// (C,S) = S + m*n[j]
+			spMultiply(X, M[0], N[j+pidx*NDIGITS]);	// X[Upper,Lower] = m*n[j]
+			C = mpAdd(&S, &S, X+0, 1);	// [C,S] = S + X[Lower]
+			mpAdd(&C, &C, X+1, 1);		// [~,C] = C + X[Upper]
+                        //printf("6 - C : %u, S: %u\n",C,S);
+
+			// t[j-1] = S
+			T[j-1] = S;
+                        //printf("T\n");
+                        //printNumber(T);
+		}
+
+		mpAddWithCarryProp(T, carry, NDIGITS);
+		// (C,S) = t[s] + C
+		C = mpAdd(&S, T+NDIGITS, &C, 1);
+                //printf("6 - C : %u, S: %u\n",C,S);
+		// t[s-1] = S
+		T[NDIGITS-1] = S;
+		// t[s] = t[s+1] + C
+		mpAdd(T+NDIGITS, T+NDIGITS+1, &C, 1);
+		// t[s+1] = 0
+		T[NDIGITS+1] = 0;
+	}
+
+	/* Step 3: if(u>=n) return u-n else return u */
+	if(mpCompare(T, &N[pidx*NDIGITS], NDIGITS) >= 0)
+	{
+		mpSubtract(T, T, &N[pidx*NDIGITS], NDIGITS);
+	}
+
+	memcpy(U, T, 4*NDIGITS);
+}
+
+
 uint32_t reverse(uint32_t x, uint32_t bits)
 {
   uint32_t y = 0;
@@ -1045,7 +1134,7 @@ void ntt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t fft
         //printf("IN(:%d/%d)\n",i,j); 
         //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
     //}
-    ntt_parallel_h2(&A[i*NDIGITS*Ancols], reducedR, fft_Ny, fft_Nx, pidx);
+    ntt_parallel_h(&A[i*NDIGITS*Ancols], reducedR, fft_Ny, fft_Nx, pidx);
     //for (j=0;j < Ancols; j++){   
         //printf("OUT(:%d/%d)\n",i,j); 
         //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
@@ -1127,62 +1216,6 @@ void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols
   free(reducedR);
 }
 
-
-void ntt_parallel_h2(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
-{
-  uint32_t Anrows = (1<<Nrows);
-  uint32_t Ancols = (1<<Ncols);
-  uint32_t Mnrows = Ancols;
-  uint32_t Mncols = Anrows;
-  uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NDIGITS * sizeof(uint32_t));
-  uint32_t *reducedR = (uint32_t *) malloc (MAX(Mncols/2,Mnrows/2) * NDIGITS * sizeof(uint32_t));
-  uint32_t i,j;
-  
-
-  transpose_h(M,A,Anrows, Ancols);
-
-  for(i=0;i<Mncols/2;i++){
-    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mnrows],sizeof(uint32_t)*NDIGITS);
-  }
-
-
-  for (i=0;i < Mnrows; i++){
-    ntt_h(&M[i*NDIGITS*Mncols], reducedR, Nrows, pidx);
-      for (j=0;j < Mncols; j++){  
-           //printf("IN(:%d,%d/%d)\n",debug_rowidx,i,j); 
-           //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
-           //printNumber(&roots[i*j*NDIGITS]);
-           montmult_h(&M[i*NDIGITS*Mncols+j*NDIGITS], &M[i*NDIGITS*Mncols+j*NDIGITS], &roots[i*j*NDIGITS], pidx);
-        //memcpy(&M[i*NDIGITS*Mncols+j*NDIGITS],&roots[i*j*NDIGITS],sizeof(uint32_t)*NDIGITS);
-           //printf("OUT(:%d,%d/%d)\n",debug_rowidx,i,j); 
-           //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
-    }
-  }
-
-  transpose_h(A,M,Mnrows, Mncols);
-
-  for(i=0;i<Mnrows/2;i++){
-    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mncols],sizeof(uint32_t)*NDIGITS);
-  }
-
-  for (i=0;i < Anrows; i++){
-    //for (j=0; j < Ancols; j++){
-           //printf("IN(:%d/%d/%d)\n",debug_rowidx,i,j); 
-           //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
-    //}
-    ntt_h(&A[i*NDIGITS*Ancols], reducedR, Ncols, pidx);
-    //for (j=0; j < Ancols; j++){
-           //printf("OUT(:%d/%d/%d)\n",debug_rowidx,i,j); 
-           //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
-    //}
-  }
-
-  transpose_h(M,A,Anrows, Ancols);
-  memcpy(A,M,Ancols * Anrows * NDIGITS * sizeof(uint32_t));
-
-  free(M);
-  free(reducedR);
-}
 
 inline void swap(uint32_t *x, uint32_t *y)
 {
@@ -1445,6 +1478,37 @@ void test_mul(void)
 
 }
 
+void test_mul2(void)
+{
+  	uint32_t r[NDIGITS]; 
+
+	int i;
+        int pidx=1;
+        int n_errors=0;
+        uint32_t a[NDIGITS], b[NDIGITS], c[NDIGITS];
+
+	for (i=0; i < 1000000; i++){
+            setRandom(a, NDIGITS);
+            setRandom(b, NDIGITS);
+            a[NDIGITS-1] &= 0x7FFFFFF;
+            b[NDIGITS-1] &= 0x7FFFFFF;
+	    
+            montmult_h(r, a, b, pidx);
+            montmult_h2(c, a, b, pidx);
+
+           if (mpCompare(r,c,NDIGITS)){
+                printf("Error in mult %d\n",i);
+              printf("Expected\n");
+              printNumber(c);
+              printf("Obtained\n");
+              printNumber(c);
+              n_errors++;
+            }
+	}
+        printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
+
+}
+
 void test_findroots(void)
 {
 	int j;
@@ -1535,9 +1599,10 @@ void test_ntt_parallel(void)
 int main()
 {
         test_mul();
-        test_findroots();
-        test_ntt();
-        test_ntt_parallel();
+        test_mul2();
+        //test_findroots();
+        //test_ntt();
+        //test_ntt_parallel();
 
   return 1;
 
