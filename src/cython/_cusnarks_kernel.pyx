@@ -315,3 +315,17 @@ def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
       return np.reshape(in_A_flat,(-1,n))
 
+def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.uint32_t pidx):
+
+      cdef ct.uint32_t n = in_A.shape[1]
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_A_flat = np.zeros(in_A.shape[0] * in_A.shape[1], dtype=np.uint32)
+
+      in_roots_flat = np.concatenate(in_roots)
+      in_A_flat = np.concatenate(in_A)
+
+      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, pidx)
+
+      return np.reshape(in_A_flat,(-1,n))
+
