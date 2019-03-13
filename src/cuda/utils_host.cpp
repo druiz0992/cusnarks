@@ -106,6 +106,7 @@ static uint32_t _1[] = {
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041    // 1 field
 };
 
+uint32_t debug_rowidx;
 #ifdef UTILS_DEBUG
 static uint32_t p_root128[] = {
   3202964282, 1415263009, 1631761676, 2375868442,  876590776, 1603946946, 2412717293,  401158326  // 128
@@ -997,10 +998,8 @@ void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_n
       }
     }
   }
-
-
 }
-void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
+void ntt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t fft_Ny,  uint32_t Ncols, uint32_t fft_Nx, uint32_t pidx)
 {
   uint32_t Anrows = (1<<Nrows);
   uint32_t Ancols = (1<<Ncols);
@@ -1015,14 +1014,24 @@ void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols
 
   for(i=0;i<Mncols;i++){
     memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mnrows],sizeof(uint32_t)*NDIGITS);
+    //if (i % 32 == 0){
+      //printNumber(&reducedR[i*NDIGITS]);
+    //}
   }
 
+
   for (i=0;i < Mnrows; i++){
-    ntt_h(&M[i*NDIGITS*Mncols], reducedR, Nrows, pidx);
+    ntt_parallel_h(&M[i*NDIGITS*Mncols], reducedR, fft_Ny, fft_Nx, pidx);
     for (j=0;j < Mncols; j++){   
+        //printf("IN(:%d/%d)\n",i,j); 
+        //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
+        //printNumber(&roots[i*j*NDIGITS]);
         montmult_h(&M[i*NDIGITS*Mncols+j*NDIGITS], &M[i*NDIGITS*Mncols+j*NDIGITS], &roots[i*j*NDIGITS], pidx);
+        //printf("OUT(:%d/%d)\n",i,j); 
+        //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
     }
   }
+
 
   transpose_h(A,M,Mnrows, Mncols);
 
@@ -1031,7 +1040,141 @@ void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols
   }
 
   for (i=0;i < Anrows; i++){
+    debug_rowidx = i;
+    //for (j=0;j < Ancols; j++){   
+        //printf("IN(:%d/%d)\n",i,j); 
+        //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
+    ntt_parallel_h2(&A[i*NDIGITS*Ancols], reducedR, fft_Ny, fft_Nx, pidx);
+    //for (j=0;j < Ancols; j++){   
+        //printf("OUT(:%d/%d)\n",i,j); 
+        //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
+  }
+
+  transpose_h(M,A,Anrows, Ancols);
+  memcpy(A,M,Ancols * Anrows * NDIGITS * sizeof(uint32_t));
+  //for (i=0;i < Anrows; i++){
+    //for (j=0;j < Ancols; j++){   
+        //printf("OUT(:%d/%d)\n",i,j); 
+        //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
+  //}
+
+  free(M);
+  free(reducedR);
+
+}
+
+void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
+{
+  uint32_t Anrows = (1<<Nrows);
+  uint32_t Ancols = (1<<Ncols);
+  uint32_t Mnrows = Ancols;
+  uint32_t Mncols = Anrows;
+  uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NDIGITS * sizeof(uint32_t));
+  uint32_t *reducedR = (uint32_t *) malloc (MAX(Mncols/2,Mnrows/2) * NDIGITS * sizeof(uint32_t));
+  uint32_t i,j;
+  
+
+  transpose_h(M,A,Anrows, Ancols);
+
+  for(i=0;i<Mncols/2;i++){
+    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mnrows],sizeof(uint32_t)*NDIGITS);
+  }
+
+
+  for (i=0;i < Mnrows; i++){
+    ntt_h(&M[i*NDIGITS*Mncols], reducedR, Nrows, pidx);
+    for (j=0;j < Mncols; j++){  
+        //if (i==0){
+           //printf("IN(:%d/%d)\n",i,j); 
+           //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
+           //printNumber(&roots[i*j*NDIGITS]);
+        //} 
+        montmult_h(&M[i*NDIGITS*Mncols+j*NDIGITS], &M[i*NDIGITS*Mncols+j*NDIGITS], &roots[i*j*NDIGITS], pidx);
+        //memcpy(&M[i*NDIGITS*Mncols+j*NDIGITS],&roots[i*j*NDIGITS],sizeof(uint32_t)*NDIGITS);
+        //if (i==0){
+           //printf("OUT(:%d/%d)\n",i,j); 
+           //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
+        //}
+    }
+  }
+
+  
+  transpose_h(A,M,Mnrows, Mncols);
+
+  for(i=0;i<Mnrows/2;i++){
+    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mncols],sizeof(uint32_t)*NDIGITS);
+  }
+
+  for (i=0;i < Anrows; i++){
+    //for (j=0; j < Ancols; j++){
+           //printf("IN(:%d/%d/%d)\n",debug_rowidx,i,j); 
+           //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
     ntt_h(&A[i*NDIGITS*Ancols], reducedR, Ncols, pidx);
+    //for (j=0; j < Ancols; j++){
+           //printf("OUT(:%d/%d/%d)\n",debug_rowidx,i,j); 
+           //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
+  }
+
+  transpose_h(M,A,Anrows, Ancols);
+  memcpy(A,M,Ancols * Anrows * NDIGITS * sizeof(uint32_t));
+
+  free(M);
+  free(reducedR);
+}
+
+
+void ntt_parallel_h2(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx)
+{
+  uint32_t Anrows = (1<<Nrows);
+  uint32_t Ancols = (1<<Ncols);
+  uint32_t Mnrows = Ancols;
+  uint32_t Mncols = Anrows;
+  uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NDIGITS * sizeof(uint32_t));
+  uint32_t *reducedR = (uint32_t *) malloc (MAX(Mncols/2,Mnrows/2) * NDIGITS * sizeof(uint32_t));
+  uint32_t i,j;
+  
+
+  transpose_h(M,A,Anrows, Ancols);
+
+  for(i=0;i<Mncols/2;i++){
+    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mnrows],sizeof(uint32_t)*NDIGITS);
+  }
+
+
+  for (i=0;i < Mnrows; i++){
+    ntt_h(&M[i*NDIGITS*Mncols], reducedR, Nrows, pidx);
+      for (j=0;j < Mncols; j++){  
+           //printf("IN(:%d,%d/%d)\n",debug_rowidx,i,j); 
+           //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
+           //printNumber(&roots[i*j*NDIGITS]);
+           montmult_h(&M[i*NDIGITS*Mncols+j*NDIGITS], &M[i*NDIGITS*Mncols+j*NDIGITS], &roots[i*j*NDIGITS], pidx);
+        //memcpy(&M[i*NDIGITS*Mncols+j*NDIGITS],&roots[i*j*NDIGITS],sizeof(uint32_t)*NDIGITS);
+           //printf("OUT(:%d,%d/%d)\n",debug_rowidx,i,j); 
+           //printNumber(&M[i*NDIGITS*Mncols+j*NDIGITS]);
+    }
+  }
+
+  transpose_h(A,M,Mnrows, Mncols);
+
+  for(i=0;i<Mnrows/2;i++){
+    memcpy(&reducedR[i*NDIGITS], &roots[i*NDIGITS*Mncols],sizeof(uint32_t)*NDIGITS);
+  }
+
+  for (i=0;i < Anrows; i++){
+    //for (j=0; j < Ancols; j++){
+           //printf("IN(:%d/%d/%d)\n",debug_rowidx,i,j); 
+           //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
+    ntt_h(&A[i*NDIGITS*Ancols], reducedR, Ncols, pidx);
+    //for (j=0; j < Ancols; j++){
+           //printf("OUT(:%d/%d/%d)\n",debug_rowidx,i,j); 
+           //printNumber(&A[i*NDIGITS*Ancols+j*NDIGITS]);
+    //}
   }
 
   transpose_h(M,A,Anrows, Ancols);
@@ -1272,6 +1415,7 @@ uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t
 
 
 #ifdef UTILS_DEBUG
+
 void test_mul(void)
 {
   	uint32_t r[NDIGITS]; 

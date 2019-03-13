@@ -290,7 +290,7 @@ __global__ void zpoly_fft2DY_kernel(uint32_t *out_vector, uint32_t *in_vector, k
  
 }
 
-__global__ void zpoly_fft3DX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void zpoly_fft3DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -314,21 +314,46 @@ __global__ void zpoly_fft3DX_kernel(uint32_t *out_vector, uint32_t *in_vector, k
         }
     }
     */
-    fft3Dx_dif(in_vector,in_vector, params);
+    // TODO
+    fft3Dxx_dif(in_vector,in_vector, params);
  
 }
 
-__global__ void zpoly_fft3DY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void zpoly_fft3DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
     if(tid > params->in_length){
       return;
     }
-
-    fft3Dy_dif(out_vector,in_vector, params);
-  return;
+    
+    fft3Dxy_dif(out_vector,in_vector, params);
+    //memcpy(&out_vector[tid], &in_vector[tid], sizeof(uint32_t)*NWORDS_256BIT);
 }
+
+__global__ void zpoly_fft3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid > params->in_length){
+      return;
+    }
+    
+    fft3Dyx_dif(in_vector,out_vector, params);
+    //fft3Dyx_dif(out_vector,out_vector, params);
+    //memcpy(&out_vector[tid], &in_vector[tid], sizeof(uint32_t)*NWORDS_256BIT);
+}
+
+__global__ void zpoly_fft3DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid > params->in_length){
+      return;
+    } 
+    int i;
+    
+    fft3Dyy_dif(out_vector,in_vector, params);
+    //memcpy(&out_vector[tid], &in_vector[tid], sizeof(uint32_t)*NWORDS_256BIT);
+}
+
 
 /*
   Input : X[0], X[1],....,X[Nx*Ny-1], for Nx,Ny = 1,2,4,8,16,32. Min Nx*Ny = 32
@@ -459,7 +484,7 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
     4) Perform Nx x Ny point FFT (FFT of columns)
     5) Convert to 1D verctor, filling it by row
 */
-__device__ void fft3Dx_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
+__device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   uint32_t Nx = params->fft_Nx; // size of underlying FFTx
@@ -468,9 +493,10 @@ __device__ void fft3Dx_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
   uint32_t Ny2 = params->N_ffty;  // N FFTy of size Ny
   mod_t    midx = params->midx;
 
-  uint32_t new_ridx = (tid << Ny2) & ((1 << (Nx2 + Ny2))-1);
-  uint32_t new_cidx = tid >> Nx2;
-  uint32_t new_cidx2, new_ridx2;
+  uint32_t new_ridx = ((tid % 1024) / 32) * 1024;
+  uint32_t new_cidx = (tid % 32) * 32 * 1024;
+  uint32_t new_kidx = (tid / 1024);
+  uint32_t new_cidx2, new_ridx2, new_kidx2;
   uint32_t reverse_idx;
   uint32_t *roots = &x[(1<<(Nx2+Ny2)) * U256K_OFFSET];
   uint32_t ridx, cidx;
@@ -483,9 +509,56 @@ __device__ void fft3Dx_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
   }
 
   // FFT rows (Every Ny points)
-  reverse_idx = ((((((tid % 32) * 0x802 & 0x22110) | ( (tid%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((tid%1024)/32)) ;
-  fftN_dif(&z[(reverse_idx + 1024*(tid/1024))*U256K_OFFSET], &x[(new_cidx + new_ridx)*U256K_OFFSET], W32, Nx,midx);
-  mul_poly(&z[(new_cidx + new_ridx)*U256K_OFFSET],&z[(new_cidx + new_ridx)*U256K_OFFSET],&roots[(tid/(1<<Nx2)) * (tid % (1<<Ny2))*U256K_OFFSET], 0, midx);
+  reverse_idx = ((((((tid % 32) * 0x802 & 0x22110) | ( (tid%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*32*1024;
+  fftN_dif(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET], &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET], W32, Nx,midx);
+  #if 0
+  if (tid==0){
+     for (uint32_t i=0; i < 16; i++){
+            logInfoBigNumber("r[i]:\n",(uint32_t *)&W32[(i*U256K_OFFSET)]);
+      }
+     for (uint32_t i=0; i < 2048; i++){
+       new_ridx2 = (i << (Ny2+Ny)) & ((1 << (Nx2 + Ny2))-1);
+       new_cidx2 = i >> (Nx2-Nx);
+       reverse_idx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((i%1024)/32)) ;
+       logInfo("in(%d/%d) : %d, out : %d , ridx: %d\n",new_ridx2, new_cidx2, new_cidx2 + new_ridx2, reverse_idx + 1024*(i/1024), 
+                 ((reverse_idx + 1024 * (tid/1024))%32) * (new_cidx2%32));
+       //if (i < 32){
+          //logInfoBigNumber("r[i2]:\n",(uint32_t *)&roots[((reverse_idx + 1024 * (i/1024))%32)*(1<<15)*U256K_OFFSET]);
+       //}
+     } 
+  }
+  #endif
+  //memcpy(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],&roots[(new_ridx/1024 * reverse_idx/(1024 *32) * 1024)*U256K_OFFSET], sizeof(uint32_t)*U256K_OFFSET);
+  mul_poly(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
+               &roots[(new_ridx/1024 * reverse_idx/(1024 *32) * 1024)*U256K_OFFSET], 0, midx);
+
+  #if 0
+  if (tid==32){
+     for (uint32_t i=1024*1022; i < 1024*1024; i++){
+       new_ridx2 = ((i/32) % 32) * 1024;
+       new_cidx2 = (i % 32) * 32 * 1024;
+       reverse_idx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((i%1024)/32)) ;
+       logInfo("in(%d/%d) : %d, out : %d , ridx: %d\n",new_ridx2, new_cidx2, new_cidx2 + new_ridx2, reverse_idx + 1024*(i/1024), 
+                 ((reverse_idx + 1024 * (i/1024))%32) * (((i / 1024) %32) * 1024));
+     }
+     for (uint32_t i=tid; i < tid + 32; i++){
+       new_ridx2 = ((i/32) % 32)* 1024;
+       new_cidx2 = (i % 32) * 32 * 1024;
+       reverse_idx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((i%1024)/32)) ;
+       logInfoBigNumber("Xin:\n",(uint32_t *)&z[i*U256K_OFFSET]);
+       logInfoBigNumber("RIn:\n",(uint32_t *)&roots[(((reverse_idx + 1024 * (i/1024))%32) * (((i / 1024) %32) * 1024))*U256K_OFFSET]);
+     } 
+  }
+  if (tid==32){
+     for (uint32_t i=tid; i < tid+32; i++){
+       new_ridx2 = (i/32) * 1024;
+       new_cidx2 = (i % 32) * 32 * 1024;
+       reverse_idx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((i%1024)/32)) ;
+       logInfoBigNumber("XOut:\n",(uint32_t *)&z[(i)*U256K_OFFSET]);
+     } 
+  }
+  #endif
+  //mul_poly(&z[(new_cidx + new_ridx)*U256K_OFFSET],&z[(new_cidx + new_ridx)*U256K_OFFSET],&roots[((reverse_idx + 1024 * (tid/1024))%32)*(1<<15)*U256K_OFFSET], 0, midx);
 #if 0
   if (tid == 0){
         //logInfo("z: %x\n",z);
@@ -508,46 +581,69 @@ __device__ void fft3Dx_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 #endif
 }
 
-__device__ void fft3Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
+__device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
   uint32_t Nx = params->fft_Nx;
   uint32_t Ny = params->fft_Ny;
   uint32_t Nx2 = params->N_fftx;  // N FFTx of size Nx
   uint32_t Ny2 = params->N_ffty;  // N FFTy of size Ny
   mod_t    midx = params->midx;
+  int new_ridx = ((tid / 32 )%1024);
+  int new_cidx = (tid % 32) * 1024;  
+  int new_kidx = (tid/(1024*32) * 32 * 1024);
+  int new_ridx2, new_cidx2, new_kidx2;
 
-  uint32_t new_ridx = (tid << Ny2) & ((1 << (Nx2 + Ny2))-1);
-  uint32_t new_cidx = tid >> Nx2;
-  uint32_t new_cidx2, new_ridx2;
   uint32_t reverse_idx;
   uint32_t *roots = &x[(1<<(Nx2+Ny2)) * U256K_OFFSET];
   uint32_t const *inv_scaler = &IW32_nroots_ct[(FFT_SIZE_1M-1)*NWORDS_256BIT];
   uint32_t ridx;
   uint32_t const *W32;
+  int debug_tid = -1;
 
+  //TODO
+  //memcpy(&z[tid*U256K_OFFSET], &x[tid*U256K_OFFSET], sizeof(uint32_t)*NWORDS_256BIT);
+  //return;
   if (params->forward) {
     W32 = W32_ct;
   } else {
     W32 = IW32_ct;
   }
-  reverse_idx = ((((((tid % 32) * 0x802 & 0x22110) | ( (tid%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((tid%1024)/32)) ;
-  fftN_dif(&z[(reverse_idx + 1024*(tid/(1<<Nx2)))*U256K_OFFSET], &x[tid*U256K_OFFSET],W32,Ny,midx);
+  reverse_idx = (((((((new_cidx/1024) % 32) * 0x802 & 0x22110) | ( ((new_cidx/1024)%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*1024*32;
+  fftN_dif(&z[(reverse_idx + new_kidx/32+ new_ridx)*U256K_OFFSET], &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET],W32,Ny,midx);
   #if 0
-  if (tid == 0){
-        for (uint32_t i=0; i< 32; i++){
-           new_ridx2 = (i << Ny) & ((1 << (Nx + Ny))-1);
-           new_cidx2 = i >> Nx;
-           //ridx = (((( ((new_ridx2/32) % 32) * 0x802 & 0x22110) | ( ((new_ridx2/32) % 32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)*32;
-           ridx = (((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)*32;
-           logInfo("i: %d, ridx  : %d \n",i, ridx + (i/32));
-           //logInfo("new_ridx: %d, ridx + new_cidx : %d\n",new_ridx2, new_ridx2 + new_cidx2);
-           logInfoBigNumber("z[ridx]:\n",&z[(ridx + (i/32))*U256K_OFFSET]);
+  if (tid == debug_tid){
+        for (uint32_t i=debug_tid; i< 32+debug_tid; i++){
+           new_ridx2 = ((i / 32)) % 1024;
+           new_cidx2 = (i % 32) * 1024;  
+           new_kidx2 = (i/(1024 * 32) * 32 * 1024);
+           ridx = (((((((new_cidx2/1024) % 32) * 0x802 & 0x22110) | ( ((new_cidx2/1024)%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*1024*32;
+           logInfo("i: %d, in : %d, out: %d, root_i : %d, root_j : %d\n",i,new_ridx2 + new_cidx2 + new_kidx2, ridx+ new_kidx2/32, (ridx + new_kidx2/32 + new_ridx2)/1024, (ridx + new_kidx2/32 + new_ridx2)%1024);
+           logInfoBigNumber("in[ridx]:\n",&z[(ridx + new_kidx2/32 + new_ridx2)*U256K_OFFSET]);
+           logInfoBigNumber("RIn:\n",(uint32_t *)&roots[((ridx + new_kidx2/32 + new_ridx2)/1024) * ((ridx + new_kidx2/32 + new_ridx2)%1024)*U256K_OFFSET]);
+        }
+  }
+  #endif
+  mul_poly(&z[(reverse_idx + new_kidx/32 + new_ridx)*U256K_OFFSET],
+           &z[(reverse_idx + new_kidx/32 + new_ridx)*U256K_OFFSET],
+           &roots[((reverse_idx + new_kidx/32 + new_ridx)/1024) * ((reverse_idx + new_kidx/32 + new_ridx)%1024)*U256K_OFFSET], 0 ,midx);
+
+  #if 0
+  if (tid == debug_tid){
+        for (uint32_t i=debug_tid; i< 32+debug_tid; i++){
+           new_ridx2 = ((i / 32)) % 1024;
+           new_cidx2 = (i % 32) * 1024;  
+           new_kidx2 = (i/(1024 * 32) * 32 * 1024);
+           ridx = (((((((new_cidx2/1024) % 32) * 0x802 & 0x22110) | ( ((new_cidx2/1024)%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*1024*32;
+           logInfo("i: %d, in : %d, out: %d, root_i : %d, root_j : %d\n",i,new_ridx2 + new_cidx2 + new_kidx2, ridx+ new_kidx2/32, (ridx + new_kidx2/32 + new_ridx2)/1024, (ridx + new_kidx2/32 + new_ridx2)%1024);
+           logInfoBigNumber("out[ridx]:\n",&z[(ridx + new_kidx2/32 + new_ridx2)*U256K_OFFSET]);
+           logInfoBigNumber("RIn:\n",(uint32_t *)&roots[((ridx + new_kidx2/32 + new_ridx2)/1024) * ((ridx + new_kidx2/32 + new_ridx2)%1024)*U256K_OFFSET]);
         }
   }
   #endif
   if (!params->forward){
-    mulmontu256( &z[(reverse_idx + 1024*(tid/(1<<Nx2)))*U256K_OFFSET],&z[(reverse_idx + 1024*(tid/1024))*U256K_OFFSET],inv_scaler ,midx);
+    //mulmontu256( &z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET],&z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET],inv_scaler ,midx);
+    mulmontu256( &z[(reverse_idx + new_kidx/32+ new_ridx)*U256K_OFFSET],&z[(reverse_idx + new_kidx/32 + new_ridx)*U256K_OFFSET],inv_scaler ,midx);
   }
   /*
   if (tid==0){
@@ -561,17 +657,160 @@ __device__ void fft3Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 
 }
 
+__device__ void fft3Dyx_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
+{
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t Nx = params->fft_Nx; // size of underlying FFTx
+  uint32_t Ny = params->fft_Ny; // N points of underlying FFTy
+  uint32_t Nx2 = params->N_fftx;  // N FFTx of size Nx
+  uint32_t Ny2 = params->N_ffty;  // N FFTy of size Ny
+  mod_t    midx = params->midx;
+
+  uint32_t new_ridx = ((tid/32) % 32);
+  uint32_t new_cidx = (tid % 32) * 32;  
+  uint32_t new_kidx = (tid/1024)*1024;
+  uint32_t new_cidx2, new_ridx2, new_kidx2;
+  uint32_t reverse_idx;
+  uint32_t *roots = &z[(1<<(Nx2+Ny2)) * U256K_OFFSET];
+  uint32_t ridx, cidx;
+  uint32_t const *W32;
+  int debug_tid = -1;
+
+  if (params->forward) {
+    W32 = W32_ct;
+  } else {
+    W32 = IW32_ct;
+  }
+
+  // FFT rows (Every Ny points)
+  reverse_idx = ((((((tid % 32) * 0x802 & 0x22110) | ( (tid%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*32;
+#if 0
+  if (tid==debug_tid){
+     for (uint32_t i=debug_tid; i< 32+debug_tid; i++){
+       new_ridx2 = ((i/32) % 32);
+       new_cidx2 = (i % 32) * 32;  
+       new_kidx2 = (i/1024)*1024;
+       ridx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*32;
+       logInfo("i: %d, in : %d, out: %d, root_i : %d, root_j : %d\n",i,new_ridx2 + new_cidx2 + new_kidx2, ridx+ new_kidx2 + new_ridx2, new_ridx2, ridx/32);
+       logInfoBigNumber("in[ridx]:\n",&x[(new_ridx2 + new_cidx2 + new_kidx2)*U256K_OFFSET]);
+     } 
+  }
+#endif
+  fftN_dif(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET], &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET], W32, Nx,midx);
+  //mul_poly(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
+           //&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
+           //&roots[(new_ridx/1024 * reverse_idx/(1024 *32) * 1024)*U256K_OFFSET], 0, midx);
+  if (tid==debug_tid){
+     for (uint32_t i=debug_tid; i< 32+debug_tid; i++){
+       new_ridx2 = ((i/32) % 32);
+       new_cidx2 = (i % 32) * 32;  
+       new_kidx2 = (i/1024)*1024;
+       ridx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*32;
+       logInfo("i: %d, in : %d, out: %d, root_i : %d, root_j : %d\n",i,new_ridx2 + new_cidx2 + new_kidx2, ridx+ new_kidx2 + new_ridx2, new_ridx2, ridx/32);
+       logInfoBigNumber("out[ridx]:\n",&z[(ridx + new_kidx2 + new_ridx2)*U256K_OFFSET]);
+       logInfoBigNumber("Root :\n",&roots[(new_ridx2 * ridx/32) * 1024 * U256K_OFFSET]);
+     } 
+  }
+  mul_poly(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
+           &z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
+           &roots[(new_ridx * reverse_idx/32) * 1024 *U256K_OFFSET], 0 ,midx);
+}
+
+__device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
+{
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t Nx = params->fft_Nx;
+  uint32_t Ny = params->fft_Ny;
+  uint32_t Nx2 = params->N_fftx;  // N FFTx of size Nx
+  uint32_t Ny2 = params->N_ffty;  // N FFTy of size Ny
+  mod_t    midx = params->midx;
+  int new_cidx = (tid % 32);  
+  int new_ridx = (((tid / 32 ) % 32)* 1024);
+  int new_kidx = (tid/1024);
+  int new_ridx2, new_cidx2, new_kidx2;
+
+  uint32_t reverse_idx;
+  uint32_t *roots = &x[(1<<(Nx2+Ny2)) * U256K_OFFSET];
+  uint32_t const *inv_scaler = &IW32_nroots_ct[(FFT_SIZE_1M-1)*NWORDS_256BIT];
+  uint32_t ridx;
+  uint32_t const *W32;
+  int debug_tid = -1;
+
+  //TODO
+  //memcpy(&z[tid*U256K_OFFSET], &x[tid*U256K_OFFSET], sizeof(uint32_t)*NWORDS_256BIT);
+  //return;
+  if (params->forward) {
+    W32 = W32_ct;
+  } else {
+    W32 = IW32_ct;
+  }
+  reverse_idx = ((((((tid%32) * 0x802 & 0x22110) | ((tid%32) * 0x8020 & 0x88440)) * 0x10101) >> 19) &0xff)*1024*32;
+  fftN_dif(&z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET], &x[(tid)*U256K_OFFSET],W32,Ny,midx);
+  #if 0
+  if (tid == debug_tid){
+        for (uint32_t i=debug_tid; i< 32+debug_tid; i++){
+           new_ridx2 = ((i / 32)) % 1024;
+           new_cidx2 = (i % 32) * 1024;  
+           new_kidx2 = (i/(1024 * 32) * 32 * 1024);
+           ridx = (((((((new_cidx2/1024) % 32) * 0x802 & 0x22110) | ( ((new_cidx2/1024)%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*1024*32;
+           logInfo("i: %d, in : %d, out: %d, root_i : %d, root_j : %d\n",i,new_ridx2 + new_cidx2 + new_kidx2, ridx+ new_kidx2/32, (ridx + new_kidx2/32 + new_ridx2)/1024, (ridx + new_kidx2/32 + new_ridx2)%1024);
+           logInfoBigNumber("in[ridx]:\n",&z[(ridx + new_kidx2/32 + new_ridx2)*U256K_OFFSET]);
+           logInfoBigNumber("RIn:\n",(uint32_t *)&roots[((ridx + new_kidx2/32 + new_ridx2)/1024) * ((ridx + new_kidx2/32 + new_ridx2)%1024)*U256K_OFFSET]);
+        }
+  }
+  #endif
+
+  #if 0
+  if (tid == debug_tid){
+        for (uint32_t i=debug_tid; i< 32+debug_tid; i++){
+           new_ridx2 = ((i / 32)) % 1024;
+           new_cidx2 = (i % 32) * 1024;  
+           new_kidx2 = (i/(1024 * 32) * 32 * 1024);
+           ridx = (((((((new_cidx2/1024) % 32) * 0x802 & 0x22110) | ( ((new_cidx2/1024)%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*1024*32;
+           logInfo("i: %d, in : %d, out: %d, root_i : %d, root_j : %d\n",i,new_ridx2 + new_cidx2 + new_kidx2, ridx+ new_kidx2/32, (ridx + new_kidx2/32 + new_ridx2)/1024, (ridx + new_kidx2/32 + new_ridx2)%1024);
+           logInfoBigNumber("out[ridx]:\n",&z[(ridx + new_kidx2/32 + new_ridx2)*U256K_OFFSET]);
+           logInfoBigNumber("RIn:\n",(uint32_t *)&roots[((ridx + new_kidx2/32 + new_ridx2)/1024) * ((ridx + new_kidx2/32 + new_ridx2)%1024)*U256K_OFFSET]);
+        }
+  }
+  #endif
+  if (!params->forward){
+    mulmontu256( &z[(reverse_idx + new_ridx)*U256K_OFFSET],&z[(reverse_idx + new_ridx)*U256K_OFFSET],inv_scaler ,midx);
+  }
+  /*
+  if (tid==0){
+        for (uint32_t i=0; i< 1024; i++){
+           logInfo("i: %d\n",i);
+           logInfoBigNumber("x[i]:\n",&z[i*U256K_OFFSET]);
+          // logInfoBigNumber("z[i]:\n",&z[i*U256K_OFFSET]);
+        }
+  }
+  */
+
+}
+
+
+
+
 /*
   Multiply 2 poly of degre d
 */
 __device__ void mul_poly(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t d, mod_t midx)
 {
   uint32_t i, coeff_idx;
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  //int debug_tid = 32;
 
   #pragma unroll
   for (i=0; i<= d; i++) {
     coeff_idx = i * NWORDS_256BIT;
+    //if (tid == debug_tid){
+           //logInfoBigNumber("x[ridx]:\n",&x[coeff_idx]);
+           //logInfoBigNumber("y[ridx]:\n",&y[coeff_idx]);
+    //}
     mulmontu256(&z[coeff_idx],&x[coeff_idx],&y[coeff_idx],midx);
+    //if (tid == debug_tid){
+           //logInfoBigNumber("out[ridx]:\n",&z[coeff_idx]);
+    //}
   }
 }
 /*
@@ -734,15 +973,18 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
   //uint32_t const *W32 = W32_ct;
   uint32_t lane = threadIdx.x % warpSize;
   //uint32_t lane = threadIdx.x % (1 << N);
-  uint32_t i, size, root_idx, debug_tidx =0;
+  uint32_t i, size, root_idx;
+  int debug_tidx =-1;
 
   movu256(thisX,x);
 
   if (tid == debug_tidx){
     logInfo("N : %d\n",N);
+    #if 0
     for (i=0;i<32; i++){
        logInfoBigNumber("X in\n",&x[i*U256K_OFFSET]);
     }
+    #endif
    logInfoBigNumber("ThisX in\n",thisX);
   }
 
@@ -812,9 +1054,12 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
       logInfoBigNumber("AfterB x:\n",z);
       logInfo("idx : %d\n",(1 << (N-i-1)) * (lane % size));
       logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (N-i-1)) * (lane%size) * NWORDS_256BIT]);
+      #if 0
       for (i=0;i<32; i++){
+         logInfo("%x\n", &z[i*U256K_OFFSET]);
          logInfoBigNumber("X out\n",&z[i*U256K_OFFSET]);
       }
+      #endif
     }
 }
 
@@ -829,7 +1074,8 @@ __device__ void ifftN_dit(uint32_t *z, uint32_t *x, const uint32_t *IW32, uint32
   //uint32_t const *IW32 = IW32_ct;
   uint32_t const *inv_scaler = &IW32_nroots_ct[(N-1)*NWORDS_256BIT];
   uint32_t lane = threadIdx.x % warpSize;
-  uint32_t i, size, root_idx, debug_tidx=0;
+  uint32_t i, size, root_idx;
+  int debug_tidx=-1;
 
   movu256(thisX,x);
  

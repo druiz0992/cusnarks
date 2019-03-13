@@ -54,7 +54,8 @@ using namespace std;
 static kernel_cb zpoly_kernel_callbacks[] = {zpoly_fft32_kernel, zpoly_ifft32_kernel, zpoly_mul32_kernel,
                                              zpoly_fftN_kernel,  zpoly_ifftN_kernel, zpoly_mulN_kernel, 
                                              zpoly_fft2DX_kernel, zpoly_fft2DY_kernel,
-                                             zpoly_fft3DX_kernel, zpoly_fft3DY_kernel};
+                                             zpoly_fft3DXX_kernel, zpoly_fft3DXY_kernel,
+                                             zpoly_fft3DYX_kernel, zpoly_fft3DYY_kernel};
 
 /*
     Constructor : Reserves GPU memory and data initialization.
