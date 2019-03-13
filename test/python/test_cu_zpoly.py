@@ -325,7 +325,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_config['gridD'] = [0, (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]
             kernel_config['kernel_idx']= [CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY]
             zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
-            result_fft2d,_ = cu_zpoly.kernelMultipleLaunch(zpoly_vector1, kernel_config, kernel_params,2)
+            result_fft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,2)
 
             p_rdc = ZPoly.from_uint256(zpoly_vector, reduced=True)
             #zpoly_fft2d = []
@@ -385,7 +385,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_config['gridD'] = [0, (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]
             kernel_config['kernel_idx']= [CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY]
             zpoly_vector1 = np.concatenate((zpoly_vector, inv_roots_rdc_u256))
-            result_ifft2d,_ = cu_zpoly.kernelMultipleLaunch(zpoly_vector1, kernel_config, kernel_params,2)
+            result_ifft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,2)
 
 
             p_rdc = ZPoly.from_uint256(zpoly_vector, reduced=True)
@@ -480,7 +480,7 @@ class CUZPolyTest(unittest.TestCase):
             zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
 
 
-            result_fft2d,_ = cu_zpoly.kernelMultipleLaunch(zpoly_vector1, kernel_config, kernel_params,4)
+            result_fft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,4)
 
             r_u256 = ntt_parallel2D_h(zpoly_vector, roots_rdc_u256, n_rows, fft_N, n_cols, fft_N, 1)
             self.assertTrue(all(np.concatenate(result_fft2d == r_u256)))
