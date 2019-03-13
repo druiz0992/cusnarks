@@ -87,6 +87,7 @@ typedef unsigned long long uint64_t;
 
 #define NDIGITS 8
 #define MAX_NDIGITS_FIOS   ((NDIGITS) + 3)
+#define MAX_NDIGITS_SOS   ((NDIGITS) * 2)
 #define MAX_DIGIT 0xFFFFFFFFUL
 #define NROOTS 128
 #define MAX(X,Y)  ((X)>=(Y) ? (X) : (Y))
@@ -976,6 +977,7 @@ void montmult_h(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
 	memcpy(U, T, 4*NDIGITS);
 }
 
+// Improved speed (in Cuda at least) by substituting mpAddWithCarryProp by mpAdd
 void montmult_h2(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
 {
 	int i, j;
@@ -1064,6 +1066,126 @@ void montmult_h2(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
 	memcpy(U, T, 4*NDIGITS);
 }
 
+
+/*
+// SOS implementation
+// substitute this step by one below for squaring
+for i=0 to s-1
+  C := 0
+  for j=0 to s-1
+    (C,S) := t[i+j] + a[j]*b[i] + C
+    t[i+j] := S
+    t[i+s] := C
+
+for i=0 to s-1
+  C := 0
+  m := t[i]*n'[0] mod W
+  for j=0 to s-1
+    (C,S) := t[i+j] + m*n[j] + C
+    t[i+j] := S
+  ADD (t[i+s],C)
+
+for j=0 to s
+  u[j] := t[j+s]
+
+B := 0
+  for i=0 to s-1
+    (B,D) := u[i] - n[i] - B
+    t[i] := D
+  (B,D) := u[s] - B
+  t[s] := D
+
+
+// squaring bit
+for i=0 to s-1
+  (C,S) := t[i+i] + a[i]*a[i]
+  for j=i+1 to s-1
+    (C,S) := t[i+j] + 2*a[j]*a[i] + C
+    t[i+j] := S
+  t[i+s] := C
+*/
+
+void montmult_sos_h(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
+{
+	int i, j;
+	uint32_t S, C, C1, C2, M[2], X[2];
+	uint32_t T[MAX_NDIGITS_SOS];
+
+	memset(T, 0, sizeof(uint32_t)*(MAX_NDIGITS_SOS));
+
+	for(i=0; i<NDIGITS; i++) {
+           C = 0;
+           for (j=0; j<NDIGITS; j++){
+                spMultiply(X, A[j], B[i]);
+		C = mpAdd(&S, &T[i+j], &X[0], 1);
+		mpAdd(&C, &C, X+1, 1);		
+                T[i+j] = S;
+                T[i+NDIGITS] = C;
+           } 
+        }
+// squaring bit
+/*
+for i=0 to s-1
+  (C,S) := t[i+i] + a[i]*a[i]
+  for j=i+1 to s-1
+    (C,S) := t[i+j] + 2*a[j]*a[i] + C
+    t[i+j] := S
+  t[i+s] := C
+*/
+	for(i=0; i<NDIGITS; i++) {
+           spMultiply(X, A[i], A[i]);
+	   C = mpAdd(&S, &T[i+j], &X[0], 1);
+	   mpAdd(&C, &C, X+1, 1);		
+           for (j=i+1; j<NDIGITS; j++){
+                spMultiply(X, A[j], A[i]);
+		C = mpAdd(&S, &T[i+j], &X[0], 1);
+		mpAdd(&C, &C, X+1, 1);		
+                T[i+j] = S;
+           } 
+           T[i+NDIGITS] = C;
+        }
+
+/*
+for i=0 to s-1
+  C := 0
+  m := t[i]*n'[0] mod W
+  for j=0 to s-1
+    (C,S) := t[i+j] + m*n[j] + C
+    t[i+j] := S
+  ADD (t[i+s],C)
+*/
+ 
+        for (i=0; i<NDIGITS;i++){
+           C = 0;
+	   spMultiply(M, &T[i], NPrime[pidx*NDIGITS]);
+           for (j=0; j< NDIGITS; j++){
+             
+           }
+/*           
+for j=0 to s
+  u[j] := t[j+s]
+*/
+        memcpy(U,&T[NDIGITS],NDIGITS*sizeof(uint32_t));
+/*
+B := 0
+  for i=0 to s-1
+    (B,D) := u[i] - n[i] - B
+    t[i] := D
+  (B,D) := u[s] - B
+  t[s] := D
+*/
+        B = 0;
+        for (i=0; i < NDIGITS; i++){
+        }
+
+	/* Step 3: if(u>=n) return u-n else return u */
+	if(mpCompare(T, &N[pidx*NDIGITS], NDIGITS) >= 0)
+	{
+		mpSubtract(T, T, &N[pidx*NDIGITS], NDIGITS);
+	}
+
+	memcpy(U, T, 4*NDIGITS);
+}
 
 uint32_t reverse(uint32_t x, uint32_t bits)
 {
