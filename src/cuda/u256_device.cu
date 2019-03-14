@@ -328,6 +328,7 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
         }
 
         if (tid==0) {
+	   //TODO change be movu256
            memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
         }
     }
@@ -548,6 +549,7 @@ __global__ void addmu256_reduce_kernel2(uint32_t *out_vector, uint32_t *in_vecto
         }
 
         if (tid==0) {
+	   //TODO change be movu256
            memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
         }
     }
@@ -952,6 +954,8 @@ __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
 {
   uint32_t i;
   uint32_t tmp[NWORDS_256BIT+1];  //288 bits. I can multiply by up to 32
+
+	   //TODO change be movu256
   memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
 
   assert(k < U256_MAX_SMALLK);
@@ -966,7 +970,7 @@ __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
   // TODO
   // modulo p and return
 }
-	
+ 
 
 /*
    aA = X[0] * Y[0]
@@ -1036,6 +1040,7 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
    * www.microsoft.com/en-us/research/wp-content/uploads/1998/06/97Acar.pdf
 
 */
+#if 0
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     uint32_t i,j;
@@ -1140,6 +1145,63 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
 
    return;
 }
+#endif
+// SOS
+__device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
+{ 
+    uint32_t i,j;
+    uint32_t S, C=0, C1, C2,C3=0,C4=0;
+    uint32_t __restrict__ M[2], X[2];
+    uint32_t __restrict__ T[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+
+    logDebugBigNumber("P\n",(uint32_t *)P_u256);
+    logDebugBigNumber("PN\n",(uint32_t *)PN_u256);
+    logDebugBigNumber("A\n", (uint32_t*) A);
+    logDebugBigNumber("B\n", (uint32_t *)B);
+
+    #pragma unroll
+    for(i=0; i<NWORDS_256BIT; i++) {
+       C=0;
+       #pragma unroll
+       for (j=0; j < NWORDS_256BITS; j++){
+          //(C,S) := t[i+j] + a[j]*b[i] + C
+          madcu32(&C, &S,A[j],B[i],C);
+          addcu32(&C1, &T[i+j], T[i+j], S);
+	  C += C1;
+       }
+       T[i+NWORDS_256BITS] = C;
+    }
+
+    for (i=0; i < NWORDS_256BITS; i++) {
+       C = 0;
+       // m = S*n'[0] mod W, where W=2^32
+       // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+       mulu32(M, &T[i], PN_u256[0]);
+       for (j=0; j < NWORDS_256BITS; j++){
+         //(C,S) := t[i+j] + m*n[j] + C
+         madcu32(&C,&S,M[0], P_u256[j],C);
+         addcu32(&C1, &T[i+j], T[i+j], S);
+         C += C1;
+	 C += ((C3 >> (i+j+1)) & 0x1);
+	 C3 &= (0xFFFFFFFF ^ (1 << (1+j+i)));
+       }
+       addcu32(&C4, &T[i+NWORDS_256BITS], T[i+NWORDS_256BITS], C);
+       C3 |= (C4 << (i+NWORDS_256BITS +1);
+    }
+
+    movu256(U,&T[NWORDS_256BITS]);
+  
+    /* Step 3: if(u>=n) return u-n else return u */
+   if (ltu256(P_u256,U)){
+      subu256(U,U,P_u256);
+   }
+   logDebugBigNumber("U after mod\n",U);
+
+   return;
+}
+
 __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
 {
    //TODO : implement proper squaring
