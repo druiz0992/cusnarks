@@ -1493,6 +1493,101 @@ uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t
 
 
 #ifdef UTILS_DEBUG
+// I am leaving this as a separate function to test both implementations are equal
+void montsquare_h(uint32_t *U, uint32_t *A, uint32_t pidx)
+{
+  int i, j;
+  uint32_t S, C, C1, C2, M[2], X[2], X1[2], carry;
+  uint32_t T[MAX_NDIGITS_FIOS];
+
+  memset(T, 0, 4*(NDIGITS+3));
+
+  for(i=0; i<NDIGITS; i++) {
+    // (C,S) = t[0] + a[0]*b[i], worst case 2 words
+    spMultiply(X, A[i], A[i]); // X[Upper,Lower] = a[0]*b[i]
+    C = mpAdd(&S, T+0, X+0, 1); // [C,S] = t[0] + X[Lower]
+    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper], No carry
+
+    // ADD(t[1],C)
+    mpAddWithCarryProp(T, C, 1, MAX_NDIGITS_FIOS);
+    //carry = mpAdd(&T[1], &T[1], &C, 1); 
+
+    // m = S*n'[0] mod W, where W=2^32
+    // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+    spMultiply(M, S, NPrime[pidx*NDIGITS]);
+
+    // (C,S) = S + m*n[0], worst case 2 words
+    spMultiply(X, M[0], N[pidx*NDIGITS]); // X[Upper,Lower] = m*n[0]
+    C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
+    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
+    
+    
+    // (C,S) = t[j] + a[i+1]*a[i+1] + C, worst case 2 words
+    spMultiply(X1, A[i+1], A[i]);
+    C1 = mpAdd(&S, &T[i+1], &C, 1);  // (C1,S) = t[i+1] + C
+    C2 = mpAdd(&S, &S, X1+0, 1);  // (C2,S) = S + X[Lower]
+    mpAdd(&C, &C1, X1+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
+    mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, doesn't produce carry
+   
+    // ADD(t[i+2],C)
+    mpAddWithCarryProp(T, C, i+2, MAX_NDIGITS_FIOS);
+   
+    // (C,S) = S + m*n[j]
+    spMultiply(X, M[0], N[1+pidx*NDIGITS]); // X[Upper,Lower] = m*n[j]
+    C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
+    C1 = mpAdd(&S, &S, X1+0, 1); // [C,S] = S + X[Lower]
+    C+=C1;
+    C1=mpAdd(&S, &X1[1], X+1, 1);  // [~,C] = C + X[Upper]
+    C+=C1;
+    mpAdd(&C, &C, &S, 1);  // [~,C] = C + X[Upper]
+   
+    // t[j-1] = S
+    T[0] = S;
+
+    C2=0;
+    for(j=2; j<NDIGITS; j++) {
+      // (C,S) = t[j] + 2*a[j]*a[i] + C, worst case 2 words
+      spMultiply(X, A[j], A[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
+      C1 = (X[0] >> 31)+C2;
+      X[0] <<= 1;
+      C2 = X[1] >> 31;
+      X[1] = (X[1] << 1) + C1;
+      C1 = mpAdd(&X[0], &X[0], &C, 1);
+      C = mpAdd(&S, &T[j], &X[0], 1);
+      C += C1;
+      mpAdd(&C, &C, X+1, 1);  
+
+      // ADD(t[j+1],C)
+      mpAddWithCarryProp(T, C, j+1, MAX_NDIGITS_FIOS);
+   
+      // (C,S) = S + m*n[j]
+      spMultiply(X, M[0], N[j+pidx*NDIGITS]); // X[Upper,Lower] = m*n[j]
+      C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
+      mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
+   
+      T[j-1] = S;
+    }
+
+    // (C,S) = t[s] + C
+    C = mpAdd(&S, T+NDIGITS, &C, 1);
+    //printf("6 - C : %u, S: %u\n",C,S);
+    // t[s-1] = S
+    T[NDIGITS-1] = S;
+    // t[s] = t[s+1] + C
+    mpAdd(T+NDIGITS, T+NDIGITS+1, &C, 1);
+    // t[s+1] = 0
+    T[NDIGITS+1] = 0;
+  }
+
+  /* Step 3: if(u>=n) return u-n else return u */
+  if(mpCompare(T, &N[pidx*NDIGITS], NDIGITS) >= 0) {
+    mpSubtract(T, T, &N[pidx*NDIGITS], NDIGITS);
+  }
+
+  memcpy(U, T, 4*NDIGITS);
+}
+
+
 // Improved speed (in Cuda at least) by substituting mpAddWithCarryProp by mpAdd
 // I am leaving this as a separate function to test both implementations are equal
 void montmult_h2(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
@@ -1846,6 +1941,35 @@ void test_mul4(void)
    printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
 }
 
+void test_mul5(void)
+{
+   uint32_t r[NDIGITS]; 
+
+   int i;
+   int pidx=1;
+   int n_errors=0;
+   uint32_t a[NDIGITS], b[NDIGITS], c[NDIGITS];
+
+   for (i=0; i < MAX_ITER; i++){
+     setRandom(a, NDIGITS);
+     a[NDIGITS-1] &= 0x7FFFFFF;
+     
+     montmult_h(r, a, a, pidx);
+     montsquare_h(c, a, pidx);
+
+     if (mpCompare(r,c,NDIGITS)){
+        printf("Error in mult %d\n",i);
+        printf("Expected\n");
+        printNumber(r);
+        printf("Obtained\n");
+        printNumber(c);
+        n_errors++;
+     }
+   }
+   printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
+}
+
+
 
 void test_findroots(void)
 {
@@ -1938,8 +2062,9 @@ int main()
 {
   //test_mul();  // test montgomery mul with predefined results
   //test_mul2(); // test optimized impl of montgomery mul
-  test_mul3(); // test SOS impl of montgomery mul
+  //test_mul3(); // test SOS impl of montgomery mul
   //test_mul4(); // test SOS impl of montgomery squaring
+  test_mul5(); // test FIOS impl of montgomery squaring
   //test_findroots();
   //test_ntt();
   //test_ntt_parallel();
