@@ -50,6 +50,7 @@ class _RNG {
 	static _RNG* get_instance();
 	static _RNG* get_instance(uint32_t seed);
         void randu32(uint32_t *samples, uint32_t n_samples);
+        void randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod);
 };
 
 #endif

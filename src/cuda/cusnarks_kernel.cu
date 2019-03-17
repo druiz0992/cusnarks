@@ -381,6 +381,13 @@ void CUSnarks::rand(uint32_t *samples, uint32_t n_samples)
     rng->randu32(samples, n_samples * size_sample);
 }
 
+void CUSnarks::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod=NULL)
+{
+    //uint32_t size_sample = in_vector_device.size / (in_vector_device.length * sizeof(uint32_t));
+    //rng->randu256(samples, n_samples * size_sample, 1);
+    rng->randu256(samples, n_samples, mod);
+}
+
 /*
    Free memory allocated in GPU:
 */
@@ -405,74 +412,6 @@ CUSnarks::~CUSnarks()
     params          : Kernel input parameters
 
 */
-#if 0
-double CUSnarks::kernelLaunch(
-                uint32_t kernel_idx,
-		vector_t *out_vector_host,
-	       	vector_t *in_vector_host,
-                kernel_config_t *config,
-                kernel_params_t *params)
-{
-  // check input lengths do not exceed reserved amount
-  if (in_vector_host->length > in_vector_device.length) { return 0.0; }
-  if (out_vector_host->length > out_vector_device.length) { return 0.0; }
-
-  in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
-  out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
-
-  double start, end_copy_in, end_kernel, end_copy_out;
-  int blockD, gridD;
-
-  // measure data xfer time Host -> Device
-  start = elapsedTime();
-  CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
-  CCHECK(cudaMemcpy(params_device, params, sizeof(kernel_params_t), cudaMemcpyHostToDevice));
-  end_copy_in = elapsedTime() - start;
- 
-  // configure kernel. Input parameter invludes block size. Grid is calculated 
-  // depending on input data length and stride (how many samples of input data are 
-  // used per thread
-  blockD = config->blockD;
-  if (config->gridD == 0){
-     config->gridD = (blockD + in_vector_host->length/params->stride - 1) / blockD;
-  }
-  gridD = config->gridD;
-
-
-  // launch kernel
-  start = elapsedTime();
-  kernel_callbacks[kernel_idx]<<<gridD, blockD, config->smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
-  CCHECK(cudaGetLastError());
-  CCHECK(cudaDeviceSynchronize());
-  end_kernel = elapsedTime() - start;
-
-  // retrieve kernel output data from GPU to host
-  start = elapsedTime();
-  CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
-  end_copy_out = elapsedTime() - start;
-
-  logInfo("----- Info -------\n");
-  logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
-		                                        in_vector_host->length,
-						       	in_vector_device.size,
-						       	in_vector_device.length);
-
-  logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
-		                                        out_vector_host->length, 
-							out_vector_device.size,
-						       	out_vector_device.length);
-
-  logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",params->premod, params->midx, params->in_length, params->out_length, params->stride);
-  logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
-          kernel_idx, gridD, blockD, config->smemS,end_kernel);
-  logInfo("Time Elapsed Xfering in %d bytes : %f sec\n",
-          in_vector_host->size, end_copy_in);
-  logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
-          out_vector_host->size, end_copy_out);
-
-  return end_kernel;
-}
-#endif
 double CUSnarks::kernelLaunch(
 		vector_t *out_vector_host,
 	       	vector_t *in_vector_host,

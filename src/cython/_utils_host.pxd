@@ -38,3 +38,5 @@ cdef extern from "../cuda/utils_host.h":
     void cfind_roots_h "find_roots_h" (ct.uint32_t *roots, ct.uint32_t *primitive_root, ct.uint32_t nroots, ct.uint32_t pidx)
     void cntt_parallel_h "ntt_parallel_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx)
     void cntt_parallel2D_h "ntt_parallel2D_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny,  ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.uint32_t pidx)
+    void crangeu256_h "rangeu256_h" (ct.uint32_t *samples, ct.uint32_t nsamples, ct.uint32_t  *start, ct.uint32_t inc, ct.uint32_t *mod)
+  

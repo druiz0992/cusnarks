@@ -43,6 +43,7 @@
 #include <random>       // for random_device
 
 #include "types.h"
+#include "utils_host.h"
 #include "rng.h"
 #include "log.h"
 
@@ -83,6 +84,21 @@ void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
    for (int i =0; i < n_samples; i++){
      samples[i] = rng();
    }
+}
+void _RNG::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod)
+{
+   uint32_t i,j;
+   logDebug("random : %d n_samples\n", n_samples);
+   for (i =0; i < n_samples; i++){
+     for (j =0; j < NWORDS_256BIT; j++){
+       samples[i*NWORDS_256BIT+j] = rng();
+     }
+     if ((mod != NULL) && (compu256_h(&samples[i*NWORDS_256BIT], mod) >= 0)){
+         do{
+           subu256_h(&samples[i*NWORDS_256BIT], mod);
+         }while(compu256_h(&samples[i*NWORDS_256BIT],mod) >=0);
+     }
+   }  
 }
 
 // null

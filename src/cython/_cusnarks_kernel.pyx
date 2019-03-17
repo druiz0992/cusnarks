@@ -56,73 +56,6 @@ cdef class CUSnarks:
         if out_size == 0:
            self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
 
-    """
-    def kernelLaunch(self, ct.uint32_t kernel_idx, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params):
-        cdef ct.vector_t out_v
-        cdef ct.vector_t in_v
-       
-        out_v.length = params['out_length']
-        in_v.length  = in_vec.shape[0]
-
-        print in_v.length, self.in_dim, out_v.length, self.out_dim
-        if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
-            assert False, "Incorrect arguments"
-            return 0.0
-
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
-
-        # create kernel config data
-        cdef ct.kernel_config_t kconfig
-        kconfig.blockD = config['blockD']
-        # gridD and smemS do not need to exist
-        if 'gridD' in config:
-            kconfig.gridD  = config['gridD']
-        else :
-            kconfig.gridD  = 0
-        if 'smemS' in config:
-            kconfig.smemS  = config['smemS']
-        else:
-            kconfig.smemS  = 0
-
-        in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-        in_vec_flat = np.concatenate(in_vec)
-        in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
-
-        out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-        out_v.data = <ct.uint32_t *>&out_vec_flat[0]
-
-        # TODO :I am trying to represent input data as ndarray. I don't
-        # know how other way to do this but to overwrite ndarray with input data
-
-        # create kernel params data
-        cdef ct.kernel_params_t kparams
-        kparams.midx = params['midx']
-        kparams.in_length = params['in_length']
-        kparams.out_length = params['out_length']
-        kparams.stride = params['stride']
-        if 'premod' in params:
-            kparams.premod = params['premod']
-        if 'premul' in params:
-            kparams.premul = params['premul']
-        if 'fft_Nx' in params:
-            kparams.fft_Nx = params['fft_Nx']
-        if 'fft_Ny' in params:
-            kparams.fft_Ny = params['fft_Ny']
-        if 'N_fftx' in params:
-            kparams.N_fftx = params['N_fftx']
-        if 'N_ffty' in params:
-            kparams.N_ffty = params['N_ffty']
-        if 'forward' in params:
-            kparams.forward = params['forward']
-        else:
-            kparams.forward = 1
-
-        exec_time = self._cusnarks_ptr.kernelLaunch (kernel_idx, &out_v, &in_v, &kconfig, &kparams) 
-        
-        return np.reshape(out_vec_flat,(-1,in_vec.shape[1])), exec_time
-    """
-
     def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel=1):
         cdef ct.vector_t out_v
         cdef ct.vector_t in_v
@@ -202,8 +135,13 @@ cdef class CUSnarks:
         self._cusnarks_ptr.rand(&samples[0],n_samples)
 
         return samples.reshape((-1,ct.NWORDS_256BIT))
-     
 
+    def randu256(self, ct.uint32_t n_samples, np.ndarray[ndim=1, dtype=np.uint32_t] mod):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
+        self._cusnarks_ptr.randu256(&samples[0],n_samples, &mod[0])
+
+        return samples.reshape((-1,ct.NWORDS_256BIT))
+     
     def getDeviceInfo(self):
        self._cusnarks_ptr.getDeviceInfo()
 
@@ -331,3 +269,11 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
       return np.reshape(in_A_flat,(-1,n))
 
+def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] start, ct.uint32_t inc,
+                                      np.ndarray[ndim=1, dtype=np.uint32_t] mod):
+
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_samples = np.zeros(nsamples * ct.NWORDS_256BIT, dtype=np.uint32)
+     
+     uh.crangeu256_h(&out_samples[0], nsamples, &start[0], inc, &mod[0])
+  
+     return out_samples.reshape((-1,ct.NWORDS_256BIT))

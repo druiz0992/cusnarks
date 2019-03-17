@@ -37,18 +37,30 @@
 
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
-__global__ void addmu256_reduce_kernel2(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void submu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void mulmontu256_2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
+//template <typename T1, typename T2>
+//__forceinline__ __device__ void addu256(T1 *z, T2 *x, T2 y);
 __forceinline__ __device__ void addu256(uint32_t __restrict__ *z, const uint32_t  __restrict__ *x, const uint32_t __restrict__ *y);
 __forceinline__ __device__ void addu288(uint32_t __restrict__ *z, const uint32_t  __restrict__ *x, const uint32_t __restrict__ *y);
-extern __device__ void subu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+__forceinline__ __device__ void addu256_2(volatile uint32_t *z,  const volatile uint32_t *x, const volatile uint32_t *y);
+
+//__forceinline__ __device__ void addu256_2(volatile uint32_t *z,  const volatile uint32_t *x, const volatile uint32_t *y);
+__forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+__forceinline__ __device__ void subu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+__forceinline__ __device__ uint32_t subgtu256(uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+
+
+template <typename T1, typename T2>
+__device__ void addmu256_2(T1 *z, T2  *x, T2 *y, mod_t midx);
+//__device__ void addmu256_2(volatile uint32_t *z, const volatile uint32_t *x, const volatile uint32_t *y, mod_t midx);
+//template <typename T1, typename T2>
+//extern __device__ void addmu256(T1 *z, T2 *x, T2 *y, mod_t midx);
 extern __device__ void addmu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx);
-extern __device__ void addmu256_2(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx);
 extern __device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx);
 extern __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx);
 extern __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
@@ -56,17 +68,7 @@ extern __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __res
 extern __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ k, mod_t midx);
 extern __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 extern __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
-//extern __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
-//extern __device__ uint32_t eq0u256(const uint32_t __restrict__ *x);
-//extern __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
 extern __device__ uint32_t shr1u256(const uint32_t __restrict__ *x);
 
-//__device__ void movu256(uint32_t __restrict__ *d_out, uint32_t __restrict__ *d_in)
-//extern __device__ void mulu32(uint32_t __restrict__ *z,  uint32_t x,  uint32_t y);
-//__forceinline__ __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);
-//__forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y);
-//__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit);
-
-//__device__ void printNumber(uint32_t *n);
 
 #endif

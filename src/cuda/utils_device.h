@@ -63,27 +63,9 @@ __forceinline__ __device__ uint32_t equ256(const uint32_t __restrict__ *x, const
 /*
    x < y for 256 bit numbers
 */
-__forceinline__ __device__ uint32_t ltu256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
-{
-   if (x[7] > y[7]) return 0;
-   else if (x[7] < y[7]) return 1;
-   else if (x[6] > y[6]) return 0;
-   else if (x[6] < y[6]) return 1;
-   else if (x[5] > y[5]) return 0;
-   else if (x[5] < y[5]) return 1;
-   else if (x[4] > y[4]) return 0;
-   else if (x[4] < y[4]) return 1;
-   else if (x[3] > y[3]) return 0;
-   else if (x[3] < y[3]) return 1;
-   else if (x[2] > y[2]) return 0;
-   else if (x[2] < y[2]) return 1;
-   else if (x[1] > y[1]) return 0;
-   else if (x[1] < y[1]) return 1;
-   else if (x[0] >= y[0]) return 0;
-   else return 1;
-}
 
-__forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t __restrict__ *d_in)
+//__forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t __restrict__ *d_in)
+__forceinline__ __device__ void movu256(uint32_t *d_out, uint32_t *d_in)
 {
   #if 0
    asm("mov.u32     %0,  %8;\n\t"
@@ -101,6 +83,30 @@ __forceinline__ __device__ void movu256(uint32_t __restrict__ *d_out, uint32_t _
   #endif
 
     ulonglong4 *out = (ulonglong4 *)d_out;
+    ulonglong4 *in =  (ulonglong4 *)d_in;
+    out->x = in->x;
+    out->y = in->y;
+    out->z = in->z;
+    out->w = in->w;
+}
+__forceinline__ __device__ void movu256_2(volatile uint32_t *d_out, uint32_t *d_in)
+{
+  #if 0
+   asm("mov.u32     %0,  %8;\n\t"
+       "mov.u32     %1,  %9;\n\t"
+       "mov.u32     %2,  %10;\n\t"
+       "mov.u32     %3,  %11;\n\t"
+       "mov.u32     %4,  %12;\n\t"
+       "mov.u32     %5,  %13;\n\t"
+       "mov.u32     %6,  %14;\n\t"
+       "mov.u32     %7,  %15;\n\t"
+    : "=r"(d_out[0]), "=r"(d_out[1]), "=r"(d_out[2]), "=r"(d_out[3]),
+      "=r"(d_out[4]), "=r"(d_out[5]), "=r"(d_out[6]), "=r"(d_out[7])
+    : "r"(d_in[0]), "r"(d_in[1]), "r"(d_in[2]), "r"(d_in[3]),
+      "r"(d_in[4]), "r"(d_in[5]), "r"(d_in[6]), "r"(d_in[7]));
+  #endif
+
+    volatile ulonglong4 *out = (volatile ulonglong4 *)d_out;
     ulonglong4 *in =  (ulonglong4 *)d_in;
     out->x = in->x;
     out->y = in->y;
