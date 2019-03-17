@@ -1000,6 +1000,37 @@ void setRandom(uint32_t *x, uint32_t ndigits)
   }
 }
 
+
+int compu256_h(uint32_t *x, uint32_t *y)
+{
+  return mpCompare(x, y, NDIGITS);
+}
+
+void rangeu256_h(uint32_t *samples, uint32_t nsamples, uint32_t  *start, uint32_t inc, uint32_t *mod)
+{
+
+   uint32_t i;
+   uint32_t _inc[] = {inc,0,0,0,0,0,0,0};
+
+   memcpy(samples,start,sizeof(uint32_t)*NDIGITS);
+
+   for (i=1; i < nsamples; i++){
+     mpAdd(&samples[i*NDIGITS], &samples[(i-1)*NDIGITS], _inc, NDIGITS);
+     if ((mod != NULL) && (compu256_h(&samples[i*NDIGITS], mod) >= 0)){
+         do{
+           subu256_h(&samples[i*NWORDS_256BIT], mod);
+         }while(compu256_h(&samples[i*NWORDS_256BIT],mod) >=0);
+     }
+   }
+}   
+   
+void subu256_h(uint32_t *x, uint32_t *y)
+{
+   uint32_t z[NDIGITS];
+
+   mpSubtract(z, x, y, NDIGITS);
+   memcpy(x,z,sizeof(uint32_t)*NDIGITS);
+}   
 /****************************************************************************/
 /**
 * This function implements the Montgomery Modular Multiplication (MMM)

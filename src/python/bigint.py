@@ -539,9 +539,9 @@ class BigInt(object):
         x2 = x.reshape((-1, BigInt.WORDS_IN_256BN))
         y2 = y.reshape((-1, BigInt.WORDS_IN_256BN))
         z = np.zeros(x2.shape[0], dtype=np.uint32)
-        for i in range(BigInt.WORDS_IN_256BN-1,0,-1):
-            z[np.bitwise_or(x2[:,i] > y2[:,i], z==0)] = 2
-            z[np.bitwise_or(x2[:,i] < y2[:,i], z==0)] = 1
+        for i in range(BigInt.WORDS_IN_256BN-1,-1,-1):
+            z[np.bitwise_and(x2[:,i] > y2[:,i], z==0)] = 2
+            z[np.bitwise_and(x2[:,i] < y2[:,i], z==0)] = 1
             if not any(z==0):
                 break
 
