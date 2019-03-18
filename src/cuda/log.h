@@ -53,9 +53,19 @@
    #else
    void logDebugBigNumber(char *str, uint32_t *x);
    #endif
+
+  #if defined (LOG_TID) && defined (__CUDACC__)
+    __host__ __device__ void logDebugBigNumberTid(int tid, uint32_t nelems,  char *str, uint32_t *n);
+    __host__ __device__ void logDebugTid(int tid, const char *f, uint32_t args);
+  #else 
+     #define logDebugBigNumberTid(TID, COUNT, STR, X)
+     #define logDebugTid(f,...)
+  #endif
 #else
   #define logDebug(f,...) 
   #define logDebugBigNumber(STR, X)
+  #define logDebugBigNumberTid(TID,COUNT,STR, X)
+  #define logDebugTid(f,...)
 #endif
 
 
@@ -66,9 +76,18 @@
    #else
    void logInfoBigNumber(char *str, uint32_t *x);
    #endif
+  #if defined (LOG_TID) && defined (__CUDACC__)
+    __host__ __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, uint32_t *n);
+    __host__ __device__ char * logInfoTid(int tid, const char *f, uint32_t  args);
+  #else 
+     #define logInfoBigNumberTid(TID,COUNT,STR, X)
+     #define logInfoTid(f,...)
+  #endif
 #else
   #define logInfo(f,...) 
   #define logInfoBigNumber(STR, X)
+  #define logInfoBigNumberTid(TID,COUNT,STR, X)
+  #define logInfoTid(f,...)
 #endif
 
 

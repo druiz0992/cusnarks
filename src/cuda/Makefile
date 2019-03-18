@@ -21,13 +21,17 @@ CUBIN_NAME=$(CUBIN_NAME)
 AUX_INCLUDES=$(AUX_INCLUDES)
 
 LOG_LEVEL=$(LOG_LEVEL)
+LOG_TID=$(LOG_TID)
 
 NVCC = nvcc
 CC  = c++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
 CFLAGS=-c -O2 -DLINUXINTEL64 -g -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-CUFLAGS= -DLOG_LEVEL=$(LOG_LEVEL) -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE) 
+CUFLAGS:= -DLOG_LEVEL=$(LOG_LEVEL) -DLOG_TID=$(LOG_TID) -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
+ifeq ($(LOG_TID),-1)
+  CUFLAGS:= -DLOG_LEVEL=$(LOG_LEVEL) -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
+endif
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_60 --shared -o 
 LDFLAGS=-lm -lcudart

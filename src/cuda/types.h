@@ -195,6 +195,7 @@ typedef enum{
    CB_U256_MOD,
    CB_U256_MULM,
    CB_U256_ADDM_REDUCE,
+   CB_U256_ADDM_REDUCE_SHFL,
    CB_U256_SHL1,
    CB_U256_N
 
@@ -202,11 +203,11 @@ typedef enum{
 
 // index to ec128bn class kernels
 typedef enum{
-   CB_EC_LDR_ADD = 0,
-   CB_EC_LDR_DOUBLE,
-   CB_EC_LDR_MUL,
-   CB_EC_LDR_MAD,
-   CB_EC_JAC_ADD,
+   //CB_EC_LDR_ADD = 0,
+   //CB_EC_LDR_DOUBLE,
+   //CB_EC_LDR_MUL,
+   //CB_EC_LDR_MAD,
+   CB_EC_JAC_ADD = 0,
    CB_EC_JAC_DOUBLE,
    CB_EC_JAC_MUL,
    CB_EC_JAC_MAD,

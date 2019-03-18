@@ -59,6 +59,7 @@ def profile_u256():
     niter = 10
     kernel_stats = []
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
+    u256_p = BigInt(prime).as_uint256()
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
     nsamples = 1<<22
 
@@ -68,6 +69,7 @@ def profile_u256():
 
     u256 = U256(nsamples, seed=10)
     u256_vector = u256.rand(nsamples)
+    u256_vector = u256.randu256(nsamples, u256_p)
             
     kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
 

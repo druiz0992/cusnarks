@@ -43,6 +43,7 @@
 #include "u256_device.h"
 #include "ecbn128_device.h"
 
+#if 0
 __global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -106,6 +107,7 @@ __global__ void madecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
   return;
 }
 
+#endif 
 
 /* 
   in_vector : k[0], px[0], py[0], k[1], px[1], py[1],...  Input EC points in Affine coordinates
@@ -447,6 +449,8 @@ __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 
   return;
 }
+
+#if 0
     
 __forceinline__ __device__
  void addecldr(uint32_t __restrict__ *xr, const uint32_t __restrict__ *x1, 
@@ -559,6 +563,7 @@ __forceinline__ __device__
   return;
 }
 
+#endif
 /*
   EC point addition
   
