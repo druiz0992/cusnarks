@@ -36,40 +36,83 @@
 #include "types.h"
 #include "log.h"
 
-#if LOG_LEVEL <= LOG_LEVEL_DEBUG
-   #ifdef __CUDACC__
-__host__ __device__ void logDebugBigNumber(char *str, uint32_t *n)
+#ifdef __CUDACC__
+  __host__ __device__ void logBigNumber(char *str, uint32_t *n)
 #else
-void logDebugBigNumber(char *str, uint32_t *n)
+  void logNumber(char *str, uint32_t *n)
 #endif
 {
-  uint32_t i;
-  char buf[500];
-  memset(buf,0, 500*sizeof(char));
-  logDebug("%s",str);
-  
-  for (i=0; i < NWORDS_256BIT; i++){
-    logDebug("%u ",n[i]);
-  }
-  logDebug("\n");
+ uint32_t i;
+ char buf[500];
+ memset(buf,0, 500*sizeof(char));
+ printf("%s",str);
+ 
+ for (i=0; i < NWORDS_256BIT; i++){
+   printf("%u ",n[i]);
+ }
+ printf("\n");
 }
+
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
+   #ifdef __CUDACC__
+     __host__ __device__ void logDebugBigNumber(char *str, uint32_t *n)
+   #else
+     void logDebugBigNumber(char *str, uint32_t *n)
+   #endif
+     {
+        logBigNumber(str, n);
+     }
+  #if defined (LOG_TID) && defined (__CUDACC__)
+    __host__ __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, uint32_t *n)
+    {
+       if (tid == LOG_TID){
+         uint32_t i;
+         for (i=0; i< nelems; i++){
+           logBigNumber(str, &n[i*NWORDS_256BIT]);
+         }
+       }
+    }
+    
+    __host__ __device__ void logDebugTid(int tid, uint32_t nelems, const char *f,uint32_t args )
+    {
+       if (tid == LOG_TID){
+          printf(f,args);
+       }
+    }
+  #endif
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_INFO
    #ifdef __CUDACC__
-__host__ __device__ void logInfoBigNumber(char *str, uint32_t *n)
-#else
-void logInfoBigNumber(char *str, uint32_t *n)
+     __host__ __device__ void logInfoBigNumber(char *str, uint32_t *n)
+   #else
+     void logInfoBigNumber(char *str, uint32_t *n)
+   #endif
+     {
+        logBigNumber(str, n);
+     }
+  #if defined (LOG_TID) && defined (__CUDACC__)
+      __host__ __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, uint32_t *n)
+      {
+         if (tid == LOG_TID){
+           uint32_t i;
+           for (i=0; i< nelems; i++){
+             logBigNumber(str, &n[i*NWORDS_256BIT]);
+           }
+         }
+      }
+    //template <typename  Args> 
+    __host__ __device__ char * logInfoTid(int tid, const char *f, uint32_t args)
+    {
+       if (tid == LOG_TID){
+          printf(f,args);
+       }
+    }
+  #endif
 #endif
-{
-  uint32_t i;
-  char buf[500];
-  memset(buf,0, 500*sizeof(char));
-  logInfo("%s",str);
+
+
+
+   
   
-  for (i=0; i < NWORDS_256BIT; i++){
-    logInfo("%u ",n[i]);
-  }
-  logInfo("\n");
-}
-#endif
+

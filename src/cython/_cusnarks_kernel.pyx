@@ -141,6 +141,12 @@ cdef class CUSnarks:
         self._cusnarks_ptr.randu256(&samples[0],n_samples, &mod[0])
 
         return samples.reshape((-1,ct.NWORDS_256BIT))
+
+    def randu256(self, ct.uint32_t n_samples):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
+        self._cusnarks_ptr.randu256(&samples[0],n_samples, <ct.uint32_t *>0)
+
+        return samples.reshape((-1,ct.NWORDS_256BIT))
      
     def getDeviceInfo(self):
        self._cusnarks_ptr.getDeviceInfo()

@@ -80,7 +80,8 @@ class CUU256Test(unittest.TestCase):
         kernel_config = {'blockD' : [U256_BLOCK_DIM] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [1], 'in_length' : [CUU256Test.nsamples], 'stride' : [1], 'out_length' : CUU256Test.nsamples}
         for iter in xrange(CUU256Test.TEST_ITER):
-            if iter < CUU256Test.TEST_ITER/10:
+            if iter%CUU256Test.TEST_ITER == 0:
+
               first_sample = np.copy(u256_p)
               first_sample[0] -= randint(0,1000*(iter+1))
               u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 100*(iter), u256_p)
