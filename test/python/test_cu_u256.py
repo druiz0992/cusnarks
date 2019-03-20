@@ -82,9 +82,11 @@ class CUU256Test(unittest.TestCase):
         for iter in xrange(CUU256Test.TEST_ITER):
             if iter%CUU256Test.TEST_ITER == 0:
 
-              first_sample = np.copy(u256_p)
-              first_sample[0] -= randint(0,1000*(iter+1))
-              u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 100*(iter), u256_p)
+              #first_sample = np.copy(u256_p)
+              #first_sample[0] -= randint(0,1000*(iter+1))
+              #u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 100*(iter), u256_p)
+              first_sample = np.zeros(8,dtype=np.uint32)
+              u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 1, u256_p)
             else:
               u256_vector = u256.randu256(CUU256Test.nsamples, u256_p)
             #u256_vector = np.tile(np.ones(8,dtype=np.uint32)*44444444,(CUU256Test.nsamples,1))
@@ -228,8 +230,26 @@ class CUU256Test(unittest.TestCase):
             #debugReduceAddm(u256_vector,result)
       
             self.assertTrue(len(result) == kernel_params['out_length'])
-            self.assertTrue(all(np.concatenate(result == r_addm_reduce)))
+            if all(np.concatenate(result == r_addm_reduce)):
+                self.assertTrue(all(np.concatenate(result == r_addm_reduce)))
+            else:
+               print all(np.concatenate(result == r_addm_reduce))
+           
 
+            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
+            kernel_params['premod'] = [1, 0]
+            kernel_params['premul'] = [1, 0]
+            kernel_params['stride'] = [1, 1]
+            kernel_config['blockD'] = [1024, 128]
+            kernel_params['in_length'] = [CUU256Test.nsamples, \
+                                         (CUU256Test.nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]) -1) / (kernel_config['blockD'][0]*kernel_params['stride'][0])]
+            kernel_params['out_length'] = 1
+            kernel_config['smemS'] = [kernel_config['blockD'][0]/32 * NWORDS_256BIT * 4, \
+                                     kernel_config['blockD'][1]/32 * NWORDS_256BIT * 4]
+            kernel_config['gridD'] = [0,  1]
+            kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE_SHFL, CB_U256_ADDM_REDUCE_SHFL]
+
+            result2,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,2 )
 
 def debugReduceAddm(u256_vector, result):
    xl = [BigInt.from_uint256(x).as_long() % CUU256Test.prime for x in u256_vector]

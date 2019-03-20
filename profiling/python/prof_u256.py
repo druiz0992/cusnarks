@@ -71,7 +71,7 @@ def profile_u256():
     u256_vector = u256.rand(nsamples)
     u256_vector = u256.randu256(nsamples, u256_p)
             
-    kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
+    kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE_SHFL]
 
     if kernel_config['kernel_idx'][0] == CB_U256_MOD or kernel_params['premod'][0] == 1:
       for s in u256_vector:
@@ -79,6 +79,7 @@ def profile_u256():
     elif kernel_config['kernel_idx'][0] == CB_U256_ADDM_REDUCE:
         kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
         kernel_params['premod'] = [1, 0]
+        kernel_params['premul'] = [0, 0]
         kernel_params['stride'] = [8, 8]
         kernel_config['blockD'] = [256, 256]
         kernel_params['in_length'] = [nsamples, \
@@ -88,6 +89,20 @@ def profile_u256():
                                      kernel_config['blockD'][1] * NWORDS_256BIT * 4]
         kernel_config['gridD'] = [0,  1]
         kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE, CB_U256_ADDM_REDUCE]
+        nkernels = 2
+    elif kernel_config['kernel_idx'][0] == CB_U256_ADDM_REDUCE_SHFL:
+        kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
+        kernel_params['premod'] = [1, 0]
+        kernel_params['premul'] = [1, 0]
+        kernel_params['stride'] = [1, 1]
+        kernel_config['blockD'] = [1024, 1024]
+        kernel_params['in_length'] = [nsamples, \
+                                         (nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]) -1) / (kernel_config['blockD'][0]*kernel_params['stride'][0])]
+        kernel_params['out_length'] = 1
+        kernel_config['smemS'] = [kernel_config['blockD'][0] * NWORDS_256BIT * 4, \
+                                     kernel_config['blockD'][1] * NWORDS_256BIT * 4]
+        kernel_config['gridD'] = [0,  1]
+        kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE_SHFL, CB_U256_ADDM_REDUCE_SHFL]
         nkernels = 2
 
     for i in range(niter):
