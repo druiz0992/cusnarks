@@ -61,35 +61,6 @@ __forceinline__ __device__ uint32_t equ256(const uint32_t __restrict__ *x, const
 
 
 /*
-   x < y for 256 bit numbers
-*/
-
-__forceinline__ __device__ void movu256_2(volatile uint32_t *d_out, uint32_t *d_in)
-{
-  #if 0
-   asm("mov.u32     %0,  %8;\n\t"
-       "mov.u32     %1,  %9;\n\t"
-       "mov.u32     %2,  %10;\n\t"
-       "mov.u32     %3,  %11;\n\t"
-       "mov.u32     %4,  %12;\n\t"
-       "mov.u32     %5,  %13;\n\t"
-       "mov.u32     %6,  %14;\n\t"
-       "mov.u32     %7,  %15;\n\t"
-    : "=r"(d_out[0]), "=r"(d_out[1]), "=r"(d_out[2]), "=r"(d_out[3]),
-      "=r"(d_out[4]), "=r"(d_out[5]), "=r"(d_out[6]), "=r"(d_out[7])
-    : "r"(d_in[0]), "r"(d_in[1]), "r"(d_in[2]), "r"(d_in[3]),
-      "r"(d_in[4]), "r"(d_in[5]), "r"(d_in[6]), "r"(d_in[7]));
-  #endif
-
-    volatile ulonglong4 *out = (volatile ulonglong4 *)d_out;
-    ulonglong4 *in =  (ulonglong4 *)d_in;
-    out->x = in->x;
-    out->y = in->y;
-    out->z = in->z;
-    out->w = in->w;
-}
-
-/*
    x * y for 32 bit number. Returns 64 bit number
  */
 __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y)

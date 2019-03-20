@@ -190,135 +190,90 @@ __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
       return;
     }
 
-    xo = (uint32_t *) &in_vector[idx  * params->stride * ECK_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]; // 0 .. N-1
+    // ECK_JAC_OUTOFFSET = 3 * NWORDS_256BIT
+    // ECP_JAC_OUTXOFFSET = 0
+    xo = (uint32_t *) &in_vector[idx  * params->stride * NWORDS_256BIT + ECP_JAC_OUTXOFFSET]; // 0 .. N-1
 
+    // ECK_JAC_OUTOFFSET = 3 * NWORDS_256BIT
+    // ECP_SCLOFFSET = 0
     xr = (uint32_t *) &out_vector[blockIdx.x * ECK_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET];  // 
-    //memset(smem, 0, blockDim.x * NWORDS_256BIT*ECK_JAC_OUTOFFSET * sizeof(uint32_t));
     
-    /*
-    if (idx == debug_idx){
-       logDebugBigNumber("smem[0]\n",smem_ptr);
-      for (i =0; i < params->stride; i++){
-       logDebugBigNumber("X[0]\n",&x[i * U256K_OFFSET]);
-      }
-    }
-    */
+    // ECK_JAC_INOFFSET = 3 * NWORDS_256BIT
+    // ECP_JAC_INXOFFSET = 1 * NWORDS_256BIT
     // scalar multipliation
     if (params->premul){
         uint32_t __restrict__ *xi, *scl;
-        xi = (uint32_t *) &in_vector[idx  * params->stride * ECK_JAC_INOFFSET + ECP_JAC_INXOFFSET]; // 0 .. N-1
-        scl = (uint32_t *) &in_vector[idx * params->stride * ECK_JAC_INOFFSET + ECP_SCLOFFSET];
+        xi = (uint32_t *) &in_vector[idx  * params->stride * NWORDS_256BIT + ECP_JAC_INXOFFSET]; // 0 .. N-1
+        scl = (uint32_t *) &in_vector[idx * params->stride * NWORDS_256BIT + ECP_SCLOFFSET];
         #pragma unroll
-        for (i =0; i < params->stride; i++){
-          if (idx == 0){
-             logInfoBigNumber("scl :\n",&scl[i*ECK_JAC_INOFFSET]);
-             logInfoBigNumber("Xin[x]:\n",&xi[i*ECK_JAC_INOFFSET]);
-             logInfoBigNumber("Xin[y]:\n",&xi[i*ECK_JAC_INOFFSET + NWORDS_256BIT]);
-          }
+        for (i =0; i < params->stride/ECK_INDIMS; i++){
+          logInfoBigNumberTid(idx,1,"scl :\n",&scl[i*ECK_JAC_INOFFSET]);
+          logInfoBigNumberTid(idx,1,"Xin[x]:\n",&xi[i*ECK_JAC_INOFFSET]);
+          logInfoBigNumberTid(idx,1,"Xin[y]:\n",&xi[i*ECK_JAC_INOFFSET + NWORDS_256BIT]);
+
           scmulecjac(&xo[i*ECK_JAC_OUTOFFSET], &xi[i*ECK_JAC_INOFFSET], &scl[i*ECK_JAC_INOFFSET],  params->midx);
-          if (idx == 0){
-             logInfoBigNumber("scl :\n",&scl[i*ECK_JAC_INOFFSET]);
-             logInfoBigNumber("Xout[x]:\n",&xo[i*ECK_JAC_OUTOFFSET]);
-             logInfoBigNumber("Xout[y]:\n",&xo[i*ECK_JAC_OUTOFFSET + NWORDS_256BIT]);
-             logInfoBigNumber("Xout[z]:\n",&xo[i*ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-          }
+
+          logInfoBigNumberTid(idx,1,"Xout[x]:\n",&xo[i*ECK_JAC_OUTOFFSET]);
+          logInfoBigNumberTid(idx,1,"Xout[y]:\n",&xo[i*ECK_JAC_OUTOFFSET + NWORDS_256BIT]);
+          logInfoBigNumberTid(idx,1,"Xout[z]:\n",&xo[i*ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
         }
     }
     
     addecjac(smem_ptr, (const uint32_t *)xo, (const uint32_t *)&xo[ECK_JAC_OUTOFFSET], params->midx);
 
-    if (idx == 0){
-       logInfoBigNumber("smem[X]\n",smem_ptr);
-       logInfoBigNumber("smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
-       logInfoBigNumber("smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
-    }
+    logInfoBigNumberTid(idx,1,"smem[X]\n",smem_ptr);
+    logInfoBigNumberTid(idx,1,"smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
+    logInfoBigNumberTid(idx,1,"smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
 
     #pragma unroll
-    for (i =0; i < params->stride-2; i++){
+    for (i =0; i < params->stride/ECK_INDIMS-2; i++){
       addecjac(smem_ptr, (const uint32_t *)smem_ptr, (const uint32_t *)&xo[(i+2)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[X]\n",smem_ptr);
-       logInfoBigNumber("smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
-       logInfoBigNumber("smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
-      }
+      logInfoBigNumberTid(idx,1,"smem[X]\n",smem_ptr);
+      logInfoBigNumberTid(idx,1,"smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
+      logInfoBigNumberTid(idx,1,"smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
     }
     __syncthreads();
 
-    /*
-    if (idx == debug_idx){
-       logDebugBigNumber("smem[i]\n",smem_ptr);
-    }
-    */
+    logDebugBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
     // reduction global mem
     if (blockDim.x >= 1024 && tid < 512){
-      /*
-      if (idx == debug_idx){
-        logDebugBigNumber("+smem[0]\n",smem_ptr);
-        logDebugBigNumber("+smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
-      }
-      */
+      logInfoBigNumberTid(idx,1,"+smem[0]\n",smem_ptr);
+      logInfoBigNumberTid(idx,1,"+smem[512]\n",&smem[(tid+512)*NWORDS_256BIT]);
+      
       addecjac(smem_ptr, 
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+512)*ECK_JAC_INOFFSET], params->midx);
-      /*
-      if (idx == debug_idx){
-        logDebugBigNumber("smem[0]\n",smem_ptr);
-      }
-      */
+      logInfoBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
     }
     __syncthreads();
 
     if (blockDim.x >= 512 && tid < 256){
-      /*
-      if (idx == debug_idx){
-        logDebugBigNumber("+smem[0]\n",smem_ptr);
-        logDebugBigNumber("+smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
-      }
-       */
+      logInfoBigNumberTid(idx,1,"+smem[0]\n",smem_ptr);
+      logInfoBigNumberTid(idx,1,"+smem[256]\n",&smem[(tid+256)*NWORDS_256BIT]);
       addecjac(smem_ptr, 
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+256)*ECK_JAC_INOFFSET], params->midx);
-       /*
-      if (idx == debug_idx){
-        logDebugBigNumber("smem[=256]\n",smem_ptr);
-      }
-      */
+      logInfoBigNumberTid(idx,1,"smem[=256]\n",smem_ptr);
     }
     __syncthreads();
 
     if (blockDim.x >= 256 && tid < 128){
-       /*
-       if (idx == debug_idx){
-         logDebugBigNumber("+smem[0]\n",smem_ptr);
-        logDebugBigNumber("+smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
-       }
-       */
+      logInfoBigNumberTid(idx,1,"+smem[0]\n",smem_ptr);
+      logInfoBigNumberTid(idx,1,"+smem[128]\n",&smem[(tid+128)*NWORDS_256BIT]);
       addecjac(smem_ptr, 
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+128)*ECK_JAC_INOFFSET], params->midx);
-       /*
-       if (idx == debug_idx){
-         logDebugBigNumber("smem[=128+0]\n",smem_ptr);
-       }
-       */
+      logInfoBigNumberTid(idx,1,"smem[=128+0]\n",smem_ptr);
     }
     __syncthreads();
 
     if (blockDim.x >= 128 && tid < 64){
-      /*
-      if (idx == debug_idx){
-        logDebugBigNumber("+smem[0]\n",smem_ptr);
-        logDebugBigNumber("+smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
-      }
-      */
+      logInfoBigNumberTid(idx,1,"+smem[0]\n",smem_ptr);
+      logInfoBigNumberTid(idx,1,"+smem[64]\n",&smem[(tid+64)*NWORDS_256BIT]);
       addecjac(smem_ptr, 
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+64)*ECK_JAC_INOFFSET], params->midx);
-      /*
-      if (idx == debug_idx){
-        logDebugBigNumber("smem[=64+0]\n",smem_ptr);
-      }
-      */
+      logInfoBigNumberTid(idx,1,"smem[=64+0]\n",smem_ptr);
     }
     __syncthreads();
       
@@ -326,121 +281,62 @@ __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     if (tid < 32)
     {
         volatile uint32_t *vsmem = smem;
-        /*
-        if (idx == debug_idx){
-          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
-        }
-        */
-      if (idx == 0){  
-       logInfoBigNumber("smem[pre32X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[pre32Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[pre32Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
+
+        logInfoBigNumberTid(idx,1,"smem[pre32X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[pre32Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[pre32Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
         addecjac((uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[(tid+32)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[32X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[32Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[32Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
-        /*
-        if (idx == debug_idx){
-        logDebugBigNumber("smem[=32+0]\n",(uint32_t *)vsmem);
-        }
-       
-        if (idx == debug_idx){
-          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
-        }
-        */
-      if (idx == 0){  
-       logInfoBigNumber("smem[pre16X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[pre16Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[pre16Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
+
+        logInfoBigNumberTid(idx,1,"smem[32X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[32Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[32Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
+        logInfoBigNumberTid(idx,1,"smem[pre16X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[pre16Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[pre16Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
         addecjac((uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[(tid+16)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[16X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[16Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[16Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
-        /*
-        if (idx == debug_idx){
-        logDebugBigNumber("smem[=16+0]\n",(uint32_t *)vsmem);
-        }
-        if (idx == debug_idx){
-          logDebugBigNumber("+smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
-        }
-        */
+
+        logInfoBigNumberTid(idx,1,"smem[16X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[16Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[16Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
         addecjac((uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[(tid+8)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[8X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[8Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[8Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
-        /*
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[=8+0]\n",(uint32_t *)vsmem);
-        }
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
-        }
-        */
+
+        logInfoBigNumberTid(idx,1,"smem[8X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[8Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[8Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
         addecjac((uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[(tid+4)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[4X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[4Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[4Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
-        /*
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[=4+0]\n",(uint32_t *)vsmem);
-        }
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
-        }
-        */
+
+        logInfoBigNumberTid(idx,1,"smem[4X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[4Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[4Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
         addecjac((uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[(tid+2)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[2X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[2Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[2Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
-        /*
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[=2+0]\n",(uint32_t *)vsmem);
-        }
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[0]\n",(uint32_t *)vsmem);
-        logDebugBigNumber("smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
-        }
-        */
+
+        logInfoBigNumberTid(idx,1,"smem[2X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[2Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[2Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
+
         addecjac((uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET],
                  (const uint32_t *)&vsmem[(tid+1)*ECK_JAC_OUTOFFSET], params->midx);
-      if (idx == 0){  
-       logInfoBigNumber("smem[X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
-       logInfoBigNumber("smem[Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
-       logInfoBigNumber("smem[Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
-      }
-        /*
-        if (idx == debug_idx){
-          logDebugBigNumber("smem[=0+1]\n",(uint32_t *)vsmem);
-        }
-        */
+
+        logInfoBigNumberTid(idx,1,"smem[X]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET]);
+        logInfoBigNumberTid(idx,1,"smem[Y]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET+NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[Z]\n",(uint32_t *)&vsmem[tid * ECK_JAC_OUTOFFSET + 2*NWORDS_256BIT]);
 
         if (tid==0) {
            memcpy(xr, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT * ECK_JAC_OUTDIMS);
@@ -876,84 +772,49 @@ __forceinline__ __device__
 
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-  /*
-  if (tid == 0){
-     logInfoBigNumber("x1\n",(uint32_t *)x1);
-     logInfoBigNumber("y1\n",(uint32_t *)y1);
-  }
-  */
+  logInfoBigNumberTid(tid, 1,"x1\n",(uint32_t *)x1);
+  logInfoBigNumberTid(tid,1,"y1\n",(uint32_t *)y1);
   sqmontu256(zr, y1, midx);  // zr = ysq
   sqmontu256(tmp_y, zr, midx);  // yr = ysqsq
 
-  /*
-  if (tid == 0){
-    logInfoBigNumber("ysq\n",(uint32_t *)zr);
-    logInfoBigNumber("Yqsq\n",(uint32_t *)tmp_y);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"ysq\n",(uint32_t *)zr);
+  logInfoBigNumberTid(tid,1,"Yqsq\n",(uint32_t *)tmp_y);
   // TODO muluk256
   mulmontu256(tmp_y, tmp_y, _8, midx);  // tmp_y = ysqsq *_8
   mulmontu256(zr, zr, x1, midx);  // S = zr = x * ysq
 
-  /*
-  if (tid == 0){
-    logInfoBigNumber("8*Ysqsq\n",(uint32_t *)tmp_y);
-    logInfoBigNumber("S\n",(uint32_t *)zr);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"8*Ysqsq\n",(uint32_t *)tmp_y);
+  logInfoBigNumberTid(tid,1,"S\n",(uint32_t *)zr);
   // TODO muluk256
   mulmontu256(zr, zr, _4, midx);  // S = zr = S * _4
 
-  /*
-  if (tid == 0){
-    logInfoBigNumber("S*4\n",(uint32_t *)zr);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"S*4\n",(uint32_t *)zr);
 
   sqmontu256(xr, x1, midx);  // M1 = xr = x * x
   // TODO muluk256
   mulmontu256(tmp1, xr, _3, midx);  // M = tmp1 = M1 * _3
 
-  /*
-  if (tid == 0){
-    logInfoBigNumber("Xsq\n",(uint32_t *)xr);
-    logInfoBigNumber("M\n",(uint32_t *)tmp1);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"Xsq\n",(uint32_t *)xr);
+  logInfoBigNumberTid(tid,1,"M\n",(uint32_t *)tmp1);
   sqmontu256(xr, tmp1, midx);  // X3 = xr = M * M,  tmp_y = Ysqsq * _8, zr = S; tmp1 = M
   // TODO muluk256
   mulmontu256(tmp2, zr, _2, midx);   // tmp2 = S * _2
   
-  /*
-  if (tid == 0){
-    logInfoBigNumber("M*M\n",(uint32_t *)xr);
-    logInfoBigNumber("S*2\n",(uint32_t *)tmp2);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"M*M\n",(uint32_t *)xr);
+  logInfoBigNumberTid(tid,1,"S*2\n",(uint32_t *)tmp2);
 
   submu256(xr, xr, tmp2, midx);      // X3 = xr; tmp_y = Ysqsq * _8, zr = S, tmp1 = M, 
   submu256(tmp2, zr, xr, midx);   //  tmp2 = S - X3
-  /*
-  if (tid == 0){
-    logInfoBigNumber("X3\n",(uint32_t *)xr);
-    logInfoBigNumber("S-X3\n",(uint32_t *)tmp2);
-  }
-  */
+
+  logInfoBigNumberTid(tid,1,"X3\n",(uint32_t *)xr);
+  logInfoBigNumberTid(tid,1,"S-X3\n",(uint32_t *)tmp2);
   mulmontu256(tmp2, tmp2, tmp1, midx); // tmp2 = M * (S - X3)
-  /*
-  if (tid == 0){
-    logInfoBigNumber("M * (S-X3)\n",(uint32_t *)tmp2);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"M * (S-X3)\n",(uint32_t *)tmp2);
   // TODO muluk256
   mulmontu256(zr, y1, _2, midx);
   submu256(yr, tmp2, tmp_y, midx);
-  /*
-  if (tid == 0){
-    logInfoBigNumber("y3\n",(uint32_t *)yr);
-    logInfoBigNumber("z3\n",(uint32_t *)zr);
-  }
-  */
+  logInfoBigNumberTid(tid,1,"y3\n",(uint32_t *)yr);
+  logInfoBigNumberTid(tid,1,"z3\n",(uint32_t *)zr);
 
 }
 
@@ -968,10 +829,6 @@ __forceinline__ __device__
   uint32_t __restrict__ *_inf = misc_const_ct[midx]._inf;
   uint32_t __restrict__ *_1 = misc_const_ct[midx]._1;
   uint32_t __restrict__ scl_cpy[NWORDS_256BIT];
-
-  if (tid==0){
-    logInfo("SCMULEC JAC\n");
-  }
 
   // TODO : review this comparison
   if (eq0u256(&x1[2*NWORDS_256BIT])){ 

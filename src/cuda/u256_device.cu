@@ -155,18 +155,18 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
 
     addmu256(smem_ptr, (const uint32_t *)x, (const uint32_t *)&x[U256K_OFFSET], params->midx);
 
-    logInfoBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
+    logDebugBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
 
     #pragma unroll
     for (i =0; i < params->stride-2; i++){
       addmu256(smem_ptr, (const uint32_t *)smem_ptr, (const uint32_t *)&x[(i+2)*U256K_OFFSET], params->midx);
 
-      logInfoTid(idx,"idx:%d\n",i);
-      logInfoBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
+      logDebugTid(idx,"idx:%d\n",i);
+      logDebugBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
     }
     __syncthreads();
 
-    logInfoBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
+    logDebugBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
 
     // reduction global mem
     if (blockDim.x >= 1024 && tid < 512){
@@ -213,70 +213,70 @@ __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector
                (const uint32_t *)smem_ptr,
                (const uint32_t *)&smem[(tid+64)*NWORDS_256BIT], params->midx);
 
-      logInfoBigNumberTid(idx,1,"smem[=64+0]\n",smem_ptr);
+      logDebugBigNumberTid(idx,1,"smem[=64+0]\n",smem_ptr);
     }
     __syncthreads();
     
-    logInfoBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
+    logDebugBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
 
     // unrolling warp
     if (tid < 32)
     {
         volatile uint32_t *vsmem = smem;
-        logInfoBigNumberTid(idx,1,"+smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
+        logDebugBigNumberTid(idx,1,"+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"+smem[32]\n",&smem[(tid+32)*NWORDS_256BIT]);
 
         addmu256(&vsmem[tid * NWORDS_256BIT],
                  &vsmem[tid * NWORDS_256BIT],
                  &vsmem[(tid+32)*NWORDS_256BIT], params->midx);
 
-        logInfoBigNumberTid(idx,1,"smem[=32+0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"+smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
+        logDebugBigNumberTid(idx,1,"smem[=32+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"+smem[16]\n",&smem[(tid+16)*NWORDS_256BIT]);
 
         addmu256(&vsmem[tid*NWORDS_256BIT],
                  &vsmem[tid*NWORDS_256BIT],
                  &vsmem[(tid+16)*NWORDS_256BIT], params->midx);
 
-        logInfoBigNumberTid(idx,1,"smem[=16+0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"+smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
+        logDebugBigNumberTid(idx,1,"smem[=16+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"+smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"+smem[8]\n",&smem[(tid+8)*NWORDS_256BIT]);
 
         addmu256(&vsmem[tid*NWORDS_256BIT],
                  &vsmem[tid*NWORDS_256BIT],
                  &vsmem[(tid+8)*NWORDS_256BIT], params->midx);
 
-        logInfoBigNumberTid(idx,1,"smem[=8+0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
+        logDebugBigNumberTid(idx,1,"smem[=8+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[4]\n",&smem[(tid+4)*NWORDS_256BIT]);
 
         addmu256(&vsmem[tid*NWORDS_256BIT],
                  &vsmem[tid*NWORDS_256BIT],
                  &vsmem[(tid+4)*NWORDS_256BIT], params->midx);
 
-        logInfoBigNumberTid(idx,1,"smem[=4+0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
+        logDebugBigNumberTid(idx,1,"smem[=4+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[2]\n",&smem[(tid+2)*NWORDS_256BIT]);
 
         addmu256(&vsmem[tid*NWORDS_256BIT],
                  &vsmem[tid*NWORDS_256BIT],
                  &vsmem[(tid+2)*NWORDS_256BIT], params->midx);
 
-        logInfoBigNumberTid(idx,1,"smem[=2+0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"smem[0]\n",(uint32_t *)vsmem);
-        logInfoBigNumberTid(idx,1,"smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
+        logDebugBigNumberTid(idx,1,"smem[=2+0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[0]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[1]\n",&smem[(tid+1)*NWORDS_256BIT]);
 
         addmu256(&vsmem[tid*NWORDS_256BIT],
                  &vsmem[tid*NWORDS_256BIT],
                  &vsmem[(tid+1)*NWORDS_256BIT], params->midx);
 
-        logInfoBigNumberTid(idx,1,"smem[=0+1]\n",(uint32_t *)vsmem);
+        logDebugBigNumberTid(idx,1,"smem[=0+1]\n",(uint32_t *)vsmem);
 
         if (tid==0) {
 	   //TODO change be movu256
            memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
            //movu256(z, smem_ptr);
-           logInfoBigNumberTid(idx,1,"Z : \n",smem_ptr);
+           logDebugBigNumberTid(idx,1,"Z : \n",smem_ptr);
         }
     }
 
@@ -287,80 +287,93 @@ __global__ void addmu256_reduce_shfl_kernel(uint32_t *out_vector, uint32_t *in_v
 {
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
-    uint32_t i;
+    uint32_t sumX[] =  {0,0,0,0,0,0,0,0};
+    uint32_t sumY[] =  {0,0,0,0,0,0,0,0};
+    uint32_t i, size1,size2;
 
     extern __shared__ uint32_t smem[];
-    uint32_t *smem_ptr = &smem[tid*NWORDS_256BIT];  // 0 .. blockDim
 
-    uint32_t __restrict__ *x;
     uint32_t __restrict__ *z;
+    uint32_t laneIdx = tid % warpSize;
+    uint32_t warpIdx = tid / warpSize;
   
-    if(idx >= params->in_length/params->stride) {
+    if(idx >= params->in_length) {
       return;
     }
 
-    x = (uint32_t *) &in_vector[idx  * params->stride * U256K_OFFSET]; // 0 .. N-1
+    movu256(sumX, &in_vector[idx * U256K_OFFSET]);
+    if (params->premod){
+      modu255(sumX, sumX, params->midx);
+    }
 
+    if (params->premul){
+       size1 = blockDim.x >> 6;
+       size2 = blockDim.x >= 32 ? 16 : blockDim.x/2;
+    } else {
+       size1 = 16;
+       //asm("clz.b32    %0,%1;\n\t"
+         //:"=r"(size2) : "r"(blockDim.x >> 6));
+       size2 = blockDim.x >> 6;
+    }
+
+    logInfoTid(idx,"Size1 :%d\n",size1);
+    logInfoTid(idx,"Size2 :%d\n",size2);
+    // last step
     if (gridDim.x == 1){
        z = (uint32_t *) out_vector;
     } else {
-       z = (uint32_t *) &in_vector[blockIdx.x * U256K_OFFSET];  // 
+       z = (uint32_t *) &in_vector[idx/blockDim.x * U256K_OFFSET];  // 
     }
 
-    if (params->premod){
-      #pragma unroll
-      for (i =0; i < params->stride; i++){
-        modu255(&x[i*U256K_OFFSET],&x[i*U256K_OFFSET], params->midx);
-      }
-    }
+    logInfoBigNumberTid(idx,1,"X[0]\n",sumX);
 
-    logDebugBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
-    logDebugBigNumberTid(idx,params->stride,"X[0]\n",&x[i * U256K_OFFSET]);
-
-    addmu256(smem_ptr, (const uint32_t *)x, (const uint32_t *)&x[U256K_OFFSET], params->midx);
-
-    logInfoBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
-
-    #pragma unroll
-    for (i =0; i < params->stride-2; i++){
-      addmu256(smem_ptr, (const uint32_t *)smem_ptr, (const uint32_t *)&x[(i+2)*U256K_OFFSET], params->midx);
-
-      logInfoTid(idx,"idx:%d\n",i);
-      logInfoBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
-    }
-    __syncthreads();
-
-    logInfoBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
-
-    uint32_t laneIdx = threadIdx.x % warpSize;
-    uint32_t warpIdx = threadIdx.x / warpSize;
-
-    #pragma unroll
     // block wide warp reduce
-    for (i=; i; i >>=1){
-      fft_butterfly(otherX, thisX, i);
-      addmu256(thisX, (const uint32_t *)thisX, (const uint32_t *)otherX, params->midx);
+    #pragma unroll
+    for (i = size1; i > 0; i >>= 1){
+      shflxoru256(sumY, sumX, i);
+      logInfoTid(idx,"idx:%d\n",i);
+      logInfoBigNumberTid(idx,1,"sumX\n",sumX);
+      logInfoBigNumberTid(idx,1,"sumY\n",sumY);
+
+      addmu256(sumX, sumX, sumY, params->midx);
+
+      logInfoBigNumberTid(idx,1,"sumX+\n",sumX);
     }
-    
+
     if (laneIdx == 0) {
-       smem[tid*NWORDS_256BIT] = 
+       movu256(&smem[warpIdx*NWORDS_256BIT], sumX);
+       logInfoTid(idx,"save idx:%d\n",warpIdx);
+       logInfoBigNumberTid(idx,1,"val\n",sumX);
     }
 
     __syncthreads();
-    logInfoBigNumberTid(idx,1,"smem[0]\n",smem_ptr);
-    
+
+    if (tid < size2*2) {
+      logInfoTid(idx,"blockDim :%d\n",blockDim.x);
+      logInfoTid(idx,"LaneIdx :%d\n",laneIdx);
+      logInfoTid(idx,"Size :%d\n",size2);
+      movu256(sumX,&smem[laneIdx*NWORDS_256BIT]);
+      logInfoBigNumberTid(idx,size2*2-idx,"Save\n",&smem[laneIdx*NWORDS_256BIT]);
+    } else {
+      set0u256(sumX);
+    }
+    logInfoBigNumberTid(idx,1,"Second\n",sumX);
     #pragma unroll
     // last warp reduce
-    for (i=16; i > 0; i >>=1){
-      fft_butterfly(otherX, thisX, i);
-      addmu256(thisX, (const uint32_t *)thisX, (const uint32_t *)otherX, params->midx);
+    for (i=size2; i > 0; i >>=1){
+      shflxoru256(sumY, sumX, i);
+      logInfoTid(idx,"idx:%d\n",i);
+      logInfoBigNumberTid(idx,1,"sumY\n",sumY);
+      logInfoBigNumberTid(idx,1,"sumX\n",sumX);
+      addmu256(sumX, sumX, sumY, params->midx);
+      logInfoBigNumberTid(idx,1,"sumX+\n",sumX);
     }
 
     if (tid==0) {
      //TODO change be movu256
-     memcpy(z, smem_ptr, sizeof(uint32_t) * NWORDS_256BIT);
-     //movu256(z, smem_ptr);
-     logInfoBigNumberTid(idx,1,"Z : \n",smem_ptr);
+     //memcpy(z, sumX, sizeof(uint32_t) * NWORDS_256BIT);
+     movu256(z, sumX);
+     logInfoBigNumberTid(idx,1,"Z : \n",sumX);
     }
 }
 
@@ -970,3 +983,16 @@ __forceinline__ __device__ uint32_t subgtu256(uint32_t __restrict__ *x, const ui
 }
 
 
+__forceinline__ __device__ void shflxoru256(uint32_t *d_out, uint32_t *d_in, uint32_t srcLane )
+{
+    ulonglong4 in, *out;
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    in = *(ulonglong4 *)d_in;
+    out = (ulonglong4 *)d_out;
+
+    out->x = __shfl_xor_sync(0xffffffff, in.x, srcLane);
+    out->y = __shfl_xor_sync(0xffffffff, in.y, srcLane);
+    out->z = __shfl_xor_sync(0xffffffff, in.z, srcLane);
+    out->w = __shfl_xor_sync(0xffffffff, in.w, srcLane);
+}

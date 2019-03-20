@@ -111,7 +111,11 @@ class ECC(object):
         if curve is None and not ECC.is_curve_init():
             assert False, "Curve is not initialized"
             return
-        elif type(p) is list and len(p) == 3:
+        elif type(p) is list:
+            if len(p) == 2 and isinstance(p[ECC.X], ZFieldElRedc):
+               p = [p[ECC.X], p[ECC.Y], ECC.one[FRDC]]
+            elif len(p) == 2:
+               p = [p[ECC.X], p[ECC.Y], ECC.one[FEXT]]
             p_l = p
         elif isinstance(p,ECC):
             p_l = p.P
@@ -376,7 +380,7 @@ class ECC(object):
         if reduced:
             P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
         else:
-            P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x],(-1,3)))
+            P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
 
         if in_ectype == 0:
             P_ = [ECCProjective(x_.tolist()) for x_ in P]
