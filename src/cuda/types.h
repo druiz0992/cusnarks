@@ -90,6 +90,18 @@
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
+class Z_t{
+};
+
+class Z1_t: public Z_t{
+   uint32_t *el;
+};
+
+class Z2_t: public Z_t{
+   uint32_t *elx;
+   uint32_t *ely;
+};
+
 // prime number info for finite fields
 typedef struct {
    uint32_t p[NWORDS_256BIT];
