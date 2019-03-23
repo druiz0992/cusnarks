@@ -120,6 +120,10 @@ cdef class CUSnarks:
             kparams[i].forward = params['forward'][i]
           else:
             kparams[i].forward = 1
+          if 'padding_idx' in params:
+            kparams[i].forward = params['padding_idx'][i]
+          else:
+            kparams[i].padding_idx = 0
 
         exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
        

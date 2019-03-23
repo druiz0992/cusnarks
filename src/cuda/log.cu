@@ -43,8 +43,8 @@
 #endif
 {
  uint32_t i;
- char buf[500];
- memset(buf,0, 500*sizeof(char));
+ //char buf[500];
+ //memset(buf,0, 500*sizeof(char));
  printf("%s",str);
  
  for (i=0; i < NWORDS_256BIT; i++){
@@ -63,7 +63,7 @@
         logBigNumber(str, n);
      }
   #if defined (LOG_TID) && defined (__CUDACC__)
-    __host__ __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, uint32_t *n)
+    __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, uint32_t *n)
     {
        if (tid == LOG_TID){
          uint32_t i;
@@ -73,7 +73,15 @@
        }
     }
     
-    __host__ __device__ void logDebugTid(int tid, uint32_t nelems, const char *f,uint32_t args )
+    __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, Z1_t *n)
+    {
+       if (tid == LOG_TID){
+         uint32_t i;
+         for (i=0; i< nelems; i++){
+           logBigNumber(str, n->get256(i);
+         }
+       }
+    __device__ void logDebugTid(int tid, uint32_t nelems, const char *f,uint32_t args )
     {
        if (tid == LOG_TID){
           printf(f,args);
@@ -92,7 +100,7 @@
         logBigNumber(str, n);
      }
   #if defined (LOG_TID) && defined (__CUDACC__)
-      __host__ __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, uint32_t *n)
+      __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, uint32_t *n)
       {
          if (tid == LOG_TID){
            uint32_t i;
@@ -101,8 +109,17 @@
            }
          }
       }
+     __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, Z1_t *n)
+      {
+         if (tid == LOG_TID){
+           uint32_t i;
+           for (i=0; i< nelems; i++){
+             logBigNumber(str, n->getu256(i));
+           }
+         }
+      }
     //template <typename  Args> 
-    __host__ __device__ char * logInfoTid(int tid, const char *f, uint32_t args)
+     __device__ char * logInfoTid(int tid, const char *f, uint32_t args)
     {
        if (tid == LOG_TID){
           printf(f,args);

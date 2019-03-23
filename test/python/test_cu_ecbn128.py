@@ -199,7 +199,7 @@ class CUECTest(unittest.TestCase):
         ecbn128_pt_ec = np.zeros(CUECTest.ecbn128_vector_u256_rdc.shape,dtype=np.uint32)
         ecbn128_pt_ec[0::3] = CUECTest.ecbn128_vector_u256_rdc[1::3]
         ecbn128_pt_ec[1::3] = CUECTest.ecbn128_vector_u256_rdc[2::3]
-        ecbn128_pt_ec[2::3] = [ZFieldElRedc(1).as_uint256()] * (len(CUECTest.ecbn128_vector_u256)/3)
+        ecbn128_pt_ec[2::3] = [ZFieldElExt(1).reduce().as_uint256()] * (len(CUECTest.ecbn128_vector_u256)/3)
         ecbn128_pt_ec = ECC.from_uint256(ecbn128_pt_ec, in_ectype=1, out_ectype=1, reduced=True)
 
        
@@ -242,6 +242,11 @@ class CUECTest(unittest.TestCase):
             kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
             kernel_config['kernel_idx'] = [CB_EC_JAC_DOUBLE]
 
+            """
+            ecbn128_vector[::3] = ecbn128_vector[1::3]
+            ecbn128_vector[1::3] = ecbn128_vector[2::3]
+            ecbn128_vector[2::3] = np.tile(ZFieldElExt(1).reduce().as_uint256(),(1024,1))
+            """
             result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples)
@@ -255,11 +260,13 @@ class CUECTest(unittest.TestCase):
             kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
             kernel_config['kernel_idx'] = [CB_EC_JAC_MUL]
 
+            """
             result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECK_JAC_OUTDIMS == nsamples)
             self.assertTrue(ECC.from_uint256(result,in_ectype=1, out_ectype=1, reduced=True) ==
                               ECC.from_uint256(r_mul, in_ectype=1, out_ectype=1, reduced=True))
+            """
 
 
             # Test mad jac
@@ -311,8 +318,129 @@ class CUECTest(unittest.TestCase):
             # I need to convert to EC point, as u256 representation can be different for same EC point
             result_ec = ECC.from_uint256(result2, in_ectype=1, out_ectype=1, reduced=True)
             r_mad_ec = ECC.from_uint256(r_mad, in_ectype=1, out_ectype=1, reduced=True)
+            #self.assertTrue(len(result) == kernel_params['out_length'])
+            #self.assertTrue(result_ec == r_mad_ec)
+
+
+            # Test mad jac shuffle
+            kernel_params['in_length'] = [nsamples * ECK_JAC_INDIMS]
+            kernel_params['stride'] = [ECK_JAC_INDIMS]
+            kernel_config['blockD'] = [256]
+            kernel_params['premul'] = [1]
+            kernel_params['padding_idx'] = [0]
+            kernel_params['out_length'] = ECK_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECK_JAC_INDIMS) -1) /
+                                                             (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECK_JAC_INDIMS))
+            kernel_config['smemS'] = [kernel_config['blockD'][0]/32 * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 ]
+               
+            kernel_config['kernel_idx'] = [CB_EC_JAC_MAD_SHFL]
+            result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
+            #a = ZFieldElExt(BigInt.from_uint256(ecbn128_vector[0]))
+            #x1 = ZFieldElRedc(BigInt.from_uint256(ecbn128_vector[1]))
+            #y1 = ZFieldElRedc(BigInt.from_uint256(ecbn128_vector[2]))
+            #P1 = ECCJacobian([x1,y1,ZFieldElExt(1).reduce()])
+            #P2 = a * P1
+
+            """
+            result_ec = np.zeros(ecbn128_vector.shape, dtype=np.uint32)
+            result_ec[::3] = ecbn128_vector[1::3]
+            result_ec[1::3] = ecbn128_vector[2::3]
+            result_ec[2::3] = np.tile(BigInt(ZFieldElExt(1).reduce().as_long()).as_uint256(),(result_ec.shape[0]/3,1))
+            result_ec = ECC.from_uint256(result_ec,in_ectype=1, out_ectype=1, reduced=True)
+            scl = CUECTest.ecbn128_scl
+            tt2 = [x * y for x,y in zip(result_ec[:10],scl[:10])]
+            """
+
+            result_ec = ECC.from_uint256(result,in_ectype=1, out_ectype=1, reduced=True)
+
+            kernel_params['in_length'] = [kernel_params['out_length']]
+            kernel_params['stride'] = [ECK_JAC_INDIMS]
+            kernel_params['premul'] = [0]
+            kernel_params['out_length'] = 1 * ECK_JAC_OUTDIMS
+            kernel_config['blockD'] = [32]
+            kernel_config['smemS'] = [kernel_config['blockD'][0]/32 * NWORDS_256BIT * ECK_JAC_OUTDIMS * 4 ]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_MAD_SHFL]
+            min_length = ECK_JAC_OUTDIMS * \
+                         (kernel_config['blockD'][0] * kernel_params['stride'][0]/ECK_JAC_INDIMS)
+            if kernel_params['in_length'][0] < min_length:
+               zeros = np.zeros((min_length - kernel_params['in_length'][0],NWORDS_256BIT), dtype=np.uint32)
+               result = np.concatenate((result,zeros))
+               kernel_params['in_length'][0] = min_length
+
+            result2,_ = ecbn128.kernelLaunch(result, kernel_config, kernel_params )
+   
+            debugReducedECCAddShfl(r_mul, result, result2)
+
+            # I need to convert to EC point, as u256 representation can be different for same EC point
+            result_ec = ECC.from_uint256(result2, in_ectype=1, out_ectype=1, reduced=True)
+            r_mad_ec = ECC.from_uint256(r_mad, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result) == kernel_params['out_length'])
             self.assertTrue(result_ec == r_mad_ec)
+
+def debugReducedECCAddShfl(r_mul, result1, result2):
+
+   tt = ECC.from_uint256(r_mul,in_ectype=1, out_ectype=1, reduced=True)
+   # 32 -> 16 
+   for i in range(len(tt)/32):
+      tt[16*i:16*(i+1)] = [x + y for x,y in zip(tt[2*i*16:2*i*16+16],tt[2*i*16+16:2*i*16+32])]
+   tt = tt[:len(tt)/2]
+   # 16 -> 8 
+   for i in range(len(tt)/16):
+      tt[8*i:8*(i+1)] = [x + y for x,y in zip(tt[2*i*8:2*i*8+8],tt[2*i*8+8:2*i*8+16])]
+   tt = tt[:len(tt)/2]
+   # 8 -> 4 
+   for i in range(len(tt)/8):
+      tt[4*i:4*(i+1)] = [x + y for x,y in zip(tt[2*i*4:2*i*4+4],tt[2*i*4+4:2*i*4+8])]
+   tt = tt[:len(tt)/2]
+   # 4 -> 2 
+   for i in range(len(tt)/4):
+      tt[2*i:2*(i+1)] = [x + y for x,y in zip(tt[2*i*2:2*i*2+2],tt[2*i*2+2:2*i*2+4])]
+   tt = tt[:len(tt)/2]
+   # 2 -> 1 
+   for i in range(len(tt)/2):
+      tt[i:(i+1)] = [x + y for x,y in zip(tt[2*i:2*i+1],tt[2*i+1:2*i+2])]
+   tt = tt[:len(tt)/2]
+
+   # 8 -> 4 
+   for i in range(len(tt)/8):
+      tt[4*i:4*(i+1)] = [x + y for x,y in zip(tt[2*i*4:2*i*4+4],tt[2*i*4+4:2*i*4+8])]
+   tt = tt[:len(tt)/2]
+   # 4 -> 2 
+   for i in range(len(tt)/4):
+      tt[2*i:2*(i+1)] = [x + y for x,y in zip(tt[2*i*2:2*i*2+2],tt[2*i*2+2:2*i*2+4])]
+   tt = tt[:len(tt)/2]
+   # 2 -> 1 
+   for i in range(len(tt)/2):
+      tt[i:(i+1)] = [x + y for x,y in zip(tt[2*i:2*i+1],tt[2*i+1:2*i+2])]
+   tt = tt[:len(tt)/2]
+
+
+   # stride reduction
+   tt = [x + y for x,y in zip(tt[::2],tt[1::2])]
+   # 64 -> 32
+   for i in range(len(tt)/64):
+      tt[32*i:32*(i+1)] = [x + y for x,y in zip(tt[2*i*32:2*i*32+32],tt[2*i*32+32:2*i*32+64])]
+   tt = tt[:len(tt)/2]
+   # 32 -> 16
+   for i in range(len(tt)/32):
+      tt[16*i:16*(i+1)] = [x + y for x,y in zip(tt[2*i*16:2*i*16+16],tt[2*i*16+16:2*i*16+32])]
+   tt = tt[:len(tt)/2]
+   # 16 -> 8 
+   for i in range(len(tt)/16):
+      tt[8*i:8*(i+1)] = [x + y for x,y in zip(tt[2*i*8:2*i*8+8],tt[2*i*8+8:2*i*8+16])]
+   tt = tt[:len(tt)/2]
+   # 8 -> 4 
+   for i in range(len(tt)/8):
+      tt[4*i:4*(i+1)] = [x + y for x,y in zip(tt[2*i*4:2*i*4+4],tt[2*i*4+4:2*i*4+8])]
+   tt = tt[:len(tt)/2]
+   # 4 -> 2 
+   for i in range(len(tt)/4):
+      tt[2*i:2*(i+1)] = [x + y for x,y in zip(tt[2*i*2:2*i*2+2],tt[2*i*2+2:2*i*2+4])]
+   tt = tt[:len(tt)/2]
+   # 2 -> 1 
+   for i in range(len(tt)/2):
+      tt[i:(i+1)] = [x + y for x,y in zip(tt[2*i:2*i+1],tt[2*i+1:2*i+2])]
+   tt = tt[:len(tt)/2]
+           
 
 def debugReducedECCAdd(r_mul, result1, result2):
 

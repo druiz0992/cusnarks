@@ -72,6 +72,7 @@ cdef extern from "types.h":
       fft_size_t fft_Ny
       fft_size_t N_ffty
       uint32_t forward
+      uint32_t padding_idx
       mod_t midx
 
 
@@ -85,7 +86,7 @@ cdef extern from "types.h":
 
   ctypedef enum ec_callback_t:
    #CB_EC_LDR_ADD, CB_EC_LDR_DOUBLE, CB_EC_LDR_MUL, CB_EC_LDR_MAD, CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MAD, CB_EC_N
-   CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MAD, CB_EC_N
+   CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MAD, CB_EC_JAC_MAD_SHFL, CB_EC_N
   
   ctypedef enum ec2_callback_t:
    CB_EC2_JAC_ADD , CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MAD, CB_EC2_N

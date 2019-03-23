@@ -89,8 +89,6 @@ AUX_REPOS := $(aux_repos)
 #             1 -> Info
 #             0 -> Debug
 # 
-LOG_LEVEL = 1
-LOG_TID = -1
 
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
@@ -102,9 +100,7 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CUSRC_PATH=$(CUSRC_PATH)'       \
               'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
-              'AUX_INCLUDES=$(AUX_INCLUDES)'  \
-              'LOG_LEVEL=$(LOG_LEVEL)'  \
-              'LOG_TID=$(LOG_TID)'
+              'AUX_INCLUDES=$(AUX_INCLUDES)' 
 
 
 #all:    
