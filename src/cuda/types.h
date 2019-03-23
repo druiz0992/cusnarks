@@ -59,6 +59,9 @@
 // Jacobian
 #define ECP_JAC_INDIMS                (2) // X, Y
 #define ECP_JAC_OUTDIMS               (3) // X, Y, Z
+#define ECP_JAC_XOFFSET_BASE          (0)
+#define ECP_JAC_YOFFSET_BASE          (1)
+#define ECP_JAC_ZOFFSET_BASE          (2)
 #define ECP_JAC_INXOFFSET             (1 * NWORDS_256BIT)
 #define ECP_JAC_INYOFFSET             (2 * NWORDS_256BIT)
 #define ECP_JAC_OUTXOFFSET            (0 * NWORDS_256BIT)
@@ -90,17 +93,9 @@
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
-class Z_t{
-};
-
-class Z1_t: public Z_t{
-   uint32_t *el;
-};
-
-class Z2_t: public Z_t{
-   uint32_t *elx;
-   uint32_t *ely;
-};
+typedef unsigned int z1_t;
+typedef unsigned int z2_t;
+typedef unsigned int uint256_t[8];
 
 // prime number info for finite fields
 typedef struct {
@@ -191,6 +186,7 @@ typedef struct{
    fft_size_t fft_Ny;
    fft_size_t N_ffty;
    uint32_t forward;
+   uint32_t padding_idx;
    mod_t    midx;   // index to prime number to be used by kernel
 
 }kernel_params_t;
@@ -223,6 +219,7 @@ typedef enum{
    CB_EC_JAC_DOUBLE,
    CB_EC_JAC_MUL,
    CB_EC_JAC_MAD,
+   CB_EC_JAC_MAD_SHFL,
    CB_EC_N
 
 }ec_callback_t;
