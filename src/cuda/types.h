@@ -45,6 +45,7 @@
 #define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
 #define ECK_INDIMS               (3)
 // Montgomery ladder
+#if 0
 #define ECP_LDR_INDIMS                (2)
 #define ECP_LDR_OUTDIMS               (2)
 #define ECP_LDR_INXOFFSET             (1 * NWORDS_256BIT)
@@ -56,22 +57,23 @@
 #define ECK_LDR_OUTDIMS              (ECP_LDR_OUTDIMS)
 #define ECK_LDR_INOFFSET             (ECK_LDR_INDIMS * NWORDS_256BIT)
 #define ECK_LDR_OUTOFFSET            (ECK_LDR_OUTDIMS * NWORDS_256BIT)
+#endif
 // Jacobian
 #define ECP_JAC_INDIMS                (2) // X, Y
 #define ECP_JAC_OUTDIMS               (3) // X, Y, Z
 #define ECP_JAC_XOFFSET_BASE          (0)
 #define ECP_JAC_YOFFSET_BASE          (1)
 #define ECP_JAC_ZOFFSET_BASE          (2)
-#define ECP_JAC_INXOFFSET             (1 * NWORDS_256BIT)
-#define ECP_JAC_INYOFFSET             (2 * NWORDS_256BIT)
+#define ECP_JAC_INXOFFSET             (0 * NWORDS_256BIT)
+#define ECP_JAC_INYOFFSET             (1 * NWORDS_256BIT)
 #define ECP_JAC_OUTXOFFSET            (0 * NWORDS_256BIT)
 #define ECP_JAC_OUTYOFFSET            (1 * NWORDS_256BIT)
 #define ECP_JAC_OUTZOFFSET            (2 * NWORDS_256BIT)
+#define ECP_JAC_INOFFSET              (ECP_JAC_INDIMS * NWORDS_256BIT)
+#define ECP_JAC_OUTOFFSET             (ECP_JAC_OUTDIMS * NWORDS_256BIT)
 
 #define ECK_JAC_INDIMS               (ECP_JAC_INDIMS  + U256_NDIMS)
 #define ECK_JAC_OUTDIMS              (ECP_JAC_OUTDIMS)
-#define ECK_JAC_INOFFSET             (ECK_JAC_INDIMS * NWORDS_256BIT)
-#define ECK_JAC_OUTOFFSET            (ECK_JAC_OUTDIMS * NWORDS_256BIT)
 
 #define ECP2_AFF_INOFFSET            (ECP2_AFF_INDIMS * NWORDS_256BIT)
 #define ECP2_AFF_INXOFFSET           (0 * NWORDS_256BIT)
