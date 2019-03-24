@@ -121,7 +121,7 @@ cdef class CUSnarks:
           else:
             kparams[i].forward = 1
           if 'padding_idx' in params:
-            kparams[i].forward = params['padding_idx'][i]
+            kparams[i].padding_idx = params['padding_idx'][i]
           else:
             kparams[i].padding_idx = 0
 

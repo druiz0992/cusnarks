@@ -462,7 +462,7 @@ double CUSnarks::kernelLaunch(
     total_kernel +=end_kernel;
 
     logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d\n",
-        params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride), params[i].padding_idx;
+        params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride, params[i].padding_idx);
     logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
           kernel_idx, gridD, blockD, smemS,end_kernel);
   }

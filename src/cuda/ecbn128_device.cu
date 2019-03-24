@@ -53,8 +53,8 @@ __global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, ker
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
     //Z1_t x1, x2, xr;
- 
-    if(tid >= params->in_length/(4*NWORDS_256BIT)) {
+
+    if(tid >= params->in_length/4) {
       return;
     }
 
@@ -76,7 +76,7 @@ __global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
     // x1 points to inPx[i].  xr points to outPx[i]
-    if(tid >= params->in_length/(2*NWORDS_256BIT)) {
+    if(tid >= params->in_length/2) {
       return;
     }
 
@@ -94,12 +94,12 @@ __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
 
    uint32_t __restrict__ *scl;
  
-   if(tid >= params->in_length/(3*NWORDS_256BIT)) {
+   if(tid >= params->in_length/3) {
      return;
    }
 
    scl = (uint32_t *) &in_vector[tid * NWORDS_256BIT + ECP_SCLOFFSET];
-   Z1_t x1(&in_vector[ params->in_length/3 + tid * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]);
+   Z1_t x1(&in_vector[ params->in_length/3 * NWORDS_256BIT+ tid * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]);
    Z1_t xr(&out_vector[tid * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
   
    scmulecjac<Z1_t, uint256_t>(&xr,0, &x1,0, scl,  params->midx);
@@ -119,23 +119,40 @@ __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
 
     uint32_t __restrict__ *scl;
    
-    if(idx >= params->in_length/(params->stride*NWORDS_256BIT)) {
+    if(idx >= params->in_length/params->stride) {
       return;
     }
+    logInfoTid(idx,"Min Padding : %d\n",params->padding_idx);
+    logInfoTid(idx,"Max Padding : %d\n",params->in_length/ECP_JAC_OUTDIMS);
     if (params->padding_idx){
        uint32_t padding[] = {0,0,0,0,0,0,0,0};
        // add zeros between padding and next multiple of 32
-       if (idx < params->padding_idx/32 * 32 + 32 && idx >= params->padding_idx){
-          movu256(&in_vector[params->in_length/3 + idx * NWORDS_256BIT],padding);
+       if (idx < params->in_length/ECP_JAC_OUTDIMS && idx >= params->padding_idx){
           movu256(&in_vector[idx * ECP_JAC_INOFFSET],padding);
           movu256(&in_vector[idx * ECP_JAC_INOFFSET + NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP_JAC_INOFFSET + 2*NWORDS_256BIT],padding);
        }
        __syncthreads();
     }
 
-    Z1_t xo(&in_vector[idx  * params->stride * NWORDS_256BIT + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
-    Z1_t xr(&out_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
-    scl = (uint32_t *) &in_vector[params->in_length/3 + idx * params->stride * NWORDS_256BIT + ECP_SCLOFFSET];
+    Z1_t xo, xr;
+    if (params->premul){
+      xo.assign(&in_vector[params->in_length/3 * NWORDS_256BIT + idx  * (params->stride-1) * NWORDS_256BIT + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
+      scl = (uint32_t *) &in_vector[idx * params->stride/3 *  NWORDS_256BIT];
+      logInfoTid(idx,"LE : %d\n",params->in_length);
+      logInfoTid(idx,"InVO : %d\n",(params->stride-1) * NWORDS_256BIT);
+      logInfoTid(idx,"SclVO : %d\n",params->in_length/3* 2 * NWORDS_256BIT);
+    } else {
+      xo.assign(&in_vector[idx  * (params->stride) * NWORDS_256BIT + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
+      scl = NULL;
+      logInfoTid(idx,"LE : %d\n",params->in_length);
+      logInfoTid(idx,"InVO : %d\n",(params->stride) * NWORDS_256BIT);
+      logInfoTid(idx,"SclVO : %d\n",params->in_length/3* 2 *NWORDS_256BIT);
+    }
+    xr.assign(&in_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
+    if (gridDim.x == 1){
+      xr.assign(out_vector);
+    }
 
     madecjac<Z1_t, uint256_t>(&xr, &xo, scl, &zsmem, params);
 }
@@ -144,35 +161,47 @@ __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 {
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
+    uint32_t poffset = 0;
 
     extern __shared__ uint32_t smem[];
     Z1_t zsmem(smem);  // 0 .. blockDim
 
     uint32_t __restrict__ *scl = NULL;
   
-    if(idx >= params->in_length/(params->stride*NWORDS_256BIT)) {
+    if(idx >= params->in_length/params->stride) {
       return;
     }
+    logInfoTid(idx,"Min Padding : %d\n",params->padding_idx);
+    logInfoTid(idx,"Max Padding : %d\n",params->in_length/ECP_JAC_OUTDIMS);
+    logInfoTid(idx,"OUt : %d\n",params->in_length/params->stride);
     if (params->padding_idx){
        uint32_t padding[] = {0,0,0,0,0,0,0,0};
        // add zeros between padding and next multiple of 32
-       if (idx < params->padding_idx/32 * 32 + 32 && idx >= params->padding_idx){
-          movu256(&in_vector[params->in_length/3 + idx * NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP_JAC_INOFFSET],padding);
-          movu256(&in_vector[idx * ECP_JAC_INOFFSET + NWORDS_256BIT],padding);
+       if (idx < params->in_length/ECP_JAC_OUTDIMS && idx >= params->padding_idx){
+          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET],padding);
+          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + 2*NWORDS_256BIT],padding);
        }
        __syncthreads();
     }
+
+    Z1_t xo;
     if (params->premul){
-      scl = (uint32_t *) &in_vector[params->in_length/3 + idx * params->stride * NWORDS_256BIT + ECP_SCLOFFSET];
+      scl = (uint32_t *) &in_vector[idx *  NWORDS_256BIT];
+      poffset = params->in_length/3 * NWORDS_256BIT;
+      xo.assign(&in_vector[poffset + idx * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]); // 0 .. N-1
+    } else {
+      xo.assign(&in_vector[idx * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
     }
 
-    Z1_t xo(&in_vector[idx * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]); // 0 .. N-1
     Z1_t xr(&in_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
+  
     if (gridDim.x == 1){
       xr.assign(out_vector);
     } 
 
+    logInfoBigNumberTid(idx,1,"SCL in \n",scl);
+    logInfoBigNumberTid(idx,2,"X in \n",&xo);
     //logInfoBigNumberTid(idx,32*3,"In \n",in_vector);
     madecjac_shfl<Z1_t, uint256_t>(&xr, &xo, scl, &zsmem, params);
 }
@@ -185,10 +214,11 @@ __forceinline__ __device__ void madecjac(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
 
+    logInfoTid(idx,"stride :%d\n",params->stride/ECK_JAC_OUTDIMS);
     // scalar multipliation
     if (params->premul){
         #pragma unroll
-        for (i =0; i < params->stride/ECP_JAC_INDIMS; i++){
+        for (i =0; i < params->stride/ECP_JAC_OUTDIMS; i++){
           /*
           logInfoBigNumberTid(idx,1,"scl :\n",&scl[i*ECP_JAC_INOFFSET]);
           logInfoBigNumberTid(idx,ndbg,"Xin[x]:\n",xos(i*ECP_JAC_INDIMS));
@@ -205,26 +235,27 @@ __forceinline__ __device__ void madecjac(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem
           */
         }
     }
-    
-    addecjac<T1,T2>(smem_ptr,tid*ECK_JAC_OUTDIMS, xr,0, xr,ECK_JAC_OUTDIMS, params->midx);
-
-    /*
-    logInfoBigNumberTid(idx,1,"smem[X]\n",smem_ptr);
-    logInfoBigNumberTid(idx,1,"smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
-    logInfoBigNumberTid(idx,1,"smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
-    */
-
-    #pragma unroll
-    for (i =0; i < params->stride/ECK_INDIMS-2; i++){
-      addecjac<T1,T2>(smem_ptr,tid*ECK_JAC_OUTDIMS, smem_ptr, 0,xr, (i+2)*ECK_JAC_OUTDIMS, params->midx);
+   
+    if (params->stride/ECK_JAC_INDIMS > 1){ 
+      addecjac<T1,T2>(smem_ptr,tid*ECK_JAC_OUTDIMS, xr,0, xr,ECK_JAC_OUTDIMS, params->midx);
       /*
       logInfoBigNumberTid(idx,1,"smem[X]\n",smem_ptr);
       logInfoBigNumberTid(idx,1,"smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
       logInfoBigNumberTid(idx,1,"smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
       */
-    }
-    __syncthreads();
 
+      #pragma unroll
+      for (i =0; i < params->stride/ECK_JAC_OUTDIMS-2; i++){
+        addecjac<T1,T2>(smem_ptr,tid*ECK_JAC_OUTDIMS, smem_ptr, 0,xr, (i+2)*ECK_JAC_OUTDIMS, params->midx);
+        /*
+        logInfoBigNumberTid(idx,1,"smem[X]\n",smem_ptr);
+        logInfoBigNumberTid(idx,1,"smem[Y]\n",&smem_ptr[NWORDS_256BIT]);
+        logInfoBigNumberTid(idx,1,"smem[Z]\n",&smem_ptr[2*NWORDS_256BIT]);
+        */
+      }
+      __syncthreads();
+    }
+  
     //logDebugBigNumberTid(idx,1,"smem[i]\n",smem_ptr);
     // reduction global mem
     if (blockDim.x >= 1024 && tid < 512){
@@ -391,12 +422,12 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     // ECP_JAC_INXOFFSET = 1 * NWORDS_256BIT
     // scalar multipliation
     if (params->premul){
-        sumX.setu256(1,xo,1,ECP_JAC_INDIMS);
+        sumX.setu256(0,xo,0,ECP_JAC_INDIMS);
 
         logInfoBigNumberTid(idx,ndbg,"scl :\n",scl);
-        logInfoBigNumberTid(idx,ndbg*3,"Xin[x,y]:\n",&sumX);
+        logInfoBigNumberTid(idx,ndbg*2,"Xin[x,y]:\n",&sumX);
  
-        scmulecjac<T1, T2>(&sumX,0, &sumX, 1, scl,  params->midx);
+        scmulecjac<T1, T2>(&sumX,0, &sumX, 0, scl,  params->midx);
           
 
         logInfoBigNumberTid(idx,3*ndbg,"Xout[x,y,z]:\n",&sumX);
@@ -925,6 +956,10 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
   #endif
   // ret of iterations, input are not affine anymore
 
+  logInfoBigNumberTid(tid,1,"SCL mul: \n",scl_cpy);
+  logInfoBigNumberTid(tid,3,"Q: \n",&Q);
+  logInfoBigNumberTid(tid,3,"N: \n",&N);
+
   while (!eq0u256(scl_cpy)){
      b0 = shr1u256(scl_cpy);
      /*
@@ -942,6 +977,8 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
      doublecjac<T1, T2>(&N,&N, midx);
   }
 
+  logInfoBigNumberTid(tid,3,"R-N: \n",&N);
+  logInfoBigNumberTid(tid,3,"R-Q: \n",&Q);
   return;
 }
 
