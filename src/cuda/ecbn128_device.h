@@ -39,6 +39,11 @@ __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
 __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
+__global__ void addec2jac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void doublec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void scmulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void madec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void madec2jac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
 template<typename T1, typename T2>
 __forceinline__ __device__ void madecjac(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem_ptr, kernel_params_t *params);

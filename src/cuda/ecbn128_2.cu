@@ -47,19 +47,20 @@
 #include "rng.h"
 #include "cusnarks_kernel.h"
 #include "ecbn128_2.h"
-#include "ecbn128_2_device.h"
+#include "ecbn128_device.h"
 
 using namespace std;
 
-static kernel_cb ecbn128_2_kernel_callbacks[] = {addecjac2_kernel, doublecjac2_kernel, scmulecjac2_kernel, madecjac2_kernel};
+static kernel_cb ecbn128_2_kernel_callbacks[] = {addec2jac_kernel, doublec2jac_kernel, scmulec2jac_kernel, madec2jac_kernel, 
+                                                madec2jac_shfl_kernel};
 
-ECBN128_2::ECBN128_2 (uint32_t len) : CUSnarks( len * ECP2_AFF_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len *  ECP2_AFF_INDIMS,
+ECBN128_2::ECBN128_2 (uint32_t len) : CUSnarks( len * ECP2_JAC_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len *  ECP2_JAC_INDIMS,
 		                            len * ECP2_JAC_OUTDIMS,  NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_OUTDIMS, 
                                             ecbn128_2_kernel_callbacks, 0)
 {
 }
 
-ECBN128_2::ECBN128_2 (uint32_t len, const uint32_t seed) :  CUSnarks(len * ECP2_AFF_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_AFF_INDIMS,
+ECBN128_2::ECBN128_2 (uint32_t len, const uint32_t seed) :  CUSnarks(len * ECP2_JAC_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_INDIMS,
 				                                 len * ECP2_JAC_OUTDIMS, NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_OUTDIMS,
 						       ecbn128_2_kernel_callbacks, seed)
 {

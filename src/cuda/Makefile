@@ -42,10 +42,10 @@ CUSRC = cusnarks_kernel.cu \
         ecbn128.cu \
         ecbn128_device.cu \
 	ecbn128_2.cu \
-        ecbn128_2_device.cu \
 	zpoly.cu \
 	zpoly_device.cu \
         z1_device.cu \
+        z2_device.cu \
         log.cu
 
 CSRC = rng.cpp \

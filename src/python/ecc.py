@@ -995,6 +995,7 @@ class ECCJacobian(ECC):
             M1 = X * X
             if self.FIDX == ZUtils.FEXT:
                 M = M1 + (M1 << ECC.one[self.FIDX])
+                #M = ECC.three[self.FIDX] * M1
             else:
                 M = ECC.three[self.FIDX] * M1
             M = M + ECC.a[self.FIDX] * Zsq * Zsq
