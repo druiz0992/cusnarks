@@ -37,7 +37,7 @@ cimport numpy as np
 cimport _types as ct
 cimport _utils_host as uh
 
-from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_ECBN128_2, C_ZCUPoly
+from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
 from cython cimport view
 from constants import *
 from libc.stdlib cimport malloc, free
@@ -63,7 +63,7 @@ cdef class CUSnarks:
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
-        #print in_v.length, self.in_dim, out_v.length, self.out_dim
+        print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
             return 0.0
@@ -186,23 +186,23 @@ cdef class ECBN128 (CUSnarks):
         del self._ecbn128_ptr
 
 
-# CUECBN128 class cython wrapper
-cdef class ECBN128_2 (CUSnarks):
-    cdef C_ECBN128_2* _ecbn128_2_ptr
+# CUEC2BN128 class cython wrapper
+cdef class EC2BN128 (CUSnarks):
+    cdef C_EC2BN128* _ec2bn128_ptr
 
     def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
         if out_len == 0:
             out_len = in_len
-        self._ecbn128_2_ptr = new C_ECBN128_2( in_len,seed)
-        self._cusnarks_ptr = <C_CUSnarks *>self._ecbn128_2_ptr
+        self._ec2bn128_ptr = new C_EC2BN128( in_len,seed)
+        self._cusnarks_ptr = <C_CUSnarks *>self._ec2bn128_ptr
         # TODO : add correct dimension
-        self.in_dim = self.in_dim * 3
-        self.out_dim = self.out_dim  * 3
+        self.in_dim = self.in_dim * 4
+        self.out_dim = self.out_dim  * 6
         self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
         self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
    
     def __dealloc__(self):
-        del self._ecbn128_2_ptr
+        del self._ec2bn128_ptr
 
 
 

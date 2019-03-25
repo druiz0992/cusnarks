@@ -19,7 +19,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : ecbn128_2.h
+// File name  : ec2bn128.h
 //
 // Date       : 22/02/2019
 //
@@ -28,24 +28,19 @@
 // Description:
 //  Definition of Elliptic Curve kernel processing for extended fields
 //
-//  TODO
-//  This implementation is quite embarrasing. I am practically copying
-//  all ecbn128.cu functionality. I need to use C++ so that ecc over extended fields
-//  is a derived class from ecc and simply let the compiler select the right
-//  class. For the moment though, this will have to do :-(
 // ------------------------------------------------------------------
 
 */
-#ifndef _ECBN128_2_H_
-#define _ECBN128_2_H_
+#ifndef _EC2BN128_H_
+#define _EC2BN128_H_
 
 
-class ECBN128_2 : public CUSnarks {
+class EC2BN128 : public CUSnarks {
 
     public:
 
-        ECBN128_2(uint32_t len);
-        ECBN128_2(uint32_t len, uint32_t seed);
+        EC2BN128(uint32_t len);
+        EC2BN128(uint32_t len, uint32_t seed);
         
 };
 

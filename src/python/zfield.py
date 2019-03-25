@@ -520,7 +520,8 @@ class ZFieldEl(BigInt):
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
                 assert False, "Invalid type"
             else:
-                newz = (self.bignum + x.bignum)
+                #newz = (self.bignum + x.bignum)
+                newz = self + x
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum + x)
         else:
@@ -544,7 +545,8 @@ class ZFieldEl(BigInt):
                     (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
                 assert False, "Invalid type"
             else:
-                newz = (self.bignum - x.bignum)
+                newz = self - x
+                #newz = (self.bignum - x.bignum)
         elif isinstance(x, int) or isinstance(x, long):
             newz = (self.bignum - x)
         else:
@@ -744,7 +746,10 @@ class ZFieldEl(BigInt):
         elif isinstance(x, BigInt):
             newZ = (self.as_long() << x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
-            newZ = (self.as_long() << x)
+            if isinstance(x, Z2FieldEl):
+               newZ = [self.P[0].as_long() << x, self.P[1].as_long() << x]
+            else :
+               newZ = (self.as_long() << x)
         else:
             assert False, "Invalid type"
 
