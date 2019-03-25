@@ -59,6 +59,7 @@
 #define ECK_LDR_OUTOFFSET            (ECK_LDR_OUTDIMS * NWORDS_256BIT)
 #endif
 // Jacobian
+#define ECP_JAC_N256W                 (1)
 #define ECP_JAC_INDIMS                (2) // X, Y
 #define ECP_JAC_OUTDIMS               (3) // X, Y, Z
 #define ECP_JAC_XOFFSET_BASE          (0)
@@ -72,20 +73,19 @@
 #define ECP_JAC_INOFFSET              (ECP_JAC_INDIMS * NWORDS_256BIT)
 #define ECP_JAC_OUTOFFSET             (ECP_JAC_OUTDIMS * NWORDS_256BIT)
 
-#define ECK_JAC_INDIMS               (ECP_JAC_INDIMS  + U256_NDIMS)
-#define ECK_JAC_OUTDIMS              (ECP_JAC_OUTDIMS)
-
-#define ECP2_AFF_INOFFSET            (ECP2_AFF_INDIMS * NWORDS_256BIT)
-#define ECP2_AFF_INXOFFSET           (0 * NWORDS_256BIT)
-#define ECP2_AFF_INYOFFSET           (2 * NWORDS_256BIT)
-#define ECP2_AFF_INZOFFSET           (4 * NWORDS_256BIT)
-#define ECP2_AFF_INDIMS             (6)               
-
-#define ECP2_JAC_OUTOFFSET           (ECP_JAC_OUTDIMS * NWORDS_256BIT)
-#define ECP2_JAC_OUTXOFFSET          (0 * NWORDS_256BIT)
-#define ECP2_JAC_OUTYOFFSET          (2 * NWORDS_256BIT)
-#define ECP2_JAC_OUTDIMS              (4)  //x0,x1, y0,y1
-#define ECK2_JAC_OUTDIMS              (ECP2_JAC_OUTDIMS)
+#define ECP2_JAC_N256W                 (2)
+#define ECP2_JAC_INDIMS                (4) // X, Y
+#define ECP2_JAC_OUTDIMS               (6) // X, Y, Z
+#define ECP2_JAC_XOFFSET_BASE          (0)
+#define ECP2_JAC_YOFFSET_BASE          (1)
+#define ECP2_JAC_ZOFFSET_BASE          (2)
+#define ECP2_JAC_INXOFFSET             (0 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_INYOFFSET             (1 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTXOFFSET            (0 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTYOFFSET            (1 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTZOFFSET            (2 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_INOFFSET              (ECP2_JAC_INDIMS *  NWORDS_256BIT)
+#define ECP2_JAC_OUTOFFSET             (ECP2_JAC_OUTDIMS * NWORDS_256BIT)
 
 #define CUSNARKS_BLOCK_DIM      (256)
 #define CUSNARKS_MAX_NCB        (32)
@@ -95,9 +95,8 @@
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
-typedef unsigned int z1_t;
-typedef unsigned int z2_t;
-typedef unsigned int uint256_t[8];
+typedef unsigned int uint256_t[NWORDS_256BIT];
+typedef unsigned int uint512_t[2*NWORDS_256BIT];
 
 // prime number info for finite fields
 typedef struct {
@@ -232,6 +231,7 @@ typedef enum{
    CB_EC2_JAC_DOUBLE,
    CB_EC2_JAC_MUL,
    CB_EC2_JAC_MAD,
+   CB_EC2_JAC_MAD_SHFL,
    CB_EC2_N
 
 }ec2_callback_t;
