@@ -113,9 +113,15 @@ class ECC(object):
             return
         elif type(p) is list:
             if len(p) == 2 and isinstance(p[ECC.X], ZFieldElRedc):
-               p = [p[ECC.X], p[ECC.Y], ECC.one[FRDC]]
+               if isinstance(p[ECC.X], Z2FieldEl):
+                  p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]])]
+               else:
+                  p = [p[ECC.X], p[ECC.Y], ECC.one[Zutils.FRDC]]
             elif len(p) == 2:
-               p = [p[ECC.X], p[ECC.Y], ECC.one[FEXT]]
+               if isinstance(p[ECC.X], Z2FieldEl):
+                 p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]])]
+               else:
+                  p = [p[ECC.X], p[ECC.Y], ECC.one[ZUtils.FEXT]]
             p_l = p
         elif isinstance(p,ECC):
             p_l = p.P
@@ -135,7 +141,7 @@ class ECC(object):
         if isinstance(p_l[ECC.X], Z2FieldEl) or type(p_l[ECC.X]) is list:
             self.P = [Z2FieldEl(x) for x in p_l]
             self.FIDX = ZUtils.FEXT
-            if isinstance(self.P[ECC.X].as_list()[0], ZFieldElRedc):
+            if isinstance(self.P[ECC.X].P[0], ZFieldElRedc):
                 self.FIDX = ZUtils.FRDC
         elif isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
             self.P = [ZFieldElExt(x) for x in p_l]
@@ -152,10 +158,10 @@ class ECC(object):
         return ECC.a[ZUtils.FEXT] is not None and ECC.b[ZUtils.FEXT] is not None
 
     @classmethod
-    def init(cls, curve_params):
+    def init(cls, curve_params, extended=False):
         if not ZField.is_init():
             assert False, "Field not initialized"
-        ECC.init_curve(curve_params)
+        ECC.init_curve(curve_params, extended=extended)
         ECC.init_constants()
 
     @classmethod
@@ -170,11 +176,19 @@ class ECC(object):
          ECC.constants_init = True
 
     @classmethod
-    def init_curve(cls, curve_params):
-        ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
-        ECC.b = [ZFieldElExt(curve_params['b']), ZFieldElExt(curve_params['b']).reduce()]
-        ECC.Gx = curve_params['Gx']
-        ECC.Gy = curve_params['Gy']
+    def init_curve(cls, curve_params, extended=False):
+        if not extended:
+           ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
+           ECC.b = [ZFieldElExt(curve_params['b']), ZFieldElExt(curve_params['b']).reduce()]
+           ECC.Gx = ZFieldElExt(curve_params['Gx'])
+           ECC.Gy = ZFieldElExt(curve_params['Gy'])
+        else :
+           ECC.a = [Z2FieldEl([curve_params['ax1'], curve_params['ax2']]),
+                   Z2FieldEl([curve_params['ax1'], curve_params['ax2']]).reduce()] 
+           ECC.b = [Z2FieldEl([curve_params['bx1'], curve_params['bx2']]),
+                    Z2FieldEl([curve_params['bx1'], curve_params['bx2']]).reduce()]
+           ECC.Gx = Z2FieldEl([curve_params['Gx1'], curve_params['Gx2']])
+           ECC.Gy = Z2FieldEl([curve_params['Gy1'], curve_params['Gy2']])
 
     @classmethod
     def p_zero(cls, ext_field=False):
@@ -371,16 +385,23 @@ class ECC(object):
         pass
 
     @staticmethod
-    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False):
+    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False,ec2=False):
         """
 
         :param x:
         :return:
         """
-        if reduced:
-            P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+        if not ec2:
+          if reduced:
+              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+          else:
+              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
         else:
-            P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+          if reduced:
+              P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0])), ZFieldElRedc(BigInt.from_uint256(x_[1]))]) for x_ in x]),(-1,3))
+          else:
+              P = np.reshape(np.asarray([Z2FieldEl([BigInt.from_uint256(x_[0]).as_long(), BigInt.from_uint256(x_[1]).as_long()]) for x_ in x]),(-1,3))
+        
 
         if in_ectype == 0:
             P_ = [ECCProjective(x_.tolist()) for x_ in P]
@@ -417,7 +438,8 @@ class ECC(object):
       for i in xrange(n):
          k = randint(1,p-1)  # generate random number between 1 and p-1
 
-         P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+         #P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+         P1 = ECCJacobian([ECC.Gx,ECC.Gy])
          P1 = k * P1
          P1 = P1.to_affine()
 
@@ -735,8 +757,8 @@ class ECCProjective(ECC):
 
         U = U1 - U2
         V = V1 - V2
-        Usq = U**2
-        Vsq = V**2
+        Usq = U*U
+        Vsq = V*V
         Vcube = Vsq * V
         W = Z1 * Z2
         A = (Usq * W) - Vcube

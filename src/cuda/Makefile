@@ -41,7 +41,7 @@ CUSRC = cusnarks_kernel.cu \
         u256_device.cu \
         ecbn128.cu \
         ecbn128_device.cu \
-	ecbn128_2.cu \
+	ec2bn128.cu \
 	zpoly.cu \
 	zpoly_device.cu \
         z1_device.cu \
