@@ -230,6 +230,14 @@ __forceinline__ __device__ void movu256(uint32_t *d_out, uint32_t *d_in)
     out->y = in->y;
     out->z = in->z;
     out->w = in->w;
+    /*
+    uint4 *out = (uint4 *)d_out;
+    uint4 *in =  (uint4 *)d_in;
+    out->x = in->x;
+    out->y = in->y;
+    out->z = in->z;
+    out->w = in->w;
+    */
 }
 
 __forceinline__ __device__ void set0u256(uint32_t *d_out)

@@ -48,12 +48,13 @@
   #define LOG_TID (0)
 #endif
 #ifndef LOG_LEVEL
-  #define LOG_LEVEL (LOG_LEVEL_NOLOG)
-  //#define LOG_LEVEL (LOG_LEVEL_INFO)
+  //#define LOG_LEVEL (LOG_LEVEL_NOLOG)
+  #define LOG_LEVEL (LOG_LEVEL_INFO)
 #endif
 
 #ifdef __CUDACC__
   #include "z1_device.h"
+  #include "z2_device.h"
 #endif
 
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
@@ -67,6 +68,7 @@
   #if defined (LOG_TID) && defined (__CUDACC__)
      __device__ void logDebugBigNumberTid(int tid, uint32_t nelems,  char *str, uint32_t *n);
      __device__ void logDebugBigNumberTid(int tid, uint32_t nelems,  char *str, Z1_t *n);
+     __device__ void logDebugBigNumberTid(int tid, uint32_t nelems,  char *str, Z2_t *n);
      __device__ void logDebugTid(int tid, const char *f, uint32_t args);
   #else
     #define logDebugBigNumberTid(TID,COUNT,STR, X)
@@ -90,6 +92,7 @@
   #if defined (LOG_TID) && defined (__CUDACC__)
      __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, uint32_t *n);
      __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, Z1_t *n);
+     __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, Z2_t *n);
      __device__ char * logInfoTid(int tid, const char *f, uint32_t  args);
   #else
     #define logInfoBigNumberTid(TID,COUNT,STR, X)

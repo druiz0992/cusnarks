@@ -237,7 +237,7 @@ class CUEC2Test(unittest.TestCase):
 
             result,_ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params )
             self.assertTrue(len(result)/ECP2_JAC_OUTDIMS == nsamples/2)
-            #self.assertTrue(all(np.concatenate(result == r_add)))
+            self.assertTrue(all(np.concatenate(result == r_add)))
 
             # Test double jac
             kernel_params['in_length'] = [nsamples  * ECP2_JAC_INDIMS]
@@ -258,7 +258,7 @@ class CUEC2Test(unittest.TestCase):
             """
             result,_ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params )
             self.assertTrue(len(result)/ECP2_JAC_OUTDIMS == nsamples)
-            #self.assertTrue(all(np.concatenate(result == r_double)))
+            self.assertTrue(all(np.concatenate(result == r_double)))
 
             # Test sc mul jac
             kernel_params['in_length'] = [nsamples  * (ECP2_JAC_INDIMS+U256_NDIMS)]

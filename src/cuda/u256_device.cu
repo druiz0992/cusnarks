@@ -670,7 +670,7 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
     uint32_t i,j;
     uint32_t S, C=0, C1, C2,C3;
     uint32_t __restrict__ M[2], X[2];
-    uint32_t __restrict__ T[]={0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0,0};
     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 
