@@ -53,6 +53,22 @@
  printf("\n");
 }
 
+#ifdef __CUDACC__
+  __host__ __device__ void logBigNumberExt(char *str, uint32_t *n)
+#else
+  void logNumberExt(char *str, uint32_t *n)
+#endif
+{
+ uint32_t i;
+ //char buf[500];
+ //memset(buf,0, 500*sizeof(char));
+ printf("%s",str);
+ 
+ for (i=0; i < 2*NWORDS_256BIT; i++){
+   printf("%u ",n[i]);
+ }
+ printf("\n");
+}
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
    #ifdef __CUDACC__
      __host__ __device__ void logDebugBigNumber(char *str, uint32_t *n)
@@ -78,9 +94,19 @@
        if (tid == LOG_TID){
          uint32_t i;
          for (i=0; i< nelems; i++){
-           logBigNumber(str, n->get256(i);
+           logBigNumber(str, n->getu256(i));
          }
        }
+    }
+    __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, Z2_t *n)
+    {
+       if (tid == LOG_TID){
+         uint32_t i;
+         for (i=0; i< nelems; i++){
+           logBigNumberExt(str, n->getu256(i));
+         }
+       }
+    }
     __device__ void logDebugTid(int tid, uint32_t nelems, const char *f,uint32_t args )
     {
        if (tid == LOG_TID){
@@ -118,6 +144,15 @@
            }
          }
       }
+    __device__ void logInfoBigNumberTid(int tid,uint32_t nelems, char *str, Z2_t *n)
+    {
+       if (tid == LOG_TID){
+         uint32_t i;
+         for (i=0; i< nelems; i++){
+           logBigNumberExt(str, n->getu256(i));
+         }
+       }
+    }
     //template <typename  Args> 
      __device__ char * logInfoTid(int tid, const char *f, uint32_t args)
     {

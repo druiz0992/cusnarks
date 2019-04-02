@@ -260,7 +260,7 @@ __global__ void madec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
       scl = NULL;
       logInfoTid(idx,"LE : %d\n",params->in_length);
       logInfoTid(idx,"InVO : %d\n",(params->stride) * NWORDS_256BIT);
-      logInfoTid(idx,"SclVO : %d\n",params->in_length/5* *NWORDS_256BIT);
+      logInfoTid(idx,"SclVO : %d\n",params->in_length/5 *NWORDS_256BIT);
     }
     xr.assign(&in_vector[blockIdx.x * ECP2_JAC_OUTOFFSET + ECP2_JAC_OUTXOFFSET]);  // 
     if (gridDim.x == 1){
@@ -302,6 +302,7 @@ __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, 
       scl = (uint32_t *) &in_vector[idx *  NWORDS_256BIT];
       poffset = params->in_length/3 * NWORDS_256BIT;
       xo.assign(&in_vector[poffset + idx * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]); // 0 .. N-1
+      logInfoBigNumberTid(idx,1,"SCL in \n",scl);
     } else {
       xo.assign(&in_vector[idx * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
     }
@@ -312,7 +313,6 @@ __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, 
       xr.assign(out_vector);
     } 
 
-    logInfoBigNumberTid(idx,1,"SCL in \n",scl);
     logInfoBigNumberTid(idx,2,"X in \n",&xo);
     //logInfoBigNumberTid(idx,32*3,"In \n",in_vector);
     madecjac_shfl<Z1_t, uint256_t>(&xr, &xo, scl, &zsmem, params);
