@@ -97,6 +97,11 @@ static uint32_t N[] = {
       4026531841, 1138881939, 2042196113,  674490440, 2172737629, 3092268470, 3778125865,  811880050  // p_field
 };
 
+static uint32_t R2[] = {
+  1401617033, 4079811675, 3561292283, 3051821329,  172064758, 1202396927, 3401069855,  114859889, //R2 group
+  2921426343,  465102405, 3814480355, 1409170097, 1404797061, 2353627965, 2135835813,   35049649  // R2 field
+};
+
 static uint32_t NPrime[] = {
   3834012553, 2278688642,  516582089, 2665381221,  406051456, 3635399632, 2441645163, 4118422199, // pp_group
   4026531839, 3269588371, 1281954227, 1703315019, 2567316369, 3818559528,  226705842, 1945644829  // pp_field
@@ -977,8 +982,10 @@ uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t
 uint32_t reverse(uint32_t x, uint32_t bits);
 inline void swap(uint32_t *x, uint32_t *y);
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
-void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void transpose_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
+void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
+void to_montgomery_h(uint32_t *z, uint32_t *x, uint32_t pidx);
+void from_montgomery_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 
 void setRandom(uint32_t *x, uint32_t);
 void printNumber(uint32_t *x);
@@ -1023,7 +1030,113 @@ void rangeu256_h(uint32_t *samples, uint32_t nsamples, uint32_t  *start, uint32_
      }
    }
 }   
+void int_to_byte_h(char *out, uint32_t *in, uint32_t nbytes)
+{
+  uint32_t i;
+
+  for (i=0; i<nbytes; i+=4){
+    out[i] = in[i/4] & 0xFF;
+    out[i+1] = (in[i/4] >> 8) & 0xFF;
+    out[i+2] = (in[i/4] >> 16) & 0xFF;
+    out[i+3] = (in[i/4] >> 24) & 0xFF;
+  }
+}
+
+
+void byte_to_int_h(uint32_t *out, char *in, uint32_t nwords)
+{
+  uint32_t i;
+
+  for (i=0; i<nwords; i++){
+    out[i] = in[4*i] |
+            ((uint32_t)in[4*i+1] << 8)  |
+            ((uint32_t)in[4*i+2] << 16) |
+            ((uint32_t)in[4*i+3] << 24);
+  }
+}
    
+void to_montgomery_h(uint32_t *z, uint32_t *x, uint32_t pidx)
+{
+  montmult_h(z,x,&R2[pidx*NWORDS_256BIT], pidx);
+}
+
+void from_montgomery_h(uint32_t *z, uint32_t *x, uint32_t pidx)
+{
+  uint32_t one[]={1,0,0,0,0,0,0,0};
+  montmult_h(z,x,one, pidx);
+}
+
+void zpoly_maddm_h(uint32_t *pout, uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx)
+{
+  uint32_t n_zpoly = pin[0];
+  uint32_t zcoeff_d_offset = 1 + n_zpoly;
+  uint32_t zcoeff_v_offset;
+  uint32_t n_zcoeff;
+  uint32_t scl[NWORDS_256BIT];
+  uint32_t i,j;
+  uint32_t *zcoeff_v_in, *zcoeff_v_out, zcoeff_d;
+  uint32_t prev_n_zcoeff = 0, accum_n_zcoeff;
+
+  /*
+  printf("N zpoly: %d\n",n_zpoly);
+  printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
+  */
+  for (i=0; i<last_idx; i++){
+    to_montgomery_h(scl, &scalar[i*NWORDS_256BIT], pidx);
+    /*
+    printf("In Scalar : \n");
+    printNumber(&scalar[i*NWORDS_256BIT]);
+    printf("Out Scalar : \n");
+    printNumber(scl);
+    */
+    
+    accum_n_zcoeff = pin[1+i];
+    n_zcoeff = accum_n_zcoeff - prev_n_zcoeff;
+    prev_n_zcoeff = accum_n_zcoeff;
+    zcoeff_v_offset = zcoeff_d_offset + n_zcoeff;
+
+    /*
+    if ((i< 5) || (i > last_idx-5)){
+      printf("N Zcoeff[%d] : %d\n", i, n_zcoeff);
+      printf("Accum N Zcoeff[%d] : %d\n", i, accum_n_zcoeff);
+      printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
+      printf("ZCoeff_v_offset[%d] : %d\n", i , zcoeff_v_offset);
+    }   
+    */
+    
+    for (j=0; j< n_zcoeff; j++){
+       zcoeff_d = pin[zcoeff_d_offset+j];
+       zcoeff_v_in = &pin[zcoeff_v_offset+j*NWORDS_256BIT];
+       zcoeff_v_out = &pout[zcoeff_d*NWORDS_256BIT];
+       /*
+       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
+         printf("V[%d] in \n", zcoeff_d);
+         printNumber(zcoeff_v_in);
+       }
+       */
+       montmult_h(zcoeff_v_in, zcoeff_v_in, scl, pidx);
+       /*
+       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
+         printf("V[%d] in after mult \n", zcoeff_d);
+         printNumber(zcoeff_v_in);
+         printf("V[%d] out before add \n", zcoeff_d);
+         printNumber(zcoeff_v_out);
+       }
+       */
+       addm_h(zcoeff_v_out, zcoeff_v_out, zcoeff_v_in, pidx);
+       /*
+       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
+         printf("V[%d] out after add \n", zcoeff_d);
+         printNumber(zcoeff_v_out);
+       }
+       */
+    }
+    zcoeff_d_offset = accum_n_zcoeff*(NWORDS_256BIT+1) +1 + n_zpoly;
+  }
+}
+
+
+
 void subu256_h(uint32_t *x, uint32_t *y)
 {
    uint32_t z[NDIGITS];
@@ -1790,7 +1903,6 @@ void montmult_sos_h(uint32_t *U, uint32_t *A, uint32_t *B, uint32_t pidx)
  }
 
 }
-
 
 
 void test_mul(void)

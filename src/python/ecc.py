@@ -385,6 +385,26 @@ class ECC(object):
         pass
 
     @staticmethod
+    def as_uint256(P, remove_last=False):
+      if remove_last:
+         last_idx=2
+      else:
+         last_idx = 3
+      if isinstance(P,list) or isinstance(P,np.ndarray) and isinstance(P[0],ECC):
+         Px = [x.get_P() for x in P]
+         Pc=[]
+         for Py in Px:
+           Pc.append([ x.as_uint256() for x in Py[0:last_idx]])
+         Pc = np.concatenate(Pc)
+      else:
+         Pc = np.asarray([ x.as_uint256() for x in P.get_P()[0:last_idx]])
+
+      if len(Pc[0])==2:
+          Pc = np.reshape(Pc,(-1,8))
+
+      return Pc
+
+    @staticmethod
     def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False,ec2=False):
         """
 

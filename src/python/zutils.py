@@ -149,6 +149,14 @@ class ZUtils(object):
     NROOTS = 8192
 
     @classmethod
+    def get_NROOTS(cls):
+       return ZUtils.NROOTS
+
+    @classmethod
+    def set_NROOTS(cls, nroots):
+       ZUtils.NROOTS = nroots
+  
+    @classmethod
     def get_default_in_rep_format(cls):
         return ZUtils.DEFAULT_IN_REP_FORMAT
 

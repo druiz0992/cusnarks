@@ -582,15 +582,15 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     T1 _inf;
     infz(&_inf, params->midx);
 
-
     // ECP_JAC_INOFFSET = 3 * NWORDS_256BIT
     // ECP_JAC_INXOFFSET = 1 * NWORDS_256BIT
     // scalar multipliation
     if (params->premul){
-        sumX.setu256((uint32_t)0,xo,(uint32_t)0,(uint32_t)(ECP_JAC_INDIMS*sizeof(T2)/sizeof(uint256_t)));
+        //sumX.setu256((uint32_t)0,xo,(uint32_t)0,(uint32_t)(ECP_JAC_INDIMS*sizeof(T2)/sizeof(uint256_t)));
+        sumX.setu256((uint32_t)0,xo,(uint32_t)0,(uint32_t)(ECP_JAC_INDIMS));
 
         logInfoBigNumberTid(idx,ndbg,"scl :\n",scl);
-        logInfoBigNumberTid(idx,ndbg*2,"Xin[x,y]:\n",&sumX);
+        //logInfoBigNumberTid(idx,ndbg*2,"Xin[x,y]:\n",&sumX);
  
         scmulecjac<T1, T2>(&sumX,0, &sumX, 0, scl,  params->midx);
           
@@ -603,7 +603,8 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     } else {
         size1 = 16;
         size2 = blockDim.x >> 6;
-        sumX.setu256(0,xo,0,ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t));
+        //sumX.setu256(0,xo,0,ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t));
+        sumX.setu256(0,xo,0,ECP_JAC_OUTDIMS);
     }
    
     // block wide warp reduce
@@ -620,7 +621,8 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     }
 
     if (laneIdx == 0) {
-       smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t), &sumX,0,3);
+       //smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t), &sumX,0,3);
+       smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS, &sumX,0,3);
        logInfoTid(idx,"save idx:%d\n",warpIdx);
        logInfoBigNumberTid(idx,ndbg*3,"val\n",&sumX);
     }
@@ -635,7 +637,8 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
         logInfoTid(idx,"LaneIdx :%d\n",laneIdx);
         logInfoTid(idx,"Size :%d\n",size2);
   
-        sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t)+ECP_JAC_XOFFSET_BASE,3);
+        //sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t)+ECP_JAC_XOFFSET_BASE,3);
+        sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS,3);
       } else {
         sumX.setu256(0,&_inf,0,3);
       }

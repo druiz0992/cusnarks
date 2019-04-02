@@ -172,6 +172,10 @@ class ZField(object):
         ZField.active_prime_idx=idx
 
     @classmethod
+    def get_field(cls):
+        return ZField.active_prime_idx
+
+    @classmethod
     def add_field(cls,p, factor_data=None):
         ZField.ext_prime.append(BigInt(p))
         idx = len(ZField.ext_prime)-1
