@@ -43,9 +43,10 @@
 data/proof.json
 data/public.json
 .idea
-.cubin
-.asm
-.bin
+*.cubin
+*.asm
+*.bin
 venv/
 third_party_libs/
 *.npz
+

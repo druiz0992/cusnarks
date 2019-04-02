@@ -38,6 +38,7 @@ cimport _types as ct
 cimport _utils_host as uh
 
 from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
+
 from cython cimport view
 from constants import *
 from libc.stdlib cimport malloc, free
@@ -63,7 +64,7 @@ cdef class CUSnarks:
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
-        print in_v.length, self.in_dim, out_v.length, self.out_dim
+        #print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
             return 0.0
@@ -196,7 +197,7 @@ cdef class EC2BN128 (CUSnarks):
         self._ec2bn128_ptr = new C_EC2BN128( in_len,seed)
         self._cusnarks_ptr = <C_CUSnarks *>self._ec2bn128_ptr
         # TODO : add correct dimension
-        self.in_dim = self.in_dim * 4
+        self.in_dim = self.in_dim * 6
         self.out_dim = self.out_dim  * 6
         self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
         self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
@@ -249,7 +250,7 @@ def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nr
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_roots_flat = np.zeros(nroots * len(in_proot), dtype=np.uint32)
       uh.cfind_roots_h(&out_roots_flat[0], &in_proot[0], nroots, pidx)
 
-      return np.reshape(out_roots_flat,(-1, len(in_prot)))
+      return np.reshape(out_roots_flat,(-1, len(in_proot)))
 
 def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
           np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx):
@@ -287,3 +288,29 @@ def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] star
      uh.crangeu256_h(&out_samples[0], nsamples, &start[0], inc, &mod[0])
   
      return out_samples.reshape((-1,ct.NWORDS_256BIT))
+
+def int_to_byte_h (np.ndarray[ndim=1, dtype=np.uint32_t] indata):
+     cdef np.ndarray[ndim=1, dtype=np.uint8_t] outd = np.zeros(4 * len(indata), dtype=np.uint8)
+
+     uh.cint_to_byte_h(<char *>&outd[0], &indata[0], len(outd))
+     return outd
+
+def byte_to_int_h (np.ndarray[ndim=1, dtype=np.uint8_t] indata):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(len(indata)/4, dtype=np.uint32)
+
+     uh.cbyte_to_int_h(&outd[0], <char *>&indata[0], len(outd))
+
+     return outd
+
+def zpoly_maddm_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
+              ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
+
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(ncoeff*8,dtype=np.uint32)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] sclflat = np.zeros(scldata.shape[0] * scldata.shape[1],dtype=np.uint32)
+     sclflat = np.reshape(scldata,-1)
+         
+     uh.czpoly_maddm_h(&outd[0],&sclflat[0], &pdata[0], ncoeff, last_idx, pidx)
+     #uh.cmaddm_h(&outd[0],&scldata[0], &pdata[0], last_idx, pout_d, pidx)
+
+     return np.reshape(outd,(-1,8))
+
