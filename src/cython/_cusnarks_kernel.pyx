@@ -156,6 +156,9 @@ cdef class CUSnarks:
     def getDeviceInfo(self):
        self._cusnarks_ptr.getDeviceInfo()
 
+    #def __dealloc__(self):
+        #del self._cusnarks_ptr
+
 # CU256 class cython wrapper
 cdef class U256 (CUSnarks):
     cdef C_U256* _u256_ptr

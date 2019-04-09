@@ -133,7 +133,7 @@ class Z2FieldEl(ZFieldEl):
             assert False, "Invalid type"
 
         if isinstance(self.P[0], ZFieldElRedc):
-            self = Z2FieldEL(newz).reduce()
+            self = Z2FieldEl(newz).reduce()
         else:
             self = Z2FieldEl(newz)
 

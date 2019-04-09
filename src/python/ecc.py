@@ -541,7 +541,7 @@ class ECCAffine(ECC):
            actual format (Montgomery/Extended)
         """
         if self.is_inf():
-            return ECCAffine(self)
+            return ECCProjective(self)
         elif isinstance(self.P[ECC.X], Z2FieldEl):
             return ECCProjective([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.zero[self.FIDX]])])
         elif isinstance(self.P[ECC.X], ZFieldEl):
@@ -564,7 +564,7 @@ class ECCAffine(ECC):
         if self.is_inf():
             return ECCJacobian(self)
         elif isinstance(self.P[ECC.X], Z2FieldEl):
-            return ECCProjective([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.zero[self.FIDX]])])
+            return ECCJacobian([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.zero[self.FIDX]])])
         elif isinstance(self.P[ECC.X], ZFieldEl):
             return ECCJacobian([self.P[ECC.X], self.P[ECC.Y], ECC.one[self.FIDX]])
         else:
@@ -786,7 +786,8 @@ class ECCProjective(ECC):
         if self.FIDX == ZUtils.FEXT:
            A -= (Vsq * V2) << ECC.one[self.FIDX]
         else:
-           A -= (Vsq * V2) * ECC.two[self.FIDX] 
+           #A -= (Vsq * V2) * ECC.two[self.FIDX] 
+           A -= (Vsq * V2) * 2
 
         X3 = V * A
         Y3 = U * (Vsq * V2 - A) - Vcube*U2
@@ -841,7 +842,7 @@ class ECCProjective(ECC):
                 W1 = W << one
                 W += W1
             else:
-                W = three * W
+                W = 3 * W
         else:  # W = a*Z^2 + 3*X^2
             W = a * Z * Z
             Xsq = X * X
@@ -849,7 +850,7 @@ class ECCProjective(ECC):
                 W1 = Xsq << one
                 W +=  W1 + Xsq
             else:
-                W1 = Xsq * three
+                W1 = 3 * Xsq
                 W += W1
 
         if self.FIDX == ZUtils.FEXT:
@@ -859,11 +860,13 @@ class ECCProjective(ECC):
             ry = W * ( (B << two) - H) - (Ysq * Ssq << three)
             rz = Scube << three  # Z' =8 * S^3
         else:
-            H = W * W - B * eight  # H = W^2 - 8*B
-            rx = H * S * two  # X' = 2 * H * S
+            H = W * W - 8*B  # H = W^2 - 8*B
+            rx = H * (2 * S )   # X' = 2 * H * S
             # Y' = W*(4*B-H) - 8*Y^2*S^2
-            ry = W * (B * four - H) - Ysq * Ssq * eight
-            rz = Scube * eight  # Z' =8 * S^3
+            #ry = W * (B * four - H) - Ysq * Ssq * eight
+            ry = W * (4*B  - H) - Ysq * Ssq * 8
+            #rz = Scube * eight  # Z' =8 * S^3
+            rz = 8 * Scube
 
         return ECCProjective([rx, ry, rz])
 
@@ -978,8 +981,8 @@ class ECCJacobian(ECC):
         if self.FIDX == ZUtils.FEXT:
           X3 = X3 - (U1 * (Hsq << ECC.one[self.FIDX]) )
         else: 
-          X3 = X3 - (U1 * Hsq * ECC.two[self.FIDX])
- 
+          X3 = X3 - (U1 * (Hsq + Hsq) )
+
         Y3 = R * (U1*Hsq - X3) - (S1 * Hcube)
         Z3 = H * Z1 *Z2
 
@@ -1024,7 +1027,8 @@ class ECCJacobian(ECC):
         if self.FIDX == ZUtils.FEXT:
             S = (S << ECC.two[self.FIDX])
         else:
-            S = S * ECC.four[self.FIDX]
+            #S = S * ECC.four[self.FIDX]
+            S = (S + S + S + S)
 
         if ECC.a[self.FIDX] == -ECC.three[self.FIDX]:
             M1 = (X + Zsq) * (X - Zsq)
@@ -1032,14 +1036,16 @@ class ECCJacobian(ECC):
                 M  = (M1 << ECC.one[self.FIDX])
                 M  = M + M1
             else:
-                M  = ECC.three[self.FIDX] * M1
+                #M  = ECC.three[self.FIDX] * M1
+                M  = (M1 + M1 + M1)
         else:
             M1 = X * X
             if self.FIDX == ZUtils.FEXT:
                 M = M1 + (M1 << ECC.one[self.FIDX])
                 #M = ECC.three[self.FIDX] * M1
             else:
-                M = ECC.three[self.FIDX] * M1
+                #M = ECC.three[self.FIDX] * M1
+                M = (M1 + M1 + M1)
             M = M + ECC.a[self.FIDX] * Zsq * Zsq
 
         X3 = M * M
@@ -1049,9 +1055,15 @@ class ECCJacobian(ECC):
             Y3 = M * (S - X3) - (Ysqsq << ECC.three[self.FIDX])
             Z3 = (Z3 << ECC.one[self.FIDX])
         else:
-            X3 = X3 - (S * ECC.two[self.FIDX])
-            Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
-            Z3 = Z3 * ECC.two[self.FIDX]
+            #X3 = X3 - (S * ECC.two[self.FIDX])
+            X3 = X3 - (S + S)
+            #Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
+            a = Ysqsq + Ysqsq
+            a = a + a
+            a = a + a
+            Y3 = M * (S - X3) - a
+            #Z3 = Z3 * ECC.two[self.FIDX]
+            Z3 = Z3 + Z3 
 
         return ECCJacobian([X3, Y3, Z3])
 

@@ -49,7 +49,7 @@
   in_vector : k[0], px[0], py[0], k[1], px[1], py[1],...  Input EC points in Affine coordinates
   out vecto : px[0], py[0], pz[0], px[1], py[1],pz[1],...              Output EC points in Jacobian coordinates
 */
-__global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void addecjacaff_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -72,7 +72,7 @@ __global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, ker
 
 }
 
-__global__ void addec2jac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void addec2jacaff_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -93,8 +93,85 @@ __global__ void addec2jac_kernel(uint32_t   *out_vector, uint32_t *in_vector, ke
 
 }
 
+__global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
+    //Z1_t x1, x2, xr;
+
+    if(tid >= params->in_length/6) {
+      return;
+    }
+
+    // x1 points to inPx[i]. x2 points to inPx[i+1]. xr points to outPx[i]
+    Z1_t x1(&in_vector[tid * 2 * ECP_JAC_OUTOFFSET + ECP_JAC_INXOFFSET]);
+    Z1_t x2(&in_vector[(tid * 2 + 1) * ECP_JAC_OUTOFFSET + ECP_JAC_INXOFFSET]);
+    Z1_t xr(&out_vector[tid * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
+   
+    //TODO : this is not very nice, but it gets the job done. Try to come up
+    // with something better 
+    addecjac<Z1_t, uint256_t>(&xr,0, &x1,0, &x2,0, params->midx);
+
+    return;
+
+}
+
+__global__ void addec2jac_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    //Z1_t x1, x2, xr;
+
+    if(tid >= params->in_length/12) {
+      return;
+    }
+
+    // x1 points to inPx[i]. x2 points to inPx[i+1]. xr points to outPx[i]
+    Z2_t x1(&in_vector[tid * 2 * ECP2_JAC_OUTOFFSET + ECP2_JAC_INXOFFSET]);
+    Z2_t x2(&in_vector[(tid * 2 + 1) * ECP2_JAC_OUTOFFSET + ECP2_JAC_INXOFFSET]);
+    Z2_t xr(&out_vector[tid * ECP2_JAC_OUTOFFSET + ECP2_JAC_OUTXOFFSET]);
+   
+    //TODO : this is not very nice, but it gets the job done. Try to come up
+    // with something better 
+    addecjac<Z2_t, uint512_t>(&xr,0, &x1,0, &x2,0, params->midx);
+
+    return;
+
+}
 __global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    // x1 points to inPx[i].  xr points to outPx[i]
+    if(tid >= params->in_length/3) {
+      return;
+    }
+
+    Z1_t x1(&in_vector[tid * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
+    Z1_t xr(&out_vector[tid * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
+    
+    doublecjac<Z1_t, uint256_t>(&xr, &x1, params->midx);
+
+    return;
+}
+
+__global__ void doublec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    // x1 points to inPx[i].  xr points to outPx[i]
+    if(tid >= params->in_length/6) {
+      return;
+    }
+
+    Z2_t x1(&in_vector[tid * ECP2_JAC_OUTOFFSET + ECP2_JAC_INXOFFSET]);
+    Z2_t xr(&out_vector[tid * ECP2_JAC_OUTOFFSET + ECP2_JAC_OUTXOFFSET]);
+    
+    doublecjac<Z2_t, uint512_t>(&xr, &x1, params->midx);
+
+    return;
+}
+__global__ void doublecjacaff_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -111,7 +188,7 @@ __global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
     return;
 }
 
-__global__ void doublec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void doublec2jacaff_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -127,6 +204,7 @@ __global__ void doublec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
 
     return;
 }
+
 
 __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
@@ -238,29 +316,29 @@ __global__ void madec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
        uint32_t padding[] = {0,0,0,0,0,0,0,0};
        // add zeros between padding and next multiple of 32
        if (idx < params->in_length/ECP2_JAC_OUTDIMS && idx >= params->padding_idx){
-          movu256(&in_vector[idx * ECP2_JAC_INOFFSET],padding);
-          movu256(&in_vector[idx * ECP2_JAC_INOFFSET+ NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP2_JAC_INOFFSET + 2*NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP2_JAC_INOFFSET + 3*NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP2_JAC_INOFFSET + 4*NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP2_JAC_INOFFSET + 5*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET+ NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 2*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 3*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 4*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 5*NWORDS_256BIT],padding);
        }
        __syncthreads();
     }
 
     Z2_t xo, xr;
     if (params->premul){
-      xo.assign(&in_vector[params->in_length/5 * NWORDS_256BIT + idx  * (params->stride-1) * NWORDS_256BIT + ECP2_JAC_OUTXOFFSET]); // 0 .. N-1
+      xo.assign(&in_vector[params->in_length/5 * NWORDS_256BIT + idx  * params->stride * NWORDS_256BIT + ECP2_JAC_OUTXOFFSET]); // 0 .. N-1
       scl = (uint32_t *) &in_vector[idx * params->stride/5 *  NWORDS_256BIT];
       logInfoTid(idx,"LE : %d\n",params->in_length);
-      logInfoTid(idx,"InVO : %d\n",(params->stride-1) * NWORDS_256BIT);
+      logInfoTid(idx,"InVO : %d\n",(params->stride) * NWORDS_256BIT);
       logInfoTid(idx,"SclVO : %d\n",params->in_length/5* NWORDS_256BIT);
     } else {
       xo.assign(&in_vector[idx  * (params->stride) * NWORDS_256BIT + ECP2_JAC_OUTXOFFSET]); // 0 .. N-1
       scl = NULL;
       logInfoTid(idx,"LE : %d\n",params->in_length);
       logInfoTid(idx,"InVO : %d\n",(params->stride) * NWORDS_256BIT);
-      logInfoTid(idx,"SclVO : %d\n",params->in_length/5 *NWORDS_256BIT);
+      logInfoTid(idx,"SclVO : %d\n",params->in_length/6 *NWORDS_256BIT);
     }
     xr.assign(&in_vector[blockIdx.x * ECP2_JAC_OUTOFFSET + ECP2_JAC_OUTXOFFSET]);  // 
     if (gridDim.x == 1){
@@ -287,7 +365,7 @@ __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, 
     logInfoTid(idx,"Max Padding : %d\n",params->in_length/ECP_JAC_OUTDIMS);
     logInfoTid(idx,"OUt : %d\n",params->in_length/params->stride);
     if (params->padding_idx){
-       uint32_t padding[] = {0,0,0,0,0,0,0,0};
+       uint32_t __align__(16) padding[] = {0,0,0,0,0,0,0,0};
        // add zeros between padding and next multiple of 32
        if (idx < params->in_length/ECP_JAC_OUTDIMS && idx >= params->padding_idx){
           movu256(&in_vector[idx * ECP_JAC_OUTOFFSET],padding);
@@ -333,18 +411,17 @@ __global__ void madec2jac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector,
       return;
     }
     logInfoTid(idx,"Min Padding : %d\n",params->padding_idx);
-    logInfoTid(idx,"Max Padding : %d\n",params->in_length/ECP2_JAC_OUTDIMS);
     logInfoTid(idx,"OUt : %d\n",params->in_length/params->stride);
     if (params->padding_idx){
        uint32_t padding[] = {0,0,0,0,0,0,0,0};
        // add zeros between padding and next multiple of 32
-       if (idx < params->in_length/ECP_JAC_OUTDIMS && idx >= params->padding_idx){
-          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET],padding);
-          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + 2*NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + 3*NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + 4*NWORDS_256BIT],padding);
-          movu256(&in_vector[idx * ECP_JAC_OUTOFFSET + 5*NWORDS_256BIT],padding);
+       if (idx < params->in_length/ECP2_JAC_OUTDIMS && idx >= params->padding_idx){
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 2*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 3*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 4*NWORDS_256BIT],padding);
+          movu256(&in_vector[idx * ECP2_JAC_OUTOFFSET + 5*NWORDS_256BIT],padding);
        }
        __syncthreads();
     }
@@ -364,7 +441,6 @@ __global__ void madec2jac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector,
       xr.assign(out_vector);
     } 
 
-    logInfoBigNumberTid(idx,1,"SCL in \n",scl);
     logInfoBigNumberTid(idx,2,"X in \n",&xo);
     //logInfoBigNumberTid(idx,32*3,"In \n",in_vector);
     madecjac_shfl<Z2_t, uint512_t>(&xr, &xo, scl, &zsmem, params);
@@ -559,7 +635,7 @@ __forceinline__ __device__ void madecjac(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem
         */
 
         if (tid==0) {
-           xr->setu256(0,smem_ptr,0, ECP_JAC_OUTDIMS);
+           xr->setu256(0,smem_ptr,0);
         }
     }
 
@@ -573,8 +649,8 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     uint32_t ndbg = T1::getN();
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
-    uint32_t zsumX[ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t)];
-    uint32_t zsumY[ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t)];
+    uint32_t __align__(16) zsumX[ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t)];
+    uint32_t __align__(16) zsumY[ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t)];
     uint32_t laneIdx = tid % warpSize;
     uint32_t warpIdx = tid / warpSize;
     T1 sumX(zsumX);
@@ -587,12 +663,15 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     // scalar multipliation
     if (params->premul){
         //sumX.setu256((uint32_t)0,xo,(uint32_t)0,(uint32_t)(ECP_JAC_INDIMS*sizeof(T2)/sizeof(uint256_t)));
-        sumX.setu256((uint32_t)0,xo,(uint32_t)0,(uint32_t)(ECP_JAC_INDIMS));
+        sumX.setu256(0,xo,0,1);
+        sumX.setu256(1,xo,1,1);
+        //sumX.setu256(0,xo,0);
 
-        logInfoBigNumberTid(idx,ndbg,"scl :\n",scl);
+        logInfoBigNumberTid(idx,1,"scl :\n",scl);
         //logInfoBigNumberTid(idx,ndbg*2,"Xin[x,y]:\n",&sumX);
  
         scmulecjac<T1, T2>(&sumX,0, &sumX, 0, scl,  params->midx);
+        //scmulecjac<T1, T2>(&sumX,0, xo, 0, scl,  params->midx);
           
 
         logInfoBigNumberTid(idx,3*ndbg,"Xout[x,y,z]:\n",&sumX);
@@ -604,7 +683,7 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
         size1 = 16;
         size2 = blockDim.x >> 6;
         //sumX.setu256(0,xo,0,ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t));
-        sumX.setu256(0,xo,0,ECP_JAC_OUTDIMS);
+        sumX.setu256(0,xo,0);
     }
    
     // block wide warp reduce
@@ -622,7 +701,8 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
 
     if (laneIdx == 0) {
        //smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t), &sumX,0,3);
-       smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS, &sumX,0,3);
+       smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t), &sumX,0);
+       //smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS, &sumX,0);
        logInfoTid(idx,"save idx:%d\n",warpIdx);
        logInfoBigNumberTid(idx,ndbg*3,"val\n",&sumX);
     }
@@ -638,9 +718,10 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
         logInfoTid(idx,"Size :%d\n",size2);
   
         //sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t)+ECP_JAC_XOFFSET_BASE,3);
-        sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS,3);
+        //sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS);
+        sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t));
       } else {
-        sumX.setu256(0,&_inf,0,3);
+        sumX.setu256(0,&_inf,0);
       }
       logInfoBigNumberTid(idx,ndbg*3,"Second\n",&sumX);
   
@@ -657,7 +738,7 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     }
     if (tid==0) {
      //TODO change be movu256
-     xr->setu256(0,&sumX,0,3);
+     xr->setu256(0,&sumX,0);
      logInfoBigNumberTid(idx,ndbg*3,"Z-sumX : \n",&sumX);
      //logInfoBigNumberTid(idx,ndbg*3,"Z-xr : \n",xr);
     }
@@ -702,11 +783,9 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
   T1 x1(zx1->getu256(0+x1offset)), y1(zx1->getu256(1+x1offset)), z1(zx1->getu256(2+x1offset));
   T1 x2(zx2->getu256(0+x2offset)), y2(zx2->getu256(1+x2offset)), z2(zx2->getu256(2+x2offset));
   T1 xr(zxr->getu256(0+zoffset)),  yr(zxr->getu256(1+zoffset)), zr(zxr->getu256(2+zoffset));
-  uint32_t *_2 = misc_const_ct[midx]._2;
   T1 _inf;
 
   infz(&_inf, midx);
-  //_2z(&_2, midx);
  
   uint32_t ndbg=T1::getN();
   uint32_t __restrict__ ztmp[7*sizeof(T2)/sizeof(uint32_t)];
@@ -728,7 +807,7 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
   */
 
   if (eq0z(&y2)){ 
-      zxr->setu256(zoffset,zx1,x1offset,3);
+      zxr->setu256(zoffset,zx1,x1offset);
       //logInfoTid(tid,"R1=inf\n",tid);
       return;  
   }
@@ -746,7 +825,7 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
   //  instead of calling double,  i proceed. It is better to avoid warp divergence
   if (eqz(&tmp1, &tmp_z) &&   // u1 == u2
        !eqz( &tmp_y, &tmp_x)){  // s1 != s2
-          zxr->setu256(zoffset,&_inf,x1offset,3);
+          zxr->setu256(zoffset,&_inf,x1offset);
           //logInfoTid(tid,"R2=inf\n",tid);
 	  return;  
 
@@ -755,11 +834,11 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
   subz(&tmp2, &tmp_z, &tmp1, midx);     // H = tmp2 = u2 - u1
   mulz(&tmp_z, &z1, &z2, midx);      // tmp_z = z1 * z2
   mulz(&zr, &tmp_z, &tmp2, midx);       // zr = z1 * z2  * h
- 
+
   /* 
-  logInfoBigNumberTid(tid,ndbg,"H\n",tmp2.getu256());
-  logInfoBigNumberTid(tid,ndbg,"z1 * z2\n",tmp_z.getu256());
-  logInfoBigNumberTid(tid,ndbg,"z1 * z2  * h\n",zr.getu256());
+  logInfoBigNumberTid(tid,ndbg,"H\n",&tmp2);
+  logInfoBigNumberTid(tid,ndbg,"z1 * z2\n",&tmp_z);
+  logInfoBigNumberTid(tid,ndbg,"z1 * z2  * h\n",&zr);
   */
 
   squarez(&tmp3, &tmp2,        midx);     // Hsq = tmp3 = H * H 
@@ -767,44 +846,40 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
   mulz(&tmp1, &tmp1, &tmp3, midx);     // tmp1 = u1 * Hsq
 
   /*
-  if (tid == 0){
-     logInfoBigNumber("Hsq\n",(uint32_t *)tmp3);
-     logInfoBigNumber("H3\n",(uint32_t *)tmp2);
-     logInfoBigNumber("Hsq * u1\n",(uint32_t *)tmp1);
-  }
+  logInfoBigNumberTid(tid,ndbg,"Hsq\n",&tmp3);
+  logInfoBigNumberTid(tid,ndbg,"H3\n",&tmp2);
+  logInfoBigNumberTid(tid,ndbg,"Hsq * u1\n",&tmp1);
   */
+
   subz(&tmp3, &tmp_x, &tmp_y, midx);        // R = tmp3 = S2 - S1 tmp1=u1*Hsq, tmp2=Hcube, tmp_x=free, tmp_y=s1, zr=zr
   mulz(&tmp_y, &tmp_y, &tmp2, midx);     // tmp_y = Hcube * s1
   squarez(&tmp_x, &tmp3, midx);     // tmp_x = R * R
 
   /*
-  if (tid == 0){
-     logInfoBigNumber("R\n",(uint32_t *)tmp3);
-     logInfoBigNumber("Hcube* s1\n",(uint32_t *)tmp_y);
-     logInfoBigNumber("Rsq * u1\n",(uint32_t *)tmp_x);
-  }
+  logInfoBigNumberTid(tid,ndbg,"R\n",&tmp3);
+  logInfoBigNumberTid(tid,ndbg,"Hcube* s1\n",&tmp_y);
+  logInfoBigNumberTid(tid,ndbg,"Rsq * u1\n",&tmp_x);
   */
+
   subz(&tmp_x, &tmp_x, &tmp2, midx);        // tmp_x = x3= (R*R)-Hcube, tmp_y = Hcube * S1, zr=zr, tmp1=u1*Hsq, tmp2 = Hcube, tmp3 = R
 
   // TODO muluk256
-  mulkz(&tmp4, &tmp1, _2, midx);     // tmp4 = u1*hsq *_2
+  mul2z(&tmp4, &tmp1, midx);     // tmp4 = u1*hsq *_2
 
   /*
-  if (tid == 0){
-     logInfoBigNumber("Rsq - H3\n",(uint32_t *)tmp_x);
-     logInfoBigNumber("Hsq * 2 * u1\n",(uint32_t *)tmp4);
-  }
+  logInfoBigNumberTid(tid,ndbg,"Rsq - H3\n",&tmp_x);
+  logInfoBigNumberTid(tid,ndbg,"Hsq * 2 * u1\n",&tmp4);
   */
+
   subz(&xr, &tmp_x, &tmp4, midx);               // x3 = xr
   subz(&tmp1, &tmp1, &xr, midx);       // tmp1 = u1*hs1 - x3
   mulz(&tmp1, &tmp1, &tmp3, midx);  // tmp1 = r * (u1 * hsq - x3)
   subz(&yr, &tmp1, &tmp_y, midx);
+
   /*
-  if (tid == 0){
-    logInfoBigNumber("X : \n",xr);
-    logInfoBigNumber("Y : \n",yr);
-    logInfoBigNumber("Z : \n",zr);
-  }
+  logInfoBigNumberTid(tid,ndbg,"X : \n",&xr);
+  logInfoBigNumberTid(tid,ndbg,"Y : \n",&yr);
+  logInfoBigNumberTid(tid,ndbg,"Z : \n",&zr);
   */
 }
 /*
@@ -822,11 +897,10 @@ __forceinline__ __device__ void addecjacaff(T1  *zxr, T1 *zx1, T1 *zx2, mod_t mi
      xr(zxr->getu256(ECP_JAC_XOFFSET_BASE)),
      yr(zxr->getu256(ECP_JAC_YOFFSET_BASE)), zr(zxr->getu256(ECP_JAC_ZOFFSET_BASE));
 
-  uint32_t *_2 = misc_const_ct[midx]._2;
   T1 _inf;
+  uint32_t ndbg = T1::getN();
 
   infz(&_inf, midx);
-  //_2z(&_2, midx);
 
  
   uint32_t __restrict__ ztmp[4*sizeof(T2)/sizeof(uint32_t)];
@@ -838,23 +912,24 @@ __forceinline__ __device__ void addecjacaff(T1  *zxr, T1 *zx1, T1 *zx2, mod_t mi
   //  if not, I should call double below. I don't want to to avoid warp divergnce
   if (eqz(zx1, zx2) &&   // u1 == u2
        !eqz( &y1,  &y2)){  // s1 != s2
-          zxr->setu256(0,&_inf,0,3);
+          zxr->setu256(0,&_inf,0);
 	  return;  //  if U1 == U2 and S1 == S2 => P1 == P2 (call double)
   }
 
   /*
-  if (tid == 0){
-     logInfoBigNumber("x1\n",(uint32_t *)x1);
-     logInfoBigNumber("y1\n",(uint32_t *)y1);
-     logInfoBigNumber("x2\n",(uint32_t *)x2);
-     logInfoBigNumber("y2\n",(uint32_t *)y2);
-  }
+  logInfoBigNumberTid(tid,ndbg,"x1\n",zx1);
+  logInfoBigNumberTid(tid,ndbg,"y1\n",&y1);
+  logInfoBigNumberTid(tid,ndbg,"x2\n",zx2);
+  logInfoBigNumberTid(tid,ndbg,"y2\n",&y2);
+
+  logInfoBigNumberTid(tid,1,"x22\n",zx2->get2u256());
+  logInfoBigNumberTid(tid,1,"x12\n",zx1->get2u256());
   */
+
   subz(&zr, zx2, zx1, midx);     // H = tmp2 = u2 - u1
+  
   /*
-  if (tid == 0){
-    logInfoBigNumber("H\n",(uint32_t *)zr);
-  }
+  logInfoBigNumberTid(tid,ndbg,"H\n",&zr);
   */
 
   squarez(&tmp3, &zr,        midx);     // Hsq = tmp3 = H * H 
@@ -862,11 +937,9 @@ __forceinline__ __device__ void addecjacaff(T1  *zxr, T1 *zx1, T1 *zx2, mod_t mi
   mulz(&tmp1, zx1, &tmp3, midx);     // tmp1 = u1 * Hsq
 
   /*
-  if (tid == 0){
-    logInfoBigNumber("Hsq\n",(uint32_t *)tmp3);
-    logInfoBigNumber("Hcube\n",(uint32_t *)tmp2);
-    logInfoBigNumber("u1 * Hsq\n",(uint32_t *)tmp1);
-  }
+  logInfoBigNumberTid(tid,ndbg,"Hsq\n",&tmp3);
+  logInfoBigNumberTid(tid,ndbg,"Hcube\n",&tmp2);
+  logInfoBigNumberTid(tid,ndbg,"u1 * Hsq\n",&tmp1);
   */
 
   subz(&tmp3, &y2, &y1, midx);        // R = tmp3 = S2 - S1 tmp1=u1*Hsq, tmp2=Hcube, xr=free, yr=s1, zr=zr
@@ -874,34 +947,31 @@ __forceinline__ __device__ void addecjacaff(T1  *zxr, T1 *zx1, T1 *zx2, mod_t mi
   squarez(zxr, &tmp3, midx);     // xr = R * R
 
   /*
-  if (tid == 0){
-    logInfoBigNumber("R\n",(uint32_t *)tmp3);
-    logInfoBigNumber("s1\n",(uint32_t *)yr);
-    logInfoBigNumber("Rsq\n",(uint32_t *)xr);
-  }
+  logInfoBigNumberTid(tid,ndbg,"R\n",&tmp3);
+  logInfoBigNumberTid(tid, ndbg,"s1\n",&yr);
+  logInfoBigNumberTid(tid,ndbg,"Rsq\n",&xr);
   */
-  subz(zxr, &xr, &tmp2, midx);        // xr = x3= (R*R)-Hcube, yr = Hcube * S1, zr=zr, tmp1=u1*Hsq, tmp2 = Hcube, tmp3 = R
+  subz(zxr, zxr, &tmp2, midx);        // xr = x3= (R*R)-Hcube, yr = Hcube * S1, zr=zr, tmp1=u1*Hsq, tmp2 = Hcube, tmp3 = R
 
   // TODO muluk256
-  mulkz(&tmp4, &tmp1, _2, midx);     // tmp4 = u1*hsq *_2
+  mul2z(&tmp4, &tmp1, midx);     // tmp4 = u1*hsq *_2
 
   /*
-  if (tid == 0){
-    logInfoBigNumber("Rsq - Hcube\n",(uint32_t *)xr);
-    logInfoBigNumber("u1 * Hsq * 2\n",(uint32_t *)tmp4);
-  }
+  logInfoBigNumberTid(tid,ndbg,"Rsq - Hcube\n",&xr);
+  logInfoBigNumberTid(tid,ndbg,"u1 * Hsq * 2\n",&tmp4);
   */
+
   subz(zxr, &xr, &tmp4, midx);               // x3 = xr
   subz(&tmp1, &tmp1, zxr, midx);       // tmp1 = u1*hs1 - x3
+  //logInfoBigNumberTid(tid,ndbg,"u1*hsq - x3\n",&tmp1);
   mulz(&tmp1, &tmp1, &tmp3, midx);  // tmp1 = r * (u1 * hsq - x3)
+  //logInfoBigNumberTid(tid,ndbg,"r * (u1*hsq - x3)\n",&tmp1);
   subz(&yr, &tmp1, &yr, midx);
 
   /*
-  if (tid == 0){
-    logInfoBigNumber("X3\n",(uint32_t *)xr);
-    logInfoBigNumber("u1 * hsq - x3\n",(uint32_t *)tmp1);
-    logInfoBigNumber("Y3\n",(uint32_t *)yr);
-  }
+  logInfoBigNumberTid(tid,ndbg,"X3\n",&xr);
+  logInfoBigNumberTid(tid,ndbg,"Y3\n",&yr);
+  logInfoBigNumberTid(tid,ndbg,"Z3\n",&zr);
   */
 }
 
@@ -928,18 +998,9 @@ __forceinline__ __device__ void doublecjac(T1 *zxr, T1 *zx1, mod_t midx)
 
   T1 y1(zx1->getu256(1)), z1(zx1->getu256(2));
   T1 yr(zxr->getu256(1)), zr(zxr->getu256(2));
-  //T1 _2,_3,_4,_8,_inf;
   T1 _inf;
+  uint32_t ndbg = T1::getN();
 
-  uint32_t *_2 = misc_const_ct[midx]._2;
-  uint32_t *_3 = misc_const_ct[midx]._3;
-  uint32_t *_4 = misc_const_ct[midx]._4;
-  uint32_t *_8 = misc_const_ct[midx]._8;
-
-  //_2z(&_2,midx);
- // _3z(&_3,midx);
- // _4z(&_4,midx);
- // _8z(&_8,midx);
   infz(&_inf,midx);
 
 
@@ -952,38 +1013,36 @@ __forceinline__ __device__ void doublecjac(T1 *zxr, T1 *zx1, mod_t midx)
   // TODO : review this comparison, and see if I can do better. or where I should put it
   // as i check this in several places
   if (eq0z(&y1)){ 
-      zxr->setu256(0,&_inf,0,3);
+      zxr->setu256(0,&_inf,0);
       //memcpy(xr, _inf, 3 * NWORDS_256BIT * sizeof(uint32_t));
       return;  
   }
   squarez(&tmp_z, &y1,            midx);  // tmp_z = ysq
   squarez(&tmp_y, &tmp_z, midx);  // tmp_y = ysqsq
   // TODO muluk256
-  mulkz(&tmp_y, &tmp_y, _8, midx);  // tmp_y = ysqsq *_8
+  mul8z(&tmp_y, &tmp_y, midx);  // tmp_y = ysqsq *_8
   mulz(&tmp_z, &tmp_z, zx1, midx);  // S = tmp_z = x * ysq
   // TODO muluk256
-  mulkz(&tmp_z, &tmp_z, _4, midx);  // S = tmp_z = S * _4
+  mul4z(&tmp_z, &tmp_z, midx);  // S = tmp_z = S * _4
 
   squarez(&tmp_x, zx1, midx);  // M1 = tmp_x = x * x
   // TODO muluk256
-  mulkz(&tmp1, &tmp_x, _3, midx);  // M = tmp1 = M1 * _3
+  mul3z(&tmp1, &tmp_x, midx);  // M = tmp1 = M1 * _3
   squarez(&tmp_x, &tmp1, midx);  // X3 = tmp_x = M * M,  tmp_y = Ysqsq * _8, tmp_z = S; tmp1 = M
   // TODO muluk256
-  mulkz(&tmp2, &tmp_z, _2, midx);   // tmp2 = S * _2
+  mul2z(&tmp2, &tmp_z, midx);   // tmp2 = S * _2
   subz(zxr, &tmp_x, &tmp2, midx);      // X3 = tmp_x; tmp_y = Ysqsq * _8, tmp_z = S, tmp1 = M, 
   subz(&tmp2, &tmp_z, zxr, midx);   //  tmp2 = S - X3
   mulz(&tmp2, &tmp2, &tmp1, midx); // tmp2 = M * (S - X3)
   mulz(&tmp_z, &y1, &z1, midx);
   // TODO muluk256
-  mulkz(&zr, &tmp_z, _2, midx);
+  mul2z(&zr, &tmp_z, midx);
   subz(&yr, &tmp2, &tmp_y, midx);
 
   /*
-  if (tid == 0){
-    logInfoBigNumber("X : \n",xr);
-    logInfoBigNumber("Y : \n",yr);
-    logInfoBigNumber("Z : \n",zr);
-  }
+  logInfoBigNumberTid(tid,ndbg,"X : \n",zxr);
+  logInfoBigNumberTid(tid,ndbg,"Y : \n",&yr);
+  logInfoBigNumberTid(tid,ndbg,"Z : \n",&zr);
   */
 }
 
@@ -1003,65 +1062,70 @@ __forceinline__ __device__ void doublecjacaff(T1 *zxr, T1 *zx1, mod_t midx)
 
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-  //T1 _2,_3,_4,_8,_inf;
   T1 _inf;
   uint32_t ndbg = T1::getN();
-  uint32_t *_2 = misc_const_ct[midx]._2;
-  uint32_t *_3 = misc_const_ct[midx]._3;
-  uint32_t *_4 = misc_const_ct[midx]._4;
-  uint32_t *_8 = misc_const_ct[midx]._8;
 
-  //_2z(&_2,midx);
-  //_3z(&_3,midx);
-  //_4z(&_4,midx);
-  //_8z(&_8,midx);
   infz(&_inf,midx);
 
+  /*
   logInfoBigNumberTid(tid, ndbg,"x1\n",zx1->getu256());
   logInfoBigNumberTid(tid,ndbg,"y1\n",y1.getu256());
+  */
   squarez(&zr, &y1, midx);  // zr = ysq
   squarez(&tmp_y, &zr, midx);  // yr = ysqsq
 
+  /*
   logInfoBigNumberTid(tid,ndbg,"ysq\n",zr.getu256());
   logInfoBigNumberTid(tid,ndbg,"Yqsq\n",tmp_y.getu256());
+  */
   // TODO muluk256
-  mulkz(&tmp_y, &tmp_y, _8, midx);  // tmp_y = ysqsq *_8
+  mul8z(&tmp_y, &tmp_y, midx);  // tmp_y = ysqsq *_8
   mulz(&zr, &zr, zx1, midx);  // S = zr = x * ysq
 
+  /*
   logInfoBigNumberTid(tid,ndbg,"8*Ysqsq\n",tmp_y.getu256());
   logInfoBigNumberTid(tid,ndbg,"S\n",zr.getu256());
+  */
   // TODO muluk256
-  mulkz(&zr, &zr, _4, midx);  // S = zr = S * _4
+  mul4z(&zr, &zr, midx);  // S = zr = S * _4
 
-  logInfoBigNumberTid(tid,ndbg,"S*4\n",zr.getu256());
+  //logInfoBigNumberTid(tid,ndbg,"S*4\n",zr.getu256());
 
   squarez(zxr, zx1, midx);  // M1 = xr = x * x
   // TODO muluk256
-  mulkz(&tmp1, zxr, _3, midx);  // M = tmp1 = M1 * _3
+  mul3z(&tmp1, zxr, midx);  // M = tmp1 = M1 * _3
 
+  /*
   logInfoBigNumberTid(tid,ndbg,"Xsq\n",zxr->getu256());
   logInfoBigNumberTid(tid,ndbg,"M\n",tmp1.getu256());
+  */
   squarez(zxr, &tmp1, midx);  // X3 = xr = M * M,  tmp_y = Ysqsq * _8, zr = S; tmp1 = M
   // TODO muluk256
-  mulkz(&tmp2, &zr, _2, midx);   // tmp2 = S * _2
- 
+  mul2z(&tmp2, &zr, midx);   // tmp2 = S * _2
+
+  /* 
   logInfoBigNumberTid(tid,ndbg,"M*M\n",zxr->getu256());
   logInfoBigNumberTid(tid,ndbg,"S*2\n",tmp2.getu256());
+  */
 
   subz(zxr, zxr, &tmp2, midx);      // X3 = xr; tmp_y = Ysqsq * _8, zr = S, tmp1 = M, 
   subz(&tmp2, &zr, zxr, midx);   //  tmp2 = S - X3
 
+  /*
   logInfoBigNumberTid(tid,ndbg,"X3\n",zxr->getu256());
   logInfoBigNumberTid(tid,ndbg,"S-X3\n",tmp2.getu256());
+  */
 
   mulz(&tmp2, &tmp2, &tmp1, midx); // tmp2 = M * (S - X3)
-  logInfoBigNumberTid(tid,ndbg,"M * (S-X3)\n",tmp2.getu256());
+  //logInfoBigNumberTid(tid,ndbg,"M * (S-X3)\n",tmp2.getu256());
   // TODO muluk256
-  mulkz(&zr, &y1, _2, midx);
+  mul2z(&zr, &y1, midx);
   subz(&yr, &tmp2, &tmp_y, midx);
 
+  /*
   logInfoBigNumberTid(tid,ndbg,"y3\n",yr.getu256());
   logInfoBigNumberTid(tid,ndbg,"z3\n",zxr->getu256());
+  */
 }
 
 template<typename T1, typename T2>
@@ -1070,8 +1134,9 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
   uint32_t b0;
   uint32_t ndbg = T1::getN();
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
+  uint32_t i, iter=0;
 
-  uint32_t __restrict__ zN[3*NWORDS_256BIT]; // N = P
+  uint32_t __restrict__ zN[3*sizeof(T2)/sizeof(uint32_t)]; // N = P
   uint32_t __restrict__ scl_cpy[NWORDS_256BIT];
   uint32_t *_1 = misc_const_ct[midx]._1;
   T1 _inf;
@@ -1083,18 +1148,20 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
 
   // TODO : review this comparison
   if (eq0z(&y1)){ 
-      zxr->setu256(zoffset,&_inf,0,3);
+      zxr->setu256(zoffset,&_inf,0);
       return;  
   }
 
-  N.setu256(0,zx1,xoffset,2);
-  //N.setu256(2,&_1,0,1);
+  //N.setu256(0,zx1,xoffset);
+  N.setu256(0,zx1,xoffset,1);
+  N.setu256(1,zx1,xoffset+1,1);
   setkz(&N,2,_1);
 
-  memcpy(scl_cpy, scl, NWORDS_256BIT * sizeof(uint32_t));
+  movu256(scl_cpy, scl);
 
-  Q.setu256(0,&_inf, 0,3);
+  Q.setu256(0,&_inf, 0);
   
+  if (eq0u256(scl)) { return; }
 
   // TODO : Either implement left to right, or count where msb is and substitute while by unrolled
   // loop
@@ -1138,10 +1205,13 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
   // ret of iterations, input are not affine anymore
 
   logInfoBigNumberTid(tid,1,"SCL mul: \n",scl_cpy);
-  logInfoBigNumberTid(tid,3,"Q: \n",&Q);
-  logInfoBigNumberTid(tid,3,"N: \n",&N);
+  logInfoBigNumberTid(tid,3*ndbg,"Q: \n",&Q);
+  logInfoBigNumberTid(tid,3*ndbg,"N: \n",&N);
 
-  while (!eq0u256(scl_cpy)){
+  //#pragma unroll
+  //while (!eq0u256(scl_cpy)){
+  for (i=0; i< 32; i++){
+    #if 0
      b0 = shr1u256(scl_cpy);
      /*
      if (tid == 0){
@@ -1156,13 +1226,38 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
        addecjac<T1, T2> (&Q,0, &N,0, &Q,0, midx);
      }
      doublecjac<T1, T2>(&N,&N, midx);
+     logInfoTid(tid,"iter : %d\n",iter++);
+     logInfoTid(tid,"B0 : %d\n",b0);
+     logInfoBigNumberTid(tid,3,"Q : \n",&Q); 
+     logInfoBigNumberTid(tid,3,"N : \n",&N); 
+    #else
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    scmulecjac_step<T1, T2>(&Q,&N, scl_cpy, midx);
+    #endif
   }
 
-  logInfoBigNumberTid(tid,3,"R-N: \n",&N);
-  logInfoBigNumberTid(tid,3,"R-Q: \n",&Q);
+  logInfoBigNumberTid(tid,3*ndbg,"R-N: \n",&N);
+  logInfoBigNumberTid(tid,3*ndbg,"R-Q: \n",&Q);
   return;
 }
 
+template<typename T1, typename T2>
+__device__ void scmulecjac_step(T1 *Q,T1 *N, uint32_t *scl, mod_t midx )
+{
+   uint32_t  b0 = shr1u256(scl);
+   int tid = threadIdx.x + blockDim.x * blockIdx.x;
+   logInfoTid(tid,"B0 : %d\n",b0);
+   if (b0) {
+      addecjac<T1, T2> (Q,0, N,0, Q,0, midx);
+   }
+   doublecjac<T1, T2>(N,N, midx);
+}
 template<typename T1, typename T2>
 __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane )
 {
@@ -1171,10 +1266,10 @@ __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane
     uint32_t i;
 
     #pragma unroll
-    for (i=0; i<ECP_JAC_OUTDIMS;i++){
+    for (i=0; i<ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t);i++){
     
-      in = *(ulonglong4 *)d_in->getu256(i);
-      out = (ulonglong4 *)d_out->getu256(i);
+      in = *(ulonglong4 *)d_in->getsingleu256(i);
+      out = (ulonglong4 *)d_out->getsingleu256(i);
 
       out->x = __shfl_xor_sync(0xffffffff, in.x, srcLane);
       out->y = __shfl_xor_sync(0xffffffff, in.y, srcLane);
@@ -1247,7 +1342,7 @@ __forceinline__ __device__
   subz(xr, xr, tmp2, midx);        // xr = x3= (R*R)-Hcube, yr = Hcube * S1, zr=zr, tmp1=u1*Hsq, tmp2 = Hcube, tmp3 = R
 
   // TODO muluk256
-  mulkz(tmp4, tmp1, _2, midx);     // tmp4 = u1*hsq *_2
+  mul2z(tmp4, tmp1, midx);     // tmp4 = u1*hsq *_2
 
   /*
   if (tid == 0){

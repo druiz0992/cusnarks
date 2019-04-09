@@ -357,10 +357,11 @@ class GrothSnarks(object):
             return False
         return True
 
-    def gen_proof(self):
+    def gen_proof(self, piter):
         """
           public_signals, pi_a_eccf1, pi_b_eccf2, pi_c_eccf1 
         """
+        self.proof_iter = piter
         ZField.set_field(GrothSnarks.FieldIDX)
         # Init r and s scalars
         self.r_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
@@ -425,7 +426,8 @@ class GrothSnarks(object):
           K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.r_scl_u256]))
           P = np.concatenate((self.A_eccf1_u256[:2*nVars],self.vk_alfa_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
           ecbn128_samples = np.concatenate((K,P))
-          ecbn128 = ECBN128(len(ecbn128_samples)/3, seed=1)
+          if self.proof_iter == 0:
+             ecbn128 = ECBN128(len(ecbn128_samples)/3, seed=1)
           self.pi_a_eccf1,t1 = ec_mad_cuda(ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
@@ -433,7 +435,8 @@ class GrothSnarks(object):
           K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.s_scl_u256]))
           P = np.concatenate((self.B2_eccf2_u256[:4*nVars],self.vk_beta_2_eccf2_u256, self.vk_delta_2_eccf2_u256))
           ec2bn128_samples = np.concatenate((K,P))
-          ec2bn128 = EC2BN128(2*len(ec2bn128_samples)/5, seed=1)
+          if self.proof_iter == 0:
+             ec2bn128 = EC2BN128(len(ec2bn128_samples)/5, seed=1)
           self.pi_b_eccf2, t1 = ec2_mad_cuda(ec2bn128, ec2bn128_samples[:1024*1024*5], ZField.get_field())
           self.t_EC.append(t1)
           
@@ -442,12 +445,10 @@ class GrothSnarks(object):
           P = np.concatenate((self.B1_eccf1_u256[:2*nVars],self.vk_beta_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
           #ecbn128_samples = np.concatenate((self.witness_scl_u256[:nVars], self.B1_eccf1_u256[:2*nVars]))
           ecbn128_samples = np.concatenate((K,P))
-          ecbn128 = ECBN128(len(ecbn128_samples)/3, seed=1)
           pib1_eccf1, t1 = ec_mad_cuda(ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
           ecbn128_samples = np.concatenate((self.witness_scl_u256[nPublic+1:nVars], self.C_eccf1_u256[2*(nPublic+1):2*nVars]))
-          ecbn128 = ECBN128(len(ecbn128_samples)/3, seed=1)
           self.pi_c_eccf1,t1 = ec_mad_cuda(ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
@@ -514,7 +515,10 @@ class GrothSnarks(object):
           nVars = self.vk_proof['nVars']
 
           #TODO -> get inverse roots
-          cuzpoly = ZCUPoly(2*len(polA_T), seed=560)
+          if self.proof_iter == 0:
+            cuzpoly = ZCUPoly(2*len(polA_T), seed=560)
+            cuu256 = U256(3*len(polA_T), seed=560)
+
           polA_S,t1 = zpoly_ifft_cuda(cuzpoly, polA_T[:nVars], self.roots1_u256, ZField.get_field())
           self.t_P.append(t1)
           polB_S,t1 = zpoly_ifft_cuda(cuzpoly, polB_T[:nVars], self.roots1_u256, ZField.get_field())
@@ -522,10 +526,9 @@ class GrothSnarks(object):
           polC_S,t1 = zpoly_ifft_cuda(cuzpoly, polC_T[:nVars], self.roots1_u256, ZField.get_field())
           self.t_P.append(t1)
 
-          polAB_S,t1 = zpoly_mul_cuda(cuzpoly, polA_S[:nVars],polB_S[:nVars],self.roots1_u256, ZField.get_field())
+          polAB_S,t1 = zpoly_mul_cuda(cuzpoly, cuu256,polA_S[:nVars],polB_S[:nVars],self.roots1_u256, ZField.get_field())
           self.t_P.append(t1)
 
-          cuu256 = U256(len(polAB_S)+len(polC_S), seed=560)
           polABC_S,t1 = zpoly_subm_cuda(cuu256, polAB_S, polC_S, ZField.get_field())
           self.t_P.append(t1)
 
@@ -769,14 +772,14 @@ def zpoly_ifft_cuda(pysnark, vector, inv_roots, fidx ):
 
         return result,t
 
-def zpoly_mul_cuda(pysnark, vectorA, vectorB, roots, fidx):
+def zpoly_mul_cuda(pysnark, cuu256, vectorA, vectorB, roots, fidx):
     t = 0
     rA,t1 = zpoly_fft_cuda(pysnark, vectorA, roots, fidx)
     t+=t1
     rB,t1 = zpoly_fft_cuda(pysnark, vectorB, roots, fidx)
     t+=t1
     #TODO : implement coeff mult kernel
-    cuu256 = U256(2*len(rA), seed=560)
+    #cuu256 = U256(2*len(rA), seed=560)
     rC,t1 = zpoly_coeffmul_cuda(cuu256, rA, rB, fidx)
     t+=t1
     rD,t1 = zpoly_ifft_cuda(pysnark, rC, roots, fidx)
@@ -826,8 +829,8 @@ def zpoly_coeffmul_cuda(pysnark, vectorA, vectorB, fidx):
 if __name__ == "__main__":
     t = []
     G = GrothSnarks()
-    for i in range(1):
-      t1,t2 = G.gen_proof()
+    for i in range(2):
+      t1,t2 = G.gen_proof(i)
       t.append(np.concatenate((t1,t2)))
     print t
      

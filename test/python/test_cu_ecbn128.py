@@ -223,14 +223,14 @@ class CUECTest(unittest.TestCase):
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [nsamples], 'stride' : [1], 'out_length' : nsamples}
         for iter in xrange(CUECTest.TEST_ITER):
 
-            # Test add jac
+            # Test add jacff
 
             kernel_params['in_length'] = [nsamples  * ECP_JAC_INDIMS]
             kernel_params['out_length']= (nsamples * ECP_JAC_OUTDIMS)/2
             kernel_params['stride'] = [2 * ECP_JAC_INDIMS]
             kernel_config['smemS'] = [0]
             kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC_JAC_ADD]
+            kernel_config['kernel_idx'] = [CB_EC_JACAFF_ADD]
             kernel_params['padding_idx'] = [0]
             kernel_params['premod'] = [0]
             kernel_params['midx'] = [MOD_FIELD]
@@ -240,13 +240,34 @@ class CUECTest(unittest.TestCase):
             self.assertTrue(len(result)/ECP_JAC_OUTDIMS == nsamples/2)
             self.assertTrue(all(np.concatenate(result == r_add)))
 
-            # Test double jac
+            # Test add jac
+
+            kernel_params['in_length'] = [nsamples  * ECP_JAC_OUTDIMS]
+            kernel_params['out_length']= (nsamples * ECP_JAC_OUTDIMS)/2
+            kernel_params['stride'] = [2 * ECP_JAC_OUTDIMS]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_ADD]
+            kernel_params['padding_idx'] = [0]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_config['gridD'] = [0]
+
+            ecbn128_vector_ext = np.zeros((nsamples * ECP_JAC_OUTDIMS, 8),dtype=np.uint32)
+            ecbn128_vector_ext[::3] = ecbn128_vector[::2]
+            ecbn128_vector_ext[1::3] = ecbn128_vector[1::2]
+            ecbn128_vector_ext[2::3] = np.tile(ZFieldElExt(1).reduce().as_uint256(),(nsamples,1))
+            result,_ = ecbn128.kernelLaunch(ecbn128_vector_ext, kernel_config, kernel_params )
+            self.assertTrue(len(result)/ECP_JAC_OUTDIMS == nsamples/2)
+            self.assertTrue(all(np.concatenate(result == r_add)))
+
+            # Test double jacaff
             kernel_params['in_length'] = [nsamples  * ECP_JAC_INDIMS]
             kernel_params['out_length']= (nsamples * ECP_JAC_OUTDIMS)
             kernel_params['stride'] = [1 * ECP_JAC_INDIMS]
             kernel_config['smemS'] = [0]
             kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC_JAC_DOUBLE]
+            kernel_config['kernel_idx'] = [CB_EC_JACAFF_DOUBLE]
             kernel_params['padding_idx'] = [0]
             kernel_params['premod'] = [0]
             kernel_config['gridD'] = [0]
@@ -258,6 +279,27 @@ class CUECTest(unittest.TestCase):
             ecbn128_vector[2::3] = np.tile(ZFieldElExt(1).reduce().as_uint256(),(1024,1))
             """
             result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
+            #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
+            self.assertTrue(len(result)/ECP_JAC_OUTDIMS == nsamples)
+            self.assertTrue(all(np.concatenate(result == r_double)))
+
+            # Test double jac
+            kernel_params['in_length'] = [nsamples  * ECP_JAC_OUTDIMS]
+            kernel_params['out_length']= (nsamples * ECP_JAC_OUTDIMS)
+            kernel_params['stride'] = [1 * ECP_JAC_OUTDIMS]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+            kernel_config['kernel_idx'] = [CB_EC_JAC_DOUBLE]
+            kernel_params['padding_idx'] = [0]
+            kernel_params['premod'] = [0]
+            kernel_config['gridD'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+
+            ecbn128_vector_ext = np.zeros((nsamples * ECP_JAC_OUTDIMS, 8),dtype=np.uint32)
+            ecbn128_vector_ext[::3] = ecbn128_vector[::2]
+            ecbn128_vector_ext[1::3] = ecbn128_vector[1::2]
+            ecbn128_vector_ext[2::3] = np.tile(ZFieldElExt(1).reduce().as_uint256(),(nsamples,1))
+            result,_ = ecbn128.kernelLaunch(ecbn128_vector_ext, kernel_config, kernel_params )
             #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
             self.assertTrue(len(result)/ECP_JAC_OUTDIMS == nsamples)
             self.assertTrue(all(np.concatenate(result == r_double)))
@@ -280,6 +322,14 @@ class CUECTest(unittest.TestCase):
             self.assertTrue(ECC.from_uint256(result,in_ectype=1, out_ectype=1, reduced=True) ==
                               ECC.from_uint256(r_mul, in_ectype=1, out_ectype=1, reduced=True))
 
+            scl_v = BigInt.from_uint256(CUECTest.ecbn128_scl_u256[0])
+            ec_v = np.zeros((6,8),dtype=np.uint32)
+            ec_v[0:2] = CUECTest.ecbn128_vector_u256_rdc[0:2]
+            ec_v[3:5] = CUECTest.ecbn128_vector_u256_rdc[3:5]
+            ec_v[2] = ZFieldElExt(1).reduce().as_uint256()
+            ec_v[5] = ZFieldElExt(1).reduce().as_uint256()
+            ec_v2  = ECC.from_uint256(ec_v, in_ectype=1, out_ectype=1, reduced=True)
+            ec_r = scl_v * ec_v2[0]
 
             # Test mad jac
             kernel_params['stride'] = [ECP_JAC_OUTDIMS, ECP_JAC_OUTDIMS]

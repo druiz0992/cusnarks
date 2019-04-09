@@ -35,61 +35,34 @@
 
 class Z2_t {
    private:
-     uint32_t *el;
+     uint32_t __align__(16) *el;
 
    public:
-     __device__  Z2_t() {}
-     __device__  Z2_t(uint32_t *x) : el(x) {}
+     __device__  Z2_t();
+     __device__  Z2_t(uint32_t *x);
 
-     __device__ uint32_t *getu256()
-     {
-       return el;
-     }
-     __device__ uint32_t *get2u256()
-     {
-       return &el[NWORDS_256BIT];
-     }
-     __device__ uint32_t *getu256(uint32_t offset)
-     {
-       return &el[offset*ECP2_JAC_N256W*NWORDS_256BIT];
-     }
-     __device__ uint32_t *get2u256(uint32_t offset)
-     {
-       return &el[offset*(ECP2_JAC_N256W+1)*NWORDS_256BIT];
-     }
-     __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize)
-     { 
-       memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              &y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              ysize * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
-     }
-     __device__ void setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
-     { 
-       memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              &y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              ysize * ECP2_JAC_N256W * NWORDS_256BIT * sizeof(uint32_t));
-     }
-     __device__ void set2u256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
-     { 
-       memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              &y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              ysize * NWORDS_256BIT * sizeof(uint32_t));
-     }
-     __device__ void assign(uint32_t *y)
-     { 
-       el = y;
-     }
-     __device__ static  uint32_t getN()
-     {
-        return ECP2_JAC_N256W;
-     }
+     __device__ uint32_t *getu256();
+     __device__ uint32_t *get2u256();
+     __device__ uint32_t *getu256(uint32_t offset);
+     __device__ uint32_t *get2u256(uint32_t offset);
+     __device__ uint32_t *getsingleu256(uint32_t offset);
+     __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset);
+     __device__ void setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset);
+     __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize);
+     __device__ void setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize);
+     __device__ void set2u256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize);
+     __device__ void assign(uint32_t *y);
+     __device__ static  uint32_t getN();
 };
 
 __device__ uint32_t eq0z(Z2_t *x);
 __device__ uint32_t eqz(Z2_t *x, Z2_t *y);
 __device__ void squarez(Z2_t *z, Z2_t *x, mod_t midx);
 __device__ void mulz(Z2_t *z, Z2_t *x, Z2_t *y, mod_t midx);
-__device__ void mulkz(Z2_t *z, Z2_t *x, uint32_t *y, mod_t midx);
+__device__ void mul2z(Z2_t *z, Z2_t *x, mod_t midx);
+__device__ void mul3z(Z2_t *z, Z2_t *x, mod_t midx);
+__device__ void mul4z(Z2_t *z, Z2_t *x, mod_t midx);
+__device__ void mul8z(Z2_t *z, Z2_t *x, mod_t midx);
 __device__ void subz(Z2_t *z, Z2_t *x, Z2_t *y, mod_t midx);
 __device__ void addz(Z2_t *z, Z2_t *x, Z2_t *y, mod_t midx);
 __device__ void movz(Z2_t *x, uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t size);
@@ -100,13 +73,6 @@ __device__ void xeccz(Z2_t *z, Z2_t *x);
 __device__ void yeccz(Z2_t *z, Z2_t *x);
 __device__ void zeccz(Z2_t *z, Z2_t *x);
 __device__ void infz(Z2_t *z, mod_t midx);
-/*
-__device__ void _1z(Z2_t *z, mod_t midx);
-__device__ void _2z(Z2_t *z, mod_t midx);
-__device__ void _3z(Z2_t *z, mod_t midx);
-__device__ void _4z(Z2_t *z, mod_t midx);
-__device__ void _8z(Z2_t *z, mod_t midx);
-*/
 
 
 #endif
