@@ -64,7 +64,11 @@
  //memset(buf,0, 500*sizeof(char));
  printf("%s",str);
  
- for (i=0; i < 2*NWORDS_256BIT; i++){
+ for (i=0; i < NWORDS_256BIT; i++){
+   printf("%u ",n[i]);
+ }
+ printf("\n");
+ for (i=NWORDS_256BIT; i < 2*NWORDS_256BIT; i++){
    printf("%u ",n[i]);
  }
  printf("\n");
@@ -102,7 +106,7 @@
     {
        if (tid == LOG_TID){
          uint32_t i;
-         for (i=0; i< nelems; i++){
+         for (i=0; i< nelems/2; i++){
            logBigNumberExt(str, n->getu256(i));
          }
        }
@@ -148,7 +152,7 @@
     {
        if (tid == LOG_TID){
          uint32_t i;
-         for (i=0; i< nelems; i++){
+         for (i=0; i< nelems/2; i++){
            logBigNumberExt(str, n->getu256(i));
          }
        }

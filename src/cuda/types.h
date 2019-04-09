@@ -124,14 +124,9 @@ typedef struct {
 
 // additional constants required
 typedef struct {
-  uint32_t _1[NWORDS_256BIT];
-  uint32_t _2[NWORDS_256BIT];
-  uint32_t _3[NWORDS_256BIT];
-  uint32_t _4[NWORDS_256BIT];
-  uint32_t _8[NWORDS_256BIT];
-  uint32_t _4b[NWORDS_256BIT];
-  uint32_t _8b[NWORDS_256BIT];
+  uint32_t _1[2*NWORDS_256BIT];
   uint32_t _inf[3*NWORDS_256BIT];
+  uint32_t _inf2[6*NWORDS_256BIT];
 
 }misc_const_t;
 /**
@@ -216,7 +211,9 @@ typedef enum{
    //CB_EC_LDR_DOUBLE,
    //CB_EC_LDR_MUL,
    //CB_EC_LDR_MAD,
-   CB_EC_JAC_ADD = 0,
+   CB_EC_JACAFF_ADD = 0,
+   CB_EC_JAC_ADD,
+   CB_EC_JACAFF_DOUBLE,
    CB_EC_JAC_DOUBLE,
    CB_EC_JAC_MUL,
    CB_EC_JAC_MAD,
@@ -227,7 +224,9 @@ typedef enum{
 
 // index to ec128bn class kernels
 typedef enum{
-   CB_EC2_JAC_ADD = 0,
+   CB_EC2_JACAFF_ADD = 0,
+   CB_EC2_JAC_ADD,
+   CB_EC2_JACAFF_DOUBLE,
    CB_EC2_JAC_DOUBLE,
    CB_EC2_JAC_MUL,
    CB_EC2_JAC_MAD,

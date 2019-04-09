@@ -40,6 +40,97 @@
 #include "u256_device.h"
 #include "z2_device.h"
 
+__device__ Z2_t::Z2_t() {}
+__device__ Z2_t::Z2_t(uint32_t *x) : el(x) {}
+
+__device__ uint32_t * Z2_t::getu256()
+{
+  return el;
+}
+
+__device__ uint32_t * Z2_t::get2u256()
+{
+  return &el[NWORDS_256BIT];
+}
+
+__device__ uint32_t * Z2_t::getsingleu256(uint32_t offset)
+{
+  return &el[offset*NWORDS_256BIT];
+}
+__device__ uint32_t * Z2_t::getu256(uint32_t offset)
+{
+  return &el[offset*ECP2_JAC_N256W*NWORDS_256BIT];
+}
+
+__device__ uint32_t * Z2_t::get2u256(uint32_t offset)
+{
+  return &el[offset*(ECP2_JAC_N256W+1)*NWORDS_256BIT];
+}
+
+__device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
+{ 
+  // memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+    //     &y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+      //   3 * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
+   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+3)*NWORDS_256BIT],&y->el[(yoffset+3)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+4)*NWORDS_256BIT],&y->el[(yoffset+4)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+5)*NWORDS_256BIT],&y->el[(yoffset+5)*NWORDS_256BIT]);
+}
+
+__device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
+{ 
+    //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+           //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+           //3* ECP2_JAC_N256W * NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
+   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+3)*NWORDS_256BIT],&y[(yoffset+3)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+4)*NWORDS_256BIT],&y[(yoffset+4)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+5)*NWORDS_256BIT],&y[(yoffset+5)*NWORDS_256BIT]);
+}
+
+__device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize)
+{ 
+       //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+              //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+              //ysize * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[(xoffset)*2*NWORDS_256BIT],&y->el[(yoffset)*2*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y->el[(yoffset)*2*NWORDS_256BIT+NWORDS_256BIT]);
+}
+
+__device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
+{ 
+    //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+           //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+           //ysize * ECP2_JAC_N256W * NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[(xoffset)*2*NWORDS_256BIT],&y[(yoffset)*2*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y[(yoffset)*2*NWORDS_256BIT+NWORDS_256BIT]);
+}
+/*
+__device__ void Z2_t::set2u256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
+{ 
+    //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+           //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+           //ysize * NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
+}
+*/
+
+__device__ void Z2_t::assign(uint32_t *y)
+{ 
+    el = y;
+}
+
+__device__  uint32_t Z2_t::getN()
+{
+    return ECP2_JAC_N256W;
+}
+
+////
 
 __device__ uint32_t eq0z(Z2_t *x)
 { 
@@ -60,42 +151,37 @@ __device__ void mulz(Z2_t *z,  Z2_t *x, Z2_t *y, mod_t midx)
   mulmontu256_2(z->getu256(), x->getu256(), y->getu256(), midx);  
 }
 
-__device__ void mulkz(Z2_t *z,  Z2_t *x, uint32_t *y, mod_t midx)
+__device__ void mul2z(Z2_t *z,  Z2_t *x, mod_t midx)
 {
-  uint32_t *_2 = misc_const_ct[midx]._2;
-  uint32_t *_3 = misc_const_ct[midx]._3;
-  uint32_t *_4 = misc_const_ct[midx]._4;
-  uint32_t *_8 = misc_const_ct[midx]._8;
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+  addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
+}
+__device__ void mul3z(Z2_t *z,  Z2_t *x, mod_t midx)
+{
+   addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+   addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
 
-  if (equ256(y, _2)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-    addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
+   addmu256(z->getu256(), z->getu256(), x->getu256(), midx);    
+   addmu256(z->get2u256(), z->get2u256(), x->get2u256(), midx);    
+}
+__device__ void mul4z(Z2_t *z,  Z2_t *x, mod_t midx)
+{
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+  addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
 
-  } else if (equ256(y, _3)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-    addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
+  addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
+  addmu256(z->get2u256(), z->get2u256(), z->get2u256(), midx);    
+}
+__device__ void mul8z(Z2_t *z,  Z2_t *x, mod_t midx)
+{
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+  addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
 
-    addmu256(z->getu256(), z->getu256(), x->getu256(), midx);    
-    addmu256(z->get2u256(), z->get2u256(), x->get2u256(), midx);    
-
-  } else if (equ256(y, _4)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-    addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
-
-    addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
-    addmu256(z->get2u256(), z->get2u256(), z->get2u256(), midx);    
+  addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
+  addmu256(z->get2u256(), z->get2u256(), z->get2u256(), midx);    
     
-  } else if (equ256(y, _8)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-    addmu256(z->get2u256(), x->get2u256(), x->get2u256(), midx);    
-
-    addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
-    addmu256(z->get2u256(), z->get2u256(), z->get2u256(), midx);    
-    
-    addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
-    addmu256(z->get2u256(), z->get2u256(), z->get2u256(), midx);    
-
-  }
+  addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
+  addmu256(z->get2u256(), z->get2u256(), z->get2u256(), midx);    
 }
 
 __device__ void subz(Z2_t *z, Z2_t *x, Z2_t *y, mod_t midx)
@@ -127,7 +213,7 @@ __device__ void movz(uint32_t *y, uint32_t yoffset, Z2_t *x, uint32_t xoffset, u
 
 __device__ void setkz(Z2_t *z, uint32_t offset, uint32_t *x)
 {
-  z->set2u256(offset,x,0,1);
+  z->setu256(offset,x,0,1);
 }
 __device__ void xeccz(Z2_t *z, Z2_t *x)
 {
@@ -144,27 +230,5 @@ __device__ void zeccz(Z2_t *z, Z2_t *x)
 
 __device__ void infz(Z2_t *z, mod_t midx)
 {
-  z->assign(misc_const_ct[midx]._inf);
+  z->assign(misc_const_ct[midx]._inf2);
 }
-#if 0
-__device__ void _1z(Z2_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._1);
-}
-__device__ void _2z(Z2_t *z, mod_t midx)
-{
-  z->assign( misc_const_ct[midx]._2);
-}
-__device__ void _3z(Z2_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._3);
-}
-__device__ void _4z(Z2_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._4);
-}
-__device__ void _8z(Z2_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._8);
-}
-#endif

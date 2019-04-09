@@ -35,6 +35,8 @@
 
 #define U256_MAX_SMALLK (32)
 
+//#include "log.h"
+
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
@@ -153,11 +155,21 @@ __forceinline__ __device__ void subu256(T1 *z, T2 *x, T3 *y)
 template <typename T1>
 __forceinline__ __device__ uint32_t eq0u256(T1 *x)
 {
+ #if 1
   if (x[0] == 0 && x[1] ==  0 && x[2] == 0 && x[3] == 0 && x[4] == 0 && x[5] == 0 && x[6] == 0 && x[7] == 0){
     return 1;
   } else { 
     return 0;
   }
+ #else
+  ulonglong4 *x4 = (ulonglong4 *)x;
+  if (x4->x == 0 && x4->y == 0 and x4->z==0 and x4->w == 0){
+     return 1;
+  } else {
+     return 0;
+  }
+  #endif
+  
 }
 
 
@@ -290,15 +302,19 @@ __device__ void submu256(T1 *z, T2 *x, T3 *y, mod_t midx)
 //__device__ void submu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y, mod_t midx)
 {
 
+  //int tid = threadIdx.x + blockDim.x * blockIdx.x;
   uint32_t const __restrict__ *p = mod_info_ct[midx].p;
   uint32_t tmp[NWORDS_256BIT];
 
+  //logInfoBigNumberTid(tid,1,"x:\n",(uint32_t *)x);
+  //logInfoBigNumberTid(tid,1,"y:\n",(uint32_t *)y);
   subu256(tmp,x,y);
   if (tmp[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   //if (ltu256(p,tmp)){
       addu256(tmp,tmp,p);
   } 
   movu256((uint32_t *) z,tmp);
+  //logInfoBigNumberTid(tid,1,"z:\n",(uint32_t *)z);
 
 }
 #endif

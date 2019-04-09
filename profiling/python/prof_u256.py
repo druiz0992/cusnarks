@@ -71,7 +71,7 @@ def profile_u256():
     u256_vector = u256.rand(nsamples)
     u256_vector = u256.randu256(nsamples, u256_p)
             
-    kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE_SHFL]
+    kernel_config['kernel_idx'] = [CB_U256_ADDM]
 
     if kernel_config['kernel_idx'][0] == CB_U256_MOD or kernel_params['premod'][0] == 1:
       for s in u256_vector:

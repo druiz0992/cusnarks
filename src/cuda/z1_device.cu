@@ -40,6 +40,60 @@
 #include "u256_device.h"
 #include "z1_device.h"
 
+__device__ Z1_t::Z1_t() {}
+__device__ Z1_t::Z1_t(uint32_t *x) : el(x) {}
+
+__device__ uint32_t * Z1_t::getu256()
+{
+  return el;
+}
+__device__ uint32_t * Z1_t::get2u256()
+{
+  return el;
+}
+
+__device__ uint32_t  * Z1_t::getu256(uint32_t offset)
+{
+    return &el[offset*NWORDS_256BIT];
+}
+__device__ uint32_t  * Z1_t::getsingleu256(uint32_t offset)
+{
+    return &el[offset*NWORDS_256BIT];
+}
+
+__device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
+{ 
+   movu256(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
+   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
+   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
+   //memcpy(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
+}
+__device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
+{ 
+    movu256(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
+    movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
+    movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
+    //memcpy(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
+}
+__device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset, uint32_t ysize)
+{ 
+   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+}
+__device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
+{ 
+   movu256(&el[(xoffset)*NWORDS_256BIT],&y[(yoffset)*NWORDS_256BIT]);
+}
+__device__ void Z1_t::assign(uint32_t *y)
+{ 
+   el = y;
+}
+__device__ uint32_t Z1_t::getN()
+{
+    return ECP_JAC_N256W;
+}
+
+
+/////
 
 __device__ uint32_t eq0z(Z1_t *x)
 { 
@@ -60,35 +114,28 @@ __device__ void mulz(Z1_t *z,  Z1_t *x, Z1_t *y, mod_t midx)
   mulmontu256(z->getu256(), x->getu256(), y->getu256(), midx);  
 }
 
-__device__ void mulkz(Z1_t *z,  Z1_t *x, uint32_t *y, mod_t midx)
+__device__ void mul2z(Z1_t *z,  Z1_t *x, mod_t midx)
 {
-  uint32_t *_2 = misc_const_ct[midx]._2;
-  uint32_t *_3 = misc_const_ct[midx]._3;
-  uint32_t *_4 = misc_const_ct[midx]._4;
-  uint32_t *_8 = misc_const_ct[midx]._8;
-
-  if (equ256(y, _2)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-
-  } else if (equ256(y, _3)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-
-    addmu256(z->getu256(), z->getu256(), x->getu256(), midx);    
-
-  } else if (equ256(y, _4)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-
-    addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
-    
-  } else if (equ256(y, _8)){
-    addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
-
-    addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
-    
-    addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
-
-  }
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
 }
+__device__ void mul3z(Z1_t *z,  Z1_t *x, mod_t midx)
+{
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+  addmu256(z->getu256(), z->getu256(), x->getu256(), midx);    
+}
+__device__ void mul4z(Z1_t *z,  Z1_t *x, mod_t midx)
+{
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+
+  addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
+}
+__device__ void mul8z(Z1_t *z,  Z1_t *x, mod_t midx)
+{
+  addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+  addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
+  addmu256(z->getu256(), z->getu256(), z->getu256(), midx);    
+}
+
 __device__ void subz(Z1_t *z, Z1_t *x, Z1_t *y, mod_t midx)
 {
   submu256(z->getu256(), x->getu256(), y->getu256(), midx);    
@@ -135,25 +182,3 @@ __device__ void infz(Z1_t *z, mod_t midx)
 {
   z->assign(misc_const_ct[midx]._inf);
 }
-#if 0
-__device__ void _1z(Z1_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._1);
-}
-__device__ void _2z(Z1_t *z, mod_t midx)
-{
-  z->assign( misc_const_ct[midx]._2);
-}
-__device__ void _3z(Z1_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._3);
-}
-__device__ void _4z(Z1_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._4);
-}
-__device__ void _8z(Z1_t *z, mod_t midx)
-{
-  z->assign(misc_const_ct[midx]._8);
-}
-#endif
