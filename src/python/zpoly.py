@@ -146,6 +146,11 @@ class ZPoly(object):
         return zcoeff, degree, FIDX
         """
         if type(p) is list:
+            if len(p) == 0:
+              degree = 0
+              zcoeff = [0]
+              FIDX = ZUtils.FEXT
+              return zcoeff, degree, FIDX
             degree = len(p) - 1
             if isinstance(p[0], ZFieldElExt):
                 zcoeff = p
@@ -812,6 +817,50 @@ class ZPoly(object):
                 t_copy = ZPoly(t)
                 rem.poly_mul(t_copy)
                 rem = rem.scale(-2*ne)
+                me = rem.get_degree()
+            else:
+                done = True
+
+        return q
+
+    def poly_div_snarks(self, v):
+        """
+          Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
+          m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
+          as ``n``.
+
+           NOTE https://github.com/iden3/iden3js
+
+           TODO optimize. There are far too many copies in this function and in multiplication
+        """
+        if not isinstance(v, ZPoly):
+            assert False, "Unexpected data type"
+
+        m = self.get_degree()
+        n = v.get_degree()
+
+        if m < n:
+            return self.zero()
+
+        # ensure deg(v) is one less than some power of 2
+        # by extending v -> ve, u -> ue (mult by x^nd)
+        nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
+        ue = self.scale(nd)
+        ve = v.scale(nd)
+        me = m + nd
+        ne = n + nd
+
+        # handle the case when m>2n
+        q = self.zero()
+        rem = ZPoly(ue)
+        done = False
+
+        while not done:
+            us = ZPoly(rem.get_coeff()[ne:]) + ZPoly(rem.get_coeff()[2*ne-nd:]) # degree me - ne
+            q = q + us
+
+            if me > 2 * ne:
+                rem = ZPoly(rem.get_coeff()[ne+1:])
                 me = rem.get_degree()
             else:
                 done = True

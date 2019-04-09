@@ -535,10 +535,11 @@ class GrothSnarks(object):
           #polA_S = ZPoly.from_uint256(polA_S)
           #polB_S = ZPoly.from_uint256(polB_S)
           #polC_S = ZPoly.from_uint256(polC_S)
-          return polABC_S
-          polABC_S = ZPoly.from_uint256(polABC_S)
-          nroots = 2 << int(np.ceil(np.log2(self.vk_proof['nVars'])))
-          polABC_S = polABC_S.expand_to_degree(nroots-1)
+          #return polABC_S
+          #polABC_S = ZPoly.from_uint256(polABC_S)
+          #nroots = 2 << int(np.ceil(np.log2(self.vk_proof['nVars'])))
+          #polABC_S = polABC_S.expand_to_degree(nroots-1)
+          polABC_S = ZPoly(20000)
           
           inv_pol = ZPoly.from_uint256(self.inv_poly_u256)
           #inv_pol = None
@@ -599,8 +600,8 @@ class GrothSnarks(object):
         polZ_S = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(m-1)] + [ZFieldElExt(1)])
 
         #TODO
-        return polABC_S
-        polH_S = polABC_S.poly_div(polZ_S, invpol = inv_pol)
+        #return polABC_S
+        polH_S = polABC_S.poly_div_snarks(polZ_S)
 
         """
         H_S_copy = ZPoly(polH_S)
