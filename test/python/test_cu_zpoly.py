@@ -58,7 +58,7 @@ sys.path.append('../../src/python')
 ZPOLY_datafile = './aux_data/zpoly_data_1M.npz'
 
 class CUZPolyTest(unittest.TestCase):
-    TEST_ITER = 1000
+    TEST_ITER = 100
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
     nsamples = 32 * 1024   # 1024 FFT 32 points
     ntest_points = 100 
@@ -72,7 +72,6 @@ class CUZPolyTest(unittest.TestCase):
     roots_rdc = [r.reduce() for r in roots_ext]
     inv_roots_rdc = [r.reduce() for r in inv_roots_ext]
 
-    """
     def test_0fft32(self):
 
         cu_zpoly = CUZPolyTest.cu_zpoly
@@ -232,7 +231,6 @@ class CUZPolyTest(unittest.TestCase):
                self.assertTrue(p_rdc_intt_all == zpoly_ifft)
 
     """
-    """
     def test_00fft_mulN(self):
 
         cu_zpoly = CUZPolyTest.cu_zpoly
@@ -279,7 +277,6 @@ class CUZPolyTest(unittest.TestCase):
                p1_rdc.poly_mul_fft(p2_rdc)
                zpoly_mul = ZPoly.from_uint256(result_mul[i*(1<<N):i*(1<<N)+(1<<N)], reduced=True)
                self.assertTrue(p1_rdc == zpoly_mul)
-    """
     """
     def test_4fft2D_1024(self):
 
@@ -401,9 +398,8 @@ class CUZPolyTest(unittest.TestCase):
             #p_rdc.intt_DIT()
             #zpoly_ifft = ZPoly.from_uint256(result_ifft[i*32:i*32+32], reduced=True)
             #self.assertTrue(p_rdc == zpoly_ifft)
-    """
 
-    def test_00fft2D_1M(self):
+    def test_6fft2D_1M(self):
 
         ntest_points = CUZPolyTest.ntest_points
         CUZPolyTest.nsamples = 1 << 20
@@ -484,7 +480,216 @@ class CUZPolyTest(unittest.TestCase):
 
             r_u256 = ntt_parallel2D_h(zpoly_vector, roots_rdc_u256, n_rows, fft_N, n_cols, fft_N, 1)
             self.assertTrue(all(np.concatenate(result_fft2d == r_u256)))
- 
+
+    def test_7add_zpoly(self):
+
+        u256_p = CUZPolyTest.u256_p
+        CUZPolyTest.nsamples = 1024 
+        nsamples = CUZPolyTest.nsamples
+        cu_zpoly = ZCUPoly(2*nsamples, seed=560)
+
+
+        for iter in xrange(CUZPolyTest.TEST_ITER):
+            zpoly_vector1 = cu_zpoly.randu256(CUZPolyTest.nsamples, u256_p )
+            zpoly_vector2 = cu_zpoly.randu256(CUZPolyTest.nsamples/2, u256_p)
+            zpoly_vector3 = cu_zpoly.randu256(CUZPolyTest.nsamples/4, u256_p)
+            kernel_config={}
+            kernel_params={}
+
+            # Test zpoly_add kernel two poly same length:
+            kernel_params['in_length'] = [2*CUZPolyTest.nsamples]
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [nsamples]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = [0]
+            kernel_config['kernel_idx']= [CB_ZPOLY_ADD]
+            zpoly_vector = np.concatenate((zpoly_vector1, zpoly_vector1))
+            result_add,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_r = zpoly_1 + zpoly_1
+
+            result_add_zpoly = ZPoly.from_uint256(result_add, reduced=True)
+            self.assertTrue(zpoly_r == result_add_zpoly)
+
+            # Test zpoly_add kernel two poly different length
+            kernel_params['in_length'] = [len(zpoly_vector1) + len(zpoly_vector2)]
+            kernel_params['out_length'] = len(zpoly_vector1)
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [len(zpoly_vector2)]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   2*kernel_params['padding_idx'][0]/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_ADD]
+            zpoly_vector = np.concatenate((zpoly_vector1, zpoly_vector2))
+            result_add,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_2 = ZPoly.from_uint256(zpoly_vector2, reduced=True)
+            zpoly_r = zpoly_1 + zpoly_2
+
+            result_add_zpoly = ZPoly.from_uint256(result_add, reduced=True)
+            self.assertTrue(zpoly_r == result_add_zpoly)
+
+            # Test zpoly_sub kernel two poly same length:
+            kernel_params['in_length'] = [2*CUZPolyTest.nsamples]
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [nsamples]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = [0]
+            kernel_config['kernel_idx']= [CB_ZPOLY_SUB]
+            zpoly_vector = np.concatenate((zpoly_vector1, zpoly_vector1))
+            result_sub,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_r = zpoly_1 - zpoly_1
+
+            result_sub_zpoly = ZPoly.from_uint256(result_sub, reduced=True)
+            self.assertTrue(zpoly_r == result_sub_zpoly)
+
+            # Test zpoly_sub kernel two poly different length
+            kernel_params['in_length'] = [len(zpoly_vector1) + len(zpoly_vector2)]
+            kernel_params['out_length'] = len(zpoly_vector1)
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [len(zpoly_vector2)]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   2*kernel_params['padding_idx'][0]/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_SUB]
+            zpoly_vector = np.concatenate((zpoly_vector1, zpoly_vector2))
+            result_sub,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_2 = ZPoly.from_uint256(zpoly_vector2, reduced=True)
+            zpoly_r = zpoly_1 - zpoly_2
+
+            result_sub_zpoly = ZPoly.from_uint256(result_sub, reduced=True)
+            self.assertTrue(zpoly_r == result_sub_zpoly)
+
+            # Test zpoly_mul kernel two poly same length:
+            kernel_params['in_length'] = [2*CUZPolyTest.nsamples]
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [nsamples]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = [0]
+            kernel_config['kernel_idx']= [CB_ZPOLY_MULC]
+            zpoly_vector = np.concatenate((zpoly_vector1, zpoly_vector1))
+            result_mulc,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_r = ZPoly([x*x for x in zpoly_1.get_coeff()])
+
+            result_mulc_zpoly = ZPoly.from_uint256(result_mulc, reduced=True)
+            self.assertTrue(zpoly_r == result_mulc_zpoly)
+
+            # Test zpoly_mulK kernel 
+            kernel_params['in_length'] = [CUZPolyTest.nsamples+1]
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = [1]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [nsamples]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   (kernel_params['in_length'][0]-1)/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_MULK]
+            zpoly_vector = np.concatenate(([zpoly_vector1[0]], zpoly_vector1))
+            result_mulK,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_r = zpoly_1.get_coeff()[0] * zpoly_1
+
+            result_mulK_zpoly = ZPoly.from_uint256(result_mulK, reduced=True)
+            self.assertTrue(zpoly_r == result_mulK_zpoly)
+
+             # Test zpoly_madd prev
+            kernel_params['in_length'] = [2*CUZPolyTest.nsamples]
+            kernel_params['out_length'] = len(zpoly_vector1)
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [nsamples]
+
+            kernel_config['return_val'] = [0]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['multiple_inload'] = 1
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   2*kernel_params['padding_idx'][0]/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_ADD]
+            zpoly_vector = np.concatenate((zpoly_vector1, zpoly_vector1))
+            result_add,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            kernel_params['in_length'] = [len(zpoly_vector2)+1]
+            kernel_params['out_length'] = len(zpoly_vector1)
+            kernel_params['stride'] = [1]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [len(zpoly_vector2)]
+
+            kernel_config['return_val'] = [0]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   2*kernel_params['padding_idx'][0]/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_MADPREV]
+            zpoly_vector = np.concatenate(([zpoly_vector1[0]],zpoly_vector2))
+            result_add,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            kernel_params['in_length'] = [len(zpoly_vector3)]
+            kernel_params['out_length'] = len(zpoly_vector1)
+            kernel_params['stride'] = [2]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [len(zpoly_vector3) ]
+
+            kernel_config['return_val'] = [1]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   2*kernel_params['padding_idx'][0]/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_ADDPREV]
+            zpoly_vector = zpoly_vector3
+            result_add,_ = cu_zpoly.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+   
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
+            zpoly_2 = ZPoly.from_uint256(zpoly_vector2, reduced=True)
+            zpoly_3 = ZPoly.from_uint256(zpoly_vector3, reduced=True)
+            zpoly_r = zpoly_1 + zpoly_1 + zpoly_1.get_coeff()[0] * zpoly_2 + zpoly_3
+
+            result_add_zpoly = ZPoly.from_uint256(result_add, reduced=True)
+            self.assertTrue(zpoly_r == result_add_zpoly)
 
 
 if __name__ == "__main__":

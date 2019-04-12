@@ -827,11 +827,8 @@ class ZPoly(object):
         """
           Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
           m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
-          as ``n``.
+          as ``n``. Assumes v(x) is of the form x^n - 1
 
-           NOTE https://github.com/iden3/iden3js
-
-           TODO optimize. There are far too many copies in this function and in multiplication
         """
         if not isinstance(v, ZPoly):
             assert False, "Unexpected data type"

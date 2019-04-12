@@ -40,12 +40,167 @@
 #include "u256_device.h"
 #include "zpoly_device.h"
 
+// longer poly first
+__global__ void zpoly_add_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
 
-__device__ uint32_t **in_data;
-/*
-    Modular addition kernel
+    uint32_t *x, *y, *z;
+   
+    if(tid >= params->padding_idx) {
+      return;
+    }
 
-*/
+    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
+    y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+   
+    logInfoBigNumberTid(tid,1,"X: \n",x); 
+    logInfoBigNumberTid(tid,1,"Y: \n",y); 
+    if (params->premod){
+       modu256(x,x, params->midx);
+       modu256(y,y, params->midx);
+    }
+    addmu256(z,x,y, params->midx);                
+    logInfoBigNumberTid(tid,1,"Z: \n",z); 
+
+    if ( (params->in_length > 2*params->padding_idx) && (tid == 0)){
+       logInfoTid(tid,"In length : %d\n",params->in_length);
+       logInfoTid(tid,"2 * padding : %d\n",2*params->padding_idx);
+       memcpy(&z[params->padding_idx*NWORDS_256BIT],
+              &y[params->padding_idx*NWORDS_256BIT],
+              (params->in_length - 2*params->padding_idx)*NWORDS_256BIT*sizeof(uint32_t));
+       logInfoBigNumberTid(tid,1,"Z: \n",z); 
+    }
+
+    return;
+}
+// first poly longer 
+__global__ void zpoly_sub_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t *x, *y, *z;
+
+    if(tid >= params->padding_idx) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
+    y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+       modu256(y,y, params->midx);
+    }
+    submu256(z,x,y, params->midx);                
+
+    if ( (params->in_length > 2*params->padding_idx) && (tid == 0)){
+       memcpy(&z[params->padding_idx*NWORDS_256BIT],
+              &x[params->padding_idx*NWORDS_256BIT],
+              (params->in_length - 2*params->padding_idx)*NWORDS_256BIT*sizeof(uint32_t));
+    }
+
+    return;
+}
+__global__ void zpoly_mulc_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t *x, *y, *z;
+
+    if(tid >= (params->in_length/2)) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
+    y = (uint32_t *) &in_vector[(params->in_length/2 + tid) * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+       modu256(y,y, params->midx);
+    }
+
+    mulmontu256(z, (const uint32_t *)x,(const uint32_t *) y, params->midx);
+
+    return;
+}
+__global__ void zpoly_mulK_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t *scl, *x,*z;
+
+    if(tid >= (params->in_length - 1)) {
+      return;
+    }
+
+    scl = (uint32_t *) &in_vector[0];
+    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT + NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    logInfoBigNumberTid(tid,1,"SCL: \n",scl); 
+    logInfoBigNumberTid(tid,1,"X: \n",x); 
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+
+    mulmontu256(z, (const uint32_t *)scl,(const uint32_t *) x, params->midx);
+    logInfoBigNumberTid(tid,1,"Z: \n",z); 
+    return;
+}
+
+// add longest element first
+__global__ void zpoly_madprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t *scl, *x,*z;
+
+    if(tid >= (params->in_length - 1)) {
+      return;
+    }
+
+    scl = (uint32_t *) &in_vector[0];
+    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT + NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+
+    logInfoBigNumberTid(tid,1,"SCL: \n",scl); 
+    logInfoBigNumberTid(tid,1,"X: \n",x); 
+    logInfoBigNumberTid(tid,1,"Z: \n",z); 
+
+    mulmontu256(x, (const uint32_t *)scl,(const uint32_t *) x, params->midx);
+    logInfoBigNumberTid(tid,1,"X: \n",x); 
+    addmu256(z,z,x, params->midx);                
+    logInfoBigNumberTid(tid,1,"Z: \n",z); 
+
+    return;
+}
+
+// add longest element first
+__global__ void zpoly_addprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t *x,*z;
+
+    if(tid >= params->in_length) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+
+    addmu256(z,z,x, params->midx);                
+
+    return;
+}
+
 __global__ void zpoly_fft32_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;

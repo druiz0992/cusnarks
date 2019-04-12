@@ -138,6 +138,7 @@ typedef struct {
         int gridD;
         int smemS;  // in bytes
         int kernel_idx;
+        int return_val;
 } kernel_config_t;
 
 
@@ -248,6 +249,12 @@ typedef enum{
    CB_ZPOLY_FFT3DXY,
    CB_ZPOLY_FFT3DYX,
    CB_ZPOLY_FFT3DYY,
+   CB_ZPOLY_ADD,
+   CB_ZPOLY_SUB,
+   CB_ZPOLY_MULC,
+   CB_ZPOLY_MULK,
+   CB_ZPOLY_MADPREV,
+   CB_ZPOLY_ADDPREV,
    CB_ZPOLY_N
 
 }zpoly_callback_t;
