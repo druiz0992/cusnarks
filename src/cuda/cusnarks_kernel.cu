@@ -475,7 +475,9 @@ double CUSnarks::kernelLaunch(
   
     // retrieve kernel output data from GPU to host
   start = elapsedTime();
-  CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  if (config[0].return_val){
+     CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  }
  
   end_copy_out = elapsedTime() - start;
 

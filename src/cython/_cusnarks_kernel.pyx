@@ -78,7 +78,11 @@ cdef class CUSnarks:
         for i in range(n_kernel):
            kconfig[i].blockD = config['blockD'][i]
            kconfig[i].kernel_idx = config['kernel_idx'][i]
-           # gridD and smemS do not need to exist
+           # gridD and smemS and return_val do not need to exist
+           if 'return_val' in config:
+               kconfig[i].return_val  = config['return_val'][i]
+           else :
+               kconfig[i].return_val  = 1
            if 'gridD' in config:
                kconfig[i].gridD  = config['gridD'][i]
            else :

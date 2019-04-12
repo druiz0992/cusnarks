@@ -517,7 +517,6 @@ class GrothSnarks(object):
           #TODO -> get inverse roots
           if self.proof_iter == 0:
             cuzpoly = ZCUPoly(2*len(polA_T), seed=560)
-            cuu256 = U256(3*len(polA_T), seed=560)
 
           polA_S,t1 = zpoly_ifft_cuda(cuzpoly, polA_T[:nVars], self.roots1_u256, ZField.get_field())
           self.t_P.append(t1)
@@ -526,10 +525,10 @@ class GrothSnarks(object):
           polC_S,t1 = zpoly_ifft_cuda(cuzpoly, polC_T[:nVars], self.roots1_u256, ZField.get_field())
           self.t_P.append(t1)
 
-          polAB_S,t1 = zpoly_mul_cuda(cuzpoly, cuu256,polA_S[:nVars],polB_S[:nVars],self.roots1_u256, ZField.get_field())
+          polAB_S,t1 = zpoly_mul_cuda(cuzpoly, polA_S[:nVars],polB_S[:nVars],self.roots1_u256, ZField.get_field())
           self.t_P.append(t1)
 
-          polABC_S,t1 = zpoly_subm_cuda(cuu256, polAB_S, polC_S, ZField.get_field())
+          polABC_S,t1 = zpoly_subm_cuda(cuzpoly, polAB_S, polC_S, ZField.get_field())
           self.t_P.append(t1)
 
           #polA_S = ZPoly.from_uint256(polA_S)
@@ -773,15 +772,13 @@ def zpoly_ifft_cuda(pysnark, vector, inv_roots, fidx ):
 
         return result,t
 
-def zpoly_mul_cuda(pysnark, cuu256, vectorA, vectorB, roots, fidx):
+def zpoly_mul_cuda(pysnark, vectorA, vectorB, roots, fidx):
     t = 0
     rA,t1 = zpoly_fft_cuda(pysnark, vectorA, roots, fidx)
     t+=t1
     rB,t1 = zpoly_fft_cuda(pysnark, vectorB, roots, fidx)
     t+=t1
-    #TODO : implement coeff mult kernel
-    #cuu256 = U256(2*len(rA), seed=560)
-    rC,t1 = zpoly_coeffmul_cuda(cuu256, rA, rB, fidx)
+    rC,t1 = zpoly_coeffmul_cuda(pysnark, rA, rB, fidx)
     t+=t1
     rD,t1 = zpoly_ifft_cuda(pysnark, rC, roots, fidx)
     t+=t1
@@ -789,7 +786,10 @@ def zpoly_mul_cuda(pysnark, cuu256, vectorA, vectorB, roots, fidx):
 
 def zpoly_subm_cuda(pysnark, vectorA, vectorB, fidx):  
      #TODO revie
-     vector =np.concatenate((vectorA, vectorB))
+     if len(vectorB) < len(vectorA): 
+        vector =np.concatenate((vectorA, vectorB))
+     else:
+        vector =np.concatenate((vectorB, vectorA))
      nsamples = len(vector)
      kernel_config={}
      kernel_params={}
@@ -798,10 +798,11 @@ def zpoly_subm_cuda(pysnark, vectorA, vectorB, fidx):
      kernel_params['in_length'] = [nsamples]
      kernel_params['out_length'] = nsamples/2
      kernel_params['stride'] = [2]
+     kernel_params['padding_idx'] = min(len(vectorA),len(vectorB))
      kernel_params['midx'] = [fidx]
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [U256_BLOCK_DIM]
-     kernel_config['kernel_idx'] = [CB_U256_SUBM]
+     kernel_config['kernel_idx'] = [CB_ZPOLY_SUB]
      result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params )
 
      return vector,t
@@ -820,7 +821,7 @@ def zpoly_coeffmul_cuda(pysnark, vectorA, vectorB, fidx):
      kernel_params['premod'] = [0]
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [U256_BLOCK_DIM]
-     kernel_config['kernel_idx'] = [CB_U256_MULM]
+     kernel_config['kernel_idx'] = [CB_ZPOLY_MULK]
      result,t= pysnark.kernelLaunch(vector, kernel_config, kernel_params )
 
      return result,t
