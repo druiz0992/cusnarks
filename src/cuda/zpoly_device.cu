@@ -55,22 +55,16 @@ __global__ void zpoly_add_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
     y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NWORDS_256BIT];
     z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
    
-    logInfoBigNumberTid(tid,1,"X: \n",x); 
-    logInfoBigNumberTid(tid,1,"Y: \n",y); 
     if (params->premod){
        modu256(x,x, params->midx);
        modu256(y,y, params->midx);
     }
     addmu256(z,x,y, params->midx);                
-    logInfoBigNumberTid(tid,1,"Z: \n",z); 
 
     if ( (params->in_length > 2*params->padding_idx) && (tid == 0)){
-       logInfoTid(tid,"In length : %d\n",params->in_length);
-       logInfoTid(tid,"2 * padding : %d\n",2*params->padding_idx);
        memcpy(&z[params->padding_idx*NWORDS_256BIT],
               &y[params->padding_idx*NWORDS_256BIT],
               (params->in_length - 2*params->padding_idx)*NWORDS_256BIT*sizeof(uint32_t));
-       logInfoBigNumberTid(tid,1,"Z: \n",z); 
     }
 
     return;
@@ -197,6 +191,74 @@ __global__ void zpoly_addprev_kernel(uint32_t *out_vector, uint32_t *in_vector, 
     }
 
     addmu256(z,z,x, params->midx);                
+
+    return;
+}
+
+__global__ void zpoly_divsnarks_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    uint32_t *x, *y, *z;
+    uint32_t nd = params->forward;
+    uint32_t ne = params->padding_idx;
+    uint32_t offset=0;
+    // from python code:
+    // me = m + nd = params->in_length
+    // ne = n + nd = params->padding_idx
+    // nd = params->forward
+    // rem = x
+   
+    if(tid >= params->in_length - 2*ne + nd) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[(tid + ne) * NWORDS_256BIT];
+    y = (uint32_t *) &in_vector[(tid + 2 * ne - nd) * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+   
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+    logInfoTid(tid,"ne : %d\n",ne);
+    logInfoTid(tid,"nd : %d\n",nd);
+    logInfoTid(tid,"inlength : %d\n",params->in_length);
+    logInfoTid(tid,"max_tid : %d\n",params->in_length - 2*ne + nd- 1);
+
+    logInfoBigNumberTid(tid,1,"Z:\n",z);
+    logInfoBigNumberTid(tid,1,"X:\n",x);
+    logInfoBigNumberTid(tid,1,"Y:\n",y);
+    addmu256(z,x,y, params->midx);                
+    logInfoBigNumberTid(tid,1,"Z:\n",z);
+
+    // TODO : Try to have groups of 8 so that it is faster (I cannot unroll automatically)
+    for(offset=ne+1; offset<params->in_length -2*ne-1 ; offset += ne+1) { 
+       if(tid >= params->in_length - offset -ne) {
+           return;
+       }
+       x = (uint32_t *) &in_vector[(tid + ne + offset) * NWORDS_256BIT];
+       y = (uint32_t *) &in_vector[(tid + 2 * ne - nd + offset) * NWORDS_256BIT];
+       logInfoTid(tid,"offset : %d\n",offset);
+       logInfoBigNumberTid(tid,1,"Z:\n",z);
+       logInfoBigNumberTid(tid,1,"X:\n",x);
+       logInfoBigNumberTid(tid,1,"Y:\n",y);
+       logInfoTid(tid,"new_lim : %d\n",params->in_length - offset);
+       logInfoTid(tid,"max_tid : %d\n",params->in_length - offset -2*ne +nd-1);
+       addmu256(z,z,x, params->midx);                
+       if(tid >= params->in_length - offset -2*ne+ nd) {
+           return;
+       }
+       addmu256(z,z,y, params->midx);                
+       //i++;
+       //if (i==3){ return;}
+ 
+    }
+    //x = (uint32_t *) &in_vector[(tid + ne + offset) * NWORDS_256BIT];
+    //logInfoBigNumberTid(tid,1,"Z:\n",z);
+    //logInfoBigNumberTid(tid,1,"X:\n",x);
+    //addmu256(z,z,&x[offset*NWORDS_256BIT], params->midx);                
+
+    //logInfoBigNumberTid(tid,1,"Z:\n",z);
 
     return;
 }

@@ -823,18 +823,14 @@ class ZPoly(object):
 
         return q
 
-    def poly_div_snarks(self, v):
+    def poly_div_snarks(self, n):
         """
           Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
           m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
           as ``n``. Assumes v(x) is of the form x^n - 1
 
         """
-        if not isinstance(v, ZPoly):
-            assert False, "Unexpected data type"
-
         m = self.get_degree()
-        n = v.get_degree()
 
         if m < n:
             return self.zero()
@@ -843,7 +839,6 @@ class ZPoly(object):
         # by extending v -> ve, u -> ue (mult by x^nd)
         nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
         ue = self.scale(nd)
-        ve = v.scale(nd)
         me = m + nd
         ne = n + nd
 
@@ -851,8 +846,11 @@ class ZPoly(object):
         q = self.zero()
         rem = ZPoly(ue)
         done = False
+        niter = 0
 
         while not done:
+            if len(rem.get_coeff()[2*ne-nd:]) == 0:
+                return q
             us = ZPoly(rem.get_coeff()[ne:]) + ZPoly(rem.get_coeff()[2*ne-nd:]) # degree me - ne
             q = q + us
 
@@ -861,6 +859,9 @@ class ZPoly(object):
                 me = rem.get_degree()
             else:
                 done = True
+            niter +=1
+            #if niter==2:
+            #  return q
 
         return q
 

@@ -120,8 +120,8 @@ class GrothSnarks(object):
           #TODO Check this
           #store inv x^(n-1)-1 where n =vk_proof['domain_bits']
           # it seems the answer is always x^(n-1)+1. If this is the case, then it is easy
-          m = self.vk_proof['domainSize']
-          self.inv_poly_u256 = self.get_invpoly_u256(m)
+          #m = self.vk_proof['domainSize']
+          #self.inv_poly_u256 = self.get_invpoly_u256(m)
 
         """
           TODO : pending capability to switch from FEXt to REDC and from/to affine/projective/affine
@@ -531,6 +531,9 @@ class GrothSnarks(object):
           polABC_S,t1 = zpoly_subm_cuda(cuzpoly, polAB_S, polC_S, ZField.get_field())
           self.t_P.append(t1)
 
+          polH_S, t1 = zpoly_div_cuda(cuzpoly, polABC_S,int(m), ZField.get_field())
+          self.t_P.append(t1)
+
           #polA_S = ZPoly.from_uint256(polA_S)
           #polB_S = ZPoly.from_uint256(polB_S)
           #polC_S = ZPoly.from_uint256(polC_S)
@@ -538,9 +541,9 @@ class GrothSnarks(object):
           #polABC_S = ZPoly.from_uint256(polABC_S)
           #nroots = 2 << int(np.ceil(np.log2(self.vk_proof['nVars'])))
           #polABC_S = polABC_S.expand_to_degree(nroots-1)
-          polABC_S = ZPoly(20000)
+          #polABC_S = ZPoly(20000)
           
-          inv_pol = ZPoly.from_uint256(self.inv_poly_u256)
+          #inv_pol = ZPoly.from_uint256(self.inv_poly_u256)
           #inv_pol = None
         
 
@@ -595,12 +598,10 @@ class GrothSnarks(object):
     
           inv_pol = None
     
-        #TODO Review this is the correct degree of poly
-        polZ_S = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(m-1)] + [ZFieldElExt(1)])
+          polZ_S = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(m-1)] + [ZFieldElExt(1)])
 
-        #TODO
-        #return polABC_S
-        polH_S = polABC_S.poly_div_snarks(polZ_S)
+          #return polABC_S
+          polH_S = polABC_S.poly_div_snarks(polZ_S.get_degree())
 
         """
         H_S_copy = ZPoly(polH_S)
@@ -628,6 +629,41 @@ class GrothSnarks(object):
         polH_S = polH_S.norm()
   
         return polH_S
+
+def zpoly_div_cuda(pysnark, poly ,n, fidx):
+     nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
+     ne = n + nd
+     nsamples = len(poly) + nd
+     zpoly_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
+     zpoly_vector[nd:] = poly
+
+     kernel_config={}
+     kernel_params={}
+     kernel_params['in_length'] = [nsamples]
+     kernel_params['out_length'] = nsamples - 2*ne + nd 
+     kernel_params['stride'] = [1]
+     kernel_params['premod'] = [0]
+     kernel_params['midx'] = [fidx]
+     kernel_params['padding_idx'] = [ne]
+     kernel_params['forward'] = [nd]
+
+     kernel_config['smemS'] = [0]
+     kernel_config['blockD'] = [256]
+     kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   kernel_params['in_length'][0]-2*ne+nd - 1)/ kernel_config['blockD'][0]]
+     kernel_config['kernel_idx']= [CB_ZPOLY_DIVSNARKS]
+
+     result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+
+     result_snarks_complete = np.zeros((nsamples-ne,NWORDS_256BIT),dtype=np.uint32)
+     result_snarks_complete[:nsamples-2*ne+nd] = result_snarks
+     result_snarks_complete[nsamples-2*ne+nd:] = zpoly_vector[-ne+nd:]
+
+     return result_snarks_complete, t
+ 
+           
+
 
 def ec2_mad_cuda(pysnark, vector, fidx):
      kernel_params={}
@@ -798,7 +834,7 @@ def zpoly_subm_cuda(pysnark, vectorA, vectorB, fidx):
      kernel_params['in_length'] = [nsamples]
      kernel_params['out_length'] = nsamples/2
      kernel_params['stride'] = [2]
-     kernel_params['padding_idx'] = min(len(vectorA),len(vectorB))
+     kernel_params['padding_idx'] = [min(len(vectorA),len(vectorB))]
      kernel_params['midx'] = [fidx]
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [U256_BLOCK_DIM]

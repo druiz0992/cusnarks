@@ -691,6 +691,52 @@ class CUZPolyTest(unittest.TestCase):
             result_add_zpoly = ZPoly.from_uint256(result_add, reduced=True)
             self.assertTrue(zpoly_r == result_add_zpoly)
 
+    def test_8divsnarks(self):
+
+        u256_p = CUZPolyTest.u256_p
+        CUZPolyTest.nsamples = 1024 
+        nd = 2047
+        n = 2048
+        m = 20000
+        ne = nd + n
+        nsamples = m + nd
+        cu_zpoly = ZCUPoly(nsamples+1, seed=560)
+
+
+        for iter in xrange(CUZPolyTest.TEST_ITER):
+            zpoly_vector1 = np.zeros((nsamples+1,NWORDS_256BIT),dtype=np.uint32)
+            zpoly_vector1[nd:] = cu_zpoly.randu256(m+1, u256_p )
+            kernel_config={}
+            kernel_params={}
+
+            # Test zpoly_add kernel two poly same length:
+            kernel_params['in_length'] = [nsamples+1]
+            kernel_params['out_length'] = nsamples - 2*ne + nd + 1
+            kernel_params['stride'] = [1]
+            kernel_params['premod'] = [0]
+            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['padding_idx'] = [ne]
+            kernel_params['forward'] = [nd]
+
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [256]
+            kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   kernel_params['in_length'][0]-2*ne+nd - 1)/ kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_DIVSNARKS]
+
+            result_snarks,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,1)
+            result_snarks_complete = np.zeros((nsamples-ne+1,NWORDS_256BIT),dtype=np.uint32)
+            result_snarks_complete[:nsamples-2*ne+nd+1] = result_snarks
+            result_snarks_complete[nsamples-2*ne+nd+1:] = zpoly_vector1[-ne+nd:]
+  
+             
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1[nd:], reduced=True)
+            zpoly_r = zpoly_1.poly_div_snarks(n)
+
+            result_snarks_zpoly = ZPoly.from_uint256(result_snarks_complete, reduced=True)
+            self.assertTrue(zpoly_r == result_snarks_zpoly)
+
 
 if __name__ == "__main__":
     unittest.main()
