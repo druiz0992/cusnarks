@@ -255,6 +255,7 @@ typedef enum{
    CB_ZPOLY_MULK,
    CB_ZPOLY_MADPREV,
    CB_ZPOLY_ADDPREV,
+   CB_ZPOLY_DIVSNARKS,
    CB_ZPOLY_N
 
 }zpoly_callback_t;
