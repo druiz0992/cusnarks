@@ -605,7 +605,7 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
   uint32_t new_cidx = tid >> Nx;
   uint32_t reverse_idx;
   uint32_t *roots = &x[(1<<(Nx+Ny)) * U256K_OFFSET];
-  uint32_t const *inv_scaler = &IW32_nroots_ct[(FFT_SIZE_1024-1)*NWORDS_256BIT];
+  uint32_t *inv_scaler = &x[(1<<(Nx+Ny+1)) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {
@@ -671,7 +671,7 @@ __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 
   uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nxyn, offset, mask) << (Nx - Nxy + Ny) ;
   uint32_t *roots = &x[(1<<(Nx+Ny)) * U256K_OFFSET];
-  uint32_t const *inv_scaler = &IW32_nroots_ct[(FFT_SIZE_1M-1)*NWORDS_256BIT];
+  uint32_t const *inv_scaler = &x[(1<<(Nx+Ny+1)) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {
@@ -686,11 +686,6 @@ __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
            &z[(reverse_idx + (new_kidx >> Nxy) + new_ridx)*U256K_OFFSET],
            &roots[((reverse_idx + (new_kidx >> Nxy) + new_ridx) >> Ny) * 
                      ((reverse_idx + (new_kidx >> Nxy) + new_ridx) & Nyn)*U256K_OFFSET] ,midx);
-
-  if (!params->forward){
-    mulmontu256( &z[(reverse_idx + (new_kidx >> Nxy)+ new_ridx)*U256K_OFFSET],
-                 &z[(reverse_idx + (new_kidx >> Nxy)+ new_ridx)*U256K_OFFSET],inv_scaler ,midx);
-  }
 
 }
 
@@ -753,7 +748,7 @@ __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 
   uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyyn, offset, mask) << (Ny + Nx - Nyy);
   uint32_t *roots = &x[(1<<(Nx+Ny)) * U256K_OFFSET];
-  uint32_t const *inv_scaler = &IW32_nroots_ct[(FFT_SIZE_1M-1)*NWORDS_256BIT];
+  uint32_t const *inv_scaler = &x[(1<<(Nx+Ny+1)) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {
@@ -764,7 +759,7 @@ __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
   fftN_dif(&z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET], &x[(tid)*U256K_OFFSET],W32,Nyy,midx);
 
   if (!params->forward){
-    mulmontu256( &z[(reverse_idx + new_ridx)*U256K_OFFSET],&z[(reverse_idx + new_ridx)*U256K_OFFSET],inv_scaler ,midx);
+    mulmontu256( &z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET],&z[(reverse_idx + new_ridx+new_kidx)*U256K_OFFSET],inv_scaler ,midx);
   }
 }
 
