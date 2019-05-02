@@ -55,7 +55,22 @@ except ImportError:
     use_pycusnarks = False
 
 sys.path.append('../../src/python')
-ZPOLY_datafile = './aux_data/zpoly_data_1M.npz'
+ZPOLY_datafile_1M = './aux_data/zpoly_data_1M.npz'
+ZPOLY_input_datafile_1M = '../c/aux_data/zpoly_input_data_1M.bin'
+ZPOLY_inputxx_datafile_1M = '../c/aux_data/zpoly_input_dataxx_1M.bin'
+ZPOLY_inputxy_datafile_1M = '../c/aux_data/zpoly_input_dataxy_1M.bin'
+ZPOLY_inputyx_datafile_1M = '../c/aux_data/zpoly_input_datayx_1M.bin'
+ZPOLY_inputyy_datafile_1M = '../c/aux_data/zpoly_input_datayy_1M.bin'
+ZPOLY_input_npz_datafile_1M = './aux_data/zpoly_input_data_1M.npz'
+ZPOLY_output_datafile_1M = '../c/aux_data/zpoly_output_data_1M.bin'
+
+ZPOLY_input_datafile_65K = '../c/aux_data/zpoly_input_data_65K.bin'
+ZPOLY_inputxx_datafile_65K = '../c/aux_data/zpoly_input_dataxx_65K.bin'
+ZPOLY_inputxy_datafile_65K = '../c/aux_data/zpoly_input_dataxy_65K.bin'
+ZPOLY_inputyx_datafile_65K = '../c/aux_data/zpoly_input_datayx_65K.bin'
+ZPOLY_inputyy_datafile_65K = '../c/aux_data/zpoly_input_datayy_65K.bin'
+ZPOLY_input_npz_datafile_65K = './aux_data/zpoly_input_data_65K.npz'
+ZPOLY_output_datafile_65K = '../c/aux_data/zpoly_output_data_65K.bin'
 
 class CUZPolyTest(unittest.TestCase):
     TEST_ITER = 100
@@ -406,8 +421,8 @@ class CUZPolyTest(unittest.TestCase):
         nsamples = CUZPolyTest.nsamples
         ZUtils.NROOTS = CUZPolyTest.nsamples
 
-        if os.path.exists(ZPOLY_datafile):
-           npzfile = np.load(ZPOLY_datafile)
+        if os.path.exists(ZPOLY_datafile_1M):
+           npzfile = np.load(ZPOLY_datafile_1M)
            roots_rdc_u256 = npzfile['roots_rdc_u256']
            #roots_rdc = npzfile['roots_rdc']
            #inv_roots_rdc = npzfile['inv_roots_rdc']
@@ -425,7 +440,7 @@ class CUZPolyTest(unittest.TestCase):
            roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc])
            inv_roots_rdc_u256 = np.asarray([x.as_uint256() for x in inv_roots_rdc])
           
-           np.savez_compressed(ZPOLY_datafile, roots_ext=roots_ext, roots_rdc=roots_rdc, inv_roots_ext=inv_roots_ext, inv_roots_rdc=inv_roots_rdc,
+           np.savez_compressed(ZPOLY_datafile_1M, roots_ext=roots_ext, roots_rdc=roots_rdc, inv_roots_ext=inv_roots_ext, inv_roots_rdc=inv_roots_rdc,
                                                roots_ext_u256 = roots_ext_u256, roots_rdc_u256=roots_rdc_u256, inv_roots_ext_u256=inv_roots_ext_u256,
                                                inv_roots_rdc_u256=inv_roots_rdc_u256)
 
@@ -436,23 +451,14 @@ class CUZPolyTest(unittest.TestCase):
         CUZPolyTest.u256 = U256(nsamples, seed=560)
         cu_zpoly = CUZPolyTest.cu_zpoly
         u256 = CUZPolyTest.u256
+        u256_p = CUZPolyTest.u256_p
         n_rows=10
         n_cols = 10
         n_kernels = 4
         fft_N = 5
 
         for iter in xrange(CUZPolyTest.TEST_ITER):
-            zpoly_vector = cu_zpoly.rand(CUZPolyTest.nsamples)
-            # do mod operatio
-            kernel_config['gridD'] = [0]
-            kernel_params['in_length'] = [CUZPolyTest.nsamples]
-            kernel_params['out_length'] = CUZPolyTest.nsamples
-            kernel_params['stride'] = [1]
-            kernel_params['midx']=[0]
-            kernel_config['smemS'] = [0]
-            kernel_config['blockD'] = [U256_BLOCK_DIM ]
-            kernel_config['kernel_idx'] = [CB_U256_MOD]
-            zpoly_vector,_ = u256.kernelLaunch(zpoly_vector, kernel_config, kernel_params )
+            zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
 
             # Test FFT kernel:
 
@@ -461,8 +467,8 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['stride'] = [2,1,1,1]
             kernel_params['premod'] = [0,0,0,0]
             kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
-            kernel_params['fft_Nx'] = [fft_N, fft_N, fft_N, fft_N]
-            kernel_params['fft_Ny'] = [fft_N, fft_N, fft_N, fft_N]
+            kernel_params['fft_Nx'] = [fft_N, fft_N, fft_N, fft_N] #xx,xx,yx,yx
+            kernel_params['fft_Ny'] = [fft_N, fft_N, fft_N, fft_N] #xy,xy,yy,yy
             kernel_params['N_fftx'] = [n_cols, n_cols, n_cols, n_cols]
             kernel_params['N_ffty'] = [n_rows, n_rows, n_rows, n_rows]
             kernel_params['forward'] = [1, 1, 1, 1]
@@ -476,12 +482,202 @@ class CUZPolyTest(unittest.TestCase):
             zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
 
 
+            #if os.path.exists(ZPOLY_input_npz_datafile_1M):
+              #npzfile = np.load(ZPOLY_input_npz_datafile_1M)
+              #zpoly_vector = npzfile['in_data']
+              #zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
+
+
             result_fft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,4)
+            #cu_zpoly.saveFile(result_fft2d.reshape(-1), ZPOLY_inputyy_datafile_1M)
+            #f = open("./testyy.txt","w")
+            #for r in result_fft2d[:64*1024]:
+            #   f.write(np.array2string(r,max_line_width=90))
+            #   f.write("\n")
+            #f.close()
 
             r_u256 = ntt_parallel2D_h(zpoly_vector, roots_rdc_u256, n_rows, fft_N, n_cols, fft_N, 1)
             self.assertTrue(all(np.concatenate(result_fft2d == r_u256)))
 
-    def test_7add_zpoly(self):
+            if not os.path.exists(ZPOLY_input_datafile_1M):
+               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_1M)
+               np.savez_compressed(ZPOLY_input_npz_datafile_1M, in_data=zpoly_vector)
+
+            if not os.path.exists(ZPOLY_output_datafile_1M):
+               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_1M)
+               cu_zpoly.saveFile(result_fft2d.reshape(-1), ZPOLY_output_datafile_1M)
+
+    def test_7ifft2D_1M(self):
+
+        ntest_points = CUZPolyTest.ntest_points
+        CUZPolyTest.nsamples = 1 << 20
+        nsamples = CUZPolyTest.nsamples
+        ZUtils.NROOTS = CUZPolyTest.nsamples
+
+        if os.path.exists(ZPOLY_datafile_1M):
+           npzfile = np.load(ZPOLY_datafile_1M)
+           inv_roots_rdc_u256 = npzfile['inv_roots_rdc_u256']
+           roots_rdc_u256 = npzfile['roots_rdc_u256']
+           #roots_rdc = npzfile['roots_rdc']
+           #inv_roots_rdc = npzfile['inv_roots_rdc']
+           #ZField.roots[0] = roots_rdc
+           #ZField.inv_roots[0] = inv_roots_rdc
+       
+        else:
+           roots_ext, inv_roots_ext = ZField.find_roots(ZUtils.NROOTS, rformat_ext=True)
+           roots_rdc = [r.reduce() for r in roots_ext]
+           inv_roots_rdc = [r.reduce() for r in inv_roots_ext]
+           ZField.roots[0] = roots_rdc
+           ZField.inv_roots[0] = roots_rdc
+           roots_ext_u256 = np.asarray([x.as_uint256() for x in roots_ext])
+           inv_roots_ext_u256 = np.asarray([x.as_uint256() for x in inv_roots_ext])
+           roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc])
+           inv_roots_rdc_u256 = np.asarray([x.as_uint256() for x in inv_roots_rdc])
+          
+           np.savez_compressed(ZPOLY_datafile_1M, roots_ext=roots_ext, roots_rdc=roots_rdc, inv_roots_ext=inv_roots_ext, inv_roots_rdc=inv_roots_rdc,
+                                               roots_ext_u256 = roots_ext_u256, roots_rdc_u256=roots_rdc_u256, inv_roots_ext_u256=inv_roots_ext_u256,
+                                               inv_roots_rdc_u256=inv_roots_rdc_u256)
+
+
+        kernel_config = {}
+        kernel_params = {}
+        CUZPolyTest.cu_zpoly = ZCUPoly(2*nsamples, seed=560)
+        CUZPolyTest.u256 = U256(nsamples, seed=560)
+        cu_zpoly = CUZPolyTest.cu_zpoly
+        u256 = CUZPolyTest.u256
+        u256_p = CUZPolyTest.u256_p
+        n_rows=10
+        n_cols = 10
+        n_kernels = 4
+        fft_N = 5
+
+        for iter in xrange(CUZPolyTest.TEST_ITER):
+            zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
+
+            # Test FFT kernel:
+
+            kernel_params['in_length'] = [2*CUZPolyTest.nsamples, nsamples, nsamples, nsamples]
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = [2,1,1,1]
+            kernel_params['premod'] = [0,0,0,0]
+            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
+            kernel_params['fft_Nx'] = [fft_N, fft_N, fft_N, fft_N] #xx,xx,yx,yx
+            kernel_params['fft_Ny'] = [fft_N, fft_N, fft_N, fft_N] #xy,xy,yy,yy
+            kernel_params['N_fftx'] = [n_cols, n_cols, n_cols, n_cols]
+            kernel_params['N_ffty'] = [n_rows, n_rows, n_rows, n_rows]
+            kernel_params['forward'] = [0, 0, 0, 0]
+
+            kernel_config['smemS'] = [0, 0, 0, 0]
+            kernel_config['blockD'] = [256, 256, 256, 256]
+            kernel_config['gridD'] = [0,  (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0], \
+                                     (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0], \
+                                     (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
+            zpoly_vector1 = np.concatenate((zpoly_vector, inv_roots_rdc_u256))
+
+
+            result_ifft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,4)
+
+            kernel_params['forward'] = [1, 1, 1, 1]
+            zpoly_vector2 = np.concatenate((result_ifft2d, roots_rdc_u256))
+            result_fft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector2, kernel_config, kernel_params,4)
+
+            self.assertTrue(all(np.concatenate(result_fft2d == zpoly_vector)))
+
+    def test_8fft2D_65K(self):
+
+        ntest_points = CUZPolyTest.ntest_points
+        Nx = 9
+        Ny = 7
+        CUZPolyTest.nsamples = 1 << (Nx+Ny)
+        nsamples = CUZPolyTest.nsamples
+        ZUtils.NROOTS = CUZPolyTest.nsamples
+
+        if os.path.exists(ZPOLY_datafile_1M):
+           npzfile = np.load(ZPOLY_datafile_1M)
+           roots_rdc_u256 = npzfile['roots_rdc_u256']
+           
+           #roots_rdc = npzfile['roots_rdc']
+           #inv_roots_rdc = npzfile['inv_roots_rdc']
+           #ZField.roots[0] = roots_rdc
+           #ZField.inv_roots[0] = inv_roots_rdc
+       
+        else:
+           roots_ext, inv_roots_ext = ZField.find_roots(ZUtils.NROOTS, rformat_ext=True)
+           roots_rdc = [r.reduce() for r in roots_ext]
+           inv_roots_rdc = [r.reduce() for r in inv_roots_ext]
+           ZField.roots[0] = roots_rdc
+           ZField.inv_roots[0] = roots_rdc
+           roots_ext_u256 = np.asarray([x.as_uint256() for x in roots_ext])
+           inv_roots_ext_u256 = np.asarray([x.as_uint256() for x in inv_roots_ext])
+           roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc])
+           inv_roots_rdc_u256 = np.asarray([x.as_uint256() for x in inv_roots_rdc])
+          
+           np.savez_compressed(ZPOLY_datafile_1M, roots_ext=roots_ext, roots_rdc=roots_rdc, inv_roots_ext=inv_roots_ext, inv_roots_rdc=inv_roots_rdc,
+                                               roots_ext_u256 = roots_ext_u256, roots_rdc_u256=roots_rdc_u256, inv_roots_ext_u256=inv_roots_ext_u256,
+                                               inv_roots_rdc_u256=inv_roots_rdc_u256)
+
+
+        kernel_config = {}
+        kernel_params = {}
+        roots_rdc_u256 = roots_rdc_u256[::1<<(20-Nx-Ny)]
+        CUZPolyTest.cu_zpoly = ZCUPoly(2*nsamples, seed=560)
+        CUZPolyTest.u256 = U256(nsamples, seed=560)
+        cu_zpoly = CUZPolyTest.cu_zpoly
+        u256 = CUZPolyTest.u256
+        u256_p = CUZPolyTest.u256_p
+        n_kernels = 4
+        fft_xx = 5
+        fft_xy = 4
+        fft_yx = 4
+        fft_yy = 3
+
+        for iter in xrange(CUZPolyTest.TEST_ITER):
+            zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
+
+            # Test FFT kernel:
+
+            kernel_params['in_length'] = [2*CUZPolyTest.nsamples, nsamples, nsamples, nsamples]
+            kernel_params['out_length'] = nsamples
+            kernel_params['stride'] = [2,1,1,1]
+            kernel_params['premod'] = [0,0,0,0]
+            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
+            kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
+            kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
+            kernel_params['N_fftx'] = [Nx, Nx, Nx, Nx]
+            kernel_params['N_ffty'] = [Ny, Ny, Ny, Ny]
+            kernel_params['forward'] = [1, 1, 1, 1]
+
+            kernel_config['smemS'] = [0, 0, 0, 0]
+            kernel_config['blockD'] = [256, 256, 256, 256]
+            kernel_config['gridD'] = [0,  (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0], \
+                                     (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0], \
+                                     (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]
+            kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
+            zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
+
+            #if os.path.exists(ZPOLY_input_npz_datafile_65K):
+              #npzfile = np.load(ZPOLY_input_npz_datafile_65K)
+              #zpoly_vector = npzfile['in_data']
+              #zpoly_vector1 = np.concatenate((zpoly_vector, roots_rdc_u256))
+
+            result_fft2d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,4)
+            #cu_zpoly.saveFile(result_fft2d.reshape(-1), ZPOLY_inputyy_datafile_65K)
+            #f = open("./testyy_65K.txt","w")
+            #for r in result_fft2d[:64*1024]:
+               #f.write(np.array2string(r,max_line_width=90))
+               #f.write("\n")
+            #f.close()
+
+            r_u256 = ntt_parallel2D_h(zpoly_vector, roots_rdc_u256, Ny, fft_yy, Nx, fft_xx, 1)
+            self.assertTrue(all(np.concatenate(result_fft2d == r_u256)))
+
+            if not os.path.exists(ZPOLY_output_datafile_65K):
+               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_65K)
+               np.savez_compressed(ZPOLY_input_npz_datafile_65K, in_data=zpoly_vector)
+               cu_zpoly.saveFile(result_fft2d.reshape(-1), ZPOLY_output_datafile_65K)
+
+    def test_10add_zpoly(self):
 
         u256_p = CUZPolyTest.u256_p
         CUZPolyTest.nsamples = 1024 
@@ -691,7 +887,7 @@ class CUZPolyTest(unittest.TestCase):
             result_add_zpoly = ZPoly.from_uint256(result_add, reduced=True)
             self.assertTrue(zpoly_r == result_add_zpoly)
 
-    def test_8divsnarks(self):
+    def test_11divsnarks(self):
 
         u256_p = CUZPolyTest.u256_p
         CUZPolyTest.nsamples = 1024 
