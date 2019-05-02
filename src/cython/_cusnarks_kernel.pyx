@@ -256,6 +256,23 @@ def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
       return np.reshape(in_A_flat,(-1,n))
 
+def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, 
+          np.ndarray[ndim=1, dtype=np.uint32_t] scaler, ct.uint32_t pidx):
+
+      cdef ct.uint32_t n = in_A.shape[1]
+      cdef ct.uint32_t L = int(np.log2(len(in_roots)))
+
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_A_flat = np.zeros(in_A.shape[0] * in_A.shape[1], dtype=np.uint32)
+
+      in_roots_flat = np.concatenate(in_roots)
+      in_A_flat = np.concatenate(in_A)
+
+      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], &scaler[0], L, pidx)
+
+      return np.reshape(in_A_flat,(-1,n))
+
 def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nroots, ct.uint32_t pidx):
  
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_roots_flat = np.zeros(nroots * len(in_proot), dtype=np.uint32)
