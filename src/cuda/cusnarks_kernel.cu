@@ -394,6 +394,19 @@ void CUSnarks::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod=NUL
     rng->randu256(samples, n_samples, mod);
 }
 
+void CUSnarks::saveFile(uint32_t *samples, uint32_t n_samples, char *fname)
+{
+  uint32_t i;
+  FILE *pFile;
+
+  pFile = fopen(fname,"wb");
+
+  for (i=0; i< n_samples * 8; i++){
+    fwrite(&samples[i],sizeof(uint32_t), 1, pFile);
+  }
+  fclose(pFile);
+}
+
 /*
    Free memory allocated in GPU:
 */

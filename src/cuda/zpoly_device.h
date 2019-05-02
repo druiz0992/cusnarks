@@ -34,7 +34,15 @@
 #define _ZPOLY_DEVICE_H_
 
 #define ZPOLY_FFT_32 (5)
+#define ZPOLY_BASE  (19)
+#define ZPOLY_BASE32 (5)
+#define ZPOLY_MOD255 (255)
 
+#define ZPOLY_BASE_OFFSET(N)   ( (ZPOLY_BASE) + (ZPOLY_BASE32) - (N))
+#define ZPOLY_BASE_MASK(N)     ( (ZPOLY_MOD255) >> ( (ZPOLY_BASE32) - (N) ))
+
+#define ZPOLY_REVERSE_IDX(X,N, offset, mask)  (((((( (X) & (N) ) * 0x802 & 0x22110) | ( ( (X) & (N) ) * 0x8020 & 0x88440)) * 0x10101 >> (offset) ) & (mask) )) 
+      
 __global__ void zpoly_add_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_sub_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_mulc_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);

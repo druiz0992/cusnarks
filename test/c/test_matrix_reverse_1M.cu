@@ -16,27 +16,22 @@ xx
 __global__ void fft3dxx_kernel(int *out_vector_d, int *in_vector_d, int Nx1, int Nx2, int Ny1, int Ny2)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    int new_ridx = ((tid/32) % 32) * 1024;
+    int new_ridx = ((tid%1024) / 32) * 1024;
     int new_cidx = (tid % 32) * 32 * 1024;  
     int new_kidx = (tid/1024);
     int new_ridx2, new_cidx2, new_kidx2;
     int reverse_idx;
 
-    #if 0 
     if (tid == 0){
        for (int i = 0; i < 2048; i++){
-         //reverse_idx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff)+32*((i%1024)/32))*1024*32;
          reverse_idx = ((((((i % 32) * 0x802 & 0x22110) | ( (i%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*32*1024;
-         new_ridx2 = ((i/32) % 32) * 1024;
+         new_ridx2 = ((i%1024) / 32) * 1024;
          new_cidx2 = (i % 32) * 32 * 1024;
          new_kidx2 = (i/1024);
-         //printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d\n",i, new_ridx2, new_cidx2, new_kidx2, reverse_idx,
-                                                                                                         //new_ridx2/1024, reverse_idx/(1024*32));
-         printf("tid : %d, in_idx : %d, out_idx: %d, root_idx: %d\n", i, new_ridx2 + new_cidx2 + new_kidx2, reverse_idx + new_kidx2 + new_ridx2,
-                                                                      new_ridx2/1024 * reverse_idx / (1024*32));
+         printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d\n",i, new_ridx2, new_cidx2, new_kidx2, reverse_idx, new_ridx2/1024, reverse_idx/(1024*32));
+         printf("tid : %d, in_idx : %d, out_idx: %d, root_idx: %d\n", i, new_ridx2 + new_cidx2 + new_kidx2, reverse_idx + new_kidx2 + new_ridx2, new_ridx2/1024 * reverse_idx / (1024*32) * 1024);
        }
     }
-    #endif
     reverse_idx = ((((((tid % 32) * 0x802 & 0x22110) | ( (tid%32) * 0x8020 & 0x88440)) * 0x10101 >> 19) &0xff))*32*1024;
 
     out_vector_d[reverse_idx + new_kidx +new_ridx] = in_vector_d[new_ridx + new_cidx + new_kidx];
@@ -189,7 +184,7 @@ main()
 
   cudaMemcpy(in_vector_d, in_vector_h, MSIZE * sizeof(int), cudaMemcpyHostToDevice);
 
-  #if 0
+  printf("XXXXXXXXXXXXXXXXXXXXX\n");
   printf("In\n");
   for (j=0;j<(1 << nrows);j++){
      for (i=0;i< (1 << ncols); i++){
@@ -197,23 +192,25 @@ main()
      }
      printf("\n");
   }
-  #endif
+  printf("XXXXXXXXXXXXXXXXXXXXX\n");
+
   blockS =256;
   gridS = (MSIZE + blockS - 1)/blockS;
   fft3dxx_kernel<<<gridS,blockS>>>(out_vector_d, in_vector_d, NX, NX2, NY,NY2);
   cudaDeviceSynchronize();
   cudaMemcpy(out_vector_h, out_vector_d, MSIZE * sizeof(int), cudaMemcpyDeviceToHost);
 
-  #if 0
-  printf("xx\n");
+  printf("XXXXXXXXXXXXXXXXXXXXX\n");
+  printf("Out XX\n");
   for ( j=0;j< (1 << nrows);j++){
      for (i=0;i< (1 << ncols); i++){
         printf("%d ",out_vector_h[i+(j<<ncols)]);
      }
      printf("\n");
   }
-  #endif
+  printf("XXXXXXXXXXXXXXXXXXXXX\n");
 
+  #if 0
   cudaMemcpy(in_vector_d, out_vector_h, MSIZE * sizeof(int), cudaMemcpyHostToDevice);
   //cudaMemset(out_vector_d, 0, MSIZE*sizeof(int));
   fft3dxy_kernel<<<gridS,blockS>>>(out_vector_d, in_vector_d, NX, NX2, NY,NY2);
@@ -257,6 +254,8 @@ main()
   }
 
   #endif 
+
+  #endif
   cudaFree(in_vector_d);
   cudaFree(out_vector_d);
   free(in_vector_h);
