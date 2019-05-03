@@ -69,9 +69,9 @@ cdef extern from "types.h":
       uint32_t out_length
       uint32_t stride
       fft_size_t fft_Nx
-      fft_size_t N_fftx
+      uint32_t N_fftx
       fft_size_t fft_Ny
-      fft_size_t N_ffty
+      uint32_t N_ffty
       uint32_t forward
       uint32_t padding_idx
       mod_t midx

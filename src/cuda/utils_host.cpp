@@ -115,6 +115,7 @@ static uint32_t _1[] = {
 uint32_t debug_rowidx;
 
 #ifdef UTILS_DEBUG
+
 #define MAX_ITER 10
 #define NROOTS_1M 20
 #define NCOLS_1M 10
@@ -1532,6 +1533,23 @@ void intt_h(uint32_t *A, uint32_t *roots, uint32_t *scaler, uint32_t levels, uin
   
 }
 
+#if 0
+void build_ntt_h(ntt_params_t *ntt_params, uint32_t nsamples)
+{
+  if (nsamples <= 32){
+    ntt_params->type =  FFT_T_1D;
+
+  } else if (nsamples <= 1024) {
+    ntt_params->type =  FFT_T_2D;
+
+  } else if (nsamples <= (1<<20) ) {
+    ntt_params->type =  FFT_T_3D;
+
+  } else {
+    ntt_params->type =  FFT_T_4D;
+  }
+}
+#endif
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
    uint32_t tmp[NDIGITS];
@@ -2209,24 +2227,35 @@ void test_findroots(void)
 
 }
 
-void test_ntt(void)
+void test_ntt(uint32_t forward)
 {
   int i,j;
   int pidx=1;
   int n_errors=0;
   int nroots = sizeof(roots_128_test)/(sizeof(uint32_t)*NDIGITS);
-  int levels=0;
-  int tmp = nroots;
+  uint32_t *samples = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+  uint32_t *result = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+  uint32_t *samples2 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+  uint32_t *roots = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+  int levels=7;
+  uint32_t scaler[]= {0,0,0,0,0,0,0,33554432};
 
-  while(tmp !=0 ){
-      tmp >>=1;
-      levels++;
+  memcpy(samples, poly_fft_in_test, nroots * NDIGITS * sizeof(uint32_t));
+  readFile(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
+
+  if (forward){
+     memcpy(result, poly_fft_out_test, nroots * NDIGITS * sizeof(uint32_t));
+     ntt_h(samples, roots, levels, pidx);
+
+  } else {
+     memcpy(result, samples, nroots * NDIGITS * sizeof(uint32_t));
+     ntt_h(samples, roots, levels, pidx);
+     readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
+     intt_h(samples, roots, scaler, levels, pidx);
   }
 
-  ntt_h(poly_fft_in_test, roots_128_test, levels-1, pidx);
-
   for (j=0;j<nroots; j++){
-      if (mpCompare(&poly_fft_in_test[j*NDIGITS],&poly_fft_out_test[j*NDIGITS],NDIGITS)){
+      if (mpCompare(&samples[j*NDIGITS],&result[j*NDIGITS],NDIGITS)){
           printf("Error in poly coeff %d\n",j);
           printf("Expected\n");
           printNumber(&poly_fft_out_test[j*NDIGITS]);
@@ -2235,7 +2264,15 @@ void test_ntt(void)
           n_errors++;
        }
   }
-  printf("N errors(FFT) : %d/%d\n",n_errors, j);
+  if (forward){
+    printf("N errors(FFT-128) : %d/%d\n",n_errors, j);
+  } else {
+    printf("N errors(IFFT-128) : %d/%d\n",n_errors, j);
+  }
+
+  free(samples);
+  free(samples2);
+  free(roots);
 }
 
 void test_ntt_parallel(void)
@@ -2304,7 +2341,7 @@ void test_ntt_parallel_65K(void)
            n_errors++;
         }
     }
-    printf("N errors(FFT) : NTT parallel %d/%d\n",n_errors, j);
+    printf("N errors(FFT-65K) :NTT parallel 1D %d/%d\n",n_errors, j);
 
     free(samples);
     free(samples2);
@@ -2339,11 +2376,9 @@ void test_ntt_parallel2D_65K(uint32_t forward)
        ntt_h(samples2, roots, levels, pidx);
      } else {
        readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
-       //intt_parallel2D_h(samples, roots, scaler, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
-       //ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
-       intt_h(samples2, roots, scaler, levels, pidx);
+       intt_parallel2D_h(samples, roots, scaler, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
        readFile(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
-       ntt_h(samples2, roots, levels, pidx);
+       ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
      }
   
      for (j=0;j<nroots; j++){
@@ -2365,6 +2400,70 @@ void test_ntt_parallel2D_65K(uint32_t forward)
   
     free(samples);
     free(samples2);
+    free(roots);
+}
+
+void test_nttmul_parallel2D_65K(void)
+{
+   int i,j,k;
+   int pidx=1;
+   int n_errors=0;
+   int Nrows = NROWS_65K, Ncols = NCOLS_65K;
+   int fft_Ny = FFT_SIZEYX_65K, fft_Nx = FFT_SIZEXX_65K;
+   int nroots = 1 << (Nrows + Ncols);
+   int levels=Nrows + Ncols;
+   uint32_t *X1 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *Y1 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *X2 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *Y2 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *roots = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t scaler[] = {0,0,0,0,0,0,0,65536}; 
+
+   for (k=0; k <MAX_ITER; k++){
+     memset(X1,0, NDIGITS * sizeof(uint32_t)); 
+     memset(Y1,0, NDIGITS * sizeof(uint32_t)); 
+     for (i=0; i < nroots/2; i++){
+       setRandom256(&X1[i*NDIGITS], &N[pidx*NDIGITS]);
+       setRandom256(&Y1[i*NDIGITS], &N[pidx*NDIGITS]);
+     }
+     memcpy(X2, X1, nroots * NDIGITS * sizeof(uint32_t));
+     memcpy(Y2, Y1, nroots * NDIGITS * sizeof(uint32_t));
+ 
+     readFile(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
+     ntt_parallel2D_h(X1, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
+     ntt_parallel2D_h(Y1, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
+
+     ntt_h(X2, roots, levels, pidx);
+     ntt_h(Y2, roots, levels, pidx);
+     
+     for (j=0; j < nroots; j++){
+       montmult_h(&Y1[j*NDIGITS], &Y1[j*NDIGITS], &X1[j*NDIGITS], pidx);
+       montmult_h(&Y2[j*NDIGITS], &Y2[j*NDIGITS], &X2[j*NDIGITS], pidx);
+     }
+
+     readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
+
+     intt_parallel2D_h(Y1, roots,scaler, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
+     intt_h(Y2, roots, scaler, levels, pidx);
+
+     for (j=0;j<nroots; j++){
+         if (mpCompare(&Y1[j*NDIGITS],&Y2[j*NDIGITS],NDIGITS)){
+             printf("Error in poly coeff %d\n",j);
+             printf("Expected\n");
+             printNumber(&Y2[j*NDIGITS]);
+             printf("Obtained\n");
+             printNumber(&Y1[j*NDIGITS]);
+             n_errors++;
+          } 
+      }
+
+      printf("N errors(FFTMUL-65K) : NTT parallel 2D File %d/%d\n",n_errors, j);
+    }
+
+    free(X1);
+    free(X2);
+    free(Y1);
+    free(Y2);
     free(roots);
 }
 
@@ -2584,7 +2683,7 @@ void test_ntt_parallel_1M(void)
            n_errors++;
         } 
     }
-    printf("N errors(FFT) : %d/%d\n",n_errors, j);
+    printf("N errors(FFT-1M) :NTT parallel 1D %d/%d\n",n_errors, j);
 
     free(samples);
     free(samples2);
@@ -2604,9 +2703,7 @@ void test_ntt_parallel2D_1M(uint32_t forward)
    uint32_t *samples = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
    uint32_t *samples2 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
    uint32_t *roots = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
-   uint32_t scaler[] = {0,0,0,0,0,0,0,4096}; 
-
-   to_montgomery_h(scaler, scaler,  pidx);
+   uint32_t scaler[] = {0,0,0,0,0,0,0,4096};
 
    for (k=0; k <MAX_ITER; k++){
   
@@ -2622,7 +2719,8 @@ void test_ntt_parallel2D_1M(uint32_t forward)
      } else {
        readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
        intt_parallel2D_h(samples, roots, scaler, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
-       intt_h(samples2, roots, scaler, levels, pidx);
+       readFile(roots,roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
+       ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
      }
   
   
@@ -2649,6 +2747,72 @@ void test_ntt_parallel2D_1M(uint32_t forward)
     free(roots);
 }
 
+void test_nttmul_parallel2D_1M(void)
+{
+   int i,j,k;
+   int pidx=1;
+   int n_errors=0;
+   int Nrows = NROWS_1M, Ncols = NCOLS_1M;
+   int fft_Ny = FFT_SIZEYX_1M, fft_Nx = FFT_SIZEXX_1M;
+   int nroots = 1 << (Nrows + Ncols);
+   int levels=Nrows + Ncols;
+   int tmp = nroots;
+   uint32_t *X1 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *Y1 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *X2 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *Y2 = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t *roots = (uint32_t *)malloc(nroots * NDIGITS * sizeof(uint32_t));
+   uint32_t scaler[] = {0,0,0,0,0,0,0,4096};
+
+   for (k=0; k <MAX_ITER; k++){
+     memset(X1,0, NDIGITS * sizeof(uint32_t)); 
+     memset(Y1,0, NDIGITS * sizeof(uint32_t)); 
+     for (i=0; i < nroots/2; i++){
+       setRandom256(&X1[i*NDIGITS], &N[pidx*NDIGITS]);
+       setRandom256(&Y1[i*NDIGITS], &N[pidx*NDIGITS]);
+     }
+     memcpy(X2, X1, nroots * NDIGITS * sizeof(uint32_t));
+     memcpy(Y2, Y1, nroots * NDIGITS * sizeof(uint32_t));
+ 
+     readFile(roots,roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
+     ntt_parallel2D_h(X1, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+     ntt_parallel2D_h(Y1, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+
+     ntt_h(X2, roots, levels, pidx);
+     ntt_h(Y2, roots, levels, pidx);
+     
+     for (j=0; j < nroots; j++){
+       montmult_h(&Y1[j*NDIGITS], &Y1[j*NDIGITS], &X1[j*NDIGITS], pidx);
+       montmult_h(&Y2[j*NDIGITS], &Y2[j*NDIGITS], &X2[j*NDIGITS], pidx);
+     }
+
+     readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
+
+     intt_parallel2D_h(Y1, roots,scaler, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+     intt_h(Y2, roots, scaler,levels, pidx);
+
+     for (j=0;j<nroots; j++){
+         if (mpCompare(&Y1[j*NDIGITS],&Y2[j*NDIGITS],NDIGITS)){
+             printf("Error in poly coeff %d\n",j);
+             printf("Expected\n");
+             printNumber(&Y2[j*NDIGITS]);
+             printf("Obtained\n");
+             printNumber(&Y1[j*NDIGITS]);
+             n_errors++;
+          } 
+      }
+
+      printf("N errors(FFTMUL-1M) : NTT parallel 2D File %d/%d\n",n_errors, j);
+    }
+
+    free(X1);
+    free(X2);
+    free(Y1);
+    free(Y2);
+    free(roots);
+}
+
+
 
 
 int main()
@@ -2659,7 +2823,8 @@ int main()
   //test_mul4(); // test SOS impl of montgomery squaring
   //test_mul5(); // test FIOS impl of montgomery squaring
   //test_findroots();
-  //test_ntt();
+  test_ntt(1);
+  test_ntt(0);
   //test_ntt_parallel();
   //test_ntt_file_1M();
   //test_ntt_parallel_file_1M();
@@ -2672,14 +2837,15 @@ int main()
   //test_ntt_parallel2D_file_1M(3);
   //test_ntt_parallel2D_1M(1);  // Forward FFT
   //test_ntt_parallel2D_1M(0);  // IFFT
-
+  //test_nttmul_parallel2D_1M();
 
   //test_ntt_parallel2D_file_65K(0);
   //test_ntt_parallel2D_file_65K(1);
   //test_ntt_parallel2D_file_65K(2);
   //test_ntt_parallel2D_file_65K(3);
   //test_ntt_parallel2D_65K(1); // Forward FFT
-  test_ntt_parallel2D_65K(0); // IFFT
+  //test_ntt_parallel2D_65K(0); // IFFT
+  test_nttmul_parallel2D_65K();
 
   return 1;
 }

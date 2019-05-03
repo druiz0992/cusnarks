@@ -41,6 +41,7 @@ void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols
 void intt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t *scaler, uint32_t Nrows, uint32_t Ncols, uint32_t pidx, uint32_t mode);
 void ntt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t fft_Ny,  uint32_t Ncols, uint32_t fft_Nx, uint32_t pidx, uint32_t mode);
 void intt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t *scaler, uint32_t Nrows, uint32_t fft_Ny,  uint32_t Ncols, uint32_t fft_Nx, uint32_t pidx, uint32_t mode);
+//void build_ntt_h(ntt_t *ntt_params, uint32_t nsamples);
 int compu256_h(uint32_t *x, uint32_t *y);
 void subu256_h(uint32_t *x, uint32_t *y);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, uint32_t  *start, uint32_t inc,  uint32_t *mod);

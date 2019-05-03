@@ -98,6 +98,27 @@ typedef int int32_t;
 typedef unsigned int uint256_t[NWORDS_256BIT];
 typedef unsigned int uint512_t[2*NWORDS_256BIT];
 
+typedef enum{
+  FFT_T_1D = 0, // N < 32
+  FFT_T_2D,     // 32 < N < 1024
+  FFT_T_3D,     // 1024 < N < 2^20
+  FFT_T_4D,     // 2^20 < N < 2^40
+  FFT_T_N 
+
+}fft_t;
+
+#if 0
+typedef struct{
+  ntt_t type;
+  fft_size_t fft1D_Nx;     // 1,2,3,4,5 -> underlying FFT 
+  fft_size_t fft1D_Ny;
+  uint32_t N_fftx;       // 
+  uint32_t N_ffty;
+  
+  
+}ntt_params_t;
+#endif
+
 // prime number info for finite fields
 typedef struct {
    uint32_t p[NWORDS_256BIT];
@@ -150,6 +171,7 @@ typedef enum{
 
 }mod_t;
 
+
 // data vector
 typedef struct{
   uint32_t *data;
@@ -179,9 +201,9 @@ typedef struct{
    uint32_t out_length; // output data length (number of elements)
    uint32_t stride; // data elemements processed by thread
    fft_size_t fft_Nx;
-   fft_size_t N_fftx;
+   uint32_t N_fftx;
    fft_size_t fft_Ny;
-   fft_size_t N_ffty;
+   uint32_t N_ffty;
    uint32_t forward;
    uint32_t padding_idx;
    mod_t    midx;   // index to prime number to be used by kernel
