@@ -98,27 +98,6 @@ typedef int int32_t;
 typedef unsigned int uint256_t[NWORDS_256BIT];
 typedef unsigned int uint512_t[2*NWORDS_256BIT];
 
-typedef enum{
-  FFT_T_1D = 0, // N < 32
-  FFT_T_2D,     // 32 < N < 1024
-  FFT_T_3D,     // 1024 < N < 2^20
-  FFT_T_4D,     // 2^20 < N < 2^40
-  FFT_T_N 
-
-}fft_t;
-
-#if 0
-typedef struct{
-  ntt_t type;
-  fft_size_t fft1D_Nx;     // 1,2,3,4,5 -> underlying FFT 
-  fft_size_t fft1D_Ny;
-  uint32_t N_fftx;       // 
-  uint32_t N_ffty;
-  
-  
-}ntt_params_t;
-#endif
-
 // prime number info for finite fields
 typedef struct {
    uint32_t p[NWORDS_256BIT];
@@ -192,6 +171,23 @@ typedef enum{
 
 }fft_size_t;
   
+
+typedef enum{
+  FFT_T_1D = 0, // N < 32
+  FFT_T_2D,     // 32 < N < 1024
+  FFT_T_3D,     // 1024 < N < 2^20
+  FFT_T_4D,     // 2^20 < N < 2^40
+  FFT_T_N 
+
+}fft_t;
+
+typedef struct{
+  fft_t fft_type;
+  uint32_t fft_N[1<<(FFT_T_N-1)];
+  uint32_t padding;
+  uint32_t levels;
+  
+}fft_params_t;
 
 // kernel input parameters
 typedef struct{
@@ -268,12 +264,14 @@ typedef enum{
    CB_ZPOLY_FFT2DX,
    CB_ZPOLY_FFT2DY,
    CB_ZPOLY_FFT3DXX,
+   CB_ZPOLY_FFT3DXX_PREV,
    CB_ZPOLY_FFT3DXY,
    CB_ZPOLY_FFT3DYX,
    CB_ZPOLY_FFT3DYY,
    CB_ZPOLY_ADD,
    CB_ZPOLY_SUB,
    CB_ZPOLY_MULC,
+   CB_ZPOLY_MULCPREV,
    CB_ZPOLY_MULK,
    CB_ZPOLY_MADPREV,
    CB_ZPOLY_ADDPREV,

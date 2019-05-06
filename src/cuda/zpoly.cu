@@ -54,9 +54,9 @@ using namespace std;
 static kernel_cb zpoly_kernel_callbacks[] = {zpoly_fft32_kernel, zpoly_ifft32_kernel, zpoly_mul32_kernel,
                                              zpoly_fftN_kernel,  zpoly_ifftN_kernel, zpoly_mulN_kernel, 
                                              zpoly_fft2DX_kernel, zpoly_fft2DY_kernel,
-                                             zpoly_fft3DXX_kernel, zpoly_fft3DXY_kernel,
+                                             zpoly_fft3DXX_kernel, zpoly_fft3DXXprev_kernel, zpoly_fft3DXY_kernel,
                                              zpoly_fft3DYX_kernel, zpoly_fft3DYY_kernel,
-                                             zpoly_add_kernel, zpoly_sub_kernel, zpoly_mulc_kernel,
+                                             zpoly_add_kernel, zpoly_sub_kernel, zpoly_mulc_kernel, zpoly_mulcprev_kernel,
                                              zpoly_mulK_kernel, zpoly_madprev_kernel, zpoly_addprev_kernel,
                                              zpoly_divsnarks_kernel};
 

@@ -62,6 +62,15 @@ cdef extern from "types.h":
   ctypedef enum fft_size_t:
      FFT_SIZE_2 = 1, FFT_SIZE_4, FFT_SIZE_8, FFT_SIZE_16, FFT_SIZE_32, FFT_SIZE_1024, FFT_SIZE_1M, FFT_SIZE_N
 
+  ctypedef enum fft_t:
+    FFT_T_1D = 0, FFT_T_2D, FFT_T_3D,  FFT_T_4D,  FFT_T_N 
+
+  ctypedef struct fft_params_t:
+     fft_t fft_type
+     uint32_t fft_N[8]
+     uint32_t padding
+     uint32_t levels
+  
   ctypedef struct kernel_params_t:
       uint32_t premod
       uint32_t premul
@@ -94,8 +103,8 @@ cdef extern from "types.h":
       
   ctypedef enum zpoly_callback_t:
    CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_ZPOLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_ZPOLY_MULN, 
-   CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY, CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY,
-   CB_ZPOLY_ADD, CB_ZPOLY_SUB, CB_ZPOLY_MULC, CB_ZPOLY_MULK, CB_ZPOLY_MADPREV, CB_ZPOLY_ADDPREV,
+   CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY, CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXXPREV, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY,
+   CB_ZPOLY_ADD, CB_ZPOLY_SUB, CB_ZPOLY_MULC, CB_ZPOLY_MULCPREV, CB_ZPOLY_MULK, CB_ZPOLY_MADPREV, CB_ZPOLY_ADDPREV,
    CB_ZPOLY_DIVSNARKS, CB_ZPOLY_N
 
 _NWORDS_256BIT = NWORDS_256BIT

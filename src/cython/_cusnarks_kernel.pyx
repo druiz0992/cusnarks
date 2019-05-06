@@ -232,12 +232,12 @@ cdef class ZCUPoly (CUSnarks):
         del self._zpoly_ptr
 
 
-def montmult(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
         uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
   
-        return out_vec.data
+        return out_vec
 
 
 def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
@@ -257,8 +257,7 @@ def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       return np.reshape(in_A_flat,(-1,n))
 
 def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, 
-          np.ndarray[ndim=1, dtype=np.uint32_t] scaler, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef ct.uint32_t L = int(np.log2(len(in_roots)))
@@ -269,7 +268,7 @@ def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], &scaler[0], L, pidx)
+      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], L, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
@@ -309,6 +308,32 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
       return np.reshape(in_A_flat,(-1,n))
 
+def ntt_build_h(ct.uint32_t nsamples):
+     cdef ct.fft_params_t *fft_params = <ct.fft_params_t *> malloc(sizeof(ct.fft_params_t))
+   
+     uh.cntt_build_h(fft_params, nsamples)
+
+     py_fft_params={}
+     py_fft_params['fft_type'] = fft_params.fft_type
+     py_fft_params['padding'] = fft_params.padding
+     py_fft_params['levels'] = fft_params.levels
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] fft_sizes = np.zeros(1<<(ct.FFT_T_N-1), dtype=np.uint32)
+     py_fft_params['fft_N'] = fft_sizes
+
+     py_fft_params['fft_N'][0] = fft_params.fft_N[0]
+     py_fft_params['fft_N'][1] = fft_params.fft_N[1]
+     py_fft_params['fft_N'][2] = fft_params.fft_N[2]
+     py_fft_params['fft_N'][3] = fft_params.fft_N[3]
+     py_fft_params['fft_N'][4] = fft_params.fft_N[4]
+     py_fft_params['fft_N'][5] = fft_params.fft_N[5]
+     py_fft_params['fft_N'][6] = fft_params.fft_N[6]
+     py_fft_params['fft_N'][7] = fft_params.fft_N[7]
+
+     free(fft_params)
+
+     return py_fft_params
+    
+    
 def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] start, ct.uint32_t inc,
                                       np.ndarray[ndim=1, dtype=np.uint32_t] mod):
 
