@@ -49,6 +49,7 @@
 import json,ast
 import os.path
 import numpy as np
+import time
 
 from zutils import ZUtils
 from random import randint
@@ -74,15 +75,17 @@ DEFAULT_PROOF_LOC =  "../../data/proof.json"
 DEFAULT_PUBLIC_LOC =  "../../data/public.json"
 DATA_FOLDER = "../../data/"
 
+ROOTS_1M_filename = '../../data/zpoly_data_1M.npz'
+
 class GrothSnarks(object):
     
     GroupIDX = 0
     FieldIDX = 1
 
-    def __init__(self, curve='BN128', witness_f=DEFAULT_WITNESS_LOC, proving_key_f = DEFAULT_PROVING_KEY_LOC, proof_f = DEFAULT_PROOF_LOC, public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, work_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, work_coor_fmt= ZUtils.JACOBIAN, accel = True):
+    def __init__(self, proving_key_f, curve='BN128',  proof_f = DEFAULT_PROOF_LOC, public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, accel = True):
 
-        self.accel = True
-        data_init = self.read_data(witness_f, proving_key_f)
+        self.accel = accel
+        data_init = self.read_proof_data(proving_key_f)
 
         self.proof_f = proof_f
         self.public_f = public_f
@@ -94,6 +97,7 @@ class GrothSnarks(object):
         ECC.init(self.curve_data['curve_params'])
         ZPoly.init(GrothSnarks.FieldIDX)
 
+        # TODO : Not sure if default represenation is relly used
         ZUtils.set_default_in_p_format(in_point_fmt)  # FEXT
         ZUtils.set_default_in_rep_format(in_coor_fmt) # AFFINE/PROJECTIVE/JACOBIAN
 
@@ -102,14 +106,19 @@ class GrothSnarks(object):
           self.init_vars()
 
           if use_pycusnarks and self.accel:
-             self.init_u256_vars(witness_f, proving_key_f)
-
-        #TODO  : Remove once working in CUDA
-        ZField.set_field(GrothSnarks.FieldIDX)
-        ZField.find_roots(ZUtils.NROOTS)
-        ZField.set_field(GrothSnarks.GroupIDX)
+             self.init_u256_vars(proving_key_f)
 
         if use_pycusnarks and self.accel:
+          npzfile = np.load(ROOTS_1M_filename)
+          self.roots1M_rdc_u256 = npzfile['roots_rdc_u256']
+          #TODO : Temp nVars
+          self.oldnVars = self.vk_proof['nVars']
+          self.vk_proof['nVars'] = 512*1024
+          self.ecbn128 = ECBN128(self.vk_proof['nVars'] + 2,   seed=1)
+          self.ec2bn128 = EC2BN128(2*self.vk_proof['nVars'] + 2, seed=1)
+          self.cuzpoly = ZCUPoly(4*self.vk_proof['nVars']+2, seed=1)
+          
+          """
           nroots = 1 << int(np.ceil(np.log2(self.vk_proof['nVars'])))
           nroots = 1024
           self.roots1_u256 = self.get_roots_u256(nroots)
@@ -122,32 +131,31 @@ class GrothSnarks(object):
           # it seems the answer is always x^(n-1)+1. If this is the case, then it is easy
           #m = self.vk_proof['domainSize']
           #self.inv_poly_u256 = self.get_invpoly_u256(m)
+          """
 
-        """
-          TODO : pending capability to switch from FEXt to REDC and from/to affine/projective/affine
-            right now, everything is ext and jacobian. Also witness_scl needs to be xformed
 
-        """
-
-    def read_data(self, witness_f, proving_key_f):
+    def read_witness_data(self, witness_f):
        ## Open and parse witness data
+       """
        witness_fnpz = witness_f[:-4] + 'npz'
-       proving_key_fnpz = proving_key_f[:-4] + 'npz'
-       data_init = False
-      
-       if use_pycusnarks and os.path.isfile(witness_fnpz)  and os.path.isfile(proving_key_fnpz) and self.accel:
+       if use_pycusnarks and os.path.isfile(witness_fnpz)  and self.accel:
           npzfile = np.load(witness_fnpz)
           self.witness_scl_u256 = npzfile['witness_u256']
        
        elif os.path.isfile(witness_f):
+       """
+       if os.path.isfile(witness_f):
            f = open(witness_f,'r')
-           self.witness_scl = [long(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
+           self.witness_scl = [BigInt(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
            f.close()
        else:
           print "File doesn't exist"
           assert False
        
-       if use_pycusnarks and os.path.isfile(proving_key_fnpz) and os.path.isfile(witness_fnpz) and self.accel:
+    def read_proof_data(self, proving_key_f):
+       proving_key_fnpz = proving_key_f[:-4] + 'npz'
+       data_init = False
+       if use_pycusnarks and os.path.isfile(proving_key_fnpz) and self.accel:
           npzfile = np.load(proving_key_fnpz)
           self.vk_alfa_1_eccf1_u256 = npzfile['alfa_1_u256']
           self.vk_beta_1_eccf1_u256 = npzfile['beta_1_u256']
@@ -182,25 +190,30 @@ class GrothSnarks(object):
 
        return data_init
 
-    def init_u256_vars(self, witness_f, proving_key_f):
-       self.witness_scl_u256 = \
-          np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
-       self.vk_alfa_1_eccf1_u256 = ECC.as_uint256(self.vk_alfa_1_eccf1,remove_last=True)
-       self.vk_beta_1_eccf1_u256 = ECC.as_uint256(self.vk_beta_1_eccf1,remove_last=True)
-       self.vk_delta_1_eccf1_u256= ECC.as_uint256(self.vk_delta_1_eccf1,remove_last= True)
-       self.vk_beta_2_eccf2_u256 = ECC.as_uint256(self.vk_beta_2_eccf2, remove_last = True)
-       self.vk_delta_2_eccf2_u256 = ECC.as_uint256(self.vk_delta_2_eccf2, remove_last = True)
+    def init_u256_vars(self, proving_key_f):
+       #self.witness_scl_u256 = \
+          #np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
 
-       self.A_eccf1_u256 = ECC.as_uint256(self.A_eccf1, remove_last = True)
-       self.B1_eccf1_u256 = ECC.as_uint256(self.B1_eccf1, remove_last = True)
-       self.B2_eccf2_u256 = ECC.as_uint256(self.B2_eccf2, remove_last = True)
-       self.C_eccf1_u256  = ECC.as_uint256(self.C_eccf1, remove_last=True)
-       self.hExps_eccf1_u256 = ECC.as_uint256(self.hExps_eccf1, remove_last=True)
+       ZField.set_field(GrothSnarks.GroupIDX)
+       self.vk_alfa_1_eccf1_u256 = ECC.as_uint256(self.vk_alfa_1_eccf1,remove_last=True, as_reduced=True)
+       self.vk_beta_1_eccf1_u256 = ECC.as_uint256(self.vk_beta_1_eccf1,remove_last=True, as_reduced=True )
+       self.vk_delta_1_eccf1_u256= ECC.as_uint256(self.vk_delta_1_eccf1,remove_last= True, as_reduced=True)
+       self.vk_beta_2_eccf2_u256 = ECC.as_uint256(self.vk_beta_2_eccf2, remove_last = True, as_reduced=True)
+       self.vk_delta_2_eccf2_u256 = ECC.as_uint256(self.vk_delta_2_eccf2, remove_last = True, as_reduced=True)
 
+       self.A_eccf1_u256 = ECC.as_uint256(self.A_eccf1, remove_last = True, as_reduced=True)
+       self.B1_eccf1_u256 = ECC.as_uint256(self.B1_eccf1, remove_last = True, as_reduced=True)
+       self.B2_eccf2_u256 = ECC.as_uint256(self.B2_eccf2, remove_last = True, as_reduced=True)
+       self.C_eccf1_u256  = ECC.as_uint256(self.C_eccf1, remove_last=True, as_reduced=True)
+       self.hExps_eccf1_u256 = ECC.as_uint256(self.hExps_eccf1, remove_last=True, as_reduced=True)
+
+
+
+       ZField.set_field(GrothSnarks.FieldIDX)
        polsA_l = []
        polsA_p = []
        for pol in self.polsA_sps:
-         l,p = pol.as_uint256() 
+         l,p = pol.reduce().as_uint256() 
          polsA_l.append(l)
          polsA_p.append(p)
        self.polsA_sps_u256 = np.asarray(np.concatenate((np.asarray([len(polsA_l)]),
@@ -209,7 +222,7 @@ class GrothSnarks(object):
        polsB_l = []
        polsB_p = []
        for pol in self.polsB_sps:
-         l,p = pol.as_uint256() 
+         l,p = pol.reduce().as_uint256() 
          polsB_l.append(l)
          polsB_p.append(p)
        self.polsB_sps_u256 = np.asarray(np.concatenate((np.asarray([len(polsB_l)]),
@@ -218,17 +231,17 @@ class GrothSnarks(object):
        polsC_l = []
        polsC_p = []
        for pol in self.polsC_sps:
-         l,p = pol.as_uint256() 
+         l,p = pol.reduce().as_uint256() 
          polsC_l.append(l)
          polsC_p.append(p)
        self.polsC_sps_u256 = np.asarray(np.concatenate((np.asarray([len(polsC_l)]),
                                     np.concatenate((np.cumsum(polsC_l),np.concatenate(polsC_p))))),dtype=np.uint32)
 
        
-       witness_fnpz = witness_f[:-4] + 'npz'
+       #witness_fnpz = witness_f[:-4] + 'npz'
        proving_key_fnpz = proving_key_f[:-4] + 'npz'
 
-       np.savez_compressed(witness_fnpz, witness_u256=self.witness_scl_u256)
+       #np.savez_compressed(witness_fnpz, witness_u256=self.witness_scl_u256)
        np.savez_compressed(proving_key_fnpz, alfa_1_u256 =  self.vk_alfa_1_eccf1_u256,
                              beta_1_u256 = self.vk_beta_1_eccf1_u256, delta_1_u256 = self.vk_delta_1_eccf1_u256,
                              beta_2_u256 = self.vk_beta_2_eccf2_u256, delta_2_u256 = self.vk_delta_2_eccf2_u256,
@@ -281,7 +294,7 @@ class GrothSnarks(object):
         # Init witness to Field El.
         # TODO :  I am assuming that all field el are FielElExt (witness_scl, polsA_sps, polsB_sps, polsC_sps, alfa1...
         # Witness is initialized a BitInt as it will operate on different fields
-        self.witness_scl = [BigInt(el) for el in self.witness_scl]
+        #self.witness_scl = [BigInt(el) for el in self.witness_scl]
 
         # Init pi's
         self.pi_a_eccf1 = ECC_F1()
@@ -322,8 +335,6 @@ class GrothSnarks(object):
             r_scl = r_scl.reduce()
             s_scl = s_scl.reduce()
         """
-        ZField.set_field(GrothSnarks.GroupIDX)
-
 
     @classmethod
     def json_to_dict(cls, data):
@@ -357,11 +368,17 @@ class GrothSnarks(object):
             return False
         return True
 
-    def gen_proof(self, piter):
+    def gen_proof(self, witness_f):
         """
           public_signals, pi_a_eccf1, pi_b_eccf2, pi_c_eccf1 
         """
-        self.proof_iter = piter
+        # Read witness
+        self.t_GP = []
+        start = time.time()
+        self.read_witness_data(witness_f)
+        end = time.time()
+        self.t_GP.append(end - start)
+
         ZField.set_field(GrothSnarks.FieldIDX)
         # Init r and s scalars
         self.r_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
@@ -369,22 +386,21 @@ class GrothSnarks(object):
         if use_pycusnarks and self.accel:
            self.r_scl_u256 = self.r_scl.as_uint256()
            self.s_scl_u256 = self.s_scl.as_uint256()
-        ZField.set_field(GrothSnarks.GroupIDX)
+           self.witness_scl_u256 = \
+             np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
 
 
         # init Pi B1 ECC point
         #pi_a, pi_b, pi_c, pib1 F (mod q)
         #pib1_eccf1 = ECC_F1()
 
-        #TODO
-        self.witness_scl_u256=np.tile(self.witness_scl_u256,(2*1024*1024//len(self.witness_scl_u256)+20,1))
-        self.A_eccf1_u256 = np.tile(self.A_eccf1_u256,(2*1024*1024//len(self.A_eccf1_u256)+20,1))
-        self.B2_eccf2_u256 = np.tile(self.B2_eccf2_u256,(4*1024*1024//len(self.B2_eccf2_u256)+20,1))
-        self.B1_eccf1_u256 = np.tile(self.B1_eccf1_u256,(2*1024*1024//len(self.B1_eccf1_u256)+20,1))
-        self.C_eccf1_u256 = np.tile(self.C_eccf1_u256,(2*1024*1024//len(self.C_eccf1_u256)+20,1))
-        self.oldnVars = self.vk_proof['nVars']
-        self.vk_proof['nVars'] = 1024*1024
-        self.roots1_u256 = self.get_roots_u256(1024*1024)
+        #TODO -> extend length to desired test length
+        if use_pycusnarks and self.accel:
+          self.witness_scl_u256=np.tile(self.witness_scl_u256,(2*self.vk_proof['nVars']//len(self.witness_scl_u256)+1,1))
+          self.A_eccf1_u256 = np.tile(self.A_eccf1_u256,(2*self.vk_proof['nVars']//len(self.A_eccf1_u256)+1,1))
+          self.B2_eccf2_u256 = np.tile(self.B2_eccf2_u256,(4*self.vk_proof['nVars']//len(self.B2_eccf2_u256)+1,1))
+          self.B1_eccf1_u256 = np.tile(self.B1_eccf1_u256,(2*self.vk_proof['nVars']//len(self.B1_eccf1_u256)+1,1))
+          self.C_eccf1_u256 = np.tile(self.C_eccf1_u256,(2*self.vk_proof['nVars']//len(self.C_eccf1_u256)+1,1))
 
         # Accumulate multiplication of S EC points and S scalar. Parallelization
         # can be accomplised by each thread performing a multiplication and storing
@@ -392,52 +408,75 @@ class GrothSnarks(object):
         # Second step is to add all ECC points
         pib1_eccf1 = self.findECPoints()
 
-
-        ZField.set_field(GrothSnarks.FieldIDX)
         d1 = d2 = d3 = 0
+        # polH must be in extended format
         polH = self.calculateH(d1, d2, d3)
-        #TODO
         
-        return self.t_EC, self.t_P
-        coeffH = polH.get_coeff()
+        if use_pycusnarks and self.accel:
+          start = time.time()
+          ZField.set_field(GrothSnarks.FieldIDX)
+          d4_u256  = ZFieldElExt(-self.r_scl * self.s_scl).as_uint256()
 
-        d4  = ZFieldElExt(-(self.r_scl * self.s_scl))
-        ZField.set_field(GrothSnarks.GroupIDX)
-        d5  = d4 * self.vk_delta_1_eccf1
+          ZField.set_field(GrothSnarks.GroupIDX)
+          self.pi_a_eccf1 = ECC.from_uint256(self.pi_a_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
+          self.pi_a_eccf1 = ECC.as_uint256(self.pi_a_eccf1, remove_last=True)
+          self.pi_b_eccf2 = ECC.from_uint256(np.reshape(self.pi_b_eccf2,(3,2,-1)),
+                                             in_ectype =1, out_ectype=2, reduced = True, ec2=True)[0]
+          self.pi_b_eccf2 = ECC.as_uint256(self.pi_b_eccf2, remove_last=True)
+          pib1_eccf1 = ECC.from_uint256(pib1_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
+          pib1_eccf1 = ECC.as_uint256(pib1_eccf1, remove_last = True)
 
-        # Accumulate products of S ecc points and S scalars (same as at the beginning)
-        n_coeff_h = len(coeffH)
-        self.pi_c_eccf1 += np.sum(np.multiply(self.hExps_eccf1[:n_coeff_h ], coeffH[:n_coeff_h]))
+          K = np.concatenate((polH,[self.s_scl_u256],[self.r_scl_u256],[d4_u256]))
+          P = np.concatenate((self.hExps_eccf1_u256[:2*len(polH)], self.pi_a_eccf1, pib1_eccf1, self.vk_delta_1_eccf1_u256))
+          ecbn128_samples = np.concatenate((K,P))
+          self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+          self.t_EC.append(t1)
+          self.pi_c_eccf1 = ECC.from_uint256(self.pi_c_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
+          self.pi_c_eccf1 = ECC.as_uint256(self.pi_c_eccf1, remove_last = True)
+          self.public_signals = self.witness_scl_u256[1:self.vk_proof['nPublic']+1]
+          end = time.time()
+          self.t_GP.append(end - start)
+
+        else :
+          d4  = ZFieldElExt(-(self.r_scl * self.s_scl))
+          ZField.set_field(GrothSnarks.GroupIDX)
+          d5  = d4 * self.vk_delta_1_eccf1
+
+          coeffH = polH.get_coeff()
+
+          # Accumulate products of S ecc points and S scalars (same as at the beginning)
+          n_coeff_h = len(coeffH)
+          self.pi_c_eccf1 += np.sum(np.multiply(self.hExps_eccf1[:n_coeff_h ], coeffH[:n_coeff_h]))
 
         
-        self.pi_c_eccf1  += (self.pi_a_eccf1 * self.s_scl) + (pib1_eccf1 * self.r_scl) + d5
+          self.pi_c_eccf1  += (self.pi_a_eccf1 * self.s_scl) + (pib1_eccf1 * self.r_scl) + d5
 
-        self.public_signals = self.witness_scl[1:self.vk_proof['nPublic']+1]
+          self.public_signals = self.witness_scl[1:self.vk_proof['nPublic']+1]
 
+        return self.t_EC, self.t_P, self.t_GP
 
     def findECPoints(self):
         nVars = self.vk_proof['nVars']
         nPublic = self.vk_proof['nPublic']
         self.t_EC = []
+        ZField.set_field(GrothSnarks.GroupIDX)
 
         if use_pycusnarks and self.accel:
-          # add 1 and r_u256 to scl, and alpha1 and delta1 to P
+          start_ec = time.time()
+          #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P 
           one = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
           K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.r_scl_u256]))
           P = np.concatenate((self.A_eccf1_u256[:2*nVars],self.vk_alfa_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
           ecbn128_samples = np.concatenate((K,P))
-          if self.proof_iter == 0:
-             ecbn128 = ECBN128(len(ecbn128_samples)/3, seed=1)
-          self.pi_a_eccf1,t1 = ec_mad_cuda(ecbn128, ecbn128_samples, ZField.get_field())
+          self.pi_a_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
           # pi_b = pi_b + beta2 + delta2 * s
-          K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.s_scl_u256]))
+          #K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.s_scl_u256]))
+          K[-1] = self.s_scl_u256
           P = np.concatenate((self.B2_eccf2_u256[:4*nVars],self.vk_beta_2_eccf2_u256, self.vk_delta_2_eccf2_u256))
           ec2bn128_samples = np.concatenate((K,P))
-          if self.proof_iter == 0:
-             ec2bn128 = EC2BN128(len(ec2bn128_samples)/5, seed=1)
-          self.pi_b_eccf2, t1 = ec2_mad_cuda(ec2bn128, ec2bn128_samples[:1024*1024*5], ZField.get_field())
+          self.pi_b_eccf2, t1 = ec2_mad_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field())
           self.t_EC.append(t1)
           
 
@@ -445,12 +484,15 @@ class GrothSnarks(object):
           P = np.concatenate((self.B1_eccf1_u256[:2*nVars],self.vk_beta_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
           #ecbn128_samples = np.concatenate((self.witness_scl_u256[:nVars], self.B1_eccf1_u256[:2*nVars]))
           ecbn128_samples = np.concatenate((K,P))
-          pib1_eccf1, t1 = ec_mad_cuda(ecbn128, ecbn128_samples, ZField.get_field())
+          pib1_eccf1, t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
+          # pi_c
           ecbn128_samples = np.concatenate((self.witness_scl_u256[nPublic+1:nVars], self.C_eccf1_u256[2*(nPublic+1):2*nVars]))
-          self.pi_c_eccf1,t1 = ec_mad_cuda(ecbn128, ecbn128_samples, ZField.get_field())
+          self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
+          end_ec = time.time()
+          self.t_EC.append(end_ec - start_ec)
 
         else :
           self.pi_a_eccf1  = np.sum(np.multiply(self.A_eccf1[:nVars], self.witness_scl[:nVars]))
@@ -496,44 +538,103 @@ class GrothSnarks(object):
     def calculateH(self, d1, d2, d3):
         #d1 = PolF.F.zero, d2 = PolF.F.zero, d3 = PolF.F.zero);
 
+        ZField.set_field(GrothSnarks.FieldIDX)
         m = self.vk_proof['domainSize']
         #nVars = self.vk_proof['nVars']
         nVars = self.oldnVars
         self.t_P = []
 
         if use_pycusnarks and self.accel:
+          start_h = time.time()
+          start = time.time()
+          d2_u256 = ZFieldElExt(d2).reduce().as_uint256()
+          d1d2 = ZFieldElExt(d1 * d2)
+          _d3_d1d2 = ZFieldElExt(-d3 - d1d2.as_long())
+          end = time.time()
+          self.t_P.append(end-start)
+
+          start = time.time()
           pidx = ZField.get_field()
-          s = np.copy(self.polsA_sps_u256)
+          # Convert witness to montgomery in zpoly_maddm_h
+          #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
           polA_T = zpoly_maddm_h(self.witness_scl_u256,self.polsA_sps_u256, nVars, nVars-1, pidx)
           polB_T = zpoly_maddm_h(self.witness_scl_u256,self.polsB_sps_u256, nVars, nVars-1, pidx)
           polC_T = zpoly_maddm_h(self.witness_scl_u256,self.polsC_sps_u256, nVars, nVars-1, pidx)
+          end = time.time()
+          self.t_P.append(end-start)
+          end_h = time.time()
+          t_h = end_h - start_h
 
-          #TODO
-          polA_T = np.tile(polA_T,(1024*1040/len(polA_T),1))
-          polB_T = np.tile(polB_T,(1024*1040/len(polB_T),1))
-          polC_T = np.tile(polC_T,(1024*1040/len(polC_T),1))
+          #TODO remove
+          polA_T = np.tile(polA_T,(self.vk_proof['nVars']/len(polA_T),1))
+          polB_T = np.tile(polB_T,(self.vk_proof['nVars']/len(polB_T),1))
+          polC_T = np.tile(polC_T,(self.vk_proof['nVars']/len(polC_T),1))
           nVars = self.vk_proof['nVars']
 
-          #TODO -> get inverse roots
-          if self.proof_iter == 0:
-            cuzpoly = ZCUPoly(2*len(polA_T), seed=560)
 
-          polA_S,t1 = zpoly_ifft_cuda(cuzpoly, polA_T[:nVars], self.roots1_u256, ZField.get_field())
+          start_h = time.time()
+          ifft_params = ntt_build_h(polA_T.shape[0]);
+          # polC_S  is extended -> use extended scaler
+          polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polC_T[:nVars], ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
           self.t_P.append(t1)
-          polB_S,t1 = zpoly_ifft_cuda(cuzpoly, polB_T[:nVars], self.roots1_u256, ZField.get_field())
+          # polA_S montgomery -> use montgomery scaler
+          polA_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polA_T[:nVars],ifft_params, ZField.get_field(), as_mont=1)
           self.t_P.append(t1)
-          polC_S,t1 = zpoly_ifft_cuda(cuzpoly, polC_T[:nVars], self.roots1_u256, ZField.get_field())
-          self.t_P.append(t1)
-
-          polAB_S,t1 = zpoly_mul_cuda(cuzpoly, polA_S[:nVars],polB_S[:nVars],self.roots1_u256, ZField.get_field())
-          self.t_P.append(t1)
-
-          polABC_S,t1 = zpoly_subm_cuda(cuzpoly, polAB_S, polC_S, ZField.get_field())
+          # polB_S montgomery  -> use montgomery scaler
+          # TODO : return_val = 0, out_extra_len= out_len
+          polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polB_T[:nVars], ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
           self.t_P.append(t1)
 
-          polH_S, t1 = zpoly_div_cuda(cuzpoly, polABC_S,int(m), ZField.get_field())
+          mul_params = ntt_build_h(polA_S.shape[0]*2);
+          #polAB_S is extended -> use extended scaler
+          # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
+          polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, polA_S[:nVars],polB_S[:nVars],mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
           self.t_P.append(t1)
 
+          # polABC_S is extended
+          # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
+          # TODO : perform several sub operations per thread to improve efficiency
+          polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, polAB_S, polC_S, ZField.get_field(), vectorA_len = 0, return_val=1)
+          self.t_P.append(t1)
+
+          # polABC_S, polH_S are extended
+          # TODO : polABC_S is stored in mem already. Only prepend padding if necessary. Do not retur value
+          polH_S, t1 = zpoly_div_cuda(self.cuzpoly, polABC_S,int(m), ZField.get_field())
+          self.t_P.append(t1)
+
+          if d2 != 0:
+            #TODO : to do all this path 
+            polH_S = zpoly_mad_cuda(self.cuzpoly,[[polH_S], [polA_S, d2_u256], [polB_S, d2_u256]], ZField.get_field())
+            self.t_P.append(t1)
+
+            #polA_S out is extended, d2_u256 is montgomery. polA_S in is extended
+            polA_S, t1 = zpoly_mulK_cuda(self.cuzpoly, polA_S,d2_u256, ZField.get_field())
+            self.t_P.append(t1)
+
+            #polB_S out is extended, d2_u256 is montgomery. polB_S in is extended
+            polB_S, t1 = zpoly_mulK_cuda(self.cuzpoly, polB_S,d2_u256, ZField.get_field())
+            self.t_P.append(t1)
+
+            #polH_S out is extended, polH_S, polA_S ad polB_S in are extended
+            polH_S = zpoly_addN_cuda(self.cuzpoly,[polH_S, polA_S, polB_S], ZField.get_field())
+            self.t_P.append(t1)
+
+            polH_S[0] = (ZFieldElExt.from_uint256(polH_S[0]) + _d3_d1d2).as_uint256()
+            polH_S[int(m)] = (ZFieldElExt.from_uint256(polH_S[int(m)]) + d1d2).as_uint256()
+          
+          else :
+            self.t_P.append(0)
+            self.t_P.append(0)
+            self.t_P.append(0)
+
+          start = time.time()
+          polH_S_idx = zpoly_norm_h(polH_S,int(m)+1)
+          polH_S = polH_S[:polH_S_idx]
+          end = time.time()
+          self.t_P.append(end-start)
+          end_h = time.time()
+          self.t_P.append(end_h - start_h + t_h)
+  
           #polA_S = ZPoly.from_uint256(polA_S)
           #polB_S = ZPoly.from_uint256(polB_S)
           #polC_S = ZPoly.from_uint256(polC_S)
@@ -603,30 +704,29 @@ class GrothSnarks(object):
           #return polABC_S
           polH_S = polABC_S.poly_div_snarks(polZ_S.get_degree())
 
-        """
-        H_S_copy = ZPoly(polH_S)
-        H_S_copy.poly_mul(polZ_S)
+          """
+          H_S_copy = ZPoly(polH_S)
+          H_S_copy.poly_mul(polZ_S)
 
-        if H_S_copy == polABC_S:
+          if H_S_copy == polABC_S:
             print "OK"
-        else:
+          else:
             print "KO"
-        """
+          """
 
-        # add coefficients of the polynomial (d2*A + d1*B - d3) + d1*d2*Z 
+          # add coefficients of the polynomial (d2*A + d1*B - d3) + d1*d2*Z 
 
+          polH_S = polH_S + d2 * polA_S + d2 * polB_S
+          polH_S = polH_S.expand_to_degree(m)
 
-        polH_S = polH_S + d2 * polA_S + d2 * polB_S
-        polH_S = polH_S.expand_to_degree(m)
-
-        polH_S.zcoeff[0] -= d3
+          polH_S.zcoeff[0] -= d3
   
-        # Z = x^m -1
-        d1d2 = d1 * d2
-        polH_S.zcoeff[m] += d1d2
-        polH_S.zcoeff[0] -= d1d2
+          # Z = x^m -1
+          d1d2 = d1 * d2
+          polH_S.zcoeff[m] += d1d2
+          polH_S.zcoeff[0] -= d1d2
     
-        polH_S = polH_S.norm()
+          polH_S = polH_S.norm()
   
         return polH_S
 
@@ -688,6 +788,7 @@ def ec2_mad_cuda(pysnark, vector, fidx):
      kernel_params['out_length'] = 1 * ECP2_JAC_OUTDIMS
      kernel_params['padding_idx'] = [0,0, 0]
      kernel_config['gridD'] = [0,1, 1]
+     kernel_config['return_val']=[1,1,1]
      min_length = [ECP2_JAC_OUTDIMS * \
              (kernel_config['blockD'][idx] * kernel_params['stride'][idx]/ECP2_JAC_OUTDIMS) for idx in range(len(kernel_params['stride']))]
 
@@ -779,80 +880,188 @@ def zpoly_fft_cuda(pysnark, vector, roots, fidx ):
         return result, t
 
 
-def zpoly_ifft_cuda(pysnark, vector, inv_roots, fidx ):
-        nsamples = len(vector)
+def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0 ):
+        nsamples = 1<<ifft_params['levels']
+        expanded_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
+        expanded_vector[:len(vector)] = vector
+        if roots is not None:
+             expanded_roots = roots[::1<<(20-ifft_params['levels'])]
+             scalerMont = ZFieldElExt(len(expanded_roots)).inv().reduce().as_uint256()
+             scalerExt = ZFieldElExt(len(expanded_roots)).inv().as_uint256()
+             zpoly_vector = np.concatenate((expanded_vector, expanded_roots, [scalerExt],[scalerMont]))
+        else :
+             zpoly_vector = expanded_vector
 
+        Nrows = ifft_params['fft_N'][(1<<FFT_T_3D)-1]
+        Ncols = ifft_params['fft_N'][(1<<FFT_T_3D)-2]
+        fft_yx = ifft_params['fft_N'][(1<<FFT_T_3D)-3]
+        fft_yy = Nrows - fft_yx
+        fft_xx = ifft_params['fft_N'][(1<<FFT_T_3D)-4]
+        fft_xy = Ncols - fft_xx
+        n_kernels1 = 4
         kernel_config={}
         kernel_params={}
-        n_cols = 10
-        n_rows = 10
+        
+        kernel_params['in_length'] = [nsamples] * n_kernels1
+        kernel_params['in_length'][0] = 2*nsamples+1
+        kernel_params['out_length'] = nsamples+out_extra_len
+        kernel_params['stride'] = [1] * n_kernels1
+        kernel_params['stride'][0] = 2
+        kernel_params['premod'] = [0] * n_kernels1
+        kernel_params['midx'] = [MOD_FIELD]  * n_kernels1
+        kernel_params['N_fftx'] = [Ncols] * n_kernels1
+        kernel_params['N_ffty'] = [Nrows] * n_kernels1
+        kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
+        kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
+        kernel_params['forward'] = [0] * n_kernels1
+        kernel_params['as_mont'] = [as_mont] * n_kernels1
+  
+        kernel_config['smemS'] = [0] * n_kernels1
+        kernel_config['blockD'] = [256] * n_kernels1
+        kernel_config['gridD'] = [(kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]*n_kernels1
+        kernel_config['gridD'][0] = 0
+        kernel_config['return_val'] = [return_val] * n_kernels1
 
-        # Test FFT kernel:
-        kernel_params['in_length'] = [2*nsamples,nsamples, nsamples, nsamples]
-        kernel_params['out_length'] = nsamples
-        kernel_params['stride'] = [2,1,1,1]
-        kernel_params['premod'] = [0,0,0,0]
-        kernel_params['midx'] = [fidx, fidx, fidx, fidx]
-        kernel_params['fft_Nx'] = [5,5, 5, 5]
-        kernel_params['fft_Ny'] = [5,5, 5,5]
-        kernel_params['forward'] = [0,0,0,0]
-
-        kernel_config['smemS'] = [0,0,0,0]
-        kernel_config['blockD'] = [256,256,256,256]
-        kernel_config['gridD'] = [0, (kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0], \
-                                     (kernel_config['blockD'][1] + nsamples-1)/kernel_config['blockD'][1], \
-                                     (kernel_config['blockD'][2] + nsamples-1)/kernel_config['blockD'][2]]
         kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
-        zpoly_vector = np.concatenate((vector, inv_roots))
+
         result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        if return_val == 0:
+           result = nsamples
 
         return result,t
 
-def zpoly_mul_cuda(pysnark, vectorA, vectorB, roots, fidx):
-    t = 0
-    rA,t1 = zpoly_fft_cuda(pysnark, vectorA, roots, fidx)
-    t+=t1
-    rB,t1 = zpoly_fft_cuda(pysnark, vectorB, roots, fidx)
-    t+=t1
-    rC,t1 = zpoly_coeffmul_cuda(pysnark, rA, rB, fidx)
-    t+=t1
-    rD,t1 = zpoly_ifft_cuda(pysnark, rC, roots, fidx)
-    t+=t1
-    return rD, t
+def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, return_val=0, as_mont=1):
+    nsamples = 1<<mul_params['levels']
+    expanded_vectorA = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
+    expanded_vectorB = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
+    expanded_vectorA[:len(vectorA)] = vectorA
+    expanded_vectorB[:len(vectorB)] = vectorB
 
-def zpoly_subm_cuda(pysnark, vectorA, vectorB, fidx):  
-     #TODO revie
-     if len(vectorB) < len(vectorA): 
-        vector =np.concatenate((vectorA, vectorB))
-     else:
-        vector =np.concatenate((vectorB, vectorA))
-     nsamples = len(vector)
+    kernel_config={}
+    kernel_params={}
+
+    if roots is not None:
+          expanded_roots = roots[::1<<(20-mul_params['levels'])]
+          scalerMont = ZFieldElExt(len(expanded_roots)).inv().reduce().as_uint256()
+          scalerExt = ZFieldElExt(len(expanded_roots)).inv().as_uint256()
+          zpoly_vectorA = np.concatenate((expanded_vectorA, expanded_roots,[scalerExt], [scalerMont]))
+    else :
+          zpoly_vectorA = expanded_vectorA
+    zpoly_vectorB = expanded_vectorB
+
+    Nrows = mul_params['fft_N'][(1<<FFT_T_3D)-1]
+    Ncols = mul_params['fft_N'][(1<<FFT_T_3D)-2]
+    fft_yx = mul_params['fft_N'][(1<<FFT_T_3D)-3]
+    fft_yy = Nrows - fft_yx
+    fft_xx = mul_params['fft_N'][(1<<FFT_T_3D)-4]
+    fft_xy = Ncols - fft_xx
+    n_kernels1 = 4
+    n_kernels2= 5
+
+    kernel_params['in_length'] = [nsamples] * n_kernels1
+    kernel_params['in_length'][0] = 2*nsamples+1
+    kernel_params['out_length'] = nsamples
+    kernel_params['stride'] = [1] * n_kernels1
+    kernel_params['stride'][0] = 2
+    kernel_params['premod'] = [0] * n_kernels1
+    kernel_params['midx'] = [MOD_FIELD]  * n_kernels1
+    kernel_params['N_fftx'] = [Ncols] * n_kernels1
+    kernel_params['N_ffty'] = [Nrows] * n_kernels1
+    kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
+    kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
+    kernel_params['forward'] = [1] * n_kernels1
+  
+    kernel_config['smemS'] = [0] * n_kernels1
+    kernel_config['blockD'] = [256] * n_kernels1
+    kernel_config['gridD'] = [(kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]*n_kernels1
+    kernel_config['gridD'][0] = 0
+    kernel_config['return_val'] = [1] * n_kernels1
+
+    kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
+
+    X1S,t1 = pysnark.kernelLaunch(zpoly_vectorA, kernel_config, kernel_params,n_kernels1)
+
+    kernel_params['in_length'][0] = nsamples
+    kernel_params['stride'][0] = 1
+    kernel_config['return_val'][0] = 0
+
+    Y1S,t2 = pysnark.kernelLaunch(zpoly_vectorB, kernel_config, kernel_params,n_kernels1)
+
+    kernel_params['in_length'] = [nsamples] * n_kernels2
+    kernel_params['out_length'] = nsamples
+    kernel_params['stride'] = [1] * n_kernels2
+    kernel_params['premod'] = [0] * n_kernels2
+    kernel_params['midx'] = [MOD_FIELD]  * n_kernels2
+    kernel_params['N_fftx'] = [Ncols] * n_kernels2
+    kernel_params['N_ffty'] = [Nrows] * n_kernels2
+    kernel_params['fft_Nx'] = [0,fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
+    kernel_params['fft_Ny'] = [0,fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
+    kernel_params['forward'] = [0,0,0,0,0]
+    kernel_params['as_mont'] = [as_mont] * n_kernels2
+  
+    kernel_config['smemS'] = [0] * n_kernels2
+    kernel_config['blockD'] = [256] * n_kernels2
+    kernel_config['gridD'] = [(kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]*n_kernels2
+    kernel_config['gridD'][0] = 0
+    kernel_config['return_val'] = [return_val] * n_kernels2
+    kernel_config['kernel_idx']= [CB_ZPOLY_MULCPREV,
+                                  CB_ZPOLY_FFT3DXXPREV, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY ]
+
+    fftmul_result,t3 = pysnark.kernelLaunch(X1S, kernel_config, kernel_params,n_kernels2)
+    if return_val == 0:
+      fftmul_result = nsamples
+  
+    return fftmul_result, t1+t2+t3
+
+def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0):  
+
      kernel_config={}
      kernel_params={}
 
+     if vectorA_len is 0:
+
+        #TODO revie
+        if len(vectorB) < len(vectorA): 
+           vector =np.concatenate((vectorA, vectorB))
+        else:
+           vector =np.concatenate((vectorB, vectorA))
+        nsamples = len(vector)
+        kernel_params['out_length'] = nsamples/2
+        kernel_params['stride'] = [2]
+        kernel_params['padding_idx'] = [min(len(vectorA),len(vectorB))]
+ 
+     else :
+        vector = vectorB
+        nsamples = len(vector)
+        kernel_params['out_length'] = vectorA_len
+        kernel_params['stride'] = [1]
+         
      kernel_params['premod'] = [0]
      kernel_params['in_length'] = [nsamples]
-     kernel_params['out_length'] = nsamples/2
-     kernel_params['stride'] = [2]
-     kernel_params['padding_idx'] = [min(len(vectorA),len(vectorB))]
      kernel_params['midx'] = [fidx]
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [U256_BLOCK_DIM]
+     #TODO
+     #kernel_config['kernel_idx'] = [CB_ZPOLY_SUBPREV]
      kernel_config['kernel_idx'] = [CB_ZPOLY_SUB]
+     kernel_config['return_val'] = [return_val] 
      result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params )
 
-     return vector,t
+     if return_val == 0:
+        result = kernel_params['out_length']
 
-def zpoly_coeffmul_cuda(pysnark, vectorA, vectorB, fidx):  
+     return result,t
+
+def zpoly_mulK_cuda(pysnark, vectorA, K, fidx):  
      #TODO revie
-     vector =np.concatenate((vectorA, vectorB))
-     nsamples = len(vector)
+     vector =np.concatenate((K, vector))
+     nsamples = len(vectorA)
      kernel_config={}
      kernel_params={}
 
-     kernel_params['in_length'] = [nsamples]
+     kernel_params['in_length'] = [nsamples+1]
      kernel_params['out_length'] = nsamples/2
-     kernel_params['stride'] = [2]
+     kernel_params['stride'] = [1]
      kernel_params['midx'] = [fidx]
      kernel_params['premod'] = [0]
      kernel_config['smemS'] = [0]
@@ -862,16 +1071,66 @@ def zpoly_coeffmul_cuda(pysnark, vectorA, vectorB, fidx):
 
      return result,t
 
+def zpoly_mad_cuda(pysnark, vectors, fidx):  
+
+     kernel_config={}
+     kernel_params={}
+    
+     """
+     #TODO revie
+     max_len = 0
+     max_v = None
+     new_v = []
+     for v in vectors:
+       if len(v[0]) > max_len: 
+          max_len = len(v[0])
+          if max_v is not None:
+            new_v.append(max_v)
+          max_v = np.copy(v)
+       else :
+          new_v.append(v)
+
+     for v in new_v:
+        vector =np.concatenate((max_v, v))
+
+
+        kernel_params['in_length'] = [len(vector)]
+        kernel_params['out_length'] = len(max_v)
+        kernel_params['stride'] = [2]
+        kernel_params['padding_idx'] = [len(v)]
+        kernel_params['premod'] = [0]
+        kernel_params['midx'] = [fidx]
+        kernel_config['smemS'] = [0]
+        kernel_config['blockD'] = [U256_BLOCK_DIM]
+        kernel_config['kernel_idx'] = [CB_ZPOLY_ADD]
+        kernel_config['return_val'] = [1]
+        kernel_config['gridD'] = \
+                 [(kernel_config['blockD'][0] + \
+                   2*kernel_params['padding_idx'][0]/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
+        vector,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
+
+     return vector,t
+     """
+
 
 
 if __name__ == "__main__":
     t = []
-    G = GrothSnarks()
-    for i in range(2):
-      t1,t2 = G.gen_proof(i)
-      t.append(np.concatenate((t1,t2)))
+    witness_f=DEFAULT_WITNESS_LOC
+    proving_key_f = DEFAULT_PROVING_KEY_LOC
+    G = GrothSnarks(proving_key_f)
+    for i in range(20):
+      t1,t2,t3 = G.gen_proof(witness_f)
+      t.append(np.concatenate((t1,t2,t3)))
     print t
      
     #G.write_json()
 
 
+"""  
+   t:
+     ECPoints-EC_MAD_CUDA, ECPoints-EC2_MAD_CUDA, ECPoints-EC_MAD_CUDA, ECPoints-EC_MAD_CUDA, ECPoints-All
+     H-d, H-ZPOLY_MADDM_H, H-IFFT_C, H-IFFT_A, H-IFFT_B, H-MUL, H-AB_C, H-DIV, 0,0,0, H-NORM, H-All
+     END- MAD_CUDA, END-all
+         
+"""

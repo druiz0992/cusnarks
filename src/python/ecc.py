@@ -385,19 +385,25 @@ class ECC(object):
         pass
 
     @staticmethod
-    def as_uint256(P, remove_last=False):
+    def as_uint256(P, remove_last=False, as_reduced=False):
       if remove_last:
          last_idx=2
       else:
          last_idx = 3
       if isinstance(P,list) or isinstance(P,np.ndarray) and isinstance(P[0],ECC):
-         Px = [x.get_P() for x in P]
+         if as_reduced:
+            Px = [x.reduce().get_P() for x in P]
+         else :
+            Px = [x.get_P() for x in P]
          Pc=[]
          for Py in Px:
            Pc.append([ x.as_uint256() for x in Py[0:last_idx]])
          Pc = np.concatenate(Pc)
       else:
-         Pc = np.asarray([ x.as_uint256() for x in P.get_P()[0:last_idx]])
+         if as_reduced:
+           Pc = np.asarray([ x.as_uint256() for x in P.reduce().get_P()[0:last_idx]])
+         else:
+           Pc = np.asarray([ x.as_uint256() for x in P.get_P()[0:last_idx]])
 
       if len(Pc[0])==2:
           Pc = np.reshape(Pc,(-1,8))

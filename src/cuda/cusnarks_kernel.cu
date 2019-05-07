@@ -440,8 +440,14 @@ double CUSnarks::kernelLaunch(
 {
   uint32_t i;
   // check input lengths do not exceed reserved amount
-  if (in_vector_host->length > in_vector_device.length) { return 0.0; }
-  if (out_vector_host->length > out_vector_device.length) { return 0.0; }
+  if (in_vector_host->length > in_vector_device.length) { 
+    logInfo("Error IVHL : %d >  IVDL : %d\n",in_vector_host->length, in_vector_device.length);
+    return 0.0;
+  }
+  if (out_vector_host->length > out_vector_device.length) {
+    logInfo("Error OVHL : %d > OVDL : %d\n",out_vector_host->length, out_vector_device.length);
+    return 0.0;
+  }
 
   in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
   out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
@@ -451,7 +457,7 @@ double CUSnarks::kernelLaunch(
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
-  CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  CCHECK(cudaMemcpy(&in_vector_device.data[config[i].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
 
   total_kernel = 0.0;

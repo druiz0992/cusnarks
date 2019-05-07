@@ -50,6 +50,7 @@ cdef extern from "types.h":
         int smemS
         int kernel_idx
         int return_val
+        int in_offset
 
   ctypedef struct vector_t:
       uint32_t *data
@@ -83,6 +84,7 @@ cdef extern from "types.h":
       uint32_t N_ffty
       uint32_t forward
       uint32_t padding_idx
+      uint32_t as_mont
       mod_t midx
 
 
@@ -104,7 +106,7 @@ cdef extern from "types.h":
   ctypedef enum zpoly_callback_t:
    CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_ZPOLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_ZPOLY_MULN, 
    CB_ZPOLY_FFT2DX, CB_ZPOLY_FFT2DY, CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXXPREV, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY,
-   CB_ZPOLY_ADD, CB_ZPOLY_SUB, CB_ZPOLY_MULC, CB_ZPOLY_MULCPREV, CB_ZPOLY_MULK, CB_ZPOLY_MADPREV, CB_ZPOLY_ADDPREV,
+   CB_ZPOLY_ADD, CB_ZPOLY_SUB, CB_ZPOLY_SUBPREV, CB_ZPOLY_MULC, CB_ZPOLY_MULCPREV, CB_ZPOLY_MULK, CB_ZPOLY_MADPREV, CB_ZPOLY_ADDPREV,
    CB_ZPOLY_DIVSNARKS, CB_ZPOLY_N
 
 _NWORDS_256BIT = NWORDS_256BIT

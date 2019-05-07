@@ -139,6 +139,7 @@ typedef struct {
         int smemS;  // in bytes
         int kernel_idx;
         int return_val;
+        int in_offset;
 } kernel_config_t;
 
 
@@ -202,6 +203,7 @@ typedef struct{
    uint32_t N_ffty;
    uint32_t forward;
    uint32_t padding_idx;
+   uint32_t as_mont;
    mod_t    midx;   // index to prime number to be used by kernel
 
 }kernel_params_t;
@@ -270,6 +272,7 @@ typedef enum{
    CB_ZPOLY_FFT3DYY,
    CB_ZPOLY_ADD,
    CB_ZPOLY_SUB,
+   CB_ZPOLY_SUBPREV,
    CB_ZPOLY_MULC,
    CB_ZPOLY_MULCPREV,
    CB_ZPOLY_MULK,

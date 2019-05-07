@@ -113,7 +113,39 @@ static uint32_t _1[] = {
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041    // 1 field
 };
 
-static uint32_t IScaler[] = {
+static uint32_t IScalerExt[] = {
+               1,          0,          0,          0,          0,          0,          0,          0,
+      4160749569, 2716924617, 1021098056, 2484728868, 1086368814, 3693617883, 1889062932,  405940025,
+      4093640705, 4075386926, 1531647084, 3727093302, 3777036869, 1245459528,  686110751,  608910038,
+      1912602625,  459650785, 1786921599, 2200791871, 2974887249, 2168863999, 2232118308,  710395044,
+      2969567233,  799266362, 4062042504, 1437641155,  426328791,  483082587, 3005122087,  761137547,
+      1350565889, 3116557799,  904635660, 1056065798, 3447016858, 1787675528, 1244140328,  786508799,
+      2688548865, 4275203517, 1473415886, 3012761767, 2809877243,  292488351,  363649449,  799194425,
+      3357540353,  559559080, 3905289648, 1843626103,  343823788, 1692378411, 4218371305,  805537237,
+      1544552449, 2996704158,  826259232, 3406541920, 3405764356, 2392323440, 1850764937,  808708644,
+       638058497, 4215276697, 1434227672, 4187999828, 2789250992, 2742295955, 2814445401,  810294347,
+      2332295169,  529595670, 1738211893,  283761486,  333510663, 2917282213, 1148801985,  811087199,
+      1031929857,  834238805, 1890204003,  479125963, 3400607794, 3004775341,  315980277,  811483625,
+      2529230849,  986560372, 4113683706, 2724291849,  639189063, 3048521906, 4194536719,  811681837,
+      1130397697, 3210204804,  930456261, 1699391145, 1405963346, 3070395188, 1838847644,  811780944,
+       430981121, 2174543372, 3633809835, 3334424440, 1789350487,  933848181, 2808486755,  811830497,
+        81272833, 1656712656, 2838002974, 2004457440, 4128527706, 2013058325, 1145822662,  811855274,
+      4201385985, 3545280945, 2440099543, 3486957588, 1003149019,  405179750, 2461974264,  811867662,
+      4113958913, 2342081442, 2241147828, 2080724014, 1587943324, 3896207758, 3120050064,  811873856,
+      1922761729, 3887965339, 2141671970, 3525090875, 1880340476, 1346754466, 3449087965,  811876953,
+      2974646785,  365939991, 4239417690, 4247274305, 2026539052, 2219511468, 1466123267,  811878502,
+      3500589313, 2899894613,  993323253,  313398725, 2099638341, 2655889969, 2622124566,  811879276,
+      3763560577, 2019388276, 3665243331,  493944582, 4283671633,  726595571, 3200125216,  811879663,
+      1747562561, 1579135108, 2853719722,  584217511, 1080720983, 4056915669, 1341641892,  811879857,
+       739563553, 3506492172,  300474269,  629353976, 3774212954, 1427108421,  412400231,  811879954,
+       235564049, 2322687056, 1171335191, 2799405856,  825991643, 2259688446, 2095263048,  811880002,
+      4278531593, 1730784497, 1606765652, 1736948148, 1499364636,  528494810, 2936694457,  811880026,
+      4152531717, 3582316866, 1824480882, 3353202942, 1836051132, 1810381640, 3357410161,  811880038,
+      1942048131,  213115755, 1933338498, 4161330339, 2004394380, 2451325055, 3567768013,  811880044,
+      2984289986, 2823482495, 4135250953,  270426741, 4236049653, 2771796762, 3672946939,  811880047
+};
+
+static uint32_t IScalerMont[] = {
     1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,  // 2^0 
      536870910, 2017203416,  210575069, 2945986415, 4244459333, 2405397650, 1033682860,  523723546,  // 2^1
      268435455, 3156085356, 2252771182, 3620476855, 2122229666, 1202698825,  516841430,  261861773,  // 2^2
@@ -144,6 +176,8 @@ static uint32_t IScaler[] = {
              0,          0,          0,          0,          0,          0,          0,         32,  // 2^27
              0,          0,          0,          0,          0,          0,          0,         16   // 2^28
 };
+
+static const uint32_t Zero[] = {0,0,0,0,0,0,0,0};
 
 #ifdef UTILS_DEBUG
 
@@ -362,8 +396,8 @@ static uint32_t AA_test[] = {
          21097887 
 };
 
-static char roots_1M_filename[]="../../test/c/aux_data/zpoly_roots_1M.bin";
-static char inv_roots_1M_filename[]="../../test/c/aux_data/zpoly_inv_roots_1M.bin";
+static char roots_1M_filename[]="../../datazpoly_roots_1M.bin";
+static char inv_roots_1M_filename[]="../../data/zpoly_inv_roots_1M.bin";
 
 static char input_1M_filename[]= "../../test/c/aux_data/zpoly_input_data_1M.bin";
 static char output_1M_filename[]="../../test/c/aux_data/zpoly_output_data_1M.bin";
@@ -1228,6 +1262,16 @@ void zpoly_maddm_h(uint32_t *pout, uint32_t *scalar, uint32_t *pin, uint32_t nco
   }
 }
 
+uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff)
+{
+  for (int i=n_coeff-1; i>=0; i--){ 
+    if (mpCompare(&pin[i*NWORDS_256BIT],(const uint32_t *)&Zero,NDIGITS)){
+       return (uint32_t) i+1;    
+    }
+  }
+  return 0;
+}
+
 
 
 void subu256_h(uint32_t *x, uint32_t *y)
@@ -1431,10 +1475,16 @@ void ntt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t fft
   free(reducedR);
 
 }
-void intt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx, uint32_t mode)
+void intt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t format, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx, uint32_t mode)
 {
   uint32_t i;
-  uint32_t *scaler = &IScaler[(Nrows+Ncols)*NDIGITS];
+  uint32_t *scaler;
+
+  if (format == 0){
+     scaler = &IScalerExt[(Nrows + Ncols)*NDIGITS];
+  } else  {
+     scaler = &IScalerMont[(Nrows + Ncols)*NDIGITS];
+  }
 
   ntt_parallel2D_h(A, roots, Nrows, fft_Nyx,  Ncols, fft_Nxx, pidx, mode);
 
@@ -1490,10 +1540,16 @@ void ntt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Ncols, uint32_t Nrows
 }
 
 
-void intt_parallel_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t pidx, uint32_t mode)
+void intt_parallel_h(uint32_t *A, uint32_t *roots,uint32_t format, uint32_t Nrows, uint32_t Ncols, uint32_t pidx, uint32_t mode)
 {
   uint32_t i;
-  uint32_t *scaler = &IScaler[(Nrows+Ncols)*NDIGITS];
+  uint32_t *scaler;
+
+  if (format == 0){
+     scaler = &IScalerExt[(Nrows + Ncols)*NDIGITS];
+  } else  {
+     scaler = &IScalerMont[(Nrows + Ncols)*NDIGITS];
+  }
 
   ntt_parallel_h(A, roots, Ncols, Nrows, pidx, mode);
 
@@ -1554,10 +1610,16 @@ void ntt_h(uint32_t *A, uint32_t *roots, uint32_t levels, uint32_t pidx)
   }
 }
 
-void intt_h(uint32_t *A, uint32_t *roots, uint32_t levels, uint32_t pidx)
+void intt_h(uint32_t *A, uint32_t *roots, uint32_t format, uint32_t levels, uint32_t pidx)
 {
   uint32_t i;
-  uint32_t *scaler = &IScaler[levels*NDIGITS];
+  uint32_t *scaler;
+  
+  if (format == 0){
+     scaler = &IScalerExt[levels*NDIGITS];
+  } else  {
+     scaler = &IScalerMont[levels*NDIGITS];
+  }
 
   ntt_h(A, roots, levels, pidx);
 
@@ -2305,7 +2367,7 @@ void test_ntt(uint32_t forward)
      memcpy(result, samples, nroots * NDIGITS * sizeof(uint32_t));
      ntt_h(samples, roots, levels, pidx);
      readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
-     intt_h(samples, roots, levels, pidx);
+     intt_h(samples, roots, 1, levels, pidx);
   }
 
   for (j=0;j<nroots; j++){
@@ -2429,7 +2491,7 @@ void test_ntt_parallel2D_65K(uint32_t forward)
        ntt_h(samples2, roots, levels, pidx);
      } else {
        readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
-       intt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
+       intt_parallel2D_h(samples, roots, 1, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
        readFile(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
        ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
      }
@@ -2495,8 +2557,8 @@ void test_nttmul_parallel2D_65K(void)
 
      readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
 
-     intt_parallel2D_h(Y1, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
-     intt_h(Y2, roots, levels, pidx);
+     intt_parallel2D_h(Y1, roots, Nrows,1, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
+     intt_h(Y2, roots, 1,levels, pidx);
 
      for (j=0;j<nroots; j++){
          if (mpCompare(&Y1[j*NDIGITS],&Y2[j*NDIGITS],NDIGITS)){
@@ -2769,9 +2831,9 @@ void test_ntt_parallel2D_1M(uint32_t forward)
        ntt_h(samples2, roots, levels, pidx);
      } else {
        readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
-       intt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+       intt_parallel2D_h(samples, roots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
        readFile(roots,roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
-       ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+       ntt_parallel2D_h(samples, roots, 1,Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
      }
   
   
@@ -2838,8 +2900,8 @@ void test_nttmul_parallel2D_1M(void)
 
      readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
 
-     intt_parallel2D_h(Y1, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
-     intt_h(Y2, roots,levels, pidx);
+     intt_parallel2D_h(Y1, roots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+     intt_h(Y2, roots,1,levels, pidx);
 
      for (j=0;j<nroots; j++){
          if (mpCompare(&Y1[j*NDIGITS],&Y2[j*NDIGITS],NDIGITS)){
@@ -2928,11 +2990,11 @@ void test_nttmul_randomsize(void)
      readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,npoints);
 
      if (fft_params.fft_type == FFT_T_2D){
-       intt_parallel_h(Y1, roots, Ncols, Nrows, pidx, 0);
+       intt_parallel_h(Y1, roots,1, Ncols, Nrows, pidx, 0);
      } else {
-       intt_parallel2D_h(Y1, roots, Nrows, fft_Nyx, Ncols, fft_Nxx, pidx, 0);
+       intt_parallel2D_h(Y1, roots, 1,Nrows, fft_Nyx, Ncols, fft_Nxx, pidx, 0);
      }
-     intt_h(Y2, roots, fft_params.levels, pidx);
+     intt_h(Y2, roots,1, fft_params.levels, pidx);
 
      for (j=0;j<npoints_raw; j++){
          if (mpCompare(&Y1[j*NDIGITS],&Y2[j*NDIGITS],NDIGITS)){

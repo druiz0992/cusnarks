@@ -45,6 +45,7 @@
       
 __global__ void zpoly_add_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_sub_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_subprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_mulc_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_mulK_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_mulcprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
@@ -83,6 +84,8 @@ __device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params
 __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
 __device__ void fft3Dyx_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
 __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
+
+__device__ void divsnarks(uint32_t *z, uint32_t *x, uint32_t *y, kernel_params_t *params);
 
 __forceinline__ __device__ void fft_butterfly(uint32_t *d_out, uint32_t *d_in, uint32_t srcLane );
 #endif

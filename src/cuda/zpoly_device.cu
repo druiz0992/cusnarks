@@ -97,6 +97,28 @@ __global__ void zpoly_sub_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
 
     return;
 }
+
+__global__ void zpoly_subprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t *x, *y, *z;
+
+    if(tid >= params->padding_idx) {
+      return;
+    }
+
+    x = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    y = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+    submu256(z,x,y, params->midx);                
+
+    return;
+}
+
 __global__ void zpoly_mulc_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -225,7 +247,6 @@ __global__ void zpoly_divsnarks_kernel(uint32_t *out_vector, uint32_t *in_vector
     uint32_t *x, *y, *z;
     uint32_t nd = params->forward;
     uint32_t ne = params->padding_idx;
-    uint32_t offset=0;
     // from python code:
     // me = m + nd = params->in_length
     // ne = n + nd = params->padding_idx
@@ -243,35 +264,76 @@ __global__ void zpoly_divsnarks_kernel(uint32_t *out_vector, uint32_t *in_vector
     if (params->premod){
        modu256(x,x, params->midx);
     }
+
+    divsnarks(z,x,y,params);
+
+}
+
+__global__ void zpoly_divsnarksprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+    uint32_t *x, *y, *z;
+    uint32_t nd = params->forward;
+    uint32_t ne = params->padding_idx;
+    // from python code:
+    // me = m + nd = params->in_length
+    // ne = n + nd = params->padding_idx
+    // nd = params->forward
+    // rem = x
+   
+    if(tid >= params->in_length - 2*ne + nd) {
+      return;
+    }
+
+    x = (uint32_t *) &in_vector[(tid + ne) * NWORDS_256BIT];
+    y = (uint32_t *) &in_vector[(tid + 2 * ne - nd) * NWORDS_256BIT];
+    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+   
+    if (params->premod){
+       modu256(x,x, params->midx);
+    }
+
+    divsnarks(z,x,y,params);
+
+}
+__device__ void divsnarks(uint32_t *z_t, uint32_t *x_t, uint32_t *y_t, kernel_params_t *params)
+{
+    uint32_t nd = params->forward;
+    uint32_t ne = params->padding_idx;
+    uint32_t offset=0;
+    uint32_t *x, *y;
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
     logInfoTid(tid,"ne : %d\n",ne);
     logInfoTid(tid,"nd : %d\n",nd);
     logInfoTid(tid,"inlength : %d\n",params->in_length);
     logInfoTid(tid,"max_tid : %d\n",params->in_length - 2*ne + nd- 1);
 
-    logInfoBigNumberTid(tid,1,"Z:\n",z);
-    logInfoBigNumberTid(tid,1,"X:\n",x);
-    logInfoBigNumberTid(tid,1,"Y:\n",y);
-    addmu256(z,x,y, params->midx);                
-    logInfoBigNumberTid(tid,1,"Z:\n",z);
+    logInfoBigNumberTid(tid,1,"Z:\n",z_t);
+    logInfoBigNumberTid(tid,1,"X:\n",x_t);
+    logInfoBigNumberTid(tid,1,"Y:\n",y_t);
+    addmu256(z_t,x_t,y_t, params->midx);                
+    logInfoBigNumberTid(tid,1,"Z:\n",z_t);
 
     // TODO : Try to have groups of 8 so that it is faster (I cannot unroll automatically)
     for(offset=ne+1; offset<params->in_length -2*ne-1 ; offset += ne+1) { 
        if(tid >= params->in_length - offset -ne) {
            return;
        }
-       x = (uint32_t *) &in_vector[(tid + ne + offset) * NWORDS_256BIT];
-       y = (uint32_t *) &in_vector[(tid + 2 * ne - nd + offset) * NWORDS_256BIT];
+       x = (uint32_t *) &x_t[(tid + ne + offset) * NWORDS_256BIT];
+       y = (uint32_t *) &y_t[(tid + 2 * ne - nd + offset) * NWORDS_256BIT];
        logInfoTid(tid,"offset : %d\n",offset);
-       logInfoBigNumberTid(tid,1,"Z:\n",z);
-       logInfoBigNumberTid(tid,1,"X:\n",x);
-       logInfoBigNumberTid(tid,1,"Y:\n",y);
+       logInfoBigNumberTid(tid,1,"Z:\n",z_t);
+       logInfoBigNumberTid(tid,1,"X:\n",x_t);
+       logInfoBigNumberTid(tid,1,"Y:\n",y_t);
        logInfoTid(tid,"new_lim : %d\n",params->in_length - offset);
        logInfoTid(tid,"max_tid : %d\n",params->in_length - offset -2*ne +nd-1);
-       addmu256(z,z,x, params->midx);                
+       addmu256(z_t,z_t,x_t, params->midx);                
        if(tid >= params->in_length - offset -2*ne+ nd) {
            return;
        }
-       addmu256(z,z,y, params->midx);                
+       addmu256(z_t,z_t,y_t, params->midx);                
        //i++;
        //if (i==3){ return;}
  
@@ -642,7 +704,7 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
   uint32_t new_cidx = tid >> Nx;
   uint32_t reverse_idx;
   uint32_t *roots = &x[(1<<(Nx+Ny)) * U256K_OFFSET];
-  uint32_t *inv_scaler = &x[(1<<(Nx+Ny+1)) * U256K_OFFSET];
+  uint32_t *inv_scaler = &x[(1<<(Nx+Ny+1+params->as_mont)) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {
@@ -712,7 +774,6 @@ __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
   int new_kidx = tid >>(Nxy + Ny) << (Nxy + Ny);
 
   uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nxyn, offset, mask) << (Nx - Nxy + Ny) ;
-  uint32_t const *inv_scaler = &x[(1<<(Nx+Ny+1)) * U256K_OFFSET];
   uint32_t const *W32;
   int root_idx = ((reverse_idx + (new_kidx >> Nxy) + new_ridx) >> Ny) * 
                      ((reverse_idx + (new_kidx >> Nxy) + new_ridx) & Nyn);
@@ -797,7 +858,7 @@ __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x,uint32_t *roots, kernel_par
   logInfoTid(tid,"Nyyyn : %d\n",Nyyyn);
 
   uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyyn, offset, mask) << (Ny + Nx - Nyy);
-  uint32_t const *inv_scaler = &x[(1<<(Nx+Ny+1)) * U256K_OFFSET];
+  uint32_t const *inv_scaler = &x[(1<<(Nx+Ny+1+params->as_mont)) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {

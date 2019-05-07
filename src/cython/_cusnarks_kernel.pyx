@@ -64,7 +64,7 @@ cdef class CUSnarks:
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
-        #print in_v.length, self.in_dim, out_v.length, self.out_dim
+        print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
             return 0.0
@@ -91,6 +91,10 @@ cdef class CUSnarks:
                kconfig[i].smemS  = config['smemS'][i]
            else:
                kconfig[i].smemS  = 0
+           if 'in_offset' in config:
+               kconfig[i].in_offset  = config['in_offset'][i]
+           else:
+               kconfig[i].in_offset = 0
 
         in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
@@ -129,6 +133,10 @@ cdef class CUSnarks:
             kparams[i].padding_idx = params['padding_idx'][i]
           else:
             kparams[i].padding_idx = 0
+          if 'as_mont' in params:
+            kparams[i].as_mont = params['as_mont'][i]
+          else:
+            kparams[i].as_mont = 1
 
         exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
        
@@ -257,7 +265,7 @@ def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       return np.reshape(in_A_flat,(-1,n))
 
 def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t fmat, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef ct.uint32_t L = int(np.log2(len(in_roots)))
@@ -268,7 +276,7 @@ def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], L, pidx)
+      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], fmat, L, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
@@ -367,4 +375,11 @@ def zpoly_maddm_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim
      #uh.cmaddm_h(&outd[0],&scldata[0], &pdata[0], last_idx, pout_d, pidx)
 
      return np.reshape(outd,(-1,8))
+
+def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data, ct.uint32_t pidx):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(pin_data.shape[0] * pin_data.shape[1],dtype=np.uint32)
+    pin_data_flat = np.reshape(pin_data,-1)
+    cdef ct.uint32_t idx = uh.czpoly_norm_h(&pin_data_flat[0],pidx)
+
+    return idx
 
