@@ -84,12 +84,12 @@ static uint32_t mod_info_init[] = {
         3632069959, 1008765974, 1752287885, 2541841041, 2172737629, 3092268470, 3778125865,  811880050, // p_group
         3834012553, 2278688642,  516582089, 2665381221,  406051456, 3635399632, 2441645163, 4118422199, // pp_group
         21690935,   3984885834,   41479672, 3944751749, 3074724569, 3479431631, 1508230713,  778507633, // rp_group
-        3632069958, 1008765974, 1752287885, 2541841041, 2172737629, 3092268470, 3778125865,  811880050, // nonres_group
+        317583274, 1757628553, 1923792719, 2366144360,  151523889, 1373741639, 1193918714,  576313009,  // nonres_group (reduced)
 
         4026531841, 1138881939, 2042196113,  674490440, 2172737629, 3092268470, 3778125865,  811880050, // p_field
         4026531839, 3269588371, 1281954227, 1703315019, 2567316369, 3818559528,  226705842, 1945644829, // pp_field
         1840322894, 3696992261, 3776048263,  151975337, 2931318109, 3357937124, 2193970460,  367786321, // rp_field
-        4026531840, 1138881939, 2042196113,  674490440, 2172737629, 3092268470, 3778125865,  811880050, // nonres_field
+        2684354566, 2538324343, 3663242087, 4046942642,  151523886, 1373741639, 1193918714,  576313009, // nonres_field (reduced)
 };
 
 
@@ -170,26 +170,32 @@ __constant__ misc_const_t misc_const_ct[MOD_N];
 
 static uint32_t misc_const_init[] = {
          3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // 1 group
-         2334006074, 2797242139, 3951957627,  351393361, 4042427480, 3437053662,  873447006,  471134083,    // 2 group
-         1353525463, 2048379561, 3780452793,  527090042, 1768673924,  860613198, 3457654158,  706701124,   // 3_group
-         1035942189,  290751008, 1856660074, 2455912978, 1617150034, 3781838855, 2263735443,  130388115,    // 4 group
-         2071884378,  581502016, 3713320148,  616858660, 3234300069, 3268710414,  232503591,  260776231,   // 8 group
-         3107826567,  872253024, 1275012926, 3072771639,  556482807, 2755581974, 2496239035,  391164346,    // 4b group
-	 1920685838, 1744506049, 2550025852, 1850575982, 1112965615, 1216196652,  697510775,  782328693,    // 8b group 
+                  0,          0,          0,          0,          0,          0,          0,          0,
+
          3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // inf group
                   0,          0,          0,          0,          0,          0,          0,          0,
          3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // 
 
+         3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // inf2 group
+                  0,          0,          0,          0,          0,          0,          0,          0,
+                  0,          0,          0,          0,          0,          0,          0,          0,
+                  0,          0,          0,          0,          0,          0,          0,          0,
+         3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // 
+                  0,          0,          0,          0,          0,          0,          0,          0,
+
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // 1 field
-         2684354550, 1496082488, 1052875347, 1845030187, 4042427484, 3437053662,  873447006,  471134083,   // 2 field
-         4026531825,   96640084, 3726796669, 2767545280, 1768673930,  860613198, 3457654158,  706701124,  // 3 field
-         1342177259, 1853283037,   63554581, 3015569934, 1617150043, 3781838855, 2263735443,  130388115,    // 4 field
-         2684354518, 3706566074,  127109162, 1736172572, 3234300087, 3268710414,  232503591,  260776231,  // 8 field
-         4026531777, 1264881815,  190663744,  456775210,  556482835, 2755581974, 2496239035,  391164346,    // 4b field
-	 3758096258, 2529763631,  381327488,  913550420, 1112965670, 1216196652,  697510775,  782328693,     // 8b field
+                  0,          0,          0,          0,          0,          0,          0,          0,
+
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // inf
                   0,          0,          0,          0,          0,          0,          0,          0,    
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // 
+
+         1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // inf2
+                  0,          0,          0,          0,          0,          0,          0,          0,    
+                  0,          0,          0,          0,          0,          0,          0,          0,    
+                  0,          0,          0,          0,          0,          0,          0,          0,    
+         1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // 
+                  0,          0,          0,          0,          0,          0,          0,          0,    
 };
 
 // 32 roots of unitity of field prime (only first 16)
@@ -388,6 +394,19 @@ void CUSnarks::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod=NUL
     rng->randu256(samples, n_samples, mod);
 }
 
+void CUSnarks::saveFile(uint32_t *samples, uint32_t n_samples, char *fname)
+{
+  uint32_t i;
+  FILE *pFile;
+
+  pFile = fopen(fname,"wb");
+
+  for (i=0; i< n_samples * 8; i++){
+    fwrite(&samples[i],sizeof(uint32_t), 1, pFile);
+  }
+  fclose(pFile);
+}
+
 /*
    Free memory allocated in GPU:
 */
@@ -421,8 +440,14 @@ double CUSnarks::kernelLaunch(
 {
   uint32_t i;
   // check input lengths do not exceed reserved amount
-  if (in_vector_host->length > in_vector_device.length) { return 0.0; }
-  if (out_vector_host->length > out_vector_device.length) { return 0.0; }
+  if (in_vector_host->length > in_vector_device.length) { 
+    logInfo("Error IVHL : %d >  IVDL : %d\n",in_vector_host->length, in_vector_device.length);
+    return 0.0;
+  }
+  if (out_vector_host->length > out_vector_device.length) {
+    logInfo("Error OVHL : %d > OVDL : %d\n",out_vector_host->length, out_vector_device.length);
+    return 0.0;
+  }
 
   in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
   out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
@@ -432,7 +457,7 @@ double CUSnarks::kernelLaunch(
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
-  CCHECK(cudaMemcpy(in_vector_device.data, in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  CCHECK(cudaMemcpy(&in_vector_device.data[config[i].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
 
   total_kernel = 0.0;
@@ -461,15 +486,17 @@ double CUSnarks::kernelLaunch(
     end_kernel = elapsedTime() - start;
     total_kernel +=end_kernel;
 
-    logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d\n",
-        params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride);
+    logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d\n",
+        params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride, params[i].padding_idx);
     logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
           kernel_idx, gridD, blockD, smemS,end_kernel);
   }
   
     // retrieve kernel output data from GPU to host
   start = elapsedTime();
-  CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  if (config[0].return_val){
+     CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+  }
  
   end_copy_out = elapsedTime() - start;
 

@@ -605,9 +605,20 @@ __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
 */
 __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
     uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
-    uint32_t tmp1[NWORDS_256BIT], tmp2[NWORDS_256BIT];
+    uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT],tmp4[NWORDS_256BIT];
 
+    mulmontu256(tmp1, A,B,midx);                  
+    mulmontu256(tmp2, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
+
+    mulmontu256(tmp3, A,&B[NWORDS_256BIT],midx);                  
+    mulmontu256(tmp4, &A[NWORDS_256BIT],B,midx);                  
+
+    submu256(U, tmp1, tmp2, midx);   
+    addmu256(&U[NWORDS_256BIT], tmp3, tmp4, midx);                
+ 
+    /* 
     addmu256(tmp1, A, &A[NWORDS_256BIT], midx);                // tmp1 = X[0] + X[1]
     addmu256(tmp2, B, &B[NWORDS_256BIT], midx);                // tmp2 = Y[0] + Y[1]
      
@@ -619,7 +630,8 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
     submu256(&U[NWORDS_256BIT], &U[NWORDS_256BIT], U, midx);   //Z[1] = tmp1 - aA - bB
     
     mulmontu256(U,U,nonres,midx);                                    // Z[0] = bB * non_residue
-    addmu256(U,U,tmp2, midx);                                  // Z[0] = Z[0] + aA
+    addmu256(U,U,tmp2, midx);                                  // Z[0] = Z[0] + aA 
+    */
 }
 
 /*
@@ -631,21 +643,27 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
 */
 __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
 {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
     uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
-    uint32_t tmp1[NWORDS_256BIT], tmp2[NWORDS_256BIT];
+    uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT];
 
-    mulmontu256(tmp1, A, &A[NWORDS_256BIT], midx);             // tmp1 = ab = X[0] * X[1]
-    mulmontu256(tmp2, nonres, &A[NWORDS_256BIT], midx);       //  tmp2 = nonres * X[1]
-    addmu256(tmp2, tmp2,A, midx);                             //  tmp2 = t1 
+    /*
+    logInfoBigNumberTid(tid,1,"X[0]:\n",(uint32_t *)A);
+    logInfoBigNumberTid(tid,1,"X[1]:\n",(uint32_t *)&A[NWORDS_256BIT]);
+    */
 
-    mulmontu256(tmp2, tmp2,A, midx);                          //  tmp2 = t1 * X[0]
-    mulmontu256(tmp2, tmp2,&A[NWORDS_256BIT], midx);          //  tmp2 = t1 * a2
-    submu256(tmp2, tmp2, tmp1, midx);                         //  tmp2 = t1 * a2 - ab
-    addmu256(&U[NWORDS_256BIT],tmp1, tmp1,midx);               // Z[1] = ab + ab
-    submu256(tmp1, tmp1, nonres, midx);                       //  tmp1 = nonres * ab
+    mulmontu256(tmp1, A,&A[NWORDS_256BIT], midx);             // Z[1] = 2 * X[0] * X[1]
 
+    sqmontu256(tmp2, A, midx);
+    sqmontu256(tmp3, &A[NWORDS_256BIT], midx);
 
-    addmu256(&U[NWORDS_256BIT],tmp1, tmp2,midx);              // Z[2] = t1 * a2 - ab + nonres * ab
+    addmu256(&U[NWORDS_256BIT],tmp1,tmp1,midx);
+    submu256(U,tmp2, tmp3,midx);                                 // Z[0] = X[0] * X[0] - (X[1] * X[1])
+    
+    /*
+    logInfoBigNumberTid(tid,1,"U[0]:\n",(uint32_t *)U);
+    logInfoBigNumberTid(tid,1,"U[1]:\n",(uint32_t *)&U[NWORDS_256BIT]);
+    */
 }
 
 
@@ -670,7 +688,7 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
     uint32_t i,j;
     uint32_t S, C=0, C1, C2,C3;
     uint32_t __restrict__ M[2], X[2];
-    uint32_t __restrict__ T[]={0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0,0};
     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 

@@ -1,4 +1,4 @@
-/*
+"""
     Copyright 2018 0kims association.
 
     This file is part of cusnarks.
@@ -19,34 +19,20 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : ecbn128_2.h
+// File name  : _zpoly_host.pxd
 //
-// Date       : 22/02/2019
+// Date       : 27/03/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//  Definition of Elliptic Curve kernel processing for extended fields
-//
-//  TODO
-//  This implementation is quite embarrasing. I am practically copying
-//  all ecbn128.cu functionality. I need to use C++ so that ecc over extended fields
-//  is a derived class from ecc and simply let the compiler select the right
-//  class. For the moment though, this will have to do :-(
+//   zpoly_host cython wrapper
 // ------------------------------------------------------------------
 
-*/
-#ifndef _ECBN128_2_H_
-#define _ECBN128_2_H_
+"""
+cimport _types as ct
 
+cdef extern from "../cuda/zpoly_host.h":
+      void cmaddm_h "maddm_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t last_idx, ct.uint32_t ncoeff, ct.uint32_t pidx)
 
-class ECBN128_2 : public CUSnarks {
-
-    public:
-
-        ECBN128_2(uint32_t len);
-        ECBN128_2(uint32_t len, uint32_t seed);
-        
-};
-
-#endif
+  

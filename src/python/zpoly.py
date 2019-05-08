@@ -57,9 +57,9 @@
 import math
 from random import randint
 import numpy as np
+import os,sys, os.path
 
 from zfield import *
-
 
 class ZPoly(object):
     # beyond this degree, poly mul is done with FFT
@@ -146,6 +146,11 @@ class ZPoly(object):
         return zcoeff, degree, FIDX
         """
         if type(p) is list:
+            if len(p) == 0:
+              degree = 0
+              zcoeff = [0]
+              FIDX = ZUtils.FEXT
+              return zcoeff, degree, FIDX
             degree = len(p) - 1
             if isinstance(p[0], ZFieldElExt):
                 zcoeff = p
@@ -428,8 +433,8 @@ class ZPoly(object):
 
         roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
 
-        print M.shape
-        print ZPoly(roots_Nslice).as_uint256()
+        #print M.shape
+        #print ZPoly(roots_Nslice).as_uint256()
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
             #newP._ntt_DIF(roots_Nslice[:ncols/2+1])
@@ -757,7 +762,7 @@ class ZPoly(object):
 
         self.zcoeff = [c * scaler for c in self.get_coeff()]
 
-    def poly_div(self, v):
+    def poly_div(self, v, invpol=None):
         """
           Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
           m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
@@ -784,7 +789,10 @@ class ZPoly(object):
         me = m + nd
         ne = n + nd
 
-        s = ve.inv()
+        if invpol is None:
+           s = ve.inv()
+        else:
+           s = invpol
 
         # handle the case when m>2n
         if me > 2* ne:
@@ -812,6 +820,48 @@ class ZPoly(object):
                 me = rem.get_degree()
             else:
                 done = True
+
+        return q
+
+    def poly_div_snarks(self, n):
+        """
+          Fast polynomial division ``u(x)`` / ``v(x)`` of polynomials with degrees
+          m and n. Time complexity is ``O(n*log(n))`` if ``m`` is of the same order
+          as ``n``. Assumes v(x) is of the form x^n - 1
+
+        """
+        m = self.get_degree()
+
+        if m < n:
+            return self.zero()
+
+        # ensure deg(v) is one less than some power of 2
+        # by extending v -> ve, u -> ue (mult by x^nd)
+        nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
+        ue = self.scale(nd)
+        me = m + nd
+        ne = n + nd
+
+        # handle the case when m>2n
+        q = self.zero()
+        rem = ZPoly(ue)
+        done = False
+        niter = 0
+
+        while not done:
+            if len(rem.get_coeff()[2*ne-nd:]) == 0:
+                return q
+            us = ZPoly(rem.get_coeff()[ne:]) + ZPoly(rem.get_coeff()[2*ne-nd:]) # degree me - ne
+            q = q + us
+
+            if me > 2 * ne:
+                rem = ZPoly(rem.get_coeff()[ne+1:])
+                me = rem.get_degree()
+            else:
+                done = True
+            niter +=1
+            #if niter==2:
+            #  return q
 
         return q
 
@@ -997,6 +1047,15 @@ class ZPoly(object):
     def as_uint256(self):
         if type(self.get_coeff()) is list:
             return np.asarray([c.as_uint256() for c in self.get_coeff()])
+        else :
+            Val = []
+            Coeff = []
+            for k,v in self.zcoeff.items():
+              Coeff.append(np.uint32(k ))
+              Val.append(v.as_uint256())
+            Val = np.concatenate(Val)
+            return len(self.zcoeff), np.concatenate((np.asarray(Coeff,dtype=np.uint32), Val))
+            #return np.asarray([np.concatenate([(np.uint32(k )], v.as_uint256())) for k,v in self.zcoeff.items()], dtype=np.uint32)
 
     @staticmethod
     def from_uint256(x,reduced=False):
@@ -1198,4 +1257,5 @@ class ZPolySparse(ZPoly):
           Not supported
         """
         assert False, "Operation not supported"
+
 

@@ -113,9 +113,15 @@ class ECC(object):
             return
         elif type(p) is list:
             if len(p) == 2 and isinstance(p[ECC.X], ZFieldElRedc):
-               p = [p[ECC.X], p[ECC.Y], ECC.one[FRDC]]
+               if isinstance(p[ECC.X], Z2FieldEl):
+                  p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]])]
+               else:
+                  p = [p[ECC.X], p[ECC.Y], ECC.one[Zutils.FRDC]]
             elif len(p) == 2:
-               p = [p[ECC.X], p[ECC.Y], ECC.one[FEXT]]
+               if isinstance(p[ECC.X], Z2FieldEl):
+                 p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]])]
+               else:
+                  p = [p[ECC.X], p[ECC.Y], ECC.one[ZUtils.FEXT]]
             p_l = p
         elif isinstance(p,ECC):
             p_l = p.P
@@ -135,7 +141,7 @@ class ECC(object):
         if isinstance(p_l[ECC.X], Z2FieldEl) or type(p_l[ECC.X]) is list:
             self.P = [Z2FieldEl(x) for x in p_l]
             self.FIDX = ZUtils.FEXT
-            if isinstance(self.P[ECC.X].as_list()[0], ZFieldElRedc):
+            if isinstance(self.P[ECC.X].P[0], ZFieldElRedc):
                 self.FIDX = ZUtils.FRDC
         elif isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
             self.P = [ZFieldElExt(x) for x in p_l]
@@ -152,10 +158,10 @@ class ECC(object):
         return ECC.a[ZUtils.FEXT] is not None and ECC.b[ZUtils.FEXT] is not None
 
     @classmethod
-    def init(cls, curve_params):
+    def init(cls, curve_params, extended=False):
         if not ZField.is_init():
             assert False, "Field not initialized"
-        ECC.init_curve(curve_params)
+        ECC.init_curve(curve_params, extended=extended)
         ECC.init_constants()
 
     @classmethod
@@ -170,11 +176,19 @@ class ECC(object):
          ECC.constants_init = True
 
     @classmethod
-    def init_curve(cls, curve_params):
-        ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
-        ECC.b = [ZFieldElExt(curve_params['b']), ZFieldElExt(curve_params['b']).reduce()]
-        ECC.Gx = curve_params['Gx']
-        ECC.Gy = curve_params['Gy']
+    def init_curve(cls, curve_params, extended=False):
+        if not extended:
+           ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
+           ECC.b = [ZFieldElExt(curve_params['b']), ZFieldElExt(curve_params['b']).reduce()]
+           ECC.Gx = ZFieldElExt(curve_params['Gx'])
+           ECC.Gy = ZFieldElExt(curve_params['Gy'])
+        else :
+           ECC.a = [Z2FieldEl([curve_params['ax1'], curve_params['ax2']]),
+                   Z2FieldEl([curve_params['ax1'], curve_params['ax2']]).reduce()] 
+           ECC.b = [Z2FieldEl([curve_params['bx1'], curve_params['bx2']]),
+                    Z2FieldEl([curve_params['bx1'], curve_params['bx2']]).reduce()]
+           ECC.Gx = Z2FieldEl([curve_params['Gx1'], curve_params['Gx2']])
+           ECC.Gy = Z2FieldEl([curve_params['Gy1'], curve_params['Gy2']])
 
     @classmethod
     def p_zero(cls, ext_field=False):
@@ -371,16 +385,49 @@ class ECC(object):
         pass
 
     @staticmethod
-    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False):
+    def as_uint256(P, remove_last=False, as_reduced=False):
+      if remove_last:
+         last_idx=2
+      else:
+         last_idx = 3
+      if isinstance(P,list) or isinstance(P,np.ndarray) and isinstance(P[0],ECC):
+         if as_reduced:
+            Px = [x.reduce().get_P() for x in P]
+         else :
+            Px = [x.get_P() for x in P]
+         Pc=[]
+         for Py in Px:
+           Pc.append([ x.as_uint256() for x in Py[0:last_idx]])
+         Pc = np.concatenate(Pc)
+      else:
+         if as_reduced:
+           Pc = np.asarray([ x.as_uint256() for x in P.reduce().get_P()[0:last_idx]])
+         else:
+           Pc = np.asarray([ x.as_uint256() for x in P.get_P()[0:last_idx]])
+
+      if len(Pc[0])==2:
+          Pc = np.reshape(Pc,(-1,8))
+
+      return Pc
+
+    @staticmethod
+    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False,ec2=False):
         """
 
         :param x:
         :return:
         """
-        if reduced:
-            P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+        if not ec2:
+          if reduced:
+              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+          else:
+              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
         else:
-            P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+          if reduced:
+              P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0])), ZFieldElRedc(BigInt.from_uint256(x_[1]))]) for x_ in x]),(-1,3))
+          else:
+              P = np.reshape(np.asarray([Z2FieldEl([BigInt.from_uint256(x_[0]).as_long(), BigInt.from_uint256(x_[1]).as_long()]) for x_ in x]),(-1,3))
+        
 
         if in_ectype == 0:
             P_ = [ECCProjective(x_.tolist()) for x_ in P]
@@ -417,7 +464,8 @@ class ECC(object):
       for i in xrange(n):
          k = randint(1,p-1)  # generate random number between 1 and p-1
 
-         P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+         #P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
+         P1 = ECCJacobian([ECC.Gx,ECC.Gy])
          P1 = k * P1
          P1 = P1.to_affine()
 
@@ -499,7 +547,7 @@ class ECCAffine(ECC):
            actual format (Montgomery/Extended)
         """
         if self.is_inf():
-            return ECCAffine(self)
+            return ECCProjective(self)
         elif isinstance(self.P[ECC.X], Z2FieldEl):
             return ECCProjective([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.zero[self.FIDX]])])
         elif isinstance(self.P[ECC.X], ZFieldEl):
@@ -522,7 +570,7 @@ class ECCAffine(ECC):
         if self.is_inf():
             return ECCJacobian(self)
         elif isinstance(self.P[ECC.X], Z2FieldEl):
-            return ECCProjective([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.zero[self.FIDX]])])
+            return ECCJacobian([self.P[ECC.X], self.P[ECC.Y], Z2FieldEl([ECC.one[self.FIDX], ECC.zero[self.FIDX]])])
         elif isinstance(self.P[ECC.X], ZFieldEl):
             return ECCJacobian([self.P[ECC.X], self.P[ECC.Y], ECC.one[self.FIDX]])
         else:
@@ -735,8 +783,8 @@ class ECCProjective(ECC):
 
         U = U1 - U2
         V = V1 - V2
-        Usq = U**2
-        Vsq = V**2
+        Usq = U*U
+        Vsq = V*V
         Vcube = Vsq * V
         W = Z1 * Z2
         A = (Usq * W) - Vcube
@@ -744,7 +792,8 @@ class ECCProjective(ECC):
         if self.FIDX == ZUtils.FEXT:
            A -= (Vsq * V2) << ECC.one[self.FIDX]
         else:
-           A -= (Vsq * V2) * ECC.two[self.FIDX] 
+           #A -= (Vsq * V2) * ECC.two[self.FIDX] 
+           A -= (Vsq * V2) * 2
 
         X3 = V * A
         Y3 = U * (Vsq * V2 - A) - Vcube*U2
@@ -799,7 +848,7 @@ class ECCProjective(ECC):
                 W1 = W << one
                 W += W1
             else:
-                W = three * W
+                W = 3 * W
         else:  # W = a*Z^2 + 3*X^2
             W = a * Z * Z
             Xsq = X * X
@@ -807,7 +856,7 @@ class ECCProjective(ECC):
                 W1 = Xsq << one
                 W +=  W1 + Xsq
             else:
-                W1 = Xsq * three
+                W1 = 3 * Xsq
                 W += W1
 
         if self.FIDX == ZUtils.FEXT:
@@ -817,11 +866,13 @@ class ECCProjective(ECC):
             ry = W * ( (B << two) - H) - (Ysq * Ssq << three)
             rz = Scube << three  # Z' =8 * S^3
         else:
-            H = W * W - B * eight  # H = W^2 - 8*B
-            rx = H * S * two  # X' = 2 * H * S
+            H = W * W - 8*B  # H = W^2 - 8*B
+            rx = H * (2 * S )   # X' = 2 * H * S
             # Y' = W*(4*B-H) - 8*Y^2*S^2
-            ry = W * (B * four - H) - Ysq * Ssq * eight
-            rz = Scube * eight  # Z' =8 * S^3
+            #ry = W * (B * four - H) - Ysq * Ssq * eight
+            ry = W * (4*B  - H) - Ysq * Ssq * 8
+            #rz = Scube * eight  # Z' =8 * S^3
+            rz = 8 * Scube
 
         return ECCProjective([rx, ry, rz])
 
@@ -936,8 +987,8 @@ class ECCJacobian(ECC):
         if self.FIDX == ZUtils.FEXT:
           X3 = X3 - (U1 * (Hsq << ECC.one[self.FIDX]) )
         else: 
-          X3 = X3 - (U1 * Hsq * ECC.two[self.FIDX])
- 
+          X3 = X3 - (U1 * (Hsq + Hsq) )
+
         Y3 = R * (U1*Hsq - X3) - (S1 * Hcube)
         Z3 = H * Z1 *Z2
 
@@ -982,7 +1033,8 @@ class ECCJacobian(ECC):
         if self.FIDX == ZUtils.FEXT:
             S = (S << ECC.two[self.FIDX])
         else:
-            S = S * ECC.four[self.FIDX]
+            #S = S * ECC.four[self.FIDX]
+            S = (S + S + S + S)
 
         if ECC.a[self.FIDX] == -ECC.three[self.FIDX]:
             M1 = (X + Zsq) * (X - Zsq)
@@ -990,13 +1042,16 @@ class ECCJacobian(ECC):
                 M  = (M1 << ECC.one[self.FIDX])
                 M  = M + M1
             else:
-                M  = ECC.three[self.FIDX] * M1
+                #M  = ECC.three[self.FIDX] * M1
+                M  = (M1 + M1 + M1)
         else:
             M1 = X * X
             if self.FIDX == ZUtils.FEXT:
                 M = M1 + (M1 << ECC.one[self.FIDX])
+                #M = ECC.three[self.FIDX] * M1
             else:
-                M = ECC.three[self.FIDX] * M1
+                #M = ECC.three[self.FIDX] * M1
+                M = (M1 + M1 + M1)
             M = M + ECC.a[self.FIDX] * Zsq * Zsq
 
         X3 = M * M
@@ -1006,9 +1061,15 @@ class ECCJacobian(ECC):
             Y3 = M * (S - X3) - (Ysqsq << ECC.three[self.FIDX])
             Z3 = (Z3 << ECC.one[self.FIDX])
         else:
-            X3 = X3 - (S * ECC.two[self.FIDX])
-            Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
-            Z3 = Z3 * ECC.two[self.FIDX]
+            #X3 = X3 - (S * ECC.two[self.FIDX])
+            X3 = X3 - (S + S)
+            #Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
+            a = Ysqsq + Ysqsq
+            a = a + a
+            a = a + a
+            Y3 = M * (S - X3) - a
+            #Z3 = Z3 * ECC.two[self.FIDX]
+            Z3 = Z3 + Z3 
 
         return ECCJacobian([X3, Y3, Z3])
 
