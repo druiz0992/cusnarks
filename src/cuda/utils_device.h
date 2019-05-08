@@ -51,12 +51,23 @@ __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x)
 */
 __forceinline__ __device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
 {
+  #if 1
+  ulonglong4 *x4 = (ulonglong4 *)x;
+  ulonglong4 *y4 = (ulonglong4 *)y;
+  
+  if ( x4->x == y4->x && x4->y == y4->y && x4->z == y4->z && x4->w == y4->w){
+    return 1;
+  } else {
+    return 0;
+  }
+  #else
   if (x[0] == y[0] && x[1] ==  y[1] && x[2] == y[2] && x[3] == y[3] &&
 		  x[4] == y[4] && x[5] == y[5] && x[6] == y[6] && x[7] == y[7]){
     return 1;
   } else { 
     return 0;
   }
+  #endif
 }
 
 

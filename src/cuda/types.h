@@ -45,6 +45,7 @@
 #define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
 #define ECK_INDIMS               (3)
 // Montgomery ladder
+#if 0
 #define ECP_LDR_INDIMS                (2)
 #define ECP_LDR_OUTDIMS               (2)
 #define ECP_LDR_INXOFFSET             (1 * NWORDS_256BIT)
@@ -56,31 +57,35 @@
 #define ECK_LDR_OUTDIMS              (ECP_LDR_OUTDIMS)
 #define ECK_LDR_INOFFSET             (ECK_LDR_INDIMS * NWORDS_256BIT)
 #define ECK_LDR_OUTOFFSET            (ECK_LDR_OUTDIMS * NWORDS_256BIT)
+#endif
 // Jacobian
+#define ECP_JAC_N256W                 (1)
 #define ECP_JAC_INDIMS                (2) // X, Y
 #define ECP_JAC_OUTDIMS               (3) // X, Y, Z
-#define ECP_JAC_INXOFFSET             (1 * NWORDS_256BIT)
-#define ECP_JAC_INYOFFSET             (2 * NWORDS_256BIT)
+#define ECP_JAC_XOFFSET_BASE          (0)
+#define ECP_JAC_YOFFSET_BASE          (1)
+#define ECP_JAC_ZOFFSET_BASE          (2)
+#define ECP_JAC_INXOFFSET             (0 * NWORDS_256BIT)
+#define ECP_JAC_INYOFFSET             (1 * NWORDS_256BIT)
 #define ECP_JAC_OUTXOFFSET            (0 * NWORDS_256BIT)
 #define ECP_JAC_OUTYOFFSET            (1 * NWORDS_256BIT)
 #define ECP_JAC_OUTZOFFSET            (2 * NWORDS_256BIT)
+#define ECP_JAC_INOFFSET              (ECP_JAC_INDIMS * NWORDS_256BIT)
+#define ECP_JAC_OUTOFFSET             (ECP_JAC_OUTDIMS * NWORDS_256BIT)
 
-#define ECK_JAC_INDIMS               (ECP_JAC_INDIMS  + U256_NDIMS)
-#define ECK_JAC_OUTDIMS              (ECP_JAC_OUTDIMS)
-#define ECK_JAC_INOFFSET             (ECK_JAC_INDIMS * NWORDS_256BIT)
-#define ECK_JAC_OUTOFFSET            (ECK_JAC_OUTDIMS * NWORDS_256BIT)
-
-#define ECP2_AFF_INOFFSET            (ECP2_AFF_INDIMS * NWORDS_256BIT)
-#define ECP2_AFF_INXOFFSET           (0 * NWORDS_256BIT)
-#define ECP2_AFF_INYOFFSET           (2 * NWORDS_256BIT)
-#define ECP2_AFF_INZOFFSET           (4 * NWORDS_256BIT)
-#define ECP2_AFF_INDIMS             (6)               
-
-#define ECP2_JAC_OUTOFFSET           (ECP_JAC_OUTDIMS * NWORDS_256BIT)
-#define ECP2_JAC_OUTXOFFSET          (0 * NWORDS_256BIT)
-#define ECP2_JAC_OUTYOFFSET          (2 * NWORDS_256BIT)
-#define ECP2_JAC_OUTDIMS              (4)  //x0,x1, y0,y1
-#define ECK2_JAC_OUTDIMS              (ECP2_JAC_OUTDIMS)
+#define ECP2_JAC_N256W                 (2)
+#define ECP2_JAC_INDIMS                (4) // X, Y
+#define ECP2_JAC_OUTDIMS               (6) // X, Y, Z
+#define ECP2_JAC_XOFFSET_BASE          (0)
+#define ECP2_JAC_YOFFSET_BASE          (1)
+#define ECP2_JAC_ZOFFSET_BASE          (2)
+#define ECP2_JAC_INXOFFSET             (0 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_INYOFFSET             (1 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTXOFFSET            (0 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTYOFFSET            (1 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_OUTZOFFSET            (2 * 2 * NWORDS_256BIT)
+#define ECP2_JAC_INOFFSET              (ECP2_JAC_INDIMS *  NWORDS_256BIT)
+#define ECP2_JAC_OUTOFFSET             (ECP2_JAC_OUTDIMS * NWORDS_256BIT)
 
 #define CUSNARKS_BLOCK_DIM      (256)
 #define CUSNARKS_MAX_NCB        (32)
@@ -90,17 +95,8 @@
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
-class Z_t{
-};
-
-class Z1_t: public Z_t{
-   uint32_t *el;
-};
-
-class Z2_t: public Z_t{
-   uint32_t *elx;
-   uint32_t *ely;
-};
+typedef unsigned int uint256_t[NWORDS_256BIT];
+typedef unsigned int uint512_t[2*NWORDS_256BIT];
 
 // prime number info for finite fields
 typedef struct {
@@ -128,14 +124,9 @@ typedef struct {
 
 // additional constants required
 typedef struct {
-  uint32_t _1[NWORDS_256BIT];
-  uint32_t _2[NWORDS_256BIT];
-  uint32_t _3[NWORDS_256BIT];
-  uint32_t _4[NWORDS_256BIT];
-  uint32_t _8[NWORDS_256BIT];
-  uint32_t _4b[NWORDS_256BIT];
-  uint32_t _8b[NWORDS_256BIT];
+  uint32_t _1[2*NWORDS_256BIT];
   uint32_t _inf[3*NWORDS_256BIT];
+  uint32_t _inf2[6*NWORDS_256BIT];
 
 }misc_const_t;
 /**
@@ -147,6 +138,8 @@ typedef struct {
         int gridD;
         int smemS;  // in bytes
         int kernel_idx;
+        int return_val;
+        int in_offset;
 } kernel_config_t;
 
 
@@ -157,6 +150,7 @@ typedef enum{
    MOD_N
 
 }mod_t;
+
 
 // data vector
 typedef struct{
@@ -179,6 +173,23 @@ typedef enum{
 }fft_size_t;
   
 
+typedef enum{
+  FFT_T_1D = 0, // N < 32
+  FFT_T_2D,     // 32 < N < 1024
+  FFT_T_3D,     // 1024 < N < 2^20
+  FFT_T_4D,     // 2^20 < N < 2^40
+  FFT_T_N 
+
+}fft_t;
+
+typedef struct{
+  fft_t fft_type;
+  uint32_t fft_N[1<<(FFT_T_N-1)];
+  uint32_t padding;
+  uint32_t levels;
+  
+}fft_params_t;
+
 // kernel input parameters
 typedef struct{
    uint32_t premod; // data requires to be mod-ded as preprocessing stage  
@@ -187,10 +198,12 @@ typedef struct{
    uint32_t out_length; // output data length (number of elements)
    uint32_t stride; // data elemements processed by thread
    fft_size_t fft_Nx;
-   fft_size_t N_fftx;
+   uint32_t N_fftx;
    fft_size_t fft_Ny;
-   fft_size_t N_ffty;
+   uint32_t N_ffty;
    uint32_t forward;
+   uint32_t padding_idx;
+   uint32_t as_mont;
    mod_t    midx;   // index to prime number to be used by kernel
 
 }kernel_params_t;
@@ -219,20 +232,26 @@ typedef enum{
    //CB_EC_LDR_DOUBLE,
    //CB_EC_LDR_MUL,
    //CB_EC_LDR_MAD,
-   CB_EC_JAC_ADD = 0,
+   CB_EC_JACAFF_ADD = 0,
+   CB_EC_JAC_ADD,
+   CB_EC_JACAFF_DOUBLE,
    CB_EC_JAC_DOUBLE,
    CB_EC_JAC_MUL,
    CB_EC_JAC_MAD,
+   CB_EC_JAC_MAD_SHFL,
    CB_EC_N
 
 }ec_callback_t;
 
 // index to ec128bn class kernels
 typedef enum{
-   CB_EC2_JAC_ADD = 0,
+   CB_EC2_JACAFF_ADD = 0,
+   CB_EC2_JAC_ADD,
+   CB_EC2_JACAFF_DOUBLE,
    CB_EC2_JAC_DOUBLE,
    CB_EC2_JAC_MUL,
    CB_EC2_JAC_MAD,
+   CB_EC2_JAC_MAD_SHFL,
    CB_EC2_N
 
 }ec2_callback_t;
@@ -247,9 +266,19 @@ typedef enum{
    CB_ZPOLY_FFT2DX,
    CB_ZPOLY_FFT2DY,
    CB_ZPOLY_FFT3DXX,
+   CB_ZPOLY_FFT3DXX_PREV,
    CB_ZPOLY_FFT3DXY,
    CB_ZPOLY_FFT3DYX,
    CB_ZPOLY_FFT3DYY,
+   CB_ZPOLY_ADD,
+   CB_ZPOLY_SUB,
+   CB_ZPOLY_SUBPREV,
+   CB_ZPOLY_MULC,
+   CB_ZPOLY_MULCPREV,
+   CB_ZPOLY_MULK,
+   CB_ZPOLY_MADPREV,
+   CB_ZPOLY_ADDPREV,
+   CB_ZPOLY_DIVSNARKS,
    CB_ZPOLY_N
 
 }zpoly_callback_t;

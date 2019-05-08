@@ -21,17 +21,14 @@ CUBIN_NAME=$(CUBIN_NAME)
 AUX_INCLUDES=$(AUX_INCLUDES)
 
 LOG_LEVEL=$(LOG_LEVEL)
-LOG_TID=$(LOG_TID)
 
 NVCC = nvcc
 CC  = c++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
-CFLAGS=-c -O2 -DLINUXINTEL64 -g -I $(INCLUDE_PATH) -w
+CFLAGS=-c -O2 -DLINUXINTEL64 -I $(INCLUDE_PATH) -w
+#CFLAGS=-c -DLINUXINTEL64 -g -G -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-CUFLAGS:= -DLOG_LEVEL=$(LOG_LEVEL) -DLOG_TID=$(LOG_TID) -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
-ifeq ($(LOG_TID),-1)
-  CUFLAGS:= -DLOG_LEVEL=$(LOG_LEVEL) -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
-endif
+CUFLAGS=  -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_60 --shared -o 
 LDFLAGS=-lm -lcudart
@@ -45,10 +42,11 @@ CUSRC = cusnarks_kernel.cu \
         u256_device.cu \
         ecbn128.cu \
         ecbn128_device.cu \
-	ecbn128_2.cu \
-        ecbn128_2_device.cu \
+	ec2bn128.cu \
 	zpoly.cu \
 	zpoly_device.cu \
+        z1_device.cu \
+        z2_device.cu \
         log.cu
 
 CSRC = rng.cpp \

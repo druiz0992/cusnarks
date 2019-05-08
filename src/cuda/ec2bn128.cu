@@ -19,7 +19,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : ecbn128_2.cu
+// File name  : ec2bn128.cu
 //
 // Date       : 22/02/2019
 //
@@ -28,12 +28,6 @@
 // Description:
 //  Implementation of CUDA EC Kernel processing for extended fields
 //
-//
-//  TODO
-//  This implementation is quite embarrasing. I am practically copying
-//  all ecbn128.cu functionality. I need to use C++ so that ecc over extended fields
-//  is a derived class from ecc and simply let the compiler select the right
-//  class. For the moment though, this will have to do :-(
 // ------------------------------------------------------------------
 
 */
@@ -46,20 +40,21 @@
 #include "cuda.h"
 #include "rng.h"
 #include "cusnarks_kernel.h"
-#include "ecbn128_2.h"
-#include "ecbn128_2_device.h"
+#include "ec2bn128.h"
+#include "ecbn128_device.h"
 
 using namespace std;
 
-static kernel_cb ecbn128_2_kernel_callbacks[] = {addecjac2_kernel, doublecjac2_kernel, scmulecjac2_kernel, madecjac2_kernel};
+static kernel_cb ecbn128_2_kernel_callbacks[] = {addec2jacaff_kernel, addec2jac_kernel, doublec2jacaff_kernel, doublec2jac_kernel,
+                                                 scmulec2jac_kernel, madec2jac_kernel, madec2jac_shfl_kernel};
 
-ECBN128_2::ECBN128_2 (uint32_t len) : CUSnarks( len * ECP2_AFF_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len *  ECP2_AFF_INDIMS,
+EC2BN128::EC2BN128 (uint32_t len) : CUSnarks( len * ECP2_JAC_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len *  ECP2_JAC_INDIMS,
 		                            len * ECP2_JAC_OUTDIMS,  NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_OUTDIMS, 
                                             ecbn128_2_kernel_callbacks, 0)
 {
 }
 
-ECBN128_2::ECBN128_2 (uint32_t len, const uint32_t seed) :  CUSnarks(len * ECP2_AFF_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_AFF_INDIMS,
+EC2BN128::EC2BN128 (uint32_t len, const uint32_t seed) :  CUSnarks(len * ECP2_JAC_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_INDIMS,
 				                                 len * ECP2_JAC_OUTDIMS, NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_OUTDIMS,
 						       ecbn128_2_kernel_callbacks, seed)
 {

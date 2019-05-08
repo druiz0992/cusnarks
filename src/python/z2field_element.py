@@ -114,6 +114,56 @@ class Z2FieldEl(ZFieldEl):
         newZ2.P[1] = -newZ2.P[1]
         return newZ2
 
+    def __iadd__(self, x):
+        """
+          X = X + Y (mod P) : Add operation is the same for extended and reduced representations.
+           Result of addition is of type self. Note that ZFieldElExt and ZFieldElRedc
+           cannot be added toguether
+        """
+        if isinstance(x, BigInt):
+            if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                    (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+                assert False, "Invalid type"
+            else:
+                #newz = (self.bignum + x.bignum)
+                newz = self + x
+        elif isinstance(x, int) or isinstance(x, long):
+            newz = (self.bignum + x)
+        else:
+            assert False, "Invalid type"
+
+        if isinstance(self.P[0], ZFieldElRedc):
+            self = Z2FieldEl(newz).reduce()
+        else:
+            self = Z2FieldEl(newz)
+
+        return self
+
+    def __isub__(self, x):
+        """
+          X = X - Y (mod P) : Add operation is the same for extended and reduced representations.
+           Result of operation is of type self. Note that ZFieldElExt and ZFieldElRedc
+           cannot be substracted toguether
+        """
+        if isinstance(x, BigInt):
+            if (isinstance(x, ZFieldElRedc) and isinstance(self, ZFieldElExt)) or \
+                    (isinstance(x, ZFieldElExt) and isinstance(self, ZFieldElRedc)):
+                assert False, "Invalid type"
+            else:
+                newz = self - x
+                #newz = (self.bignum - x.bignum)
+        elif isinstance(x, int) or isinstance(x, long):
+            newz = (self.bignum - x)
+        else:
+            assert False, "Invalid type"
+
+        if isinstance(self.P[0], ZFieldElRedc):
+            self = Z2FieldEl(newz).reduce()
+        else:
+            self = Z2FieldEl(newz)
+
+        return self
+
     def square(self):
         idx = 0
         if isinstance(self.P[0], ZFieldElRedc):
@@ -210,6 +260,8 @@ class Z2FieldEl(ZFieldEl):
         if not ((isinstance(self.P[0], ZFieldElExt) and isinstance(self.P[1], ZFieldElExt)) or \
                 (isinstance(self.P[0], ZFieldElRedc) and isinstance(self.P[1], ZFieldElRedc))):
             assert False, "Invalid type"
+        if not isinstance(other, Z2FieldEl):
+            return False
 
         return self.P[0] == other.P[0] and self.P[1] == other.P[1]
 
@@ -247,3 +299,8 @@ class Z2FieldEl(ZFieldEl):
         newZ2.P[1] = -(self.P[1] * t3)
 
         return newZ2
+
+    def as_uint256(self):
+       x = self.as_list()
+       return  [BigInt(x[0]).as_uint256(), BigInt(x[1]).as_uint256()]
+

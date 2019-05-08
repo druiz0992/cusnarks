@@ -37,7 +37,8 @@ cimport numpy as np
 cimport _types as ct
 cimport _utils_host as uh
 
-from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_ECBN128_2, C_ZCUPoly
+from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
+
 from cython cimport view
 from constants import *
 from libc.stdlib cimport malloc, free
@@ -63,7 +64,7 @@ cdef class CUSnarks:
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
-        #print in_v.length, self.in_dim, out_v.length, self.out_dim
+        print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
             return 0.0
@@ -77,7 +78,11 @@ cdef class CUSnarks:
         for i in range(n_kernel):
            kconfig[i].blockD = config['blockD'][i]
            kconfig[i].kernel_idx = config['kernel_idx'][i]
-           # gridD and smemS do not need to exist
+           # gridD and smemS and return_val do not need to exist
+           if 'return_val' in config:
+               kconfig[i].return_val  = config['return_val'][i]
+           else :
+               kconfig[i].return_val  = 1
            if 'gridD' in config:
                kconfig[i].gridD  = config['gridD'][i]
            else :
@@ -86,6 +91,10 @@ cdef class CUSnarks:
                kconfig[i].smemS  = config['smemS'][i]
            else:
                kconfig[i].smemS  = 0
+           if 'in_offset' in config:
+               kconfig[i].in_offset  = config['in_offset'][i]
+           else:
+               kconfig[i].in_offset = 0
 
         in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
         in_vec_flat = np.concatenate(in_vec)
@@ -120,6 +129,14 @@ cdef class CUSnarks:
             kparams[i].forward = params['forward'][i]
           else:
             kparams[i].forward = 1
+          if 'padding_idx' in params:
+            kparams[i].padding_idx = params['padding_idx'][i]
+          else:
+            kparams[i].padding_idx = 0
+          if 'as_mont' in params:
+            kparams[i].as_mont = params['as_mont'][i]
+          else:
+            kparams[i].as_mont = 1
 
         exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
        
@@ -148,8 +165,15 @@ cdef class CUSnarks:
 
         return samples.reshape((-1,ct.NWORDS_256BIT))
      
+    def saveFile(self, np.ndarray[ndim=1, dtype=np.uint32_t] samples, bytes fname):
+        cdef char *fname_c = fname
+        self._cusnarks_ptr.saveFile(&samples[0],len(samples)/8, fname_c)
+        
     def getDeviceInfo(self):
        self._cusnarks_ptr.getDeviceInfo()
+
+    #def __dealloc__(self):
+        #del self._cusnarks_ptr
 
 # CU256 class cython wrapper
 cdef class U256 (CUSnarks):
@@ -182,23 +206,23 @@ cdef class ECBN128 (CUSnarks):
         del self._ecbn128_ptr
 
 
-# CUECBN128 class cython wrapper
-cdef class ECBN128_2 (CUSnarks):
-    cdef C_ECBN128_2* _ecbn128_2_ptr
+# CUEC2BN128 class cython wrapper
+cdef class EC2BN128 (CUSnarks):
+    cdef C_EC2BN128* _ec2bn128_ptr
 
     def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
         if out_len == 0:
             out_len = in_len
-        self._ecbn128_2_ptr = new C_ECBN128_2( in_len,seed)
-        self._cusnarks_ptr = <C_CUSnarks *>self._ecbn128_2_ptr
+        self._ec2bn128_ptr = new C_EC2BN128( in_len,seed)
+        self._cusnarks_ptr = <C_CUSnarks *>self._ec2bn128_ptr
         # TODO : add correct dimension
-        self.in_dim = self.in_dim * 3
-        self.out_dim = self.out_dim  * 3
+        self.in_dim = self.in_dim * 6
+        self.out_dim = self.out_dim  * 6
         self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
         self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
    
     def __dealloc__(self):
-        del self._ecbn128_2_ptr
+        del self._ec2bn128_ptr
 
 
 
@@ -216,12 +240,12 @@ cdef class ZCUPoly (CUSnarks):
         del self._zpoly_ptr
 
 
-def montmult(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
         uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
   
-        return out_vec.data
+        return out_vec
 
 
 def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
@@ -240,15 +264,32 @@ def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
       return np.reshape(in_A_flat,(-1,n))
 
+def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t fmat, ct.uint32_t pidx):
+
+      cdef ct.uint32_t n = in_A.shape[1]
+      cdef ct.uint32_t L = int(np.log2(len(in_roots)))
+
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
+      cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_A_flat = np.zeros(in_A.shape[0] * in_A.shape[1], dtype=np.uint32)
+
+      in_roots_flat = np.concatenate(in_roots)
+      in_A_flat = np.concatenate(in_A)
+
+      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], fmat, L, pidx)
+
+      return np.reshape(in_A_flat,(-1,n))
+
 def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nroots, ct.uint32_t pidx):
  
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_roots_flat = np.zeros(nroots * len(in_proot), dtype=np.uint32)
       uh.cfind_roots_h(&out_roots_flat[0], &in_proot[0], nroots, pidx)
 
-      return np.reshape(out_roots_flat,(-1, len(in_prot)))
+      return np.reshape(out_roots_flat,(-1, len(in_proot)), 0)
 
 def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx,
+          ct.uint32_t mode=0):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
@@ -257,12 +298,12 @@ def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, pidx)
+      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, pidx, mode)
 
       return np.reshape(in_A_flat,(-1,n))
 
 def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.uint32_t pidx, ct.uint32_t mode=0):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
@@ -271,10 +312,36 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, pidx)
+      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, pidx, mode)
 
       return np.reshape(in_A_flat,(-1,n))
 
+def ntt_build_h(ct.uint32_t nsamples):
+     cdef ct.fft_params_t *fft_params = <ct.fft_params_t *> malloc(sizeof(ct.fft_params_t))
+   
+     uh.cntt_build_h(fft_params, nsamples)
+
+     py_fft_params={}
+     py_fft_params['fft_type'] = fft_params.fft_type
+     py_fft_params['padding'] = fft_params.padding
+     py_fft_params['levels'] = fft_params.levels
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] fft_sizes = np.zeros(1<<(ct.FFT_T_N-1), dtype=np.uint32)
+     py_fft_params['fft_N'] = fft_sizes
+
+     py_fft_params['fft_N'][0] = fft_params.fft_N[0]
+     py_fft_params['fft_N'][1] = fft_params.fft_N[1]
+     py_fft_params['fft_N'][2] = fft_params.fft_N[2]
+     py_fft_params['fft_N'][3] = fft_params.fft_N[3]
+     py_fft_params['fft_N'][4] = fft_params.fft_N[4]
+     py_fft_params['fft_N'][5] = fft_params.fft_N[5]
+     py_fft_params['fft_N'][6] = fft_params.fft_N[6]
+     py_fft_params['fft_N'][7] = fft_params.fft_N[7]
+
+     free(fft_params)
+
+     return py_fft_params
+    
+    
 def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] start, ct.uint32_t inc,
                                       np.ndarray[ndim=1, dtype=np.uint32_t] mod):
 
@@ -283,3 +350,36 @@ def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] star
      uh.crangeu256_h(&out_samples[0], nsamples, &start[0], inc, &mod[0])
   
      return out_samples.reshape((-1,ct.NWORDS_256BIT))
+
+def int_to_byte_h (np.ndarray[ndim=1, dtype=np.uint32_t] indata):
+     cdef np.ndarray[ndim=1, dtype=np.uint8_t] outd = np.zeros(4 * len(indata), dtype=np.uint8)
+
+     uh.cint_to_byte_h(<char *>&outd[0], &indata[0], len(outd))
+     return outd
+
+def byte_to_int_h (np.ndarray[ndim=1, dtype=np.uint8_t] indata):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(len(indata)/4, dtype=np.uint32)
+
+     uh.cbyte_to_int_h(&outd[0], <char *>&indata[0], len(outd))
+
+     return outd
+
+def zpoly_maddm_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
+              ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
+
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(ncoeff*8,dtype=np.uint32)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] sclflat = np.zeros(scldata.shape[0] * scldata.shape[1],dtype=np.uint32)
+     sclflat = np.reshape(scldata,-1)
+         
+     uh.czpoly_maddm_h(&outd[0],&sclflat[0], &pdata[0], ncoeff, last_idx, pidx)
+     #uh.cmaddm_h(&outd[0],&scldata[0], &pdata[0], last_idx, pout_d, pidx)
+
+     return np.reshape(outd,(-1,8))
+
+def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data, ct.uint32_t pidx):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(pin_data.shape[0] * pin_data.shape[1],dtype=np.uint32)
+    pin_data_flat = np.reshape(pin_data,-1)
+    cdef ct.uint32_t idx = uh.czpoly_norm_h(&pin_data_flat[0],pidx)
+
+    return idx
+
