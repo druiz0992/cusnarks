@@ -87,13 +87,17 @@ void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
 }
 void _RNG::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod)
 {
-   uint32_t i,j;
+   uint32_t i,j,nwords,nbits;
    logDebug("random : %d n_samples\n", n_samples);
+   memset(samples,0,NWORDS_256BIT*n_samples*sizeof(uint32_t));
    for (i =0; i < n_samples; i++){
-     for (j =0; j < NWORDS_256BIT; j++){
+     nwords = rng() % NWORDS_256BIT;
+     nbits = rng() % 32;
+     for (j =0; j <= nwords; j++){
        samples[i*NWORDS_256BIT+j] = rng();
      }
-     if ((mod != NULL) && (compu256_h(&samples[i*NWORDS_256BIT], mod) >= 0)){
+     samples[i*NWORDS_256BIT+j-1] &= ((1<<nbits)-1); 
+     if ((mod != NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&samples[i*NWORDS_256BIT], mod) >= 0)){
          do{
            subu256_h(&samples[i*NWORDS_256BIT], mod);
          }while(compu256_h(&samples[i*NWORDS_256BIT],mod) >=0);

@@ -45,4 +45,5 @@ cdef extern from "../cuda/utils_host.h":
     void cbyte_to_int_h "byte_to_int_h" (ct.uint32_t *outd, char *ind, ct.uint32_t nwords)
     void czpoly_maddm_h "zpoly_maddm_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx)
     ct.uint32_t czpoly_norm_h "zpoly_norm_h" (ct.uint32_t *pin, ct.uint32_t cidx)
+    void csortu256_idx_h "sortu256_idx_h" (ct.uint32_t *v, ct.uint32_t *idx, ct.uint32_t l)
   

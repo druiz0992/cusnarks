@@ -34,6 +34,8 @@
 #define _U256_DEVICE_H_
 
 #define U256_MAX_SMALLK (32)
+#define U256_BSELM (1)
+#define  U256_MBSCLUSTER (2)
 
 //#include "log.h"
 
@@ -45,6 +47,7 @@ __global__ void modu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel
 __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void mulmontu256_2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void shl1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
 __forceinline__ __device__ void addu288(uint32_t __restrict__ *z, const uint32_t  __restrict__ *x, const uint32_t __restrict__ *y);
 __forceinline__ __device__ uint32_t subgtu256(uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
@@ -58,6 +61,9 @@ extern __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restr
 extern __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 extern __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
 extern __device__ uint32_t shr1u256(const uint32_t __restrict__ *x);
+extern __device__ uint32_t shl1u256(const uint32_t __restrict__ *x);
+extern __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel);
+extern __device__ uint32_t clzMu256(const uint32_t __restrict__ *x);
 
 
 // Implementation of tamplate functions, and functions used by template functions.
@@ -192,7 +198,7 @@ __forceinline__ __device__ uint32_t ltu256(T1 *x, T2 *y)
    subu256(z,y,x); 
 
    asm("clz.b32    %0,%1;\n\t"
-       :"=r"(r) : "r"(z[7]));
+       :"=r"(r) : "r"(z[NWORDS_256BIT-1]));
    flag = r > 0;
    if ((r == 32) && eq0u256(z)){
      flag = 0;
