@@ -53,7 +53,7 @@ sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 from pycusnarks import *
 
 sys.path.append('../../src/python')
-ZPOLY_datafile = '../../test/python/aux_data/zpoly_data_1M.npz'
+ZPOLY_datafile = '../../data/zpoly_data_1M.npz'
 
 def profile_zpoly_1024():
 

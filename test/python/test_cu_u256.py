@@ -80,15 +80,15 @@ class CUU256Test(unittest.TestCase):
         kernel_config = {'blockD' : [U256_BLOCK_DIM] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [1], 'in_length' : [CUU256Test.nsamples], 'stride' : [1], 'out_length' : CUU256Test.nsamples}
         for iter in xrange(CUU256Test.TEST_ITER):
-            if iter%CUU256Test.TEST_ITER == 0:
+            #if iter%CUU256Test.TEST_ITER == 0:
 
-              #first_sample = np.copy(u256_p)
-              #first_sample[0] -= randint(0,1000*(iter+1))
-              #u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 100*(iter), u256_p)
-              first_sample = np.zeros(8,dtype=np.uint32)
-              u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 1, u256_p)
-            else:
-              u256_vector = u256.randu256(CUU256Test.nsamples, u256_p)
+              ##first_sample = np.copy(u256_p)
+              ##first_sample[0] -= randint(0,1000*(iter+1))
+              ##u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 100*(iter), u256_p)
+              #first_sample = np.zeros(8,dtype=np.uint32)
+              #u256_vector = rangeu256_h(CUU256Test.nsamples, first_sample, 1, u256_p)
+            #else:
+            u256_vector = u256.randu256(CUU256Test.nsamples, u256_p)
             #u256_vector = np.tile(np.ones(8,dtype=np.uint32)*44444444,(CUU256Test.nsamples,1))
             #x = u256_vector[0:2] 
             #r_mod = BigInt.modu256(x, u256_p)
@@ -106,6 +106,21 @@ class CUU256Test(unittest.TestCase):
    
             self.assertTrue(len(result) == CUU256Test.nsamples)
             self.assertTrue(all(np.concatenate(result) == np.concatenate(r_mod)))
+
+            #Test shr kernel:
+            test_points = sample(xrange(CUU256Test.nsamples-1), ntest_points)
+
+            kernel_params['in_length'] = [CUU256Test.nsamples]
+            kernel_params['out_length'] = CUU256Test.nsamples
+            kernel_params['stride'] = [1]
+            kernel_config['smemS'] = [0]
+            kernel_config['blockD'] = [U256_BLOCK_DIM]
+            kernel_config['kernel_idx']=[CB_U256_SHR1]
+            result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params )
+            r_shr = u256_vector[test_points]
+    
+            self.assertTrue(len(result) == CUU256Test.nsamples)
+            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_shr)))
 
             #Test shl kernel:
             test_points = sample(xrange(CUU256Test.nsamples-1), ntest_points)

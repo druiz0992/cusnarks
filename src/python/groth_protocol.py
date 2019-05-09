@@ -388,6 +388,10 @@ class GrothSnarks(object):
            self.s_scl_u256 = self.s_scl.as_uint256()
            self.witness_scl_u256 = \
              np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
+           nVars = self.oldnVars
+           nPublic = self.vk_proof['nPublic']
+           self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl_u256[:nVars])
+           self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl_u256[nPublic+1:nVars])
 
 
         # init Pi B1 ECC point
@@ -396,7 +400,12 @@ class GrothSnarks(object):
 
         #TODO -> extend length to desired test length
         if use_pycusnarks and self.accel:
-          self.witness_scl_u256=np.tile(self.witness_scl_u256,(2*self.vk_proof['nVars']//len(self.witness_scl_u256)+1,1))
+          self.witness_scl_u256=np.tile(self.witness_scl_u256,(self.vk_proof['nVars']//len(self.witness_scl_u256)+1,1))
+          nVars = self.vk_proof['nVars']
+          nPublic = int(self.vk_proof['nPublic'])
+          self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl_u256[:nVars])
+          self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl_u256[nPublic+1:nVars])
+
           self.A_eccf1_u256 = np.tile(self.A_eccf1_u256,(2*self.vk_proof['nVars']//len(self.A_eccf1_u256)+1,1))
           self.B2_eccf2_u256 = np.tile(self.B2_eccf2_u256,(4*self.vk_proof['nVars']//len(self.B2_eccf2_u256)+1,1))
           self.B1_eccf1_u256 = np.tile(self.B1_eccf1_u256,(2*self.vk_proof['nVars']//len(self.B1_eccf1_u256)+1,1))
@@ -465,8 +474,10 @@ class GrothSnarks(object):
           start_ec = time.time()
           #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P 
           one = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
-          K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.r_scl_u256]))
-          P = np.concatenate((self.A_eccf1_u256[:2*nVars],self.vk_alfa_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
+          sorted_scl = self.witness_scl_u256[:nVars][self.sorted_witness1_idx]
+          sorted_A_ecc = np.reshape(self.A_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
+          K = np.concatenate((sorted_scl,[one], [self.r_scl_u256]))
+          P = np.concatenate((np.reshape(sorted_A_ecc,(-1,NWORDS_256BIT)),self.vk_alfa_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
           ecbn128_samples = np.concatenate((K,P))
           self.pi_a_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
@@ -474,21 +485,25 @@ class GrothSnarks(object):
           # pi_b = pi_b + beta2 + delta2 * s
           #K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.s_scl_u256]))
           K[-1] = self.s_scl_u256
-          P = np.concatenate((self.B2_eccf2_u256[:4*nVars],self.vk_beta_2_eccf2_u256, self.vk_delta_2_eccf2_u256))
+          sorted_B2_ecc = np.reshape(self.B2_eccf2_u256[:4*nVars],(-1,4,NWORDS_256BIT))[self.sorted_witness1_idx]
+          P = np.concatenate((np.reshape(sorted_B2_ecc,(-1,NWORDS_256BIT)),self.vk_beta_2_eccf2_u256, self.vk_delta_2_eccf2_u256))
           ec2bn128_samples = np.concatenate((K,P))
           self.pi_b_eccf2, t1 = ec2_mad_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field())
           self.t_EC.append(t1)
           
 
           # pib1 = pib1 + beta1 + delta1 * s
-          P = np.concatenate((self.B1_eccf1_u256[:2*nVars],self.vk_beta_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
+          sorted_B1_ecc = np.reshape(self.B1_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
+          P = np.concatenate((np.reshape(sorted_B1_ecc,(-1,NWORDS_256BIT)),self.vk_beta_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
           #ecbn128_samples = np.concatenate((self.witness_scl_u256[:nVars], self.B1_eccf1_u256[:2*nVars]))
           ecbn128_samples = np.concatenate((K,P))
           pib1_eccf1, t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
           # pi_c
-          ecbn128_samples = np.concatenate((self.witness_scl_u256[nPublic+1:nVars], self.C_eccf1_u256[2*(nPublic+1):2*nVars]))
+          sorted_scl = self.witness_scl_u256[nPublic+1:nVars][self.sorted_witness2_idx]
+          sorted_C_ecc = np.reshape(self.C_eccf1_u256[2*(nPublic+1):2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness2_idx]
+          ecbn128_samples = np.concatenate((sorted_scl, np.reshape(sorted_C_ecc,(-1,NWORDS_256BIT))))
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
           end_ec = time.time()
@@ -1122,6 +1137,7 @@ if __name__ == "__main__":
     for i in range(20):
       t1,t2,t3 = G.gen_proof(witness_f)
       t.append(np.concatenate((t1,t2,t3)))
+      print t[-1]
     print t
      
     #G.write_json()

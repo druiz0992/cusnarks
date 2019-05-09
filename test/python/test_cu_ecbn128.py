@@ -406,7 +406,13 @@ class CUECTest(unittest.TestCase):
                      kernel_params['in_length'][bidx] = min_length[bidx]
                      kernel_params['padding_idx'][bidx] = l/ECP_JAC_OUTDIMS
 
-            result,_ = ecbn128.kernelLaunch(ecbn128_vector_mad, kernel_config, kernel_params,2 )
+            idx_v = sortu256_idx_h(ecbn128_vector_mad[:nsamples])
+            sorted_scl_vector = ecbn128_vector_mad[:nsamples][idx_v]
+            tmp_v = np.reshape(ecbn128_vector_mad[nsamples:],(-1,2,8))
+            sorted_ecc_vector = np.reshape(tmp_v[idx_v],(-1,8))
+            sorted_ecbn128_vector_mad = np.concatenate((sorted_scl_vector,sorted_ecc_vector))
+            
+            result,_ = ecbn128.kernelLaunch(sorted_ecbn128_vector_mad, kernel_config, kernel_params,2 )
             
             result2 = 0
             #debugReducedECCAddShfl(r_mul, result, result2)

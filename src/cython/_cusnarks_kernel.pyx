@@ -64,7 +64,7 @@ cdef class CUSnarks:
         out_v.length = params['out_length']
         in_v.length  = in_vec.shape[0]
 
-        print in_v.length, self.in_dim, out_v.length, self.out_dim
+        #print in_v.length, self.in_dim, out_v.length, self.out_dim
         if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
             assert False, "Incorrect arguments"
             return 0.0
@@ -383,3 +383,12 @@ def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data, ct.uint32_t pid
 
     return idx
 
+def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] vin_flat = np.zeros(vin.shape[0] * vin.shape[1],dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] idx_flat = np.zeros(vin.shape[0],dtype=np.uint32)
+
+    vin_flat = np.reshape(vin,-1)
+
+    uh.csortu256_idx_h(&vin_flat[0],&idx_flat[0],vin.shape[0])
+
+    return idx_flat

@@ -80,11 +80,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cmath>
+#include <algorithm>
 #include "types.h"
 #include "utils_host.h"
 
-
-typedef unsigned long long uint64_t;
+//typedef unsigned long long uint64_t;
 
 #define NDIGITS 8
 #define MAX_NDIGITS_FIOS   ((NDIGITS) + 3)
@@ -1106,10 +1106,10 @@ void readFile(uint32_t *samples, char *filename, uint32_t insize, uint32_t outsi
 
 void printNumber(uint32_t *x)
 {
-     for (uint32_t i=0; i < NDIGITS; i++){
+  for (uint32_t i=0; i < NDIGITS; i++){
     printf("%u ",x[i]);
-     }
-     printf ("\n");
+  }
+  printf ("\n");
 }
 
 void setRandom(uint32_t *x, uint32_t ndigits)
@@ -1124,11 +1124,16 @@ void setRandom(uint32_t *x, uint32_t ndigits)
 void setRandom256(uint32_t *x, uint32_t *p)
 {
   int i;
+  uint32_t nwords = rand() % NDIGITS;
+  uint32_t nbits = rand() % 32;
 
-  for (i=0; i< NDIGITS; i++){
+  memset(x,0,NDIGITS*sizeof(uint32_t));
+
+  for (i=0; i<= nwords; i++){
     x[i] = rand(); 
   }
-  if ((p!= NULL) && (compu256_h(x, p) >= 0)){
+  x[i-1] &= ((1 << nbits)-1);
+  if ((p!= NULL) && (nwords==NDIGITS-1) && (compu256_h(x, p) >= 0)){
          do{
            subu256_h(x, p);
          }while(compu256_h(x,p) >=0);
@@ -1138,6 +1143,11 @@ void setRandom256(uint32_t *x, uint32_t *p)
 int compu256_h(uint32_t *x, uint32_t *y)
 {
   return mpCompare(x, y, NDIGITS);
+}
+
+bool ltu256_h(uint32_t *x, uint32_t *y)
+{
+  return (mpCompare(x, y, NDIGITS) < 0);
 }
 
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, uint32_t  *start, uint32_t inc, uint32_t *mod)
@@ -1270,6 +1280,20 @@ uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff)
     }
   }
   return 0;
+}
+
+void sortu256_idx_h(uint32_t *v, uint32_t *idx, uint32_t len)
+{
+  uint32_t i;
+
+  for (i=0;i < len; i++){  
+    idx[i] = i;
+  }
+
+   //std::sort(idx, idx+len, [&v](uint32_t i1, uint32_t i2){ return (v[i1*NDIGITS] < v[i2*NDIGITS]);});
+   std::sort(idx, idx+len, 
+       [&v](uint32_t i1, uint32_t i2){ 
+         return (ltu256_h(&v[i1*NDIGITS],&v[i2*NDIGITS]));});
 }
 
 
@@ -2833,7 +2857,7 @@ void test_ntt_parallel2D_1M(uint32_t forward)
        readFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
        intt_parallel2D_h(samples, roots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
        readFile(roots,roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
-       ntt_parallel2D_h(samples, roots, 1,Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
+       ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
      }
   
   
@@ -3021,6 +3045,29 @@ void test_nttmul_randomsize(void)
     }
 
 }
+void test_sort(void)
+{
+  uint32_t LEN = 1024;
+  uint32_t *samples = (uint32_t *)malloc(LEN*NWORDS_256BIT*sizeof(uint32_t));
+  uint32_t *idx_v = (uint32_t *)malloc(LEN*sizeof(uint32_t));
+
+  for (uint32_t i=0; i < LEN; i++){
+     setRandom256(&samples[i*NDIGITS], NULL);
+  }
+
+  printf("Unsorted\n");
+  for (uint32_t i=0; i< LEN; i++){
+    printNumber(&samples[i*NDIGITS]);
+  }
+  sort_idx_h(samples,idx_v,LEN, NDIGITS-1);
+  printf("Sorted\n");
+  for (uint32_t i=0; i< LEN; i++){
+    printNumber(&samples[idx_v[i]*NDIGITS]);
+  }
+
+  free(samples);
+  free(idx_v);
+}
 
 
 int main()
@@ -3055,7 +3102,9 @@ int main()
   //test_ntt_parallel2D_65K(0); // IFFT
   //test_nttmul_parallel2D_65K();
 
-  test_nttmul_randomsize();
+  //test_nttmul_randomsize();
+
+  test_sort();
 
   return 1;
 }

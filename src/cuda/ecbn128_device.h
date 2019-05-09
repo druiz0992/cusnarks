@@ -54,8 +54,9 @@ __forceinline__ __device__ void madecjac(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem
 template<typename T1, typename T2>
 __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem_ptr, kernel_params_t *params);
 template<typename T1, typename T2>
-//__forceinline__ __device__ void addecjac(T1 *xr, T1 *x1, T1 *x2, mod_t midx);
 __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t x1offset, T1 *zx2, uint32_t x2offset, mod_t midx);
+template<typename T1, typename T2>
+__forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t x1offset, T1 *zx2, uint32_t x2offset, mod_t midx);
 template<typename T1, typename T2>
 __forceinline__ __device__ void doublecjac(T1 *xr, T1 *x1, mod_t midx);
 template <typename T1, typename T2>
@@ -67,7 +68,9 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
 template<typename T1, typename T2>
 __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane );
 template<typename T1, typename T2>
-__device__ void scmulecjac_step(T1 *Q,T1 *N, uint32_t *scl, mod_t midx );
+__device__ void scmulecjac_step_r2l(T1 *Q,T1 *N, uint32_t *scl, mod_t midx );
+template<typename T1, typename T2>
+__device__ void scmulecjac_step_l2r(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset, mod_t midx );
 
 
 

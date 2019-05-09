@@ -43,10 +43,12 @@ void ntt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t Nrows, uint32_t fft
 void intt_parallel2D_h(uint32_t *A, uint32_t *roots, uint32_t format, uint32_t Nrows, uint32_t fft_Ny,  uint32_t Ncols, uint32_t fft_Nx, uint32_t pidx, uint32_t mode);
 void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
 int compu256_h(uint32_t *x, uint32_t *y);
+bool ltu256_h(uint32_t *x, uint32_t *y);
 void subu256_h(uint32_t *x, uint32_t *y);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, uint32_t  *start, uint32_t inc,  uint32_t *mod);
 void int_to_byte_h(char *out, uint32_t *in, uint32_t nbytes);
 void byte_to_int_h(uint32_t *out, char *in, uint32_t nwords);
 void zpoly_maddm_h(uint32_t *pout, uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
+void sortu256_idx_h(uint32_t *v, uint32_t *idx, uint32_t len);
 #endif
