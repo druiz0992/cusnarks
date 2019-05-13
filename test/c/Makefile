@@ -43,9 +43,10 @@ clean:
 
 ##################################################
 test: $(OBJ)
+	@for i in $(subst .cpp,,$(CSRC)); do \
+	./$$i; done
 
 ##################################################
 %.o : %.cpp
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS2) $*.cpp -o $*.o	
 	$(CC) $(LINKFLAGS2) $(OBJ) $(LDFLAGS2) -o $*
-	./$*
