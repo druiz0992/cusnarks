@@ -40,7 +40,7 @@ class CUSnarks {
         kernel_params_t *params_device; // kernel params (device side)
 
         kernel_cb *kernel_callbacks;    // pointer to kernel callbacks
-        _RNG *rng;
+        //_RNG *rng;
 
         CUSnarks(uint32_t in_len, uint32_t in_size, 
 		 uint32_t out_len, uint32_t out_size, kernel_cb *kcb);
@@ -50,7 +50,7 @@ class CUSnarks {
         ~CUSnarks();
 
         void allocateCudaResources(uint32_t in_size, uint32_t out_size);
-        void initRNG(uint32_t seed);
+        //void initRNG(uint32_t seed);
         double elapsedTime(void);
 
     public:

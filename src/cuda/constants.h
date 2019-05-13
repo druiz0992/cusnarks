@@ -15,42 +15,38 @@
 
     You should have received a copy of the GNU General Public License along with
     cusnarks. If not, see <https://www.gnu.org/licenses/>.
+*/
 
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : rng.h
+// File name  : constants.h
 //
-// Date       : 08/02/2019
+// Date       : 5/09/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Random number generator class definition
+//   Header of functions used in Cusnarks constant.cpp
+//
 // ------------------------------------------------------------------
 
-*/
+#ifndef _CONSTANTS_H_
+#define _CONSTANTS_H_
 
-#ifndef _RNG_H_
-#define _RNG_H_
-
-#include "pcg_random.hpp"
-
-class _RNG {
-    private:
-        static _RNG *instance;
-        pcg32 rng; 
-
-        // prevent instances
-        _RNG();
-        _RNG(uint32_t seed);
-
-    public:
-        ~_RNG();
-	static _RNG* get_instance();
-	static _RNG* get_instance(uint32_t seed);
-        void randu32(uint32_t *samples, uint32_t n_samples);
-        //void randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod);
-};
+const uint32_t * CusnarksPGet(mod_t type);
+const uint32_t * CusnarksR2Get(mod_t type);
+const uint32_t * CusnarksNPGet(mod_t type);
+const uint32_t * CusnarksIScalerGet(fmt_t type);
+const uint32_t * CusnarksZeroGet(void);
+const uint32_t * CusnarksOneGet(void);
+const uint32_t * CusnarksOnMonteGet(uint32_t pidx);
+const uint32_t * CusnarksEcbn128ParamsGet(void);
+const uint32_t * CusnarksModInfoGet(void);
+const uint32_t * CusnarksMiscKGet(void);
+const uint32_t * CusnarksW32RootsGet(void);
+const uint32_t * CusnarksIW32RootsGet(void);
+const uint32_t * CusnarksIW32NRootsGet(void);
 
 #endif
+

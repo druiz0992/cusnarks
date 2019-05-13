@@ -43,7 +43,7 @@ import sys
 from os.path import join as pjoin
 from setuptools import setup
 from distutils.extension import Extension
-from Cython.Distutils import build_ext
+from Cython.Distutils import build_ext, Extension
 from Cython.Build import cythonize
 import numpy
 
@@ -78,6 +78,7 @@ def locate_cuda():
             raise EnvironmentError('The nvcc binary could not be '
                 'located in your $PATH. Either add it to your path, '
                 'or set $CUDAHOME')
+            return None
         home = os.path.dirname(os.path.dirname(nvcc))
 
     cudaconfig = {'home': home, 'nvcc': nvcc,
@@ -140,7 +141,8 @@ class custom_build_ext(build_ext):
 try:
     CUDA = locate_cuda()
 except EnvironmentError:
-     sys.exit(1)
+     print "CUDA not installed"
+     #sys.exit(1)
 
 # Obtain the numpy include directory. This logic works across numpy versions.
 try:
@@ -149,7 +151,9 @@ except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
 
-ext = [ Extension('pycusnarks',
+if CUDA is not None:
+  ext = [ Extension('pycusnarks',
+                    cython_compile_time_env=dict(CUDA_DEF=True),
                     sources = ['_cusnarks_kernel.pyx'],
                     library_dirs = [CUDA['lib64']],
                     libraries = ['cudart','cusnarks'],
@@ -169,6 +173,17 @@ ext = [ Extension('pycusnarks',
                     include_dirs = [numpy_include, CUDA['include'], '../cuda'] 
                  )
       ]
+  cmdc = {'build_ext': custom_build_ext}
+else:
+  ext = [ Extension('pycusnarks', 
+                    cython_compile_time_env=dict(CUDA_DEF=False,),
+                    sources = ['_cusnarks_kernel.pyx'],
+                    libraries = ['cusnarks'],
+                    language = 'c++',
+                    include_dirs = [numpy_include, '../cuda'] 
+                 )
+      ]
+  cmdc = {'build_ext': build_ext}
 
 
 
@@ -181,7 +196,9 @@ setup(name = 'cusnarks-lib',
       #ext_modules = cythonize(ext),
 
       # Inject our custom trigger
-      cmdclass = {'build_ext': custom_build_ext}
+      #cmdclass = {'build_ext': custom_build_ext}
+      #cmdclass = {'build_ext': build_ext}
+      cmdclass = cmdc
 
       # Since the package has c code, the egg cannot be zipped
       #zip_safe = False

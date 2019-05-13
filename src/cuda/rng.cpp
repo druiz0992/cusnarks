@@ -85,6 +85,7 @@ void _RNG::randu32(uint32_t *samples, uint32_t n_samples)
      samples[i] = rng();
    }
 }
+#if 0
 void _RNG::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod)
 {
    uint32_t i,j,nwords,nbits;
@@ -104,7 +105,7 @@ void _RNG::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod)
      }
    }  
 }
-
+#endif
 // null
 _RNG* _RNG::instance=NULL;
 

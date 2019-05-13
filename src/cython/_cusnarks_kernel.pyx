@@ -37,209 +37,211 @@ cimport numpy as np
 cimport _types as ct
 cimport _utils_host as uh
 
-from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
-
 from cython cimport view
 from constants import *
 from libc.stdlib cimport malloc, free
 
-# CUSnarks class cython wrapper
-cdef class CUSnarks:
-    cdef C_CUSnarks* _cusnarks_ptr
-    cdef ct.uint32_t in_dim, in_size, out_dim, out_size, in_ndim, out_ndim
+IF CUDA_DEF:
+  from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
 
-    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
-        self.in_dim = in_len
-        if out_len == 0:
-           self.out_dim = self.in_dim
-        if in_size == 0:
-           self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
-        if out_size == 0:
-           self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
 
-    def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel=1):
-        cdef ct.vector_t out_v
-        cdef ct.vector_t in_v
+  # CUSnarks class cython wrapper
+  cdef class CUSnarks:
+      cdef C_CUSnarks* _cusnarks_ptr
+      cdef ct.uint32_t in_dim, in_size, out_dim, out_size, in_ndim, out_ndim
+  
+      def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+          self.in_dim = in_len
+          if out_len == 0:
+             self.out_dim = self.in_dim
+          if in_size == 0:
+             self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
+          if out_size == 0:
+             self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+  
+      def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel=1):
+          cdef ct.vector_t out_v
+          cdef ct.vector_t in_v
+         
+          out_v.length = params['out_length']
+          in_v.length  = in_vec.shape[0]
+  
+          #print in_v.length, self.in_dim, out_v.length, self.out_dim
+          if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
+              assert False, "Incorrect arguments"
+              return 0.0
+  
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
+  
+          # create kernel config data
+          cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernel * sizeof(ct.kernel_config_t))
+  
+          for i in range(n_kernel):
+             kconfig[i].blockD = config['blockD'][i]
+             kconfig[i].kernel_idx = config['kernel_idx'][i]
+             # gridD and smemS and return_val do not need to exist
+             if 'return_val' in config:
+                 kconfig[i].return_val  = config['return_val'][i]
+             else :
+                 kconfig[i].return_val  = 1
+             if 'gridD' in config:
+                 kconfig[i].gridD  = config['gridD'][i]
+             else :
+                 kconfig[i].gridD  = 0
+             if 'smemS' in config:
+                 kconfig[i].smemS  = config['smemS'][i]
+             else:
+                 kconfig[i].smemS  = 0
+             if 'in_offset' in config:
+                 kconfig[i].in_offset  = config['in_offset'][i]
+             else:
+                 kconfig[i].in_offset = 0
+  
+          in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+          in_vec_flat = np.concatenate(in_vec)
+          in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
+  
+          out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+          out_v.data = <ct.uint32_t *>&out_vec_flat[0]
+  
+          # TODO :I am trying to represent input data as ndarray. I don't
+          # know how other way to do this but to overwrite ndarray with input data
+  
+          # create kernel params data
+          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernel * sizeof(ct.kernel_params_t))
+          for i in range(n_kernel):
+            kparams[i].midx = params['midx'][i]
+            kparams[i].in_length = params['in_length'][i]
+            kparams[i].out_length = params['out_length']
+            kparams[i].stride = params['stride'][i]
+            if 'premod' in params:
+              kparams[i].premod = params['premod'][i]
+            if 'premul' in params:
+              kparams[i].premul = params['premul'][i]
+            if 'fft_Nx' in params:
+              kparams[i].fft_Nx = params['fft_Nx'][i]
+            if 'fft_Ny' in params:
+              kparams[i].fft_Ny = params['fft_Ny'][i]
+            if 'N_fftx' in params:
+              kparams[i].N_fftx = params['N_fftx'][i]
+            if 'N_ffty' in params:
+              kparams[i].N_ffty = params['N_ffty'][i]
+            if 'forward' in params:
+              kparams[i].forward = params['forward'][i]
+            else:
+              kparams[i].forward = 1
+            if 'padding_idx' in params:
+              kparams[i].padding_idx = params['padding_idx'][i]
+            else:
+              kparams[i].padding_idx = 0
+            if 'as_mont' in params:
+              kparams[i].as_mont = params['as_mont'][i]
+            else:
+              kparams[i].as_mont = 1
+  
+          exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
+         
+          kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
+  
+          free(kconfig)
+          free(kparams)
+  
+          return kdata, exec_time
+   
+      def rand(self, ct.uint32_t n_samples):
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
+          self._cusnarks_ptr.rand(&samples[0],n_samples)
+  
+          return samples.reshape((-1,ct.NWORDS_256BIT))
+  
+      def randu256(self, ct.uint32_t n_samples, np.ndarray[ndim=1, dtype=np.uint32_t] mod):
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
+          self._cusnarks_ptr.randu256(&samples[0],n_samples, &mod[0])
+  
+          return samples.reshape((-1,ct.NWORDS_256BIT))
+  
+      def randu256(self, ct.uint32_t n_samples):
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
+          self._cusnarks_ptr.randu256(&samples[0],n_samples, <ct.uint32_t *>0)
+  
+          return samples.reshape((-1,ct.NWORDS_256BIT))
        
-        out_v.length = params['out_length']
-        in_v.length  = in_vec.shape[0]
-
-        #print in_v.length, self.in_dim, out_v.length, self.out_dim
-        if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
-            assert False, "Incorrect arguments"
-            return 0.0
-
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
-
-        # create kernel config data
-        cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernel * sizeof(ct.kernel_config_t))
-
-        for i in range(n_kernel):
-           kconfig[i].blockD = config['blockD'][i]
-           kconfig[i].kernel_idx = config['kernel_idx'][i]
-           # gridD and smemS and return_val do not need to exist
-           if 'return_val' in config:
-               kconfig[i].return_val  = config['return_val'][i]
-           else :
-               kconfig[i].return_val  = 1
-           if 'gridD' in config:
-               kconfig[i].gridD  = config['gridD'][i]
-           else :
-               kconfig[i].gridD  = 0
-           if 'smemS' in config:
-               kconfig[i].smemS  = config['smemS'][i]
-           else:
-               kconfig[i].smemS  = 0
-           if 'in_offset' in config:
-               kconfig[i].in_offset  = config['in_offset'][i]
-           else:
-               kconfig[i].in_offset = 0
-
-        in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-        in_vec_flat = np.concatenate(in_vec)
-        in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
-
-        out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-        out_v.data = <ct.uint32_t *>&out_vec_flat[0]
-
-        # TODO :I am trying to represent input data as ndarray. I don't
-        # know how other way to do this but to overwrite ndarray with input data
-
-        # create kernel params data
-        cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernel * sizeof(ct.kernel_params_t))
-        for i in range(n_kernel):
-          kparams[i].midx = params['midx'][i]
-          kparams[i].in_length = params['in_length'][i]
-          kparams[i].out_length = params['out_length']
-          kparams[i].stride = params['stride'][i]
-          if 'premod' in params:
-            kparams[i].premod = params['premod'][i]
-          if 'premul' in params:
-            kparams[i].premul = params['premul'][i]
-          if 'fft_Nx' in params:
-            kparams[i].fft_Nx = params['fft_Nx'][i]
-          if 'fft_Ny' in params:
-            kparams[i].fft_Ny = params['fft_Ny'][i]
-          if 'N_fftx' in params:
-            kparams[i].N_fftx = params['N_fftx'][i]
-          if 'N_ffty' in params:
-            kparams[i].N_ffty = params['N_ffty'][i]
-          if 'forward' in params:
-            kparams[i].forward = params['forward'][i]
-          else:
-            kparams[i].forward = 1
-          if 'padding_idx' in params:
-            kparams[i].padding_idx = params['padding_idx'][i]
-          else:
-            kparams[i].padding_idx = 0
-          if 'as_mont' in params:
-            kparams[i].as_mont = params['as_mont'][i]
-          else:
-            kparams[i].as_mont = 1
-
-        exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
-       
-        kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
-
-        free(kconfig)
-        free(kparams)
-
-        return kdata, exec_time
- 
-    def rand(self, ct.uint32_t n_samples):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
-        self._cusnarks_ptr.rand(&samples[0],n_samples)
-
-        return samples.reshape((-1,ct.NWORDS_256BIT))
-
-    def randu256(self, ct.uint32_t n_samples, np.ndarray[ndim=1, dtype=np.uint32_t] mod):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
-        self._cusnarks_ptr.randu256(&samples[0],n_samples, &mod[0])
-
-        return samples.reshape((-1,ct.NWORDS_256BIT))
-
-    def randu256(self, ct.uint32_t n_samples):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
-        self._cusnarks_ptr.randu256(&samples[0],n_samples, <ct.uint32_t *>0)
-
-        return samples.reshape((-1,ct.NWORDS_256BIT))
+      def saveFile(self, np.ndarray[ndim=1, dtype=np.uint32_t] samples, bytes fname):
+          cdef char *fname_c = fname
+          self._cusnarks_ptr.saveFile(&samples[0],len(samples)/8, fname_c)
+          
+      def getDeviceInfo(self):
+         self._cusnarks_ptr.getDeviceInfo()
+  
+      #def __dealloc__(self):
+          #del self._cusnarks_ptr
+  
+  # CU256 class cython wrapper
+  cdef class U256 (CUSnarks):
+      cdef C_U256* _u256_ptr
+  
+      def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+          if out_len == 0:
+              out_len = in_len
+          self._u256_ptr = new C_U256(in_len,seed)
+          self._cusnarks_ptr = <C_CUSnarks *>self._u256_ptr
+  
+      def __dealloc__(self):
+          del self._u256_ptr
+      
+  # CUECBN128 class cython wrapper
+  cdef class ECBN128 (CUSnarks):
+      cdef C_ECBN128* _ecbn128_ptr
+  
+      def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+          if out_len == 0:
+              out_len = in_len
+          self._ecbn128_ptr = new C_ECBN128( in_len,seed)
+          self._cusnarks_ptr = <C_CUSnarks *>self._ecbn128_ptr
+          self.in_dim = self.in_dim * 3
+          self.out_dim = self.out_dim  * 3
+          self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+          self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
      
-    def saveFile(self, np.ndarray[ndim=1, dtype=np.uint32_t] samples, bytes fname):
-        cdef char *fname_c = fname
-        self._cusnarks_ptr.saveFile(&samples[0],len(samples)/8, fname_c)
-        
-    def getDeviceInfo(self):
-       self._cusnarks_ptr.getDeviceInfo()
-
-    #def __dealloc__(self):
-        #del self._cusnarks_ptr
-
-# CU256 class cython wrapper
-cdef class U256 (CUSnarks):
-    cdef C_U256* _u256_ptr
-
-    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
-        if out_len == 0:
-            out_len = in_len
-        self._u256_ptr = new C_U256(in_len,seed)
-        self._cusnarks_ptr = <C_CUSnarks *>self._u256_ptr
-
-    def __dealloc__(self):
-        del self._u256_ptr
-    
-# CUECBN128 class cython wrapper
-cdef class ECBN128 (CUSnarks):
-    cdef C_ECBN128* _ecbn128_ptr
-
-    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
-        if out_len == 0:
-            out_len = in_len
-        self._ecbn128_ptr = new C_ECBN128( in_len,seed)
-        self._cusnarks_ptr = <C_CUSnarks *>self._ecbn128_ptr
-        self.in_dim = self.in_dim * 3
-        self.out_dim = self.out_dim  * 3
-        self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
-        self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
-   
-    def __dealloc__(self):
-        del self._ecbn128_ptr
-
-
-# CUEC2BN128 class cython wrapper
-cdef class EC2BN128 (CUSnarks):
-    cdef C_EC2BN128* _ec2bn128_ptr
-
-    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
-        if out_len == 0:
-            out_len = in_len
-        self._ec2bn128_ptr = new C_EC2BN128( in_len,seed)
-        self._cusnarks_ptr = <C_CUSnarks *>self._ec2bn128_ptr
-        # TODO : add correct dimension
-        self.in_dim = self.in_dim * 6
-        self.out_dim = self.out_dim  * 6
-        self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
-        self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
-   
-    def __dealloc__(self):
-        del self._ec2bn128_ptr
-
-
-
-# CUPoly class cython wrapper
-cdef class ZCUPoly (CUSnarks):
-    cdef C_ZCUPoly* _zpoly_ptr
-
-    def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
-        if out_len == 0:
-            out_len = in_len
-        self._zpoly_ptr = new C_ZCUPoly(in_len,seed)
-        self._cusnarks_ptr = <C_CUSnarks *>self._zpoly_ptr
-
-    def __dealloc__(self):
-        del self._zpoly_ptr
-
-
+      def __dealloc__(self):
+          del self._ecbn128_ptr
+  
+  
+  # CUEC2BN128 class cython wrapper
+  cdef class EC2BN128 (CUSnarks):
+      cdef C_EC2BN128* _ec2bn128_ptr
+  
+      def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+          if out_len == 0:
+              out_len = in_len
+          self._ec2bn128_ptr = new C_EC2BN128( in_len,seed)
+          self._cusnarks_ptr = <C_CUSnarks *>self._ec2bn128_ptr
+          # TODO : add correct dimension
+          self.in_dim = self.in_dim * 6
+          self.out_dim = self.out_dim  * 6
+          self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+          self.in_size = self.in_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
+     
+      def __dealloc__(self):
+          del self._ec2bn128_ptr
+  
+  
+  
+  # CUPoly class cython wrapper
+  cdef class ZCUPoly (CUSnarks):
+      cdef C_ZCUPoly* _zpoly_ptr
+  
+      def __cinit__(self, ct.uint32_t in_len, ct.uint32_t out_len=0,  ct.uint32_t in_size=0, ct.uint32_t out_size=0, ct.uint32_t seed=0):
+          if out_len == 0:
+              out_len = in_len
+          self._zpoly_ptr = new C_ZCUPoly(in_len,seed)
+          self._cusnarks_ptr = <C_CUSnarks *>self._zpoly_ptr
+  
+      def __dealloc__(self):
+          del self._zpoly_ptr
+  
+  
 def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
@@ -351,19 +353,6 @@ def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] star
   
      return out_samples.reshape((-1,ct.NWORDS_256BIT))
 
-def int_to_byte_h (np.ndarray[ndim=1, dtype=np.uint32_t] indata):
-     cdef np.ndarray[ndim=1, dtype=np.uint8_t] outd = np.zeros(4 * len(indata), dtype=np.uint8)
-
-     uh.cint_to_byte_h(<char *>&outd[0], &indata[0], len(outd))
-     return outd
-
-def byte_to_int_h (np.ndarray[ndim=1, dtype=np.uint8_t] indata):
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(len(indata)/4, dtype=np.uint32)
-
-     uh.cbyte_to_int_h(&outd[0], <char *>&indata[0], len(outd))
-
-     return outd
-
 def zpoly_maddm_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
               ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
 
@@ -389,6 +378,6 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 
     vin_flat = np.reshape(vin,-1)
 
-    uh.csortu256_idx_h(&vin_flat[0],&idx_flat[0],vin.shape[0])
+    uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
 
     return idx_flat
