@@ -1363,7 +1363,7 @@ void test_nttmul_parallel2D_65K(void)
 
      readU256DataFile(roots,inv_roots_1M_filename,1<<NROOTS_1M,nroots);
 
-     intt_parallel2D_h(Y1, roots, Nrows,1, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
+     intt_parallel2D_h(Y1, roots, 1, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
      intt_h(Y2, roots, 1,levels, pidx);
 
      for (j=0;j<nroots; j++){
@@ -1848,6 +1848,7 @@ void test_sort(void)
 
 int main()
 {
+  /*
   test_mul();  // test montgomery mul with predefined results
   test_mul2(); // test optimized impl of montgomery mul
   test_mul3(); // test SOS impl of montgomery mul
@@ -1876,6 +1877,7 @@ int main()
   test_ntt_parallel2D_file_65K(3);
   test_ntt_parallel2D_65K(1); // Forward FFT
   test_ntt_parallel2D_65K(0); // IFFT
+  */
   test_nttmul_parallel2D_65K();
 
   test_nttmul_randomsize();
