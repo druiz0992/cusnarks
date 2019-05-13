@@ -351,6 +351,21 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
 ///////////////////
 
 /*
+  Write circuit binary file
+
+  t_uint32_t * samples : input vector containing samples. Vector is of length nwords 
+  char * filename      : location of file to be written
+  uint32_t nwords      : Number of samples to write.
+*/
+void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords)
+{
+  FILE *ifp = fopen(filename,"wb");
+  fwrite(samples, sizeof(uint32_t), nwords, ifp); 
+  fclose(ifp);
+
+}
+
+/*
   Read u256 data binary file and optionally decimate samples
 
   t_uint32_t * samples : output vector containing samples. Vector is of length outsize
@@ -479,7 +494,7 @@ bool ltu256_h(const uint32_t *x, const uint32_t *y)
    uint32_t inc      : sample increment 
    uint32_t *mod     : if different from NULL, it is maximum sample value. If generation reaches this value, it will go back to 0.  
 */
-void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc, uint32_t *mod)
+void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc, const uint32_t *mod)
 {
    uint32_t i;
    uint32_t _inc[] = {inc,0,0,0,0,0,0,0};

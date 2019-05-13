@@ -57,6 +57,7 @@ from zfield import *
 from ecc import *
 from zpoly import *
 from constants import *
+from pysnarks_utils import *
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 try:
@@ -181,7 +182,7 @@ class GrothSnarks(object):
        elif os.path.isfile(proving_key_f):
            f = open(proving_key_f,'r')
            tmp_data = json.load(f)
-           self.vk_proof = GrothSnarks.json_to_dict(tmp_data)
+           self.vk_proof = json_to_dict(tmp_data)
            f.close()
        else:
           print "File doesn't exist"
@@ -335,38 +336,6 @@ class GrothSnarks(object):
             r_scl = r_scl.reduce()
             s_scl = s_scl.reduce()
         """
-
-    @classmethod
-    def json_to_dict(cls, data):
-       data = {str(k) : data[k] for k in data.keys()}
-       for k, v in data.items():
-           if type(data[k]) is list:
-               GrothSnarks.json_to_list(data[k])
-           elif type(data[k]) is dict:
-               GrothSnarks.json_to_dict(data[k])
-           elif GrothSnarks.is_long(v):
-               data[k] = long(v)
-
-       return data
-
-    @classmethod
-    def json_to_list(cls,data):
-        for idx,el in enumerate(data):
-            if type(el) is list:
-                GrothSnarks.json_to_list(el)
-            elif type(el) is dict:
-                data[idx] = GrothSnarks.json_to_dict(el)
-            elif type(el) is unicode or type(el) is str:
-                data[idx] = long(el)
-        return
-
-    @classmethod
-    def is_long(cls, input):
-        try:
-            num = long(input)
-        except ValueError:
-            return False
-        return True
 
     def gen_proof(self, witness_f):
         """

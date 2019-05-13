@@ -381,3 +381,6 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
     uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
 
     return idx_flat
+
+def writeU256CircuitFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
+    uh.cwriteU256CircuitFile_h(&vin[0], <char *>fname, vin.shape[0])
