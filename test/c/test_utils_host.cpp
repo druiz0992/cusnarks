@@ -1834,7 +1834,7 @@ void test_sort(void)
 
   sortu256_idx_h(idx_v,samples,LEN);
   for (uint32_t i=0; i< LEN-1; i++){
-    if(compu256_h(&samples[idx_v[i]],&samples[idx_v[i+1]]) >= 0) {
+    if(compu256_h(&samples[idx_v[i]*NWORDS_256BIT],&samples[idx_v[i+1]*NWORDS_256BIT]) > 0) {
        n_errors++;
     }
   }
@@ -1848,7 +1848,6 @@ void test_sort(void)
 
 int main()
 {
-  /*
   test_mul();  // test montgomery mul with predefined results
   test_mul2(); // test optimized impl of montgomery mul
   test_mul3(); // test SOS impl of montgomery mul
@@ -1877,7 +1876,7 @@ int main()
   test_ntt_parallel2D_file_65K(3);
   test_ntt_parallel2D_65K(1); // Forward FFT
   test_ntt_parallel2D_65K(0); // IFFT
-  */
+  
   test_nttmul_parallel2D_65K();
 
   test_nttmul_randomsize();
