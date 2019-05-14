@@ -384,3 +384,27 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 
 def writeU256CircuitFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     uh.cwriteU256CircuitFile_h(&vin[0], <char *>fname, vin.shape[0])
+
+def readU256CircuitFileHeader_h(bytes fname):
+    cdef ct.cirbin_hfile_t header
+    uh.creadU256CircuitFileHeader_h(&header, <char *>fname)
+   
+    header_d = {'nWords' : header.nWords,
+                'nPubInputs' : header.nPubInputs,
+                'nOutputs' : header.nOutputs,
+                'nVars' : header.nVars,
+                'nConstraints' : header.nConstraints,
+                'constA_nWords' : header.constA_nWords,
+                'constB_nWords' : header.constB_nWords,
+                'constC_nWords' : header.constC_nWords }
+    
+    return header_d
+
+def readU256CircuitFile_h(bytes fname):
+    header_d = readU256CircuitFileHeader_h(<char *>fname)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] cir_data = np.zeros(header_d['nWords'],dtype=np.uint32)
+   
+    uh.creadU256CircuitFile_h(&cir_data[0], <char *>fname, header_d['nWords'])
+
+    return cir_data
+

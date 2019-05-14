@@ -293,4 +293,29 @@ typedef enum{
 
 }zpoly_callback_t;
 
+typedef struct{
+  uint32_t nWords;
+  uint32_t nPubInputs;
+  uint32_t nOutputs;
+  uint32_t nVars;
+  uint32_t nConstraints;
+  uint32_t constA_nWords;
+  uint32_t constB_nWords;
+  uint32_t constC_nWords;
+  
+}cirbin_hfile_t;
+
+typedef enum{
+  CIRBIN_H_NWORDS_OFFSET = 0,
+  CIRBIN_H_NPUBINPUTS_OFFSET_,
+  CIRBIN_H_NOUTPUTS_OFFSET,
+  CIRBIN_H_NVARS_OFFSET,
+  CIRBIN_H_NCONSTRAINTS_OFFSET,
+  CIRBIN_H_CONSTA_NWORDS_OFFSET,
+  CIRBIN_H_CONSTB_NWORDS_OFFSET,
+  CIRBIN_H_CONSTC_NWORDS_OFFSET,
+  CIRBIN_H_N_OFFSET
+
+}cirbin_hfile_offset_t;
+
 #endif

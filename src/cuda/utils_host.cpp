@@ -350,6 +350,79 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
 
 ///////////////////
 
+//uint32_t **constraints_to_zpoly(uint32_t *cin, uint32_t ncoeffs, uint32_t nconst)
+void constraints_to_zpoly(uint32_t *pout, uint32_t *cin, uint32_t ncoeffs, uint32_t nconst)
+{
+  //uint32_t **pout;
+  uint32_t i,j;
+  uint32_t poly_idx, const_offset, n_coeff,prev_n_coeff, coeff_offset;
+
+  //pout = (uint32_t **) calloc(ncoeffs,sizeof(uint32_t *));
+
+  //for (i=0; i < ncoeffs; i++){
+  //   pout[i] = (uint32_t *)calloc(nconst, sizeof(uint32_t)*(NWORDS_256BIT+1)+1);
+  //}
+   
+  const_offset = cin[0]+1;
+  prev_n_coeff = 0;
+
+  for (i=0; i < nconst; i++){
+     n_coeff = cin[1+i];
+     coeff_offset = const_offset + n_coeff - prev_n_coeff;
+     for (j=0; j < n_coeff - prev_n_coeff ;j++){
+       //poly_idx = cin[const_offset+j];
+       pout[nconst*((NWORDS_256BIT+1)+1)+1+j]=i;
+       //pout[poly_idx*nc][1+j]=i;
+       //memcpy(&pout[poly_idx][1+nconst+i*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       memcpy(&pout[nconst*((NWORDS_256BIT+1)+1)+1+nconst+i*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       coeff_offset += NWORDS_256BIT;
+     }
+     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
+     prev_n_coeff = n_coeff;
+  }
+}
+/*
+  Read header circuit binary file
+
+  char * filename      : location of file to be written
+
+  circuit bin header file format:
+*/
+void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename)
+{
+  FILE *ifp = fopen(filename,"rb");
+  fread(&hfile->nWords, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nPubInputs, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nOutputs, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nVars, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nConstraints, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->constA_nWords, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->constB_nWords, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->constC_nWords, sizeof(uint32_t), 1, ifp); 
+  fclose(ifp);
+
+}
+/*
+  Read circuit binary file
+
+       
+*/
+void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords=0)
+{
+  FILE *ifp = fopen(filename,"rb");
+  uint32_t i=0;
+  if (!nwords){
+    while (!feof(ifp)){
+      fread(&samples[i++], sizeof(uint32_t), 1, ifp); 
+    }
+  } else {
+      fread(samples, sizeof(uint32_t), nwords, ifp); 
+  }
+  fclose(ifp);
+
+}
+
+
 /*
   Write circuit binary file
 
