@@ -21,7 +21,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : test_grooth_protocol.py
+// File name  : test_grooth_prover.py
 //
 // Date       : 31/01/2019
 //
@@ -41,7 +41,7 @@ from random import randint
 
 sys.path.append('../../src/python')
 
-from groth_protocol import *
+from groth_prover import *
 from subprocess import call
 
 SNARKJS ="snarkjs"

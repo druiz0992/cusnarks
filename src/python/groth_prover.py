@@ -26,7 +26,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : groth_protocol
+// File name  : groth_prover
 //
 // Date       : 27/01/2019
 //
@@ -35,7 +35,7 @@
 // NOTES:
 
 # 
-# Zero Kowledge Groth protocol implementation
+# Zero Kowledge Groth prover implementation
 # 
 
 
@@ -78,7 +78,7 @@ DATA_FOLDER = "../../data/"
 
 ROOTS_1M_filename = '../../data/zpoly_data_1M.npz'
 
-class GrothSnarks(object):
+class GrothProver(object):
     
     GroupIDX = 0
     FieldIDX = 1
@@ -96,7 +96,7 @@ class GrothSnarks(object):
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data['curve_params'])
-        ZPoly.init(GrothSnarks.FieldIDX)
+        ZPoly.init(GrothProver.FieldIDX)
 
         # TODO : Not sure if default represenation is relly used
         ZUtils.set_default_in_p_format(in_point_fmt)  # FEXT
@@ -195,7 +195,7 @@ class GrothSnarks(object):
        #self.witness_scl_u256 = \
           #np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
 
-       ZField.set_field(GrothSnarks.GroupIDX)
+       ZField.set_field(GrothProver.GroupIDX)
        self.vk_alfa_1_eccf1_u256 = ECC.as_uint256(self.vk_alfa_1_eccf1,remove_last=True, as_reduced=True)
        self.vk_beta_1_eccf1_u256 = ECC.as_uint256(self.vk_beta_1_eccf1,remove_last=True, as_reduced=True )
        self.vk_delta_1_eccf1_u256= ECC.as_uint256(self.vk_delta_1_eccf1,remove_last= True, as_reduced=True)
@@ -210,7 +210,7 @@ class GrothSnarks(object):
 
 
 
-       ZField.set_field(GrothSnarks.FieldIDX)
+       ZField.set_field(GrothProver.FieldIDX)
        polsA_l = []
        polsA_p = []
        for pol in self.polsA_sps:
@@ -256,7 +256,7 @@ class GrothSnarks(object):
     def get_invpoly_u256(self, n):
        fidx = ZField.get_field()
 
-       ZField.set_field(GrothSnarks.FieldIDX)
+       ZField.set_field(GrothProver.FieldIDX)
        inv_fnpz = DATA_FOLDER + "inv_"+str(n)+".npz"
        if not os.path.isfile(inv_fnpz):
           poly = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(n-1)] + [ZFieldElExt(1)])
@@ -277,7 +277,7 @@ class GrothSnarks(object):
     def get_roots_u256(self, nroots):
        fidx = ZField.get_field()
 
-       ZField.set_field(GrothSnarks.FieldIDX)
+       ZField.set_field(GrothProver.FieldIDX)
        root_fnpz = DATA_FOLDER + "root_"+str(nroots)+".npz"
        if not os.path.isfile(root_fnpz):
          proot = ZField.find_primitive_root(nroots).reduce().as_uint256()
@@ -321,7 +321,7 @@ class GrothSnarks(object):
         self.hExps_eccf1 = map(ECC_F1,self.vk_proof['hExps'])
 
 
-        ZField.set_field(GrothSnarks.FieldIDX)
+        ZField.set_field(GrothProver.FieldIDX)
 
         ZField.find_roots(ZUtils.NROOTS)
         # TODO : This representation may not be optimum. I only have good representation of sparse polynomial,
@@ -348,7 +348,7 @@ class GrothSnarks(object):
         end = time.time()
         self.t_GP.append(end - start)
 
-        ZField.set_field(GrothSnarks.FieldIDX)
+        ZField.set_field(GrothProver.FieldIDX)
         # Init r and s scalars
         self.r_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
         self.s_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
@@ -392,10 +392,10 @@ class GrothSnarks(object):
         
         if use_pycusnarks and self.accel:
           start = time.time()
-          ZField.set_field(GrothSnarks.FieldIDX)
+          ZField.set_field(GrothProver.FieldIDX)
           d4_u256  = ZFieldElExt(-self.r_scl * self.s_scl).as_uint256()
 
-          ZField.set_field(GrothSnarks.GroupIDX)
+          ZField.set_field(GrothProver.GroupIDX)
           self.pi_a_eccf1 = ECC.from_uint256(self.pi_a_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
           self.pi_a_eccf1 = ECC.as_uint256(self.pi_a_eccf1, remove_last=True)
           self.pi_b_eccf2 = ECC.from_uint256(np.reshape(self.pi_b_eccf2,(3,2,-1)),
@@ -417,7 +417,7 @@ class GrothSnarks(object):
 
         else :
           d4  = ZFieldElExt(-(self.r_scl * self.s_scl))
-          ZField.set_field(GrothSnarks.GroupIDX)
+          ZField.set_field(GrothProver.GroupIDX)
           d5  = d4 * self.vk_delta_1_eccf1
 
           coeffH = polH.get_coeff()
@@ -437,7 +437,7 @@ class GrothSnarks(object):
         nVars = self.vk_proof['nVars']
         nPublic = self.vk_proof['nPublic']
         self.t_EC = []
-        ZField.set_field(GrothSnarks.GroupIDX)
+        ZField.set_field(GrothProver.GroupIDX)
 
         if use_pycusnarks and self.accel:
           start_ec = time.time()
@@ -522,7 +522,7 @@ class GrothSnarks(object):
     def calculateH(self, d1, d2, d3):
         #d1 = PolF.F.zero, d2 = PolF.F.zero, d3 = PolF.F.zero);
 
-        ZField.set_field(GrothSnarks.FieldIDX)
+        ZField.set_field(GrothProver.FieldIDX)
         m = self.vk_proof['domainSize']
         #nVars = self.vk_proof['nVars']
         nVars = self.oldnVars
@@ -1102,7 +1102,7 @@ if __name__ == "__main__":
     t = []
     witness_f=DEFAULT_WITNESS_LOC
     proving_key_f = DEFAULT_PROVING_KEY_LOC
-    G = GrothSnarks(proving_key_f)
+    G = GrothProver(proving_key_f)
     for i in range(20):
       t1,t2,t3 = G.gen_proof(witness_f)
       t.append(np.concatenate((t1,t2,t3)))
