@@ -33,6 +33,7 @@ Modules are divided into 4 categories depending on functionality:
 
 4. **Applications Layer** : User applications. For now only prover functionality is included, but in the future witness generation and trusted setup implemention will be in this layer. Application layer modules are implemented in Python and can launch CUDA kernels via cusnarks_kernel module and host side accelerated C functions via utils_host Cython wrapped module
 
+![Architecture](doc/architecture.png)
 
 ## Modules
 
