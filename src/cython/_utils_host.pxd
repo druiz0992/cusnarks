@@ -47,4 +47,5 @@ cdef extern from "../cuda/utils_host.h":
     void cwriteU256CircuitFile_h "writeU256CircuitFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256CircuitFile_h "readU256CircuitFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256CircuitFileHeader_h "readU256CircuitFileHeader_h"( ct.cirbin_hfile_t *hfile, const char *filename)
+    ct.uint32_t cr1cs_to_zpoly_h "r1cs_to_zpoly_h" (ct.uint32_t *pout, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t pwords, ct.uint32_t extend)
   

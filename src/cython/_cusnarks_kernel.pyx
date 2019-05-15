@@ -394,9 +394,9 @@ def readU256CircuitFileHeader_h(bytes fname):
                 'nOutputs' : header.nOutputs,
                 'nVars' : header.nVars,
                 'nConstraints' : header.nConstraints,
-                'constA_nWords' : header.constA_nWords,
-                'constB_nWords' : header.constB_nWords,
-                'constC_nWords' : header.constC_nWords }
+                'R1CSA_nWords' : header.R1CSA_nWords,
+                'R1CSB_nWords' : header.R1CSB_nWords,
+                'R1CSC_nWords' : header.R1CSC_nWords }
     
     return header_d
 
@@ -407,4 +407,22 @@ def readU256CircuitFile_h(bytes fname):
     uh.creadU256CircuitFile_h(&cir_data[0], <char *>fname, header_d['nWords'])
 
     return cir_data
+
+def r1cs_to_zpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t pwords, ct.uint32_t extend):
+    cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
+    cdef ct.uint32_t ret_val
+
+    header_c.nWords = header['nWords']
+    header_c.nPubInputs = header['nPubInputs']
+    header_c.nOutputs = header['nOutputs']
+    header_c.nVars = header['nVars']
+    header_c.nConstraints = header['nConstraints']
+    header_c.R1CSC_nWords = header['R1CSA_nWords']
+    header_c.R1CSB_nWords = header['R1CSB_nWords']
+    header_c.R1CSC_nWords = header['R1CSC_nWords']
+
+    ret_val = uh.cr1cs_to_zpoly_h(&pout[0], &r1cs[0], header_c,pwords, extend)
+    
+    return ret_val, pout
 

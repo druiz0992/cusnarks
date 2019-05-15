@@ -84,7 +84,7 @@ class GrothSetup(object):
         self.vk_proof = {}
         self.vk_verifier = {}
 
-        self.nWord        = None
+        self.nWords       = None
         self.nPubInputs   = None
         self.nOutputs     = None
         self.nVars        = None
@@ -95,6 +95,7 @@ class GrothSetup(object):
         self.R1CSA        = None
         self.R1CSB        = None
         self.R1CSC        = None
+        self.header       = None
 
         if in_circuit_f is not None:
            self.circuitRead(in_circuit_f,out_circuit_f)
@@ -113,36 +114,55 @@ class GrothSetup(object):
 
         self._ciru256_to_vars(cir_u256)
 
-    def setup(self,cirvars):
+    def setup(self):
         ZPoly.init(GrothSetup.FieldIDX)
-        domainBits =  np.uint32(math.ceil(math.log(cirvars['nConstraints']+ 
-                                           cirvars['nPubInputs'] + 
-                                           cirvars['nOutputs'],2)))
+        domainBits =  np.uint32(math.ceil(math.log(self.nConstraints+ 
+                                           self.nPubInputs + 
+                                           self.nOutputs,2)))
 
 
-        self.vk_proof = { 'nVars' : cirvars['nVars'],
-                     'nPublic' : cirvars['nPubInputs'] + cirvars['nOutputs'],
+        self.vk_proof = { 'nVars' : self.nVars,
+                     'nPublic' : self.nPubInputs + self.nOutputs,
                      'domainBits' : domainBits,
                      'domainSize' : 1 << domainBits,
-                     'constA' : cirvars['constA'],
-                     'constB' : cirvars['constB'],
-                     'constC' : cirvars['constC']}
+                     'R1CSA' : self.R1CSA,
+                     'R1CSB' : self.R1CSB,
+                     'R1CSC' : self.R1CSC}
 
-        self.vk_verifier = {'nPublic' : cirvars['nPubInputs'] + cirvars['nOutputs']}
+        self.vk_verifier = {'nPublic' : self.nPubInputs + self.nOutputs}
   
         prime = ZField.get_extended_p()
         toxic = randint(0,prime.as_long()-1)
 
-        self.calculatePoly(cirvars)
+        self._calculatePoly()
         self.calculateEncryptedValuesAtT(cirvars,toxic)
 
         return 
 
 
-    def calculatePoly(self, cirvars):
-        polsA = constraints_to_poly(cirvars['constA'])
-        polsB = constraints_to_poly(cirvars['constB'])
-        polsC = constraints_to_poly(cirvars['constC'])
+    def _calculatePoly(self):
+        self._computeHeader()
+
+        while True:
+           pout_len = self.header['R1CSA_nWords']/8
+           ret_v, polsA = r1cs_to_zpoly_h(self.R1CSA, self.header, pout_len, 1)
+           if ret_v == 1:
+              break
+           pout_len *= 2
+
+        while True:
+           pout_len = self.header['R1CSB_nWords']/8
+           ret_v, polsB = r1cs_to_zpoly_h(self.R1CSB, self.header, pout_len, 0)
+           if ret_v == 1:
+              break
+           pout_len *= 2
+
+        while True:
+           pout_len = self.header['R1CSC_nWords']/8
+           ret_v, polsC = r1cs_to_zpoly_h(self.R1CSC, self.header, pout_len, 0)
+           if ret_v == 1:
+              break
+           pout_len *= 2
 
     def calculateEncryptedValuesAtT(self, cirvars,toxic):
        return
@@ -161,16 +181,16 @@ class GrothSetup(object):
                        np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]) + \
                        np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
 
-        self.nWords        =  np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET]),
-        self.nPubInputs    =  np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET]),
-        self.nOutputs      =  np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET]),
-        self.nVars         =  np.uint32(ciru256_data[CIRBIN_H_NVARS_OFFSET]),
-        self.nConstraints  =  np.uint32(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET]),
-        self.R1CSA_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]),
-        self.R1CSB_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET]),
-        self.R1CSC_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET]),
-        self.R1CSA        =  ciru256_data[R1CSA_offset:R1CSB_offset] ,
-        self.R1CSB        =  ciru256_data[R1CSB_offset:R1CSC_offset],
+        self.nWords        =  np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET])
+        self.nPubInputs    =  np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET])
+        self.nOutputs      =  np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET])
+        self.nVars         =  np.uint32(ciru256_data[CIRBIN_H_NVARS_OFFSET])
+        self.nConstraints  =  np.uint32(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET])
+        self.R1CSA_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
+        self.R1CSB_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
+        self.R1CSC_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET])
+        self.R1CSA        =  ciru256_data[R1CSA_offset:R1CSB_offset] 
+        self.R1CSB        =  ciru256_data[R1CSB_offset:R1CSC_offset]
         self.R1CSC        =  ciru256_data[R1CSC_offset:] 
 
     def _cirvarsPack(self):
@@ -187,6 +207,17 @@ class GrothSetup(object):
                         self.R1CSB,
                         self.R1CSC))
 
+    
+    def _computeHeader(self):
+
+        self.header = {'nWords' : self.nWords,
+                  'nPubInputs' : self.nPubInputs,
+                  'nOutputs' : self.nOutputs,
+                  'nVars' : self.nVars,
+                  'nConstraints' : self.nConstraints,
+                  'R1CSA_nWords' : self.R1CSA_nWords,
+                  'R1CSB_nWords' : self.R1CSB_nWords,
+                  'R1CSC_nWords' : self.R1CSC_nWords}
 
     def _cirjson_to_u256(self,circuit_f):
         """
@@ -312,9 +343,10 @@ class GrothSetup(object):
 
 
 if __name__ == "__main__":
-    in_circuit_f = '../../data/prove-kyc.json'
-    out_circuit_f = '../../data/prove-kyc.bin'
-    GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f)
+    #in_circuit_f = '../../data/prove-kyc.json'
+    #out_circuit_f = '../../data/prove-kyc.bin'
+    #GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f)
 
-    #in_circuit_f = '../../data/prove-kyc.bin'
-    #G = GrothSetup(in_circuit_f)
+    in_circuit_f = '../../data/prove-kyc.bin'
+    GS = GrothSetup(in_circuit_f=in_circuit_f)
+    GS.setup()
