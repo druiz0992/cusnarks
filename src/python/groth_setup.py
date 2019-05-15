@@ -66,24 +66,12 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-#Input files
-DEFAULT_WITNESS_LOC = "../../data/witness_pedersen.json"
-DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_pedersen.json"
-#DEFAULT_WITNESS_LOC = "../../data/witness_multiplier.json"
-#DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_multiplier.json"
-#Output files
-DEFAULT_PROOF_LOC =  "../../data/proof.json"
-DEFAULT_PUBLIC_LOC =  "../../data/public.json"
-DATA_FOLDER = "../../data/"
-
-ROOTS_1M_filename = '../../data/zpoly_data_1M.npz'
-
 class GrothSetup(object):
     
     GroupIDX = 0
     FieldIDX = 1
 
-    def __init__(self, in_circuit_f, out_circuit_f=None, curve='BN128'):
+    def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None):
   
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group 
@@ -92,29 +80,46 @@ class GrothSetup(object):
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data['curve_params'])
         ZPoly.init(GrothSetup.FieldIDX)
+
         self.vk_proof = {}
         self.vk_verifier = {}
 
+        self.nWord        = None
+        self.nPubInputs   = None
+        self.nOutputs     = None
+        self.nVars        = None
+        self.nConstraints = None
+        self.R1CSA_nWords = None
+        self.R1CSB_nWords = None
+        self.R1CSC_nWords = None
+        self.R1CSA        = None
+        self.R1CSB        = None
+        self.R1CSC        = None
+
+        if in_circuit_f is not None:
+           self.circuitRead(in_circuit_f,out_circuit_f)
+
+    def circuitRead(self,circuit_f, out_circuit_f=None):
         # cir Json to u256
         if in_circuit_f.endswith('.json'):
-           cir_u256 = self.cirjson_to_u256(in_circuit_f)
+           cir_u256 = self._cirjson_to_u256(in_circuit_f)
 
            #u256 to bin
            if out_circuit_f is not None:
-              self.ciru256_to_bin(cir_u256, out_circuit_f)
+              self._ciru256_to_bin(cir_u256, out_circuit_f)
 
         elif in_circuit_f.endswith('.bin'):
-             cir_u256 = self.cirbin_to_u256(in_circuit_f)
+             cir_u256 = self._cirbin_to_u256(in_circuit_f)
 
-        cir_vars = self.ciru256_to_vars(cir_u256)
-
-        self.setup(cir_vars)
+        self._ciru256_to_vars(cir_u256)
 
     def setup(self,cirvars):
         ZPoly.init(GrothSetup.FieldIDX)
         domainBits =  np.uint32(math.ceil(math.log(cirvars['nConstraints']+ 
                                            cirvars['nPubInputs'] + 
                                            cirvars['nOutputs'],2)))
+
+
         self.vk_proof = { 'nVars' : cirvars['nVars'],
                      'nPublic' : cirvars['nPubInputs'] + cirvars['nOutputs'],
                      'domainBits' : domainBits,
@@ -133,6 +138,7 @@ class GrothSetup(object):
 
         return 
 
+
     def calculatePoly(self, cirvars):
         polsA = constraints_to_poly(cirvars['constA'])
         polsB = constraints_to_poly(cirvars['constB'])
@@ -141,117 +147,174 @@ class GrothSetup(object):
     def calculateEncryptedValuesAtT(self, cirvars,toxic):
        return
 
-    def cirbin_to_u256(self, circuit_f):
-        cir_u256 = readU256CircuitFile_h(circuit_f)
-        return cir_u256
+    def _cirbin_to_u256(self, circuit_f):
+        return readU256CircuitFile_h(circuit_f)
 
-    def ciru256_to_bin(self, ciru256_data, circuit_f):
+    def _ciru256_to_bin(self, ciru256_data, circuit_f):
         writeU256CircuitFile_h(ciru256_data, circuit_f)
 
-    def ciru256_to_vars(self, ciru256_data):
-        constA_offset = CIRBIN_H_N_OFFSET
-        constB_offset = CIRBIN_H_N_OFFSET +  \
+    def _ciru256_to_vars(self, ciru256_data):
+        R1CSA_offset = CIRBIN_H_N_OFFSET
+        R1CSB_offset = CIRBIN_H_N_OFFSET +  \
                        np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
-        constC_offset = CIRBIN_H_N_OFFSET + \
+        R1CSC_offset = CIRBIN_H_N_OFFSET + \
                        np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]) + \
                        np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
 
-        cirvars = {'nWords'     : np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET]),
-                    'nPubInputs' : np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET]),
-                    'nOutputs'   : np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET]),
-                    'nVars'      : np.uint32(ciru256_data[CIRBIN_H_NVARS_OFFSET]),
-                    'nConstraints' : np.uint32(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET]),
-                    'constA_nWords' : np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]),
-                    'constB_nWords' : np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET]),
-                    'constC_nWords' : np.uint32(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET]),
-                    'constA' : ciru256_data[constA_offset:constB_offset] ,
-                    'constB' : ciru256_data[constB_offset:constC_offset],
-                    'constC' : ciru256_data[constC_offset:] }
+        self.nWords        =  np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET]),
+        self.nPubInputs    =  np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET]),
+        self.nOutputs      =  np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET]),
+        self.nVars         =  np.uint32(ciru256_data[CIRBIN_H_NVARS_OFFSET]),
+        self.nConstraints  =  np.uint32(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET]),
+        self.R1CSA_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]),
+        self.R1CSB_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET]),
+        self.R1CSC_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET]),
+        self.R1CSA        =  ciru256_data[R1CSA_offset:R1CSB_offset] ,
+        self.R1CSB        =  ciru256_data[R1CSB_offset:R1CSC_offset],
+        self.R1CSC        =  ciru256_data[R1CSC_offset:] 
 
-        return cirvars
+    def _cirvarsPack(self):
+        return  np.concatenate((
+                       [self.nWords,
+                        self.nPubInputs,
+                        self.nOutputs,
+                        self.nVars,
+                        self.nConstraints,
+                        self.R1CSA_nWords,
+                        self.R1CSB_nWords,
+                        self.R1CSC_nWords],
+                        self.R1CSA,
+                        self.R1CSB,
+                        self.R1CSC))
 
-    def cirvars_to_u256(self, cirvars):
-        circuit_u256 = np.concatenate((
-                       [cirvars['nWords'],
-                        cirvars['nPubInputs'],
-                        cirvars['nOutputs'],
-                        cirvars['nVars'],
-                        cirvars['nConstraints'],
-                        cirvars['constA_nWords'],
-                        cirvars['constB_nWords'],
-                        cirvars['constC_nWords']],
-                        cirvars['constA'],
-                        cirvars['constB'],
-                        cirvars['constC']))
 
-        return circuit_u256
+    def _cirjson_to_u256(self,circuit_f):
+        """
+          Converts from circom .json output file to binary format required to 
+            calculate snarks setup. Only the following entries are used:
+             - constraints -> R1CS a,b,c
+             - nPubInputs  -> k
+             - nVars       -> N
+             - nOutputs    ->
 
-    def cirjson_to_u256(self,circuit_f):
+          R1CS binary format:
+            N constraints  -------------------------------- 32 bits  
+            cumsum(  -> cumulative
+              N coeff constraints[0] ---------------------- 32 bits
+              N coeff constraints[1] ---------------------- 32 bits : N constraints[0] + N constraints[1]
+              ----
+              N coeff constraints[N-1] -------------------- 32 bits : N contraints[0] + N constraints[1] +
+                                                                      N constraints[2] +...+ Nconstraints[N-1]
+            )
+            Coeff[0,0] constraint 0, coeff 0 -------------- 32 bits
+            Coeff[0,1] constraint 0, coeff 1 -------------- 32 bits
+            ----
+            Coeff[0,C0-1] constraint 0, coeff C0-1 -------- 32 bits
+            Val[0,0] constraint 0, value 0 ---------------- 256 bits (8 words) : word 0 is LSW
+            Val[0,1] constraint 0, value 1 ---------------- 256 bits 
+            ----
+            Val[0,C0-1] constraint 0, value C0-1 - -------- 256 bits 
+            Coeff[1,0] constraint 1, coeff 0 -------------- 32 bits
+            Coeff[1,1] constraint 1, coeff 1 -------------- 32 bits
+            ----
+            Coeff[1,C1-1] constraint 1, coeff C1-1 -------- 32 bits
+            Val[1,0] constraint 1, value 0 ---------------- 256 bits 
+            Val[1,1] constraint 1, value 1 ---------------- 256 bits 
+            ----
+            Val[1,C1-1] constraint 1, value C1-1 -- ------- 256 bits 
+            ----
+            ----
+            Coeff[N-1,0] constraint N-1, coeff 0 ---------- 32 bits
+            Coeff[N-1,1] constraint N-1, coeff 1 ---------- 32 bits
+            ----
+            Coeff[N-1,CN_1-1] constraint N-1, coeff CN_1-1  32 bits
+            Val[N-1,0] constraint 1, value 0 -------------- 256 bits 
+            Val[N-1,1] constraint 1, value 1 -------------- 256 bits 
+            ----
+            Val[N-1,CN_1-1] constraint 1, value CN_1-1 ---- 256 bits 
+
+          Binary file format
+            nWords : File size in 32 bit workds --------------- 32 bits
+            nPubInputs : -------------------------------------- 32 bits
+            nOutputs   : -------------------------------------- 32 bits
+            nVars      : -------------------------------------- 32 bits
+            nConstraints : Number of constraints--------------- 32 bits
+            R1CSA_nWords : R1CSA size in 32 bit words --------- 32 bits
+            R1CSB_nWords : R1CSB size in 32 bit words --------- 32 bits
+            R1CSC_nWords : R1CSC size in 32 bit words --------- 32 bits
+            R1CSA        :  R1CS  format 
+            R1CSB        :  R1CS format
+            R1CSC        : R1Cs format
+ 
+            
+        """
+        labels = ['constraints', 'nPubInputs','nOutputs','nVars']
         f = open(circuit_f,'r')
         cir_json_data = json.load(f)
-        cir_data = json_to_dict(cir_json_data)
+        cir_data = json_to_dict(cir_json_data, labels)
         f.close()
 
-        constA_u256 = [ZPolySparse(coeff[0]).as_uint256() for coeff in cir_data['constraints']]
-        constA_l = []
-        constA_p = []
-        for l,p in constA_u256:
-            constA_l.append(l)
-            constA_p.append(p)
-        constA_u256 = np.asarray(np.concatenate((np.asarray([len(constA_l)]),
+        R1CSA_u256 = [ZPolySparse(coeff[0]).as_uint256() for coeff in cir_data['constraints']]
+        R1CSA_l = []
+        R1CSA_p = []
+        for l,p in R1CSA_u256:
+            R1CSA_l.append(l)
+            R1CSA_p.append(p)
+        R1CSA_u256 = np.asarray(np.concatenate((np.asarray([len(R1CSA_l)]),
                                               np.concatenate(
-                                                 (np.cumsum(constA_l), 
-                                                  np.concatenate(constA_p))))),
+                                                 (np.cumsum(R1CSA_l), 
+                                                  np.concatenate(R1CSA_p))))),
                                                   dtype=np.uint32)
+        R1CSA_len = R1CSA_u256.shape[0]
+                
 
-        constB_u256 = [ZPolySparse(coeff[1]).as_uint256() for coeff in cir_data['constraints']]
-        constB_l = []
-        constB_p = []
-        for l,p in constB_u256:
-            constB_l.append(l)
-            constB_p.append(p)
-        constB_u256 = np.asarray(np.concatenate((np.asarray([len(constB_l)]),
+        R1CSB_u256 = [ZPolySparse(coeff[1]).as_uint256() for coeff in cir_data['constraints']]
+        R1CSB_l = []
+        R1CSB_p = []
+        for l,p in R1CSB_u256:
+            R1CSB_l.append(l)
+            R1CSB_p.append(p)
+        R1CSB_u256 = np.asarray(np.concatenate((np.asarray([len(R1CSB_l)]),
                                               np.concatenate(
-                                                 (np.cumsum(constB_l), 
-                                                  np.concatenate(constB_p))))),
+                                                 (np.cumsum(R1CSB_l), 
+                                                  np.concatenate(R1CSB_p))))),
                                                   dtype=np.uint32)
+        R1CSB_len = R1CSB_u256.shape[0]
 
-        constC_u256 = [ZPolySparse(coeff[2]).as_uint256() for coeff in cir_data['constraints']]
-        constC_l = []
-        constC_p = []
-        for l,p in constC_u256:
-            constC_l.append(l)
-            constC_p.append(p)
-        constC_u256 = np.asarray(np.concatenate((np.asarray([len(constC_l)]),
+        R1CSC_u256 = [ZPolySparse(coeff[2]).as_uint256() for coeff in cir_data['constraints']]
+        R1CSC_l = []
+        R1CSC_p = []
+        for l,p in R1CSC_u256:
+            R1CSC_l.append(l)
+            R1CSC_p.append(p)
+        R1CSC_u256 = np.asarray(np.concatenate((np.asarray([len(R1CSC_l)]),
                                               np.concatenate(
-                                                 (np.cumsum(constC_l), 
-                                                  np.concatenate(constC_p))))),
+                                                 (np.cumsum(R1CSC_l), 
+                                                  np.concatenate(R1CSC_p))))),
                                                   dtype=np.uint32)
+        R1CSC_len = R1CSC_u256.shape[0]
 
-        pol_ncoeff =  np.uint32(cir_data['nVars'])
+        fsize = CIRBIN_H_N_OFFSET + R1CSA_len + R1CSB_len + R1CSC_len
 
-        fsize = CIRBIN_H_N_OFFSET + constA_u256.shape[0] + constB_u256.shape[0] + constC_u256.shape[0]
-        cirvars = {'nWords'     : np.uint32(fsize),
-                    'nPubInputs' : np.uint32(cir_data['nPubInputs']),
-                    'nOutputs'   : np.uint32(cir_data['nOutputs']),
-                    'nVars'      : np.uint32(cir_data['nVars']),
-                    'nConstraints'  : np.uint32(len(cir_data['constraints'])),
-                    'constA_nWords' : np.uint32(constA_u256.shape[0]),
-                    'constB_nWords' : np.uint32(constB_u256.shape[0]),
-                    'constC_nWords' : np.uint32(constC_u256.shape[0]),
-                    'constA' :   constA_u256,
-                    'constB' : constB_u256,
-                    'constC' : constC_u256 }
+        self.nWords       =  np.uint32(fsize)
+        self.nPubInputs   =  np.uint32(cir_data['nPubInputs'])
+        self.nOutputs     =  np.uint32(cir_data['nOutputs'])
+        self.nVars        =  np.uint32(cir_data['nVars'])
+        self.nConstraints =  np.uint32(len(cir_data['constraints']))
+        self.R1CSA_nWords =  np.uint32(R1CSA_len)
+        self.R1CSB_nWords =  np.uint32(R1CSB_len)
+        self.R1CSC_nWords =  np.uint32(R1CSC_len)
+        self.R1CSA        =  R1CSA_u256
+        self.R1CSB        =  R1CSB_u256
+        self.R1CSC        =  R1CSC_u256 
 
-        cir_u256data =  self.cirvars_to_u256(cirvars)
-
-        return cir_u256data
+        return  self._cirvarsPack()
 
 
 if __name__ == "__main__":
     in_circuit_f = '../../data/prove-kyc.json'
     out_circuit_f = '../../data/prove-kyc.bin'
-    G = GrothSetup(in_circuit_f, out_circuit_f=out_circuit_f)
+    GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f)
 
     #in_circuit_f = '../../data/prove-kyc.bin'
     #G = GrothSetup(in_circuit_f)
