@@ -60,10 +60,9 @@ void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void printU256Number(const uint32_t *x);
-void readU256DataFile(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
+void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
 void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
 void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename);
 void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
-//uint32_t **constraints_to_zpoly(uint32_t *cin, uint32_t ncoeffs, uint32_t nconst);
-void constraints_to_zpoly(uint32_t *pout, uint32_t *cin, uint32_t ncoeffs, uint32_t nconst);
+uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t pwords, uint32_t extend);
 #endif

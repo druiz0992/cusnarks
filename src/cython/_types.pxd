@@ -115,9 +115,9 @@ cdef extern from "types.h":
      uint32_t nOutputs
      uint32_t nVars
      uint32_t nConstraints
-     uint32_t constA_nWords
-     uint32_t constB_nWords
-     uint32_t constC_nWords
+     uint32_t R1CSA_nWords
+     uint32_t R1CSB_nWords
+     uint32_t R1CSC_nWords
   
 
   ctypedef enum cirbin_hfile_offset_t:
