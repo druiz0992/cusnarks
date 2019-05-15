@@ -51,15 +51,18 @@ import time
 
 from random import randint
 
-def json_to_dict(data, ):
-    data = {str(k) : data[k] for k in data.keys()}
+def json_to_dict(data, labels=None ):
+    if labels is None:
+       data = {str(k) : data[k] for k in data.keys()}
+    else:
+        data = {str(k) : data[k] for k in data.keys() if k in labels}
     for k, v in data.items():
         if type(data[k]) is list:
-            json_to_list(data[k])
+          json_to_list(data[k])
         elif type(data[k]) is dict:
-            json_to_dict(data[k])
+          json_to_dict(data[k])
         elif is_long(v):
-            data[k] = long(v)
+          data[k] = long(v)
 
     return data
 
