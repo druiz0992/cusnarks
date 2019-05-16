@@ -726,8 +726,8 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    logInfoBigNumberTid(tid,1,"A\n",A);
-    logInfoBigNumberTid(tid,1,"B\n",B);
+    logInfoBigNumberTid(tid,1,"A\n",(uint32_t *)A);
+    logInfoBigNumberTid(tid,1,"B\n",(uint32_t *)B);
     #pragma unroll
     for(i=0; i<NWORDS_256BIT; i++)
     {
