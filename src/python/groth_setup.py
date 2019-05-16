@@ -143,26 +143,23 @@ class GrothSetup(object):
     def _calculatePoly(self):
         self._computeHeader()
 
-        while True:
-           pout_len = self.header['R1CSA_nWords']/8
-           ret_v, polsA = r1cs_to_zpoly_h(self.R1CSA, self.header, pout_len, 1)
-           if ret_v == 1:
-              break
-           pout_len *= 2
+        ret_v, polsA = r1cs_to_mpoly_h(self.R1CSA, self.header, pout_len, 1)
+        if ret_v > 0:
+           print "increase MAX_R1CSPOLYTMP_NWORDS" 
+        elif ret_v < 0:
+           print "increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v)
 
-        while True:
-           pout_len = self.header['R1CSB_nWords']/8
-           ret_v, polsB = r1cs_to_zpoly_h(self.R1CSB, self.header, pout_len, 0)
-           if ret_v == 1:
-              break
-           pout_len *= 2
+        ret_v, polsB = r1cs_to_mpoly_h(self.R1CSB, self.header, pout_len, 0)
+        if ret_v > 0:
+           print "increase MAX_R1CSPOLYTMP_NWORDS" 
+        elif ret_v < 0:
+           print "increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v)
 
-        while True:
-           pout_len = self.header['R1CSC_nWords']/8
-           ret_v, polsC = r1cs_to_zpoly_h(self.R1CSC, self.header, pout_len, 0)
-           if ret_v == 1:
-              break
-           pout_len *= 2
+        ret_v, polsC = r1cs_to_mpoly_h(self.R1CSC, self.header, pout_len, 0)
+        if ret_v > 0:
+           print "increase MAX_R1CSPOLYTMP_NWORDS" 
+        elif ret_v < 0:
+           print "increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v)
 
     def calculateEncryptedValuesAtT(self, cirvars,toxic):
        return

@@ -353,15 +353,14 @@ def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] star
   
      return out_samples.reshape((-1,ct.NWORDS_256BIT))
 
-def zpoly_maddm_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
+def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
               ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
 
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(ncoeff*8,dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] sclflat = np.zeros(scldata.shape[0] * scldata.shape[1],dtype=np.uint32)
      sclflat = np.reshape(scldata,-1)
          
-     uh.czpoly_maddm_h(&outd[0],&sclflat[0], &pdata[0], ncoeff, last_idx, pidx)
-     #uh.cmaddm_h(&outd[0],&scldata[0], &pdata[0], last_idx, pout_d, pidx)
+     uh.cmpoly_eval_h(&outd[0],&sclflat[0], &pdata[0], ncoeff, last_idx, pidx)
 
      return np.reshape(outd,(-1,8))
 
@@ -408,9 +407,10 @@ def readU256CircuitFile_h(bytes fname):
 
     return cir_data
 
-def r1cs_to_zpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t pwords, ct.uint32_t extend):
+def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t extend):
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
+    #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(MAX_R1CSPOLY_NWORDS*NWORDS_256BIT,dtype=np.uint32)
     cdef ct.uint32_t ret_val
 
     header_c.nWords = header['nWords']
@@ -422,7 +422,7 @@ def r1cs_to_zpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
 
-    ret_val = uh.cr1cs_to_zpoly_h(&pout[0], &r1cs[0], header_c,pwords, extend)
+    ret_val = uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
     
     return ret_val, pout
 

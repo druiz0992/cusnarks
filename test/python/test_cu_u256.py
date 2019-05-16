@@ -189,13 +189,14 @@ class CUU256Test(unittest.TestCase):
             r_rdc = [x * y for x,y in zip(x1_rdc, x2_rdc)]
             r_mul = np.asarray([x.as_uint256() for x in r_rdc])
             
-            #idx=0
-            #result2 = np.zeros(r_mul.shape, dtype=np.uint32)
-            #for x1,x2 in zip(x1_rdc, x2_rdc):
-               #result2[idx] = montmult_h(x1.as_uint256(), x2.as_uint256(), 1)
-               #idx+=1
+            idx=0
+            result2 = np.zeros(r_mul.shape, dtype=np.uint32)
+            for x1,x2 in zip(x1_rdc, x2_rdc):
+               result2[idx] = montmult_h(x1.as_uint256(), x2.as_uint256(), 1)
+               idx+=1
             self.assertTrue(len(result) == CUU256Test.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mul)))
+            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(result2)))
 
             # Test addm_reduce kernel:
             # First iteration : Reduce by blockSize * stride => 
