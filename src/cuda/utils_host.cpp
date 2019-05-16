@@ -526,7 +526,7 @@ void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nw
   uint32_t outsize     : Number of output samples. Samples are stored in vector with a 
                          insize/outsize ratio 
 */
-void readU256DataFile(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize)
+void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize)
 {
   uint32_t i, j=0,k=0;
   uint32_t r[NWORDS_256BIT];
@@ -582,22 +582,23 @@ void setRandom(uint32_t *x, const uint32_t nsamples)
 */
 void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
 {
-  int i,j;
+  int j;
   _RNG* rng = _RNG::get_instance(x[0]);
   uint32_t nwords, nbits;
 
-  rng->randu32(&nwords,1);
-  rng->randu32(&nbits,1);
-
-  nwords %= NWORDS_256BIT;
-  nbits %= 32;
 
   memset(x,0,NWORDS_256BIT*sizeof(uint32_t));
 
   for (j=0; j < nsamples; j++){
-    rng->randu32(&x[j*NWORDS_256BIT+i],nwords); 
+    rng->randu32(&nwords,1);
+    rng->randu32(&nbits,1);
 
-    x[j*NWORDS_256BIT+i-1] &= ((1 << nbits)-1);
+    nwords %= NWORDS_256BIT;
+    nbits %= 32;
+
+    rng->randu32(&x[j*NWORDS_256BIT],nwords); 
+
+    x[j*NWORDS_256BIT+nwords] &= ((1 << nbits)-1);
     if ((p!= NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
          do{
            subu256_h(&x[j*NWORDS_256BIT], p);

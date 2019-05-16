@@ -77,7 +77,7 @@ class CUU256Test(unittest.TestCase):
         u256 = CUU256Test.u256
         ntest_points = CUU256Test.ntest_points
         u256_p = CUU256Test.u256_p
-        kernel_config = {'blockD' : [U256_BLOCK_DIM] }
+        kernel_config = {'blockD' : [U256_BLOCK_DIM], 'in_offset' : [0] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [1], 'in_length' : [CUU256Test.nsamples], 'stride' : [1], 'out_length' : CUU256Test.nsamples}
         for iter in xrange(CUU256Test.TEST_ITER):
             #if iter%CUU256Test.TEST_ITER == 0:
@@ -188,7 +188,12 @@ class CUU256Test(unittest.TestCase):
             x2_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[np.add(test_points2,1)]]
             r_rdc = [x * y for x,y in zip(x1_rdc, x2_rdc)]
             r_mul = np.asarray([x.as_uint256() for x in r_rdc])
-    
+            
+            #idx=0
+            #result2 = np.zeros(r_mul.shape, dtype=np.uint32)
+            #for x1,x2 in zip(x1_rdc, x2_rdc):
+               #result2[idx] = montmult_h(x1.as_uint256(), x2.as_uint256(), 1)
+               #idx+=1
             self.assertTrue(len(result) == CUU256Test.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mul)))
 
