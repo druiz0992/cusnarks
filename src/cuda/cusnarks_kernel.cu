@@ -242,7 +242,8 @@ double CUSnarks::kernelLaunch(
 
   // measure data xfer time Host -> Device
   start = elapsedTime();
-  CCHECK(cudaMemcpy(&in_vector_device.data[config[i].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  //printf("%d. %d, %d, %d\n", config[i].in_offset, in_vector_device.data[config[i].in_offset], in_vector_host->data, in_vector_host->size);
+  CCHECK(cudaMemcpy(&in_vector_device.data[config[0].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
   end_copy_in = elapsedTime() - start;
 
   total_kernel = 0.0;
