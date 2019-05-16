@@ -395,7 +395,7 @@ class BigInt(object):
             assert False, "Unexpected dimensions"
 
         n = np.asarray([long(x) * long(1 << 32 * i) for i, x in enumerate(bn_uint256)])
-        return BigInt( np.sum(n))
+        return BigInt( long(np.sum(n)))
 
     @classmethod
     def addu256(cls, x, y):
