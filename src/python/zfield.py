@@ -750,9 +750,9 @@ class ZFieldEl(BigInt):
         elif isinstance(x, BigInt):
             newZ = (self.as_long() << x.as_long())
         elif isinstance(x, int) or isinstance(x, long):
-            if isinstance(x, Z2FieldEl):
-               newZ = [self.P[0].as_long() << x, self.P[1].as_long() << x]
-            else :
+            #if isinstance(x, Z2FieldEl):
+             #  newZ = [self.P[0].as_long() << x, self.P[1].as_long() << x]
+            #else :
                newZ = (self.as_long() << x)
         else:
             assert False, "Invalid type"
@@ -1037,9 +1037,13 @@ class ZFieldElRedc(ZFieldEl):
         """
         if isinstance(x, ZFieldElRedc):
             x_l = x.as_long()  # Montgomery multiplicatoin and reduction
-        elif isinstance(x, BigInt):
+        #elif isinstance(x, BigInt) and not isinstance(x,ZFieldEl):
+        elif isinstance(x, BigInt): 
             # standard multiplication
-            return ZFieldElRedc((self.bignum * x.as_long()))
+            try:
+               return ZFieldElRedc((self.bignum * x.as_long()))
+            except  AttributeError :
+                return x * self
         elif isinstance(x, int) or isinstance(x, long):
             # standard multiplication
             return ZFieldElRedc((self.bignum * x) )
