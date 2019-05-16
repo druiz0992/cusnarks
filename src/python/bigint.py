@@ -394,8 +394,8 @@ class BigInt(object):
         elif bn_uint256.ndim != 1 or bn_uint256.shape[0] != BigInt.WORDS_IN_256BN:
             assert False, "Unexpected dimensions"
 
-        n = np.asarray([long(x) * long(1 << 32 * i) for i, x in enumerate(bn_uint256)])
-        return BigInt( long(np.sum(n)))
+        n = [long(long(x) << (32 * i)) for i, x in enumerate(bn_uint256)]
+        return BigInt( sum(n))
 
     @classmethod
     def addu256(cls, x, y):

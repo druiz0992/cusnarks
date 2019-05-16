@@ -858,6 +858,10 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 
   memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
 
+  //printf("A\n");
+  //printU256Number(A);
+  //printf("B\n");
+  //printU256Number(B);
   for(i=0; i<NWORDS_256BIT; i++) {
     // (C,S) = t[0] + a[0]*b[i], worst case 2 words
     spMultiply(X, A[0], B[i]); // X[Upper,Lower] = a[0]*b[i]
