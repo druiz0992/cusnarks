@@ -349,8 +349,79 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
 
 
 ///////////////////
+/*
+  TODO
+*/
+void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx)
+{
+  uint32_t n_zpoly = pin[0];
+  uint32_t zcoeff_d_offset = 1 + n_zpoly;
+  uint32_t zcoeff_v_offset;
+  uint32_t n_zcoeff;
+  uint32_t scl[NWORDS_256BIT];
+  uint32_t i,j;
+  uint32_t *zcoeff_v_in, *zcoeff_v_out, zcoeff_d;
+  uint32_t prev_n_zcoeff = 0, accum_n_zcoeff;
 
-uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t pwords, uint32_t extend)
+  /*
+  printf("N zpoly: %d\n",n_zpoly);
+  printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
+  */
+  for (i=0; i<last_idx; i++){
+    to_montgomery_h(scl, &scalar[i*NWORDS_256BIT], pidx);
+    /*
+    printf("In Scalar : \n");
+    printU256Number(&scalar[i*NWORDS_256BIT]);
+    printf("Out Scalar : \n");
+    printU256Number(scl);
+    */
+    
+    accum_n_zcoeff = pin[1+i];
+    n_zcoeff = accum_n_zcoeff - prev_n_zcoeff;
+    prev_n_zcoeff = accum_n_zcoeff;
+    zcoeff_v_offset = zcoeff_d_offset + n_zcoeff;
+
+    /*
+    if ((i< 5) || (i > last_idx-5)){
+      printf("N Zcoeff[%d] : %d\n", i, n_zcoeff);
+      printf("Accum N Zcoeff[%d] : %d\n", i, accum_n_zcoeff);
+      printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
+      printf("ZCoeff_v_offset[%d] : %d\n", i , zcoeff_v_offset);
+    }   
+    */
+    
+    for (j=0; j< n_zcoeff; j++){
+       zcoeff_d = pin[zcoeff_d_offset+j];
+       zcoeff_v_in = &pin[zcoeff_v_offset+j*NWORDS_256BIT];
+       zcoeff_v_out = &pout[zcoeff_d*NWORDS_256BIT];
+       /*
+       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
+         printf("V[%d] in \n", zcoeff_d);
+         printU256Number(zcoeff_v_in);
+       }
+       */
+       montmult_h(zcoeff_v_in, zcoeff_v_in, scl, pidx);
+       /*
+       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
+         printf("V[%d] in after mult \n", zcoeff_d);
+         printU256Number(zcoeff_v_in);
+         printf("V[%d] out before add \n", zcoeff_d);
+         printU256Number(zcoeff_v_out);
+       }
+       */
+       addm_h(zcoeff_v_out, zcoeff_v_out, zcoeff_v_in, pidx);
+       /*
+       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
+         printf("V[%d] out after add \n", zcoeff_d);
+         printU256Number(zcoeff_v_out);
+       }
+       */
+    }
+    zcoeff_d_offset = accum_n_zcoeff*(NWORDS_256BIT+1) +1 + n_zpoly;
+  }
+}
+
+int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
 {
   uint32_t **tmp_poly;
   uint32_t i,j,k;
@@ -361,7 +432,7 @@ uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, 
   tmp_poly = (uint32_t **) calloc(header->nVars,sizeof(uint32_t *));
 
   for (i=0; i < header->nVars; i++){
-     tmp_poly[i] = (uint32_t *)calloc(pwords * ((NWORDS_256BIT+1))+1, sizeof(uint32_t));
+     tmp_poly[i] = (uint32_t *)calloc(MAX_R1CSPOLYTMP_NWORDS * NWORDS_256BIT, sizeof(uint32_t));
   }
    
   const_offset = cin[0]+1;
@@ -374,15 +445,15 @@ uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, 
        poly_idx = cin[const_offset+j];
        coeff_idx = tmp_poly[poly_idx][0]++;
        final_poly_size++;
-       if (pwords <= coeff_idx){
+       if (coeff_idx >= (MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1))/NWORDS_256BIT - 1){
            for(k=0;k < header->nVars;k++){
               free(tmp_poly[k]);
            }
            free(tmp_poly);
-           return 0;
+           return coeff_idx*NWORDS_256BIT/(NWORDS_256BIT-1);
        }
        tmp_poly[poly_idx][1+coeff_idx]=i;
-       memcpy(&tmp_poly[poly_idx][1+pwords+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       memcpy(&tmp_poly[poly_idx][1+MAX_R1CSPOLYTMP_NWORDS+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
        coeff_offset += NWORDS_256BIT;
      }
      const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
@@ -393,18 +464,17 @@ uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, 
     for (i=0; i < header->nPubInputs + header->nOutputs + 1; i++){
        coeff_idx = tmp_poly[i][0]++;
        final_poly_size++;
-       if (pwords <= coeff_idx){
+       if (coeff_idx >= MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1)/NWORDS_256BIT - 1){
            for(k=0;k < header->nVars;k++){
               free(tmp_poly[k]);
            }
            free(tmp_poly);
-           return 0;
+           return coeff_idx*NWORDS_256BIT/(NWORDS_256BIT-1);
        }
        tmp_poly[i][1+coeff_idx]=i + header->nConstraints;
-       memcpy(&tmp_poly[i][1+pwords+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+       memcpy(&tmp_poly[i][1+MAX_R1CSPOLYTMP_NWORDS+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
     }
   }
-
   #if 0
   for (j=0; j < header->nVars; j++){
     printf("\n\nPoly : %d\n",j);
@@ -417,13 +487,13 @@ uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, 
   #endif
 
   final_poly_size = final_poly_size*(NWORDS_256BIT+1)+ header->nVars +1;
-  
-  if (pwords <= final_poly_size){
+ 
+  if (MAX_R1CSPOLY_NWORDS*NWORDS_256BIT <= final_poly_size){
       for(k=0;k < header->nVars;k++){
          free(tmp_poly[k]);
       }
       free(tmp_poly);
-      return 0;
+      return -(final_poly_size/NWORDS_256BIT);
   } 
 
   poly_idx = 0;
@@ -444,7 +514,7 @@ uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, 
     }
     memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[i][1],sizeof(uint32_t)*coeff_idx);
     const_offset += coeff_idx;
-    memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[i][1+pwords],sizeof(uint32_t)*NWORDS_256BIT*coeff_idx);
+    memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[i][1+MAX_R1CSPOLYTMP_NWORDS],sizeof(uint32_t)*NWORDS_256BIT*coeff_idx);
     const_offset += (NWORDS_256BIT*coeff_idx);
     free(tmp_poly[i]);
   }
@@ -458,7 +528,7 @@ uint32_t r1cs_to_zpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, 
     printf("%d\n",r1cs[i]);
   }
   #endif
-  return 1;
+  return 0;
 }
 /*
   Read header circuit binary file
@@ -596,10 +666,10 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
     nwords %= NWORDS_256BIT;
     nbits %= 32;
 
-    rng->randu32(&x[j*NWORDS_256BIT],nwords); 
+    rng->randu32(&x[j*NWORDS_256BIT],nwords+1); 
 
     x[j*NWORDS_256BIT+nwords] &= ((1 << nbits)-1);
-    if ((p!= NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
+    if ((p!= NULL) && (nwords==NWORDS_256BIT) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
          do{
            subu256_h(&x[j*NWORDS_256BIT], p);
          }while(compu256_h(&x[j*NWORDS_256BIT],p) >=0);
@@ -694,77 +764,6 @@ void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
   montmult_h(z,x,one, pidx);
 }
 
-/*
-  TODO
-*/
-void zpoly_maddm_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx)
-{
-  uint32_t n_zpoly = pin[0];
-  uint32_t zcoeff_d_offset = 1 + n_zpoly;
-  uint32_t zcoeff_v_offset;
-  uint32_t n_zcoeff;
-  uint32_t scl[NWORDS_256BIT];
-  uint32_t i,j;
-  uint32_t *zcoeff_v_in, *zcoeff_v_out, zcoeff_d;
-  uint32_t prev_n_zcoeff = 0, accum_n_zcoeff;
-
-  /*
-  printf("N zpoly: %d\n",n_zpoly);
-  printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
-  */
-  for (i=0; i<last_idx; i++){
-    to_montgomery_h(scl, &scalar[i*NWORDS_256BIT], pidx);
-    /*
-    printf("In Scalar : \n");
-    printU256Number(&scalar[i*NWORDS_256BIT]);
-    printf("Out Scalar : \n");
-    printU256Number(scl);
-    */
-    
-    accum_n_zcoeff = pin[1+i];
-    n_zcoeff = accum_n_zcoeff - prev_n_zcoeff;
-    prev_n_zcoeff = accum_n_zcoeff;
-    zcoeff_v_offset = zcoeff_d_offset + n_zcoeff;
-
-    /*
-    if ((i< 5) || (i > last_idx-5)){
-      printf("N Zcoeff[%d] : %d\n", i, n_zcoeff);
-      printf("Accum N Zcoeff[%d] : %d\n", i, accum_n_zcoeff);
-      printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
-      printf("ZCoeff_v_offset[%d] : %d\n", i , zcoeff_v_offset);
-    }   
-    */
-    
-    for (j=0; j< n_zcoeff; j++){
-       zcoeff_d = pin[zcoeff_d_offset+j];
-       zcoeff_v_in = &pin[zcoeff_v_offset+j*NWORDS_256BIT];
-       zcoeff_v_out = &pout[zcoeff_d*NWORDS_256BIT];
-       /*
-       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
-         printf("V[%d] in \n", zcoeff_d);
-         printU256Number(zcoeff_v_in);
-       }
-       */
-       montmult_h(zcoeff_v_in, zcoeff_v_in, scl, pidx);
-       /*
-       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
-         printf("V[%d] in after mult \n", zcoeff_d);
-         printU256Number(zcoeff_v_in);
-         printf("V[%d] out before add \n", zcoeff_d);
-         printU256Number(zcoeff_v_out);
-       }
-       */
-       addm_h(zcoeff_v_out, zcoeff_v_out, zcoeff_v_in, pidx);
-       /*
-       if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
-         printf("V[%d] out after add \n", zcoeff_d);
-         printU256Number(zcoeff_v_out);
-       }
-       */
-    }
-    zcoeff_d_offset = accum_n_zcoeff*(NWORDS_256BIT+1) +1 + n_zpoly;
-  }
-}
 
 /*
     Removes higher order coefficient equal to 0
@@ -1041,67 +1040,72 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
 
   memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
 
+  printf("A\n");
+  printU256Number(A);
+  printf("B\n");
+  printU256Number(B);
   for(i=0; i<NWORDS_256BIT; i++) {
     // (C,S) = t[0] + a[0]*b[i], worst case 2 words
     spMultiply(X, A[0], B[i]); // X[Upper,Lower] = a[0]*b[i]
     C = mpAdd(&S, T+0, X+0, 1); // [C,S] = t[0] + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper], No carry
 
-    //printf("0 - C : %u, S: %u\n",C,S);
+    printf("0 - C : %u, S: %u\n",C,S);
     //printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
     // ADD(t[1],C)
     //mpAddWithCarryProp(T, C, 1);
     carry = mpAdd(&T[1], &T[1], &C, 1); 
-    //printf("T\n");
-    //printU256Number(T);
+    printf("C3: %d\n",carry);
+    printf("T\n");
+    printU256Number(T);
 
     // m = S*n'[0] mod W, where W=2^32
     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
     spMultiply(M, S, NPrime[0]);
-    //printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
+    printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
 
     // (C,S) = S + m*n[0], worst case 2 words
-    spMultiply(X, M[0], N[pidx*NWORDS_256BIT]); // X[Upper,Lower] = m*n[0]
+    spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
     C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-    //printf("1 - C : %u, S: %u\n",C,S);
+    printf("1 - C : %u, S: %u\n",C,S);
 
     for(j=1; j<NWORDS_256BIT; j++) {
       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
       spMultiply(X, A[j], B[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
       C1 = mpAdd(&S, T+j, &C, 1);  // (C1,S) = t[j] + C
-      //printf("2 - C1 : %u, S: %u\n",C1,S);
+      printf("2 - C1 : %u, S: %u\n",C1,S);
       C2 = mpAdd(&S, &S, X+0, 1);  // (C2,S) = S + X[Lower]
-      //printf("3 - C2 : %u, S: %u\n",C1,S);
-      //printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
+      printf("3 - C2 : %u, S: %u\n",C2,S);
+      printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
       mpAdd(&C, &C1, X+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
-      //printf("4 - C : %u\n",C);
+      printf("4 - C : %u\n",C);
       mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, doesn't produce carry
-      //printf("5 - C : %u\n",C);
+      printf("5 - C : %u\n",C);
    
       // ADD(t[j+1],C)
       C += carry;
       carry = mpAdd(&T[j+1], &T[j+1], &C, 1); 
       //mpAddWithCarryProp(T, C, j+1);
-      //printf("T\n");
-      //printU256Number(T);
+      printf("T\n");
+      printU256Number(T);
    
       // (C,S) = S + m*n[j]
-      spMultiply(X, M[0], N[j+pidx*NWORDS_256BIT]); // X[Upper,Lower] = m*n[j]
+      spMultiply(X, M[0], N[j]); // X[Upper,Lower] = m*n[j]
       C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
       mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
       //printf("6 - C : %u, S: %u\n",C,S);
    
       // t[j-1] = S
       T[j-1] = S;
-      //printf("T\n");
-      //printU256Number(T);
+      printf("T\n");
+      printU256Number(T);
     }
 
     mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
     // (C,S) = t[s] + C
     C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
-    //printf("6 - C : %u, S: %u\n",C,S);
+    printf("6 - C : %u, S: %u\n",C,S);
     // t[s-1] = S
     T[NWORDS_256BIT-1] = S;
     // t[s] = t[s+1] + C
@@ -1111,8 +1115,8 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
   }
 
   /* Step 3: if(u>=n) return u-n else return u */
-  if(compu256_h(T, &N[pidx*NWORDS_256BIT]) >= 0) {
-    mpSubtract(T, T, &N[pidx*NWORDS_256BIT], NWORDS_256BIT);
+  if(compu256_h(T, N) >= 0) {
+    mpSubtract(T, T, N, NWORDS_256BIT);
   }
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
@@ -1198,7 +1202,7 @@ void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t 
     spMultiply(M, T[i], NPrime[0]);
     for (j=0; j< NWORDS_256BIT; j++){
          //(C,S) := t[i+j] + m*n[j] + C
-         spMultiply(X, M[0], N[pidx*NWORDS_256BIT+j]);
+         spMultiply(X, M[0], N[j]);
          C1 = mpAdd(&X[0], &X[0], &C, 1);
          C = mpAdd(&S, &T[i+j], &X[0], 1);
          C +=C1;
@@ -1219,8 +1223,8 @@ void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t 
   memcpy(U,&T[NWORDS_256BIT],(NWORDS_256BIT)*sizeof(uint32_t));
 
  /* Step 3: if(u>=n) return u-n else return u */
- if(compu256_h(U, &N[pidx*NWORDS_256BIT]) >= 0) {
-    mpSubtract(U, U, &N[pidx*NWORDS_256BIT], NWORDS_256BIT);
+ if(compu256_h(U, N) >= 0) {
+    mpSubtract(U, U, N, NWORDS_256BIT);
  }
 
 }

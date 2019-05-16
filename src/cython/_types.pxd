@@ -43,6 +43,8 @@ cdef extern from "types.h":
 
   #Constants 
   cdef uint32_t NWORDS_256BIT
+  cdef uint32_t MAX_R1CSPOLY_NWORDS
+  cdef uint32_t MAX_R1CSPOLYTMP_NWORDS
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -128,3 +130,5 @@ cdef extern from "types.h":
 
 
 _NWORDS_256BIT = NWORDS_256BIT
+_MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
+_MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS

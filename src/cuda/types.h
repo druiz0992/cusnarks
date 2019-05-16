@@ -38,6 +38,9 @@
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE              (30)
+#define MAX_R1CSPOLY_NWORDS  (10000)
+#define MAX_R1CSPOLYTMP_NWORDS  (10000)
+
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
 #define U256_NDIMS              (1)

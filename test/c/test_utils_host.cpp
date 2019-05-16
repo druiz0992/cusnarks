@@ -965,10 +965,10 @@ void test_mul2(void)
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
    uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
 
-   for (i=0; i < MAX_ITER; i++){
+   for (i=0; i < MAX_ITER*1000; i++){
      setRandom256(a,1, N);
      setRandom256(b,1, N);
-     
+    
      montmult_h(r, a, b, pidx);
      montmult_h2(c, a, b, pidx);
 
@@ -979,9 +979,10 @@ void test_mul2(void)
         printf("Obtained\n");
         printU256Number(c);
         n_errors++;
+        break;
      }
    }
-   printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
+   printf("N errors(Test_Mul FIOS opt.) : %d/%d\n",n_errors, i);
 }
 
 void test_mul3(void)
@@ -991,82 +992,29 @@ void test_mul3(void)
    int i;
    int pidx=1;
    int n_errors=0;
-   //uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
-   uint32_t c[NWORDS_256BIT];
+   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
 
-   uint32_t a[] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x2FFFFFFF};
-   uint32_t b[] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x2FFFFFFF};
-     
-   montmult_h(r, a, b, pidx);
-   montmult_sos_h(c, a, b, pidx);
+   for (i=0; i < MAX_ITER*1000; i++){
+     setRandom256(a,1, N);
+     setRandom256(b,1, N);
+    
+     montmult_h(r, a, b, pidx);
+     montmult_sos_h(c, a, b, pidx);
 
-   if (compu256_h(r,c)){
-      //printf("Error in mult %d\n",i);
-      //printf("Expected\n");
-      //printU256Number(r);
-      //printf("Obtained\n");
-      //printU256Number(c);
-      n_errors++;
+     if (compu256_h(r,c)){
+        printU256Number(a);
+        printU256Number(b);
+        printf("Error in mult %d\n",i);
+        printf("Expected\n");
+        printU256Number(r);
+        printf("Obtained\n");
+        printU256Number(c);
+        n_errors++;
+        break;
+     }
    }
-   printf("N errors(Test_Mul) %d\n",n_errors);
-}
-
-void test_mul3a(void)
-{
-   uint32_t r[NWORDS_256BIT*2]; 
-
- int i;
- int pidx=1;
- int n_errors=0;
- uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[2*NWORDS_256BIT];
-
- for (i=0; i < sizeof(A_test)/(sizeof(uint32_t) * NWORDS_256BIT); i++){
-     memcpy(a, &A_test[i*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT);
-     memcpy(b, &B_test[i*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT);
-     memcpy(c, &C512_test[i*NWORDS_256BIT*2], sizeof(uint32_t) * NWORDS_256BIT*2);
-     
-     montmult_sos_h(r, a, b, pidx);
-
-     if (compu256_h(r,c)){
-        //printf("Error in mult %d\n",i);
-        //printf("Expected\n");
-        //printU256Number(c);
-        //printf("Obtained\n");
-        //printU256Number(r);
-        n_errors++;
-     }
-  }
-  printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
-
-}
-
-void test_mul3b(void)
-{
-   uint32_t r[NWORDS_256BIT*2]; 
-
- int i;
- int pidx=1;
- int n_errors=0;
- uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[2*NWORDS_256BIT];
-
- for (i=0; i < sizeof(A_test)/(sizeof(uint32_t) * NWORDS_256BIT); i++){
-     memcpy(a, &A_test[i*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT);
-     memcpy(b, &B_test[i*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT);
-     memcpy(c, &AA_test[i*NWORDS_256BIT*2], sizeof(uint32_t) * NWORDS_256BIT*2);
-     
-     montmult_sos_h(r, a, a, pidx);
-
-     if (compu256_h(r,c)){
-        //printf("Error in mult %d\n",i);
-        //printf("Expected\n");
-        //printU256Number(c);
-        //printf("Obtained\n");
-        //printU256Number(r);
-        n_errors++;
-     }
-  }
-  printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
-
+   printf("N errors(Test_Mul SOS) : %d/%d\n",n_errors, i);
 }
 
 void test_mul4(void)
@@ -1078,7 +1026,7 @@ void test_mul4(void)
    int n_errors=0;
    uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
 
-   for (i=0; i < MAX_ITER; i++){
+   for (i=0; i < MAX_ITER*1000; i++){
      setRandom(a, NWORDS_256BIT);
      a[NWORDS_256BIT-1] &= 0x7FFFFFF;
      
@@ -1094,7 +1042,7 @@ void test_mul4(void)
         n_errors++;
      }
    }
-   printf("N errors(Test_Mul : Montgomery Squaring SOS) : %d/%d\n",n_errors, i);
+   printf("N errors(Test_Squaring SOS) : %d/%d\n",n_errors, i);
 }
 
 void test_mul5(void)
@@ -1851,7 +1799,7 @@ int main()
   test_mul2(); // test optimized impl of montgomery mul
   test_mul3(); // test SOS impl of montgomery mul
   test_mul4(); // test SOS impl of montgomery squaring
-  test_mul5(); // test FIOS impl of montgomery squaring
+  //test_mul5(); // test FIOS impl of montgomery squaring
   #if 0
   test_findroots();
   test_ntt(1);

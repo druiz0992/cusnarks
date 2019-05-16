@@ -541,9 +541,9 @@ class GrothProver(object):
           pidx = ZField.get_field()
           # Convert witness to montgomery in zpoly_maddm_h
           #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-          polA_T = zpoly_maddm_h(self.witness_scl_u256,self.polsA_sps_u256, nVars, nVars-1, pidx)
-          polB_T = zpoly_maddm_h(self.witness_scl_u256,self.polsB_sps_u256, nVars, nVars-1, pidx)
-          polC_T = zpoly_maddm_h(self.witness_scl_u256,self.polsC_sps_u256, nVars, nVars-1, pidx)
+          polA_T = mpoly_eval_h(self.witness_scl_u256,self.polsA_sps_u256, nVars, nVars-1, pidx)
+          polB_T = mpoly_eval_h(self.witness_scl_u256,self.polsB_sps_u256, nVars, nVars-1, pidx)
+          polC_T = mpoly_eval_h(self.witness_scl_u256,self.polsC_sps_u256, nVars, nVars-1, pidx)
           end = time.time()
           self.t_P.append(end-start)
           end_h = time.time()
