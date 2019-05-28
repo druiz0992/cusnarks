@@ -23,15 +23,19 @@ AUX_INCLUDES=$(AUX_INCLUDES)
 LOG_LEVEL=$(LOG_LEVEL)
 
 NVCC = nvcc
-CC  = c++
+CC  = g++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
-CFLAGS=-c -O2 -DLINUXINTEL64 -I $(INCLUDE_PATH) -w
+#CFLAGS=-c -g -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
+CFLAGS=-c -g -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
 #CFLAGS=-c -DLINUXINTEL64 -g -G -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-CUFLAGS=  -std=c++11 -rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
+EXTRA_CFLAGS2=-I $(AUX_INCLUDES) -shared -fPIC
+CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_60 --shared -o 
+LINKFLAGS2=--shared -o 
 LDFLAGS=-lm -lcudart
+LDFLAGS2=-lm
 NVDISASM = nvdisasm
 NVDISASM_FLAGS = --no-dataflow --print-code --print-line-info --separate-functions
 CUOBJDUMP = cuobjdump
@@ -50,13 +54,21 @@ CUSRC = cusnarks_kernel.cu \
         log.cu
 
 CSRC = rng.cpp \
-       utils_host.cpp 
+       utils_host.cpp \
+       constants.cpp
 
 NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
 CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
 
+
+CUDA_INSTALLED := $(shell which $(NVCC))
+
+ifeq ($(CUDA_INSTALLED),)
+OBJ= $(CSRC:.cpp=.o)
+else
 OBJ=$(CUSRC:.cu=.o) \
     $(CSRC:.cpp=.o)
+endif
 
 clean:
 	rm -f *.o *.cubin *.asm *.cuobj
@@ -70,12 +82,22 @@ cubin :
 
 ##################################################
 so: $(OBJ)
+ifeq ($(CUDA_INSTALLED),)
+	$(CC) $(LINKFLAGS2) $(LIB_PATH)/$(CUSNARKS_LIB) $(OBJ) $(LDFLAGS2)
+else
 	$(NVCC) $(LINKFLAGS) $(LIB_PATH)/$(CUSNARKS_LIB) $(OBJ) $(LDFLAGS)
+endif
 
 ##################################################
 %.o : %.cu
+ifneq ($(CUDA_INSTALLED),)
 	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS) $*.cu -o $*.o	
+endif
 
 ##################################################
 %.o : %.cpp
+ifeq ($(CUDA_INSTALLED),)
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS2) $*.cpp -o $*.o	
+else
 	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS) $*.cpp -o $*.o	
+endif

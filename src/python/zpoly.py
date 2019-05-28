@@ -953,7 +953,7 @@ class ZPoly(object):
                return ZPoly([0])
             elif a == 0 and self.FIDX == ZUtils.FRDC:
                return ZPoly([ZFieldElRedc(0)])
-            elif a == 1:
+            elif a == 1 and not isinstance(a,ZFieldElRedc):
                return ZPoly(self)
             else:
                return ZPoly([p * a for p in self.zcoeff])
