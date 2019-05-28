@@ -452,8 +452,12 @@ __global__ void zpoly_mul32_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
          logInfoBigNumber("X*Y out \n",&z[i*U256K_OFFSET]);
       }
     }
+    // TODO
+    // last step (IFFT) cannot be done within the same kernel. I don't understand why, but
+    // this FFT is not used for anything so it is not a big deal having to call IFFT32 in a separate
+    // step. See test_1fft_mul32() in test_cu_zpoly.py, f
     */
-    ifft32_dit(z,z, params->midx);
+    //ifft32_dit(z,z, params->midx);
     /*
     if (tid==0){
       for (i=0; i<32 ; i++){
@@ -558,7 +562,7 @@ __global__ void zpoly_fft2DX_kernel(uint32_t *out_vector, uint32_t *in_vector, k
 
     uint32_t *x;
 
-    if(tid > params->in_length/2){
+    if(tid >= params->in_length/2){
       return;
     }
 
@@ -576,7 +580,7 @@ __global__ void zpoly_fft2DY_kernel(uint32_t *out_vector, uint32_t *in_vector, k
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tid > params->in_length){
+    if(tid >= params->in_length){
       return;
     }
 
@@ -590,7 +594,8 @@ __global__ void zpoly_fft3DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 
     uint32_t *x;
 
-    if(tid > params->in_length/params->stride){
+    //if(tid >= (params->in_length-2)/params->stride){
+    if(tid >= (params->padding_idx-2)/params->stride){
       return;
     }
 
@@ -601,15 +606,16 @@ __global__ void zpoly_fft3DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, 
     }
 
     fft3Dxx_dif(in_vector,in_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
+    //fft3Dxx_dif(out_vector,in_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
     //fft3Dxx_dif(out_vector,in_vector, params);
- 
+
 }
 
 __global__ void zpoly_fft3DXXprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tid > params->in_length){
+    if(tid >= params->in_length){
       return;
     }
 
@@ -622,17 +628,18 @@ __global__ void zpoly_fft3DXXprev_kernel(uint32_t *out_vector, uint32_t *in_vect
 __global__ void zpoly_fft3DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > params->in_length){
+    if(tid >= params->in_length){
       return;
     }
     
+    //memcpy(&out_vector[tid*NWORDS_256BIT],&in_vector[tid*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
     fft3Dxy_dif(out_vector,in_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
 }
 
 __global__ void zpoly_fft3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > params->in_length){
+    if(tid >= params->in_length){
       return;
     }
     
@@ -642,7 +649,7 @@ __global__ void zpoly_fft3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 __global__ void zpoly_fft3DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if(tid > params->in_length){
+    if(tid >= params->in_length){
       return;
     } 
    
@@ -704,7 +711,7 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
   uint32_t new_cidx = tid >> Nx;
   uint32_t reverse_idx;
   uint32_t *roots = &x[(1<<(Nx+Ny)) * U256K_OFFSET];
-  uint32_t *inv_scaler = &x[(1<<(Nx+Ny+1+params->as_mont)) * U256K_OFFSET];
+  uint32_t *inv_scaler = &x[((1<<(Nx+Ny+1))+params->as_mont) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {
@@ -752,7 +759,7 @@ __device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
   fftN_dif(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET], &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET], W32, Nxx, midx);
   mulmontu256(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
               &z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
-              //&roots[(((new_ridx >> Ny) * (reverse_idx >> (Ny + Nx  - Nxx))) << Ny)*U256K_OFFSET], midx);
+              ////&roots[(((new_ridx >> Ny) * (reverse_idx >> (Ny + Nx  - Nxx))) << Ny)*U256K_OFFSET], midx);
               &roots[root_idx*NWORDS_256BIT], midx);
 }
 
@@ -858,7 +865,7 @@ __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x,uint32_t *roots, kernel_par
   logInfoTid(tid,"Nyyyn : %d\n",Nyyyn);
 
   uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyyn, offset, mask) << (Ny + Nx - Nyy);
-  uint32_t const *inv_scaler = &x[(1<<(Nx+Ny+1+params->as_mont)) * U256K_OFFSET];
+  uint32_t const *inv_scaler = &x[((1<<(Nx+Ny+1))+params->as_mont) * U256K_OFFSET];
   uint32_t const *W32;
 
   if (params->forward) {
@@ -868,9 +875,11 @@ __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x,uint32_t *roots, kernel_par
   }
   fftN_dif(&z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET], &x[(tid)*U256K_OFFSET],W32,Nyy,midx);
 
+  
   if (!params->forward){
     mulmontu256( &z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET],&z[(reverse_idx + new_ridx+new_kidx)*U256K_OFFSET],inv_scaler ,midx);
   }
+ 
 }
 
 
@@ -905,21 +914,13 @@ __device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx)
   for (i=ZPOLY_FFT_32-1; i>=1 ; i--){
     size = 1 << i;
 
-    /*
-    if (tid == 2){
-      logInfoBigNumber("PreB OtherX :\n",otherX);
-      logInfoBigNumber("PreB X :\n",thisX);
-      logInfo("size : %d\n",size);
-    }
-    */
+    logInfoBigNumberTid(tid,1,"PreB OtherX :\n",otherX);
+    logInfoBigNumberTid(tid,1,"PreB X :\n",thisX);
+    logInfoTid(tid,"size : %d\n",size);
 
     fft_butterfly(otherX, thisX, size);
 
-    /*
-    if (tid == 2){
-      logInfoBigNumber("AfterB OtherX :\n",otherX);
-    }
-    */
+    logInfoBigNumberTid(tid,1,"AfterB OtherX :\n",otherX);
 
     root_idx = (1<< (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT;
     if (lane%(size<<1) < size){  //  It 0: 0-15      W0,W1,...,W15
@@ -928,65 +929,38 @@ __device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx)
                                  //  It 3: 0-1, 4-5, 8-9, 12-13,...  W0, W8
 
       addmu256(thisX, thisX, otherX, midx);
-      /*
-        if (tid == 2){ 
-          logInfo("Op : x + otherX : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
-        }
-      */
+      logInfoTid(tid,"Op : x + otherX : lane%(size>>1) : %d\n", lane%(size<<1));
+      logInfoTid(tid,"Op : x + otherX : size : %d\n",size);
     } else {
       submu256(thisX, otherX, thisX,  midx);
       mulmontu256(thisX, thisX, &W32[ root_idx], midx);
-      /*
-      if (tid == 2){ 
-        logInfo("Op : otherX - x : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
-      }
-      */
+      logInfoTid(tid,"Op : otherX - x : lane%(size>>1) : %d\n", lane%(size<<1));
+      logInfoTid(tid,"Op : otherX - x : size : %d\n", size);
     }
-    /*
-    if (tid == 2){
-      logInfoBigNumber("AfterB x:\n",thisX);
-      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ root_idx]);
-      logInfo("idx : %d\n", root_idx / NWORDS_256BIT);
-    }
-    */
+    logInfoBigNumberTid(tid,1,"AfterB x:\n",thisX);
+    logInfoBigNumberTid(tid,1,"Root : \n",(uint32_t *)&W32[ root_idx]);
+    logInfoTid(tid,"idx : %d\n", root_idx / NWORDS_256BIT);
   }
-    /*
-    if (tid == 2){
-      logInfoBigNumber("PreB OtherX :\n",otherX);
-      logInfoBigNumber("PreB X :\n",thisX);
-      logInfo("size : %d\n",size);
-    }
-    */
+    logInfoBigNumberTid(tid,1,"PreB OtherX :\n",otherX);
+    logInfoBigNumberTid(tid,1,"PreB X :\n",thisX);
+    logInfoTid(tid,"size : %d\n",size);
+
   // I can skip mulypliying by 1 in the last iteration
   //  It 4: 0,2,4,6,...    W0
+
   fft_butterfly(otherX, thisX, 1);
-    /*
-    if (tid == 2){
-      logInfoBigNumber("AfterB OtherX :\n",otherX);
-    }
-    */
+  logInfoBigNumberTid(tid,1,"AfterB OtherX :\n",otherX);
+
   if (lane % 2 == 0){  
       addmu256(z, thisX, otherX, midx);
-      /*
-      if (tid == 2){ 
-        logInfo("Op : x + otherX : lane%(size>>1) : %d\n", lane%2);
-      }
-      */
+      logInfoTid(tid,"Op : x + otherX : lane%(size>>1) : %d\n", lane%2);
   } else {
       submu256(z, otherX, thisX, midx);
-       /*
-      if (tid == 2){ 
-        logInfo("Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
-      }
-      */
+      logInfoTid(tid,"Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
   }
-    /*
-    if (tid == 2){
-      logInfoBigNumber("AfterB x:\n",z);
-      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT]);
-      logInfo("idx : %d\n",(1 << (ZPOLY_FFT_32-i-1)) * (lane % size));
-    }
-    */
+    logInfoBigNumberTid(tid,1,"AfterB x:\n",z);
+    logInfoBigNumberTid(tid,1,"Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT]);
+    logInfoTid(tid,"idx : %d\n",(1 << (ZPOLY_FFT_32-i-1)) * (lane % size));
 }
 
 /*
@@ -1033,7 +1007,7 @@ __device__ void ifft32_dit(uint32_t *z, uint32_t *x, mod_t midx)
   //     Scaler = 32. Inv Scaler 21204235282094297871551205565717985242031228012903033270457635305745314480129L
   // If X is Montgomery, W is Mongtgomery => Result is montgomery and scaler can be normal or Montgomery
   //    Scaler =.  Inv Scaler = 3618502788666131106986593281521497120414687020801267626233049500247285301248L => 1<< 251
- mulmontu256(z,thisX,inv_scaler, midx);
+  mulmontu256(z,thisX,inv_scaler, midx);
 }
 
 /*
@@ -1048,36 +1022,23 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
   uint32_t lane = threadIdx.x % warpSize;
   //uint32_t lane = threadIdx.x % (1 << N);
   uint32_t i, size, root_idx;
-  int debug_tidx =-1;
 
   movu256(thisX,x);
 
-  #if 0
-  if (tid == debug_tidx){
-    logInfo("N : %d\n",N);
-   logInfoBigNumber("ThisX in\n",thisX);
-  }
-  #endif
+  logInfoTid(tid,"N : %d\n",N);
+  logInfoBigNumberTid(tid,1,"ThisX in\n",thisX);
 
   #pragma unroll
   for (i=N-1; i>=1 ; i--){
     size = 1 << i;
 
-    #if 0
-    if (tid == debug_tidx){
-      logInfoBigNumber("PreB OtherX :\n",otherX);
-      logInfoBigNumber("PreB X :\n",thisX);
-      logInfo("size : %d\n",size);
-    }
-    #endif
+    logInfoBigNumberTid(tid,1,"PreB OtherX :\n",otherX);
+    logInfoBigNumberTid(tid,1,"PreB X :\n",thisX);
+    logInfoTid(tid,"size : %d\n",size);
 
     fft_butterfly(otherX, thisX, size);
 
-    #if 0
-    if (tid == debug_tidx){
-      logInfoBigNumber("AfterB OtherX :\n",otherX);
-    }
-    #endif
+    logInfoBigNumberTid(tid,1,"AfterB OtherX :\n",otherX);
 
     root_idx = ((1<< (N-i-1)) * (lane%size) * NWORDS_256BIT) << (ZPOLY_FFT_32 - N);
     if (lane%(size<<1) < size){  //  It 0: 0-15      W0,W1,...,W15
@@ -1086,66 +1047,36 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
                                  //  It 3: 0-1, 4-5, 8-9, 12-13,...  W0, W8
 
       addmu256(thisX, thisX, otherX, midx);
-        #if 0
-        if (tid == debug_tidx){ 
-          logInfo("Op : x + otherX : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
-        }
-        #endif
+      logInfoTid(tid,"Op : x + otherX : lane%(size>>1) : %d\n", lane%(size<<1));
+      logInfoTid(tid,"size : %d\n", lane%(size<<1));
     } else {
       submu256(thisX, otherX, thisX,  midx);
       mulmontu256(thisX, thisX, &W32[ root_idx], midx);
-      #if 0
-      if (tid == debug_tidx){ 
-        logInfo("Op : otherX - x : lane%(size>>1) : %d, size : %d\n", lane%(size<<1),size);
-      }
-      #endif
+      logInfoTid(tid,"Op : x + otherX : lane%(size>>1) : %d\n", lane%(size<<1));
+      logInfoTid(tid,"size : %d\n", lane%(size<<1));
     }
-    #if 0
-    if (tid == debug_tidx){
-      logInfoBigNumber("AfterB x:\n",thisX);
-      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ root_idx]);
-      logInfo("idx : %d\n", root_idx / (NWORDS_256BIT * (1 << (ZPOLY_FFT_32 - N))) );
-    }
-    #endif
+      logInfoBigNumberTid(tid,1,"AfterB x:\n",thisX);
+      logInfoBigNumberTid(tid,1,"Root : \n",(uint32_t *)&W32[ root_idx]);
+      logInfoTid(tid,"idx : %d\n", root_idx / (NWORDS_256BIT * (1 << (ZPOLY_FFT_32 - N))) );
   }
-    #if 0
-    if (tid == debug_tidx){
-      logInfoBigNumber("PreB OtherX :\n",otherX);
-      logInfoBigNumber("PreB X :\n",thisX);
-      logInfo("size : %d\n",size);
-    }
-    #endif
+    logInfoBigNumberTid(tid,1,"PreB OtherX :\n",otherX);
+    logInfoBigNumberTid(tid,1,"PreB X :\n",thisX);
+    logInfoTid(tid,"size : %d\n",size);
   // I can skip mulypliying by 1 in the last iteration
   //  It 4: 0,2,4,6,...    W0
   fft_butterfly(otherX, thisX, 1);
-    #if 0
-    if (tid == debug_tidx){
-      logInfoBigNumber("AfterB OtherX :\n",otherX);
-    }
-    #endif
+    logInfoBigNumberTid(tid,1,"AfterB OtherX :\n",otherX);
 
   if (lane % 2 == 0){  
       addmu256(z, thisX, otherX, midx);
-      #if 0
-      if (tid == debug_tidx){ 
-        logInfo("Op : x + otherX : lane%(size>>1) : %d\n", lane%2);
-      }
-      #endif
+      logInfoTid(tid,"Op : x + otherX : lane%(size>>1) : %d\n", lane%2);
   } else {
       submu256(z, otherX, thisX, midx);
-      #if 0
-      if (tid == debug_tidx){ 
-        logInfo("Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
-      }
-      #endif
+      logInfoTid(tid,"Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
   }
-      #if 0
-    if (tid == debug_tidx){
-      logInfoBigNumber("AfterB x:\n",z);
-      logInfo("idx : %d\n",(1 << (N-i-1)) * (lane % size));
-      logInfoBigNumber("Root : \n",(uint32_t *)&W32[ (1 << (N-i-1)) * (lane%size) * NWORDS_256BIT]);
-    }
-    #endif
+    logInfoBigNumberTid(tid,1,"AfterB x:\n",z);
+    logInfoTid(tid,"idx : %d\n",(1 << (N-i-1)) * (lane % size));
+    logInfoBigNumberTid(tid,1,"Root : \n",(uint32_t *)&W32[ (1 << (N-i-1)) * (lane%size) * NWORDS_256BIT]);
 }
 
 /*

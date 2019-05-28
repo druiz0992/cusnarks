@@ -382,14 +382,14 @@ __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, 
       xo.assign(&in_vector[poffset + idx * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]); // 0 .. N-1
       logInfoBigNumberTid(idx,1,"SCL in \n",scl);
     } else {
-      xo.assign(&in_vector[idx * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
+      xo.assign(&out_vector[idx * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]); // 0 .. N-1
     }
 
-    Z1_t xr(&in_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
+    Z1_t xr(&out_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
   
-    if (gridDim.x == 1){
-      xr.assign(out_vector);
-    } 
+    //if (gridDim.x == 1){
+      //xr.assign(out_vector);
+    //} 
 
     logInfoBigNumberTid(idx,2,"X in \n",&xo);
     //logInfoBigNumberTid(idx,32*3,"In \n",in_vector);
@@ -658,34 +658,28 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
     T1 _inf;
     infz(&_inf, params->midx);
 
+    size1 = 16;
     // ECP_JAC_INOFFSET = 3 * NWORDS_256BIT
     // ECP_JAC_INXOFFSET = 1 * NWORDS_256BIT
     // scalar multipliation
     if (params->premul){
-        //sumX.setu256((uint32_t)0,xo,(uint32_t)0,(uint32_t)(ECP_JAC_INDIMS*sizeof(T2)/sizeof(uint256_t)));
         sumX.setu256(0,xo,0,1);
         sumX.setu256(1,xo,1,1);
-        //sumX.setu256(0,xo,0);
 
         logInfoBigNumberTid(idx,1,"scl :\n",scl);
-        //logInfoBigNumberTid(idx,ndbg*2,"Xin[x,y]:\n",&sumX);
  
         scmulecjac<T1, T2>(&sumX,0, &sumX, 0, scl,  params->midx);
-        //scmulecjac<T1, T2>(&sumX,0, xo, 0, scl,  params->midx);
           
-
         logInfoBigNumberTid(idx,3*ndbg,"Xout[x,y,z]:\n",&sumX);
-     
 
-        size1 = 16;
         size2 = blockDim.x >> 6;
     } else {
-        size1 = 16;
         size2 = blockDim.x >> 6;
-        //sumX.setu256(0,xo,0,ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint32_t));
         sumX.setu256(0,xo,0);
     }
    
+    __syncthreads();
+
     // block wide warp reduce
     #pragma unroll
     for (i = size1; i > 0; i >>= 1){
@@ -699,10 +693,9 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
       logInfoBigNumberTid(idx,3*ndbg,"sumX+\n",&sumX);
     }
 
+    __syncthreads();
     if (laneIdx == 0) {
-       //smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t), &sumX,0,3);
        smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t), &sumX,0);
-       //smem_ptr->setu256(warpIdx*ECP_JAC_OUTDIMS, &sumX,0);
        logInfoTid(idx,"save idx:%d\n",warpIdx);
        logInfoBigNumberTid(idx,ndbg*3,"val\n",&sumX);
     }
@@ -717,8 +710,6 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
         logInfoTid(idx,"LaneIdx :%d\n",laneIdx);
         logInfoTid(idx,"Size :%d\n",size2);
   
-        //sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t)+ECP_JAC_XOFFSET_BASE,3);
-        //sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS);
         sumX.setu256(0,smem_ptr,laneIdx*ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t));
       } else {
         sumX.setu256(0,&_inf,0);
@@ -736,11 +727,12 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
         logInfoBigNumberTid(idx,3*ndbg,"sumX+\n",&sumX);
       }
     }
+
+    __syncthreads();
     if (tid==0) {
      //TODO change be movu256
      xr->setu256(0,&sumX,0);
      logInfoBigNumberTid(idx,ndbg*3,"Z-sumX : \n",&sumX);
-     //logInfoBigNumberTid(idx,ndbg*3,"Z-xr : \n",xr);
     }
 
   return;
@@ -1391,20 +1383,20 @@ __device__ void scmulecjac_step_l2r(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset,
 template<typename T1, typename T2>
 __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane )
 {
-    ulonglong4 in, *out;
+    ulonglong4 *in, *out;
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     uint32_t i;
 
     #pragma unroll
     for (i=0; i<ECP_JAC_OUTDIMS*sizeof(T2)/sizeof(uint256_t);i++){
     
-      in = *(ulonglong4 *)d_in->getsingleu256(i);
+      in = (ulonglong4 *)d_in->getsingleu256(i);
       out = (ulonglong4 *)d_out->getsingleu256(i);
 
-      out->x = __shfl_xor_sync(0xffffffff, in.x, srcLane);
-      out->y = __shfl_xor_sync(0xffffffff, in.y, srcLane);
-      out->z = __shfl_xor_sync(0xffffffff, in.z, srcLane);
-      out->w = __shfl_xor_sync(0xffffffff, in.w, srcLane);
+      out->x = __shfl_xor_sync(0xffffffff, in->x, srcLane);
+      out->y = __shfl_xor_sync(0xffffffff, in->y, srcLane);
+      out->z = __shfl_xor_sync(0xffffffff, in->z, srcLane);
+      out->w = __shfl_xor_sync(0xffffffff, in->w, srcLane);
     }
 }
 /////////
