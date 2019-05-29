@@ -39,7 +39,7 @@
 #ifdef __CUDACC__
   __host__ __device__ void logBigNumber(char *str, uint32_t *n)
 #else
-  void logNumber(char *str, uint32_t *n)
+  void logBigNumber(char *str, uint32_t *n)
 #endif
 {
  uint32_t i;
@@ -56,7 +56,7 @@
 #ifdef __CUDACC__
   __host__ __device__ void logBigNumberExt(char *str, uint32_t *n)
 #else
-  void logNumberExt(char *str, uint32_t *n)
+  void logBigNumberExt(char *str, uint32_t *n)
 #endif
 {
  uint32_t i;

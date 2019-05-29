@@ -644,8 +644,8 @@ class ECCTest(unittest.TestCase):
             k = ZFieldElExt(1)
 
             # Affine
-            zelx_exta = [k * c['curve_params_g2']['G1x'], k * c['curve_params_g2']['G2x']]
-            zely_exta = [k * c['curve_params_g2']['G1y'], k * c['curve_params_g2']['G2y']]
+            zelx_exta = [k * c['curve_params_g2']['Gx1'], k * c['curve_params_g2']['Gx2']]
+            zely_exta = [k * c['curve_params_g2']['Gy1'], k * c['curve_params_g2']['Gy2']]
             zelz_exta = [1, 0]
 
             p1_exta = ECCJacobian([zelx_exta, zely_exta, zelz_exta], c['curve_params'], force_init=True)

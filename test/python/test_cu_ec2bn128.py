@@ -63,7 +63,7 @@ EC2BN128_datafile = './aux_data/ec2bn128_data_210.npz'
 
 
 class CUEC2Test(unittest.TestCase):
-    TEST_ITER = 1000
+    TEST_ITER = 1
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = curve_data['prime_r']
     nsamples = 1024

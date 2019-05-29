@@ -36,7 +36,11 @@
 
 #define NWORDS_256BIT           (8)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
+#define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE              (30)
+#define MAX_R1CSPOLY_NWORDS  (10000)
+#define MAX_R1CSPOLYTMP_NWORDS  (10000)
+
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
 #define U256_NDIMS              (1)
@@ -150,6 +154,14 @@ typedef enum{
    MOD_N
 
 }mod_t;
+
+typedef enum {
+  FMT_EXT = 0,
+  FMT_MONT,
+  FMT_N
+
+}fmt_t;
+
 
 
 // data vector
@@ -283,5 +295,30 @@ typedef enum{
    CB_ZPOLY_N
 
 }zpoly_callback_t;
+
+typedef struct{
+  uint32_t nWords;
+  uint32_t nPubInputs;
+  uint32_t nOutputs;
+  uint32_t nVars;
+  uint32_t nConstraints;
+  uint32_t R1CSA_nWords;
+  uint32_t R1CSB_nWords;
+  uint32_t R1CSC_nWords;
+  
+}cirbin_hfile_t;
+
+typedef enum{
+  CIRBIN_H_NWORDS_OFFSET = 0,
+  CIRBIN_H_NPUBINPUTS_OFFSET_,
+  CIRBIN_H_NOUTPUTS_OFFSET,
+  CIRBIN_H_NVARS_OFFSET,
+  CIRBIN_H_NCONSTRAINTS_OFFSET,
+  CIRBIN_H_CONSTA_NWORDS_OFFSET,
+  CIRBIN_H_CONSTB_NWORDS_OFFSET,
+  CIRBIN_H_CONSTC_NWORDS_OFFSET,
+  CIRBIN_H_N_OFFSET
+
+}cirbin_hfile_offset_t;
 
 #endif

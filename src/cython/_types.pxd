@@ -43,6 +43,8 @@ cdef extern from "types.h":
 
   #Constants 
   cdef uint32_t NWORDS_256BIT
+  cdef uint32_t MAX_R1CSPOLY_NWORDS
+  cdef uint32_t MAX_R1CSPOLYTMP_NWORDS
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -109,4 +111,24 @@ cdef extern from "types.h":
    CB_ZPOLY_ADD, CB_ZPOLY_SUB, CB_ZPOLY_SUBPREV, CB_ZPOLY_MULC, CB_ZPOLY_MULCPREV, CB_ZPOLY_MULK, CB_ZPOLY_MADPREV, CB_ZPOLY_ADDPREV,
    CB_ZPOLY_DIVSNARKS, CB_ZPOLY_N
 
+  ctypedef struct cirbin_hfile_t:
+     uint32_t nWords
+     uint32_t nPubInputs
+     uint32_t nOutputs
+     uint32_t nVars
+     uint32_t nConstraints
+     uint32_t R1CSA_nWords
+     uint32_t R1CSB_nWords
+     uint32_t R1CSC_nWords
+  
+
+  ctypedef enum cirbin_hfile_offset_t:
+      CIRBIN_H_NWORDS_OFFSET = 0, CIRBIN_H_NPUBINPUTS_OFFSET, CIRBIN_H_NOUTPUTS_OFFSET, 
+      CIRBIN_H_NVARS_OFFSET, CIRBIN_H_NCONSTRAINTS_OFFSET, CIRBIN_H_CONSTA_NWORDS_OFFSET,
+      CIRBIN_H_CONSTB_NWORDS_OFFSET, CIRBIN_H_CONSTC_NWORDS_OFFSET, CIRBIN_H_N_OFFSET
+
+
+
 _NWORDS_256BIT = NWORDS_256BIT
+_MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
+_MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS
