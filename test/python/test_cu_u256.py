@@ -183,19 +183,32 @@ class CUU256Test(unittest.TestCase):
             test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
+            #u256_vector[0] = np.asarray([1895965571, 2509118507, 1177768607,   19354091,         0,         0,
+               #0,         0], dtype=np.uint32)
+            #u256_vector[1] = np.asarray([4197368849, 3466883767, 0,       0,          0,
+                #0,          0,          0], dtype=np.uint32)
+            #test_points2[0]=0
             result, _ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params )
             x1_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[test_points2]]
             x2_rdc = [ZFieldElRedc(BigInt.from_uint256(x)) for x in u256_vector[np.add(test_points2,1)]]
             r_rdc = [x * y for x,y in zip(x1_rdc, x2_rdc)]
             r_mul = np.asarray([x.as_uint256() for x in r_rdc])
-    
+            
+            idx=0
+            result2 = np.zeros(r_mul.shape, dtype=np.uint32)
+            for x1,x2 in zip(x1_rdc, x2_rdc):
+                result2[idx] = montmult_h(x1.as_uint256(), x2.as_uint256(), 1)
+                idx+=1
             self.assertTrue(len(result) == CUU256Test.nsamples/2)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_mul)))
+            self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(result2)))
 
             # Test addm_reduce kernel:
             # First iteration : Reduce by blockSize * stride => 
             r_addm_reduce = BigInt.addmu256_reduce(u256_vector[::2], u256_vector[1::2], u256_p)
-
+   
+        
+            """
             kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
             kernel_params['premod'] = [1, 0]
             kernel_params['stride'] = [4, 2]
@@ -208,7 +221,6 @@ class CUU256Test(unittest.TestCase):
             kernel_config['gridD'] = [0,  1]
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE, CB_U256_ADDM_REDUCE]
 
-            #para with zeros if necessary
             min_length = kernel_config['blockD'][1] * kernel_params['stride'][1]
             if kernel_params['in_length'][1] < min_length:
               zeros = np.zeros((min_length - kernel_params['in_length'][1],NWORDS_256BIT), dtype=np.uint32)
@@ -217,7 +229,6 @@ class CUU256Test(unittest.TestCase):
 
             result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,2 )
 
-            """
             kernel_params['midx'] = [MOD_FIELD]
             kernel_params['premod'] = [1]
             kernel_params['stride'] = [4]
@@ -240,7 +251,6 @@ class CUU256Test(unittest.TestCase):
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
 
             result,_ = u256.kernelLaunch(result, kernel_config, kernel_params,1 )
-            """
            
             #debugReduceAddm(u256_vector,result)
       
@@ -249,6 +259,7 @@ class CUU256Test(unittest.TestCase):
                 self.assertTrue(all(np.concatenate(result == r_addm_reduce)))
             else:
                print all(np.concatenate(result == r_addm_reduce))
+            """
            
 
             kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
@@ -265,6 +276,7 @@ class CUU256Test(unittest.TestCase):
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE_SHFL, CB_U256_ADDM_REDUCE_SHFL]
 
             result2,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,2 )
+            self.assertTrue(all(np.concatenate(result2 == r_addm_reduce)))
 
 def debugReduceAddm(u256_vector, result):
    xl = [BigInt.from_uint256(x).as_long() % CUU256Test.prime for x in u256_vector]

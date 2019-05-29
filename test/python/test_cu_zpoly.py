@@ -100,11 +100,18 @@ class CUZPolyTest(unittest.TestCase):
         kernel_config = {'blockD' : [256] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
 
-        for iter in xrange(CUZPolyTest.TEST_ITER):
+        for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
 
             # Test FFT kernel:
             test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
+            #try:
+             # test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
+            #except ValueError:
+              #print "Test 0"
+              #print ntest_points, CUZPolyTest.nsamples/32  - 1
+              #return
+            print "Test 0 : " + str(niter)+"                        \r",
             kernel_params['in_length'] = [CUZPolyTest.nsamples]
             kernel_params['out_length'] = CUZPolyTest.nsamples
             kernel_params['stride'] = [1]
@@ -141,12 +148,13 @@ class CUZPolyTest(unittest.TestCase):
 
         kernel_config = {'blockD' : [256] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
-        for iter in xrange(CUZPolyTest.TEST_ITER):
+        for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
             for st in xrange(16,32):
                zpoly_vector[st::32] = np.zeros((nsamples/32,8),dtype=np.uint32)
 
             # Test FFT kernel:
+            print "Test 1 : " + str(niter)+"                               \r",
             test_points = sample(xrange(CUZPolyTest.nsamples/64-1), ntest_points)
             kernel_params['in_length'] = [CUZPolyTest.nsamples]
             kernel_params['out_length'] = CUZPolyTest.nsamples/2
@@ -175,14 +183,16 @@ class CUZPolyTest(unittest.TestCase):
             #zpoly_mul = ZPoly.from_uint256(result_mul[0*32:0*32+32], reduced=True)
 
 
-            #for i in test_points:
-            for i in range(len(zpoly_vector)/64):
+            for i in test_points:
+            #for i in range(len(zpoly_vector)/64):
 
                p1_rdc = ZPoly.from_uint256(zpoly_vector[i*32:i*32+16], reduced=True)
                p2_rdc = ZPoly.from_uint256(zpoly_vector[nsamples/2 + i*32:nsamples/2 + i*32+16], reduced=True)
                p1_rdc.poly_mul_fft(p2_rdc)
                zpoly_mul = ZPoly.from_uint256(result_mul[i*32:i*32+32], reduced=True)
-       
+
+               #if p1_rdc != zpoly_mul:
+                   #print niter, i
                self.assertTrue(p1_rdc == zpoly_mul)
 
     def test_2fftN(self):
@@ -197,12 +207,12 @@ class CUZPolyTest(unittest.TestCase):
 
         kernel_config = {'blockD' : [256] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
-        for iter in xrange(CUZPolyTest.TEST_ITER):
+        for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
 
             # Test FFT kernel:
-            N = 1 + (iter % 5)
-
+            N = 1 + (niter % 5)
+            print "Test 2 : " + str(niter)+"                                     \r",
             test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
             #test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
             kernel_params['in_length'] = [CUZPolyTest.nsamples]
@@ -252,10 +262,11 @@ class CUZPolyTest(unittest.TestCase):
         kernel_config = {}
         kernel_params = {}
 
-        for iter in xrange(CUZPolyTest.TEST_ITER):
+        for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
 
             # Test FFT kernel:
+            print "Test 4 : " + str(niter)+"                                     \r",
             kernel_params['in_length'] = [2*CUZPolyTest.nsamples+2,CUZPolyTest.nsamples]
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1]
@@ -309,6 +320,7 @@ class CUZPolyTest(unittest.TestCase):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
 
             # Test FFT kernel:
+            print "Test 5 : " + str(niter)+"                                \r",
             kernel_params['in_length'] = [2*CUZPolyTest.nsamples+2,CUZPolyTest.nsamples]
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1]
@@ -596,11 +608,12 @@ class CUZPolyTest(unittest.TestCase):
         fft_yx = 4
         fft_yy = 3
 
-        for iter in xrange(20):
+        for niter in xrange(20):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
 
             # Test FFT kernel:
 
+            print "Test 8 : " + str(niter)+"                             \r",
             kernel_params['in_length'] = [2*CUZPolyTest.nsamples+2, nsamples, nsamples, nsamples]
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1,1,1]
@@ -695,11 +708,12 @@ class CUZPolyTest(unittest.TestCase):
         fft_yx = 4
         fft_yy = 3
 
-        for iter in xrange(20):
+        for niter in xrange(20):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
 
             # Test FFT kernel:
 
+            print "Test 9 : " + str(niter)+"                                   \r",
             kernel_params['in_length'] = [2*CUZPolyTest.nsamples+2, nsamples, nsamples, nsamples]
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1,1,1]
@@ -790,7 +804,13 @@ class CUZPolyTest(unittest.TestCase):
           inv_roots_rdc_u256 = inv_rootsM_rdc_u256[::1<<(20-Nrows-Ncols)]
           roots_rdc_u256 = rootsM_rdc_u256[::1<<(20-Ncols-Nrows)]
 
-          for niter in xrange(10):
+          if k > 15:
+            ntests = 1
+          else :
+             ntests = 10
+
+          for niter in xrange(ntests):
+               print "Test 10 : " + str(k) + " " + str(niter)+"                               \r",
                kernel_config = {}
                kernel_params = {}
                X1 = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
@@ -880,6 +900,7 @@ class CUZPolyTest(unittest.TestCase):
 
 
         for niter in xrange(CUZPolyTest.TEST_ITER):
+            print "Test 11 : " + str(niter)+ "                 \r",
             zpoly_vector1 = cu_zpoly.randu256(CUZPolyTest.nsamples, u256_p )
             zpoly_vector2 = cu_zpoly.randu256(CUZPolyTest.nsamples/2, u256_p)
             zpoly_vector3 = cu_zpoly.randu256(CUZPolyTest.nsamples/4, u256_p)

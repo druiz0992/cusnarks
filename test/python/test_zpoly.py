@@ -877,9 +877,9 @@ class ZPolyTest(unittest.TestCase):
         # *, + , - , /, inv, scalar mul
         for i in xrange(ZPolyTest.TEST_ITER):
             nr = 1 << randint(0, ZPolyTest.MAX_FFT_NROWS)
-            nwr = 1 << randint(0, ZPolyTest.MAX_FFT_NROWS_W)
+            nwr = 1 << randint(1, ZPolyTest.MAX_FFT_NROWS_W)
             nc =  1 << randint(0, ZPolyTest.MAX_FFT_NCOLS)
-            nwc = 1 << randint(0, ZPolyTest.MAX_FFT_NCOLS_W)
+            nwc = 1 << randint(1, ZPolyTest.MAX_FFT_NCOLS_W)
             p_d = (ZPolyTest.FFT_PARALLEL_N * nr * nwr * ZPolyTest.FFT_PARALLEL_N * nc * nwc) - 1
 
             poly_ext = ZPoly(p_d)

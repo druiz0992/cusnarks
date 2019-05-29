@@ -187,6 +187,7 @@ uint32_t mpAdd(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t ndig
 /* [1]
   
   Computes multiplication of 2 32 bit numbers x and y and stores it in 2x32 bit array p
+
   uint32_t p[2] : output result
   uint32_t x    : input factor 1
   uint32_t y    : input factor 2
@@ -227,6 +228,7 @@ int mpMultiply(uint32_t p[3], uint32_t x[2], uint32_t y)
 
 /* 
    Compare multi precision  integers X and Y.
+
    uint32_t a[] : integer x
    uint32_t b[] : integer y
    size_t ndigits : number of 32-bit words in x and y
@@ -287,6 +289,7 @@ uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t
 
 /*
   Bit reverse 32 bit number
+
   uint32_t x : input number
   uint32_t bits : number of bits
   
@@ -522,7 +525,9 @@ int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint3
 }
 /*
   Read header circuit binary file
+
   char * filename      : location of file to be written
+
   circuit bin header file format:
 */
 void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename)
@@ -561,6 +566,7 @@ void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwo
 
 /*
   Write circuit binary file
+
   t_uint32_t * samples : input vector containing samples. Vector is of length nwords 
   char * filename      : location of file to be written
   uint32_t nwords      : Number of samples to write.
@@ -575,6 +581,7 @@ void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nw
 
 /*
   Read u256 data binary file and optionally decimate samples
+
   t_uint32_t * samples : output vector containing samples. Vector is of length outsize
   char * filename      : location of file containing samples
   uint32_t insize      : Number of samples from file to read. 
@@ -614,6 +621,7 @@ void printU256Number(const uint32_t *x)
 
 /*
    Generate N 32 bit random samples
+
    uint32_t *x      : output vector containing 32 bit samples. Vector is of length nsamples
    uint32_t ndigits : Number of samples to generate
    
@@ -628,6 +636,7 @@ void setRandom(uint32_t *x, const uint32_t nsamples)
 
 /*
    Generate N 256 bit random samples
+
    uint32_t *x       : output vector containing 256 bit samples. Vector is of length nsamples
    uint32_t nsamples : Number of 256 bit samples to generate
    uint32_t *p       : If different from null, samples will be less than p (p is a 256 bit number)
@@ -652,7 +661,7 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
     rng->randu32(&x[j*NWORDS_256BIT],nwords+1); 
 
     x[j*NWORDS_256BIT+nwords] &= ((1 << nbits)-1);
-    if ((p!= NULL) && (nwords==NWORDS_256BIT) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
+    if ((p!= NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
          do{
            subu256_h(&x[j*NWORDS_256BIT], p);
          }while(compu256_h(&x[j*NWORDS_256BIT],p) >=0);
@@ -661,6 +670,7 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
 }
 /* 
    Compare 256 bit integers X and Y.
+
    uint32_t *x : 256 bit integer x
    uint32_t *y : 256 bit integer y
    returns 
@@ -675,8 +685,10 @@ int compu256_h(const uint32_t *x, const uint32_t *y)
 
 /* 
    Compare 256 bit integers X and Y.
+
    uint32_t *x : 256 bit integer x
    uint32_t *y : 256 bit integer y
+
    returns 
       true          : x < y
       false         : x >= y
@@ -689,6 +701,7 @@ bool ltu256_h(const uint32_t *x, const uint32_t *y)
 /*
    Generates N 256 bit samples with incremements of inc starting at start. If sample reached value of mod,
    value goes back to 0
+
    uint32_t *samples : Vector containing output samples. Vector is of length nsamples
    uint32_t nsamples : Number of samples to generate
    uint32_t *start   : First sample value 
@@ -716,6 +729,7 @@ void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, u
    Convert 256 bit number to montgomery representation of one of the two prime 
       p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
       p2 = 21888242871839275222246405745257275088548364400416034343698204186575808495617L
+
    uint32_t *z   : montgomery represention of input sample x. Z is 256 bits
    uint32_t *x   : input 256 bit sample
    uint32_t pidx : prime select. if 0, use p1. If 1, use p2
@@ -730,6 +744,7 @@ void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
    Convert 256 bit number from montgomery representation of one of the two prime 
       p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
       p2 = 21888242871839275222246405745257275088548364400416034343698204186575808495617L
+
    uint32_t *z   : normal represention of input sample x. Z is 256 bits
    uint32_t *x   : input 256 bit sample in montgomery format
    uint32_t pidx : prime select. if 0, use p1. If 1, use p2
@@ -743,8 +758,10 @@ void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
 
 /*
     Removes higher order coefficient equal to 0
+
     uint32_t *pin    : poly vector
     uint32_t n_coeff : number of polynomial coefficients
+
     returns number of remaining coefficients
 */
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff)
@@ -761,6 +778,7 @@ uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff)
 /*
    Sort 256-bit samples in ascending order.  Input samples indexes are actually sorted. Samples are
     left unsorted. 
+
    uint32_t *idx  : output vector containing sorted indexed. Size of idx is len.
    uint32_t *v    : input vector of size len 256 bit samples
    uint32_t len   : number of samples to sort 
@@ -984,7 +1002,6 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
    
       T[j-1] = S;
     }
-
     // (C,S) = t[s] + C
     C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
     //printf("6 - C : %u, S: %u\n",C,S);
@@ -1017,55 +1034,76 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
 
   memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
 
+  /*
   printf("A\n");
   printU256Number(A);
   printf("B\n");
   printU256Number(B);
+  */
+
   for(i=0; i<NWORDS_256BIT; i++) {
     // (C,S) = t[0] + a[0]*b[i], worst case 2 words
     spMultiply(X, A[0], B[i]); // X[Upper,Lower] = a[0]*b[i]
     C = mpAdd(&S, T+0, X+0, 1); // [C,S] = t[0] + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper], No carry
 
+    /*
     printf("0 - C : %u, S: %u\n",C,S);
+    */
     //printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
     // ADD(t[1],C)
     //mpAddWithCarryProp(T, C, 1);
     carry = mpAdd(&T[1], &T[1], &C, 1); 
+    /*
     printf("C3: %d\n",carry);
     printf("T\n");
     printU256Number(T);
+    */
 
     // m = S*n'[0] mod W, where W=2^32
     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
     spMultiply(M, S, NPrime[0]);
+    /*
     printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
+    */
 
     // (C,S) = S + m*n[0], worst case 2 words
     spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
     C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
+    /*
     printf("1 - C : %u, S: %u\n",C,S);
+    */
 
     for(j=1; j<NWORDS_256BIT; j++) {
       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
       spMultiply(X, A[j], B[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
       C1 = mpAdd(&S, T+j, &C, 1);  // (C1,S) = t[j] + C
+      /*
       printf("2 - C1 : %u, S: %u\n",C1,S);
+      */
       C2 = mpAdd(&S, &S, X+0, 1);  // (C2,S) = S + X[Lower]
+      /*
       printf("3 - C2 : %u, S: %u\n",C2,S);
       printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
+      */
       mpAdd(&C, &C1, X+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
+      /*
       printf("4 - C : %u\n",C);
+      */
       mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, doesn't produce carry
+      /*
       printf("5 - C : %u\n",C);
+      */
    
       // ADD(t[j+1],C)
       C += carry;
       carry = mpAdd(&T[j+1], &T[j+1], &C, 1); 
       //mpAddWithCarryProp(T, C, j+1);
+      /*
       printf("T\n");
       printU256Number(T);
+      */
    
       // (C,S) = S + m*n[j]
       spMultiply(X, M[0], N[j]); // X[Upper,Lower] = m*n[j]
@@ -1075,14 +1113,18 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
    
       // t[j-1] = S
       T[j-1] = S;
+      /*
       printf("T\n");
       printU256Number(T);
+      */
     }
 
     mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
     // (C,S) = t[s] + C
     C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
+    /*
     printf("6 - C : %u, S: %u\n",C,S);
+    */
     // t[s-1] = S
     T[NWORDS_256BIT-1] = S;
     // t[s] = t[s+1] + C
@@ -1098,6 +1140,7 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
 }
+
 
 /****************************************************************************/
 /** [1]
@@ -1207,15 +1250,51 @@ void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t 
 }
 
 
+/*
+  Recursive 4 step N 256 bit sample IFFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
+   1) Get input samples in a N=N1xN2 matrix, filling the matrix by columns. Compute N1 N2 point FFT (FFT of every row)
+   2) Multiply resulting N1xN2 Ajk matrix by inv_root[j*k]
+   3) Transpose resulting matrix to N2xN1 matrix
+   4) Perform N2 N1 point FFT
+   5) Divide each coefficient by number of samples
 
+   Retrieve data columnwise from the resulting N2xN1 matrix
+   Function is 2D because when computing FFT of rows/columns, the 4-step procedure is repeated
 
+   uint32_t *A     : Input vector containing ordered samples in Montgomery format. Input vector has 1<<(Nrows+Ncols) samples. Resulting FFT is returned in vector A
+                        Output samples are ordered
+   uint32_t *roots : input roots (first root is 1) in Montgomery. If roots are inverse, IFFT is computed
+   uint32_t *format : if 0, output is in normal format. If 1, outout is montgomery
+   uint32_t Nrows  : Number of rows in starting matrix (N1)
+   uint32_t fft_Nyx   : Number of columns N12 in secondary matrix (N1=N11xN12)
+   uint32_t Ncols  : Number of columns in starting matrix (N2)
+   uint32_t fft_Nxx : Number of columns N22 in secondary matrix (N2=N21xN22)
+   uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
+   uint32_t mode    : Debug mode. If 0, run normal FFT operation. 
+                                  If 1, stop after first step
+                                  If 2, stop after second step
+                                  If 3, stop after third step
+*/
+
+void intt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx, uint32_t mode)
+{
+  uint32_t i;
+  const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
+
+  ntt_parallel2D_h(A, roots, Nrows, fft_Nyx,  Ncols, fft_Nxx, pidx, mode);
+
+  for (i=0;i < 1 << (Nrows + Ncols); i++){
+      montmult_h(&A[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &scaler[(Nrows + Ncols)*NWORDS_256BIT], pidx);
+  }
+}
 
 /*
-  Recursive 4 step N 256 bit sample FFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
+  4 step N 256 bit sample FFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
    1) Get input samples in a N=N1xN2 matrix, filling the matrix by columns. Compute N1 N2 point FFT (FFT of every row)
    2) Multiply resulting N1xN2 Ajk matrix by root[j*k]
    3) Transpose resulting matrix to N2xN1 matrix
    4) Perform N2 N1 point FFT
+
    Retrieve data columnwise from the resulting N2xN1 matrix
    Function is 2D because when computing FFT of rows/columns, the 4-step procedure is repeated
    uint32_t *A     : Input vector containing ordered samples in Montgomery format. Input vector has 1<<(Nrows+Ncols) samples. Resulting FFT is returned in vector A
@@ -1294,41 +1373,6 @@ void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32
   free(reducedR);
 }
 
-/*
-  Recursive 4 step N 256 bit sample IFFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
-   1) Get input samples in a N=N1xN2 matrix, filling the matrix by columns. Compute N1 N2 point FFT (FFT of every row)
-   2) Multiply resulting N1xN2 Ajk matrix by inv_root[j*k]
-   3) Transpose resulting matrix to N2xN1 matrix
-   4) Perform N2 N1 point FFT
-   5) Divide each coefficient by number of samples
-   Retrieve data columnwise from the resulting N2xN1 matrix
-   Function is 2D because when computing FFT of rows/columns, the 4-step procedure is repeated
-   uint32_t *A     : Input vector containing ordered samples in Montgomery format. Input vector has 1<<(Nrows+Ncols) samples. Resulting FFT is returned in vector A
-                        Output samples are ordered
-   uint32_t *roots : input roots (first root is 1) in Montgomery. If roots are inverse, IFFT is computed
-   uint32_t *format : if 0, output is in normal format. If 1, outout is montgomery
-   uint32_t Nrows  : Number of rows in starting matrix (N1)
-   uint32_t fft_Nyx   : Number of columns N12 in secondary matrix (N1=N11xN12)
-   uint32_t Ncols  : Number of columns in starting matrix (N2)
-   uint32_t fft_Nxx : Number of columns N22 in secondary matrix (N2=N21xN22)
-   uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
-   uint32_t mode    : Debug mode. If 0, run normal FFT operation. 
-                                  If 1, stop after first step
-                                  If 2, stop after second step
-                                  If 3, stop after third step
-*/
-
-void intt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx, uint32_t mode)
-{
-  uint32_t i;
-  const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
-
-  ntt_parallel2D_h(A, roots, Nrows, fft_Nyx,  Ncols, fft_Nxx, pidx, mode);
-
-  for (i=0;i < 1 << (Nrows + Ncols); i++){
-      montmult_h(&A[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &scaler[(Nrows + Ncols)*NWORDS_256BIT], pidx);
-  }
-}
 
 /*
   4 step N 256 bit sample FFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
@@ -1337,6 +1381,7 @@ void intt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint
    3) Transpose resulting matrix to N2xN1 matrix
    4) Perform N2 N1 point FFT
    Retrieve data columnwise from the resulting N2xN1 matrix
+
    uint32_t *A     : Input vector containing ordered samples in Montgomery format. Input vector has 1<<(Nrows+Ncols) samples. Resulting FFT is returned in vector A
                         Output samples are ordered
    uint32_t *roots : input roots (first root is 1) in Montgomery. If roots are inverse, IFFT is computed
@@ -1401,7 +1446,9 @@ void ntt_parallel_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t
    3) Transpose resulting matrix to N2xN1 matrix
    4) Perform N2 N1 point FFT
    5) Divide each coefficient by number of samples
+
    Retrieve data columnwise from the resulting N2xN1 matrix
+
    uint32_t *A     : Input vector containing ordered samples in Montgomery format. Input vector has 1<<(Nrows+Ncols) samples. Resulting FFT is returned in vector A
                         Output samples are ordered
    uint32_t *roots : input roots (first root is 1) in Montgomery. If roots are inverse, IFFT is computed
@@ -1432,6 +1479,9 @@ void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_
    with respect to the given primitive nth root of unity under the given modulus.
    The length of the vector must be a power of 2.
    NOTE https://www.nayuki.io/page/number-theoretic-transform-integer-dft
+
+   NOTE https://www.nayuki.io/page/number-theoretic-transform-integer-dft
+
    uint32_t *A     : ordered input vector of length 1<<levels in montgomery format. Ordered result is 
                   is stored in A as well.
    uint32_t *roots : input roots (first root is 1) in Montgomery. If roots are inverse, IFFT is computed. 
@@ -1475,7 +1525,9 @@ void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t pidx)
    Computes the inverse number-theoretic transform of the given vector in place,
    with respect to the given primitive nth root of unity under the given modulus.
    The length of the vector must be a power of 2.
+
    NOTE https://www.nayuki.io/page/number-theoretic-transform-integer-dft
+
    uint32_t *A     : ordered input vector of length 1<<levels in montgomery format. Ordered result is 
                   is stored in A as well.
    uint32_t *roots : input inverse roots (first root is 1) in Montgomery. 
@@ -1499,6 +1551,7 @@ void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels
 /*
   Generate format of FFT from number of samples. Parameters include 1D FFT/2D FFT/ 3D FFT/ 4D FFT, size of 
    matrix for multi D FFT,...
+
   fft_params_t *ntt_params : pointer to structure containing resulting FFT format
   uint32_t nsamples : number of samples of FFT
   
@@ -1543,6 +1596,7 @@ void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples)
 
 /*
   modular addition of 256 bit numbers : Z = X + Y mod P
+
   uint32_t *z : Output 256 bit number
   uint32_t *x : Input 256 bit number 1
   uint32_t *y : Input 256 bit number 2
@@ -1562,6 +1616,7 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 
 /*
   modular substraction of 256 bit numbers : Z = X - Y mod P
+
   uint32_t *z : Output 256 bit number
   uint32_t *x : Input 256 bit number 1
   uint32_t *y : Input 256 bit number 2
@@ -1582,6 +1637,7 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 
 /*
   Computes N roots of unity from a given primitive root. Roots are in montgomery format
+
   uint32_t *roots : Output vector containing computed roots. Size of vector is nroots
   uint32_t *primitive_root : Primitive root 
   uint32_t nroots : Number of roots

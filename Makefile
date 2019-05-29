@@ -46,6 +46,7 @@ CTSRC_PATH = $(CUSNARKS_PATH)/src/cython
 PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
+CTEST_PATH = $(CUSNARKS_PATH)/test/c
 
 AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
 PCG_PATH = $(AUX_PATH)/pcg-cpp/test-high
@@ -61,7 +62,9 @@ dirs= $(CUSRC_PATH) \
 
 aux_dirs = $(PCG_PATH)
 
-test_dirs = $(PYTST_PATH) 
+test_dirs = $(CTEST_PATH) \
+          $(PYTST_PATH) 
+            
 
 aux_repos = $(PCG_REPO)
 
@@ -98,6 +101,7 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'PYSRC_PATH=$(PYSRC_PATH)'       \
               'PYTST_PATH=$(PYTST_PATH)'       \
               'CUSRC_PATH=$(CUSRC_PATH)'       \
+              'CTEST_PATH=$(CTEST_PATH)'       \
               'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
               'AUX_INCLUDES=$(AUX_INCLUDES)' 
