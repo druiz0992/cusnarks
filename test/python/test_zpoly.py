@@ -897,5 +897,69 @@ class ZPolyTest(unittest.TestCase):
 
             self.assertTrue(p_rdc == r_rdc)
 
+    def test_6div(self):
+      """
+      A_poly / B_poly
+       
+      two cases:
+         degree A_poly > 2 * degree B_poly
+         degree A_poly <= 2 * degree B_poly
+      """
+      c = ZUtils.CURVE_DATA['BN128']
+      prime = c['prime_r']
+      ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
+      ZPoly.init()
+      min_Adegree = 128
+      max_Adegree = 1024
+      min_Bdegree = 32 
+      max_Bdegree = 128
+      ZUtils.NROOTS=  max_Adegree*4
+      roots_rdc, inv_roots_rdc = ZField.find_roots(ZUtils.NROOTS, rformat_ext=False)
+
+      for niter in xrange(ZPolyTest.TEST_ITER):
+         Ad = randint(min_Adegree, max_Adegree)
+         Bd = randint(min_Bdegree, max_Bdegree)
+         A_poly = ZPoly(Ad).reduce()
+         B_poly = ZPoly([ZFieldElExt(-1).reduce()] + [ZFieldElExt(0).reduce() for i in range(Bd-1)] + [ZFieldElExt(1).reduce()])
+         
+         At = ZPoly(A_poly)
+         Bt = ZPoly(B_poly)
+        
+         At.poly_mul(Bt)
+         At = At + ZPoly(Bd-1).reduce()
+        
+         r1 = At.poly_div(B_poly)
+         self.assertTrue(r1 == A_poly)
+ 
+         r2 = At.poly_div_snarks(B_poly.get_degree())
+         self.assertTrue(r2 == A_poly)
+
+          
+      for niter in xrange(ZPolyTest.TEST_ITER):
+         Ad = randint(min_Adegree, max_Adegree)
+         Bd = Ad - 2
+         A_poly = ZPoly(Ad).reduce()
+         B_poly = ZPoly([ZFieldElExt(-1).reduce()] + [ZFieldElExt(0).reduce() for i in range(Bd-1)] + [ZFieldElExt(1).reduce()])
+         
+         At = ZPoly(A_poly)
+         Bt = ZPoly(B_poly)
+        
+         At.poly_mul(Bt)
+         At = At + ZPoly(Bd-1).reduce()
+         
+         r1 = At.poly_div(B_poly)
+         self.assertTrue(r1 == A_poly)
+
+         r2 = At.poly_div_snarks(B_poly.get_degree())
+         self.assertTrue(r2 == A_poly)
+          
+          
+         
+
+if __name__ == "__main__":
+    unittest.main()
+          
+         
+
 if __name__ == "__main__":
     unittest.main()

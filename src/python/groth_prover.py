@@ -569,7 +569,7 @@ class GrothProver(object):
           polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polB_T[:nVars], ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
           self.t_P.append(t1)
 
-          mul_params = ntt_build_h(polA_S.shape[0]*2);
+          mul_params = ntt_build_h(polA_S.shape[0]*2)
           #polAB_S is extended -> use extended scaler
           # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
           polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, polA_S[:nVars],polB_S[:nVars],mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
@@ -585,9 +585,6 @@ class GrothProver(object):
           # TODO : polABC_S is stored in mem already. Only prepend padding if necessary. Do not retur value
           polH_S, t1 = zpoly_div_cuda(self.cuzpoly, polABC_S,int(m), ZField.get_field())
           self.t_P.append(t1)
-          #polZ_S = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(m-1)] + [ZFieldElExt(1)])
-          #polABC_S2 = ZPoly.from_uint256(polABC_S)
-          #polH_S2 = polABC_S2.poly_div_snarks(polZ_S.get_degree())
 
           if d2 != 0:
             #TODO : to do all this path 

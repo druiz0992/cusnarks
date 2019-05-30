@@ -788,11 +788,20 @@ class ZPoly(object):
         ve = v.scale(nd)
         me = m + nd
         ne = n + nd
+  
+        #print me, ne
 
         if invpol is None:
            s = ve.inv()
         else:
            s = invpol
+
+        #print "UE " 
+        #print ue.as_list()      
+        #print "VE " 
+        #print ve.as_list()
+        #print "S " 
+        #print s.as_list()
 
         # handle the case when m>2n
         if me > 2* ne:
@@ -801,6 +810,8 @@ class ZPoly(object):
             s_copy = ZPoly(s)
             s_copy.poly_mul(ve_copy)
             t = ZPoly([ZPoly.one[self.FIDX]]).scale( 2 * ne) - s_copy
+            #print "T "
+            #print t.as_list()[0]
 
         q = self.zero()
         rem = ZPoly(ue)
@@ -812,12 +823,18 @@ class ZPoly(object):
             us.poly_mul(rem_copy)
             us = us.scale(-2*ne)
             q = q + us
+            #print "US "
+            #print us.as_list()[0]
+            #print "Q "
+            #print q.as_list()[0]
 
             if me > 2 * ne:
                 t_copy = ZPoly(t)
                 rem.poly_mul(t_copy)
                 rem = rem.scale(-2*ne)
                 me = rem.get_degree()
+                #print "REM "
+                #print rem.as_list()[0]
             else:
                 done = True
 
@@ -842,21 +859,39 @@ class ZPoly(object):
         me = m + nd
         ne = n + nd
 
+        #print me, ne
+        #print "UE " 
+        #print ue.as_list()      
+
         # handle the case when m>2n
         q = self.zero()
         rem = ZPoly(ue)
         done = False
         niter = 0
+        #if self.FIDX == ZUtils.FEXT:
+          #t = ZPoly([ZFieldElExt(0) for i in range(n-1)] + [ZFieldElExt(1)])
+        #else:
+          #t = ZPoly([ZFieldElRedc(0) for i in range(n-1)] + [ZFieldExt(1).reduce()])
+        #print "T "
+        #print t.as_list()
 
         while not done:
-            if len(rem.get_coeff()[2*ne-nd:]) == 0:
-                return q
+            #if len(rem.get_coeff()[2*ne-nd:]) == 0:
+            #if me <= 2 * ne:
+             #   return q
             us = ZPoly(rem.get_coeff()[ne:]) + ZPoly(rem.get_coeff()[2*ne-nd:]) # degree me - ne
             q = q + us
+            #print "US "
+            #print us.as_list()[0]
+            #print "Q "
+            #print q.as_list()[0]
 
             if me > 2 * ne:
-                rem = ZPoly(rem.get_coeff()[ne+1:])
+                #rem = ZPoly(rem.get_coeff()[ne+1:])
+                rem = rem.scale(-2*n)
                 me = rem.get_degree()
+                #print "REM "
+                #print rem.as_list()[0]
             else:
                 done = True
             niter +=1
@@ -974,7 +1009,10 @@ class ZPoly(object):
                 new_p = ZPoly(self.get_coeff())
             else:
                 new_p = ZPoly(v)
-    
+
+            if min_d == 0:
+                return new_p.norm()
+
             c1 = self.get_coeff()
             c2 = v.get_coeff()
     

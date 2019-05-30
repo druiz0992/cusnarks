@@ -317,23 +317,27 @@ __device__ void divsnarks(uint32_t *z_t, uint32_t *x_t, uint32_t *y_t, kernel_pa
     logInfoBigNumberTid(tid,1,"Z:\n",z_t);
 
     // TODO : Try to have groups of 8 so that it is faster (I cannot unroll automatically)
-    for(offset=ne+1; offset<params->in_length -2*ne-1 ; offset += ne+1) { 
+    //for(offset=ne+1; offset<params->in_length -2*ne-1 ; offset += ne+1) { 
+    for(offset=2*(ne-nd); offset<params->in_length -ne-1 ; offset += 2*(ne-nd)) { 
+       logInfoTid(tid,"new_lim : %d\n",params->in_length - offset);
+       logInfoTid(tid,"max_tid1 : %d\n",params->in_length - offset -ne);
+       logInfoTid(tid,"max_tid2 : %d\n",params->in_length - offset -ne +nd);
        if(tid >= params->in_length - offset -ne) {
            return;
        }
-       x = (uint32_t *) &x_t[(tid + ne + offset) * NWORDS_256BIT];
-       y = (uint32_t *) &y_t[(tid + 2 * ne - nd + offset) * NWORDS_256BIT];
+       x = (uint32_t *) &x_t[(offset) * NWORDS_256BIT];
        logInfoTid(tid,"offset : %d\n",offset);
-       logInfoBigNumberTid(tid,1,"Z:\n",z_t);
-       logInfoBigNumberTid(tid,1,"X:\n",x_t);
-       logInfoBigNumberTid(tid,1,"Y:\n",y_t);
-       logInfoTid(tid,"new_lim : %d\n",params->in_length - offset);
-       logInfoTid(tid,"max_tid : %d\n",params->in_length - offset -2*ne +nd-1);
-       addmu256(z_t,z_t,x_t, params->midx);                
-       if(tid >= params->in_length - offset -2*ne+ nd) {
+       logInfoBigNumberTid(tid,1,"X:\n",x);
+       addmu256(z_t,z_t,x, params->midx);                
+
+       if(tid >= params->in_length - offset -ne+ nd) {
            return;
        }
-       addmu256(z_t,z_t,y_t, params->midx);                
+       y = (uint32_t *) &y_t[(offset) * NWORDS_256BIT];
+       logInfoBigNumberTid(tid,1,"Y:\n",y);
+       addmu256(z_t,z_t,y, params->midx);                
+       logInfoBigNumberTid(tid,1,"Z:\n",z_t);
+
        //i++;
        //if (i==3){ return;}
  
