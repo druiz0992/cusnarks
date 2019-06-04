@@ -27,12 +27,13 @@
 #
 # ------------------------------------------------------------------
 
+PYTHON=python3
 PYTHON_TESTS = $(shell find -name 'test_*.py')
 
 test:
 	@for i in $(PYTHON_TESTS); do \
 	echo "Starting Test :  $$i"; \
-	python $$i; \
+	$(PYTHON) $$i; \
 	done
 
 clean:

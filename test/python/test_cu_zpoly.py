@@ -75,7 +75,7 @@ ZPOLY_output_datafile_65K = '../c/aux_data/zpoly_output_data_65K.bin'
 class CUZPolyTest(unittest.TestCase):
     TEST_ITER = 100
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
-    nsamples = 32 * 1024   # 1024 FFT 32 points
+    nsamples = int(32 * 1024)   # 1024 FFT 32 points
     ntest_points = 100 
     u256_p = BigInt(prime).as_uint256()
     if use_pycusnarks:
@@ -104,7 +104,7 @@ class CUZPolyTest(unittest.TestCase):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
 
             # Test FFT kernel:
-            test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
+            test_points = sample(xrange(int(CUZPolyTest.nsamples/32)-1), ntest_points)
             #try:
              # test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
             #except ValueError:
@@ -138,6 +138,7 @@ class CUZPolyTest(unittest.TestCase):
     def test_01fft_mul32(self):
 
         cu_zpoly = CUZPolyTest.cu_zpoly
+ 
         nsamples = CUZPolyTest.nsamples
         u256 = CUZPolyTest.u256
         ntest_points = CUZPolyTest.ntest_points
@@ -151,11 +152,11 @@ class CUZPolyTest(unittest.TestCase):
         for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
             for st in xrange(16,32):
-               zpoly_vector[st::32] = np.zeros((nsamples/32,8),dtype=np.uint32)
+               zpoly_vector[st::32] = np.zeros((int(nsamples/32),8),dtype=np.uint32)
 
             # Test FFT kernel:
             #print "Test 1 : " + str(niter)+"                               \r",
-            test_points = sample(xrange(CUZPolyTest.nsamples/64-1), ntest_points)
+            test_points = sample(xrange(int(CUZPolyTest.nsamples/64)-1), ntest_points)
             kernel_params['in_length'] = [CUZPolyTest.nsamples]
             kernel_params['out_length'] = CUZPolyTest.nsamples/2
             kernel_params['stride'] = [2]
@@ -187,7 +188,7 @@ class CUZPolyTest(unittest.TestCase):
             #for i in range(len(zpoly_vector)/64):
 
                p1_rdc = ZPoly.from_uint256(zpoly_vector[i*32:i*32+16], reduced=True)
-               p2_rdc = ZPoly.from_uint256(zpoly_vector[nsamples/2 + i*32:nsamples/2 + i*32+16], reduced=True)
+               p2_rdc = ZPoly.from_uint256(zpoly_vector[int(nsamples/2) + i*32:int(nsamples/2) + i*32+16], reduced=True)
                p1_rdc.poly_mul_fft(p2_rdc)
                zpoly_mul = ZPoly.from_uint256(result_mul[i*32:i*32+32], reduced=True)
 
@@ -214,7 +215,7 @@ class CUZPolyTest(unittest.TestCase):
             N = 1 + (niter % 5)
             #print "Test 2 : " + str(niter)+"                                     \r",
             #try:
-            test_points = sample(xrange(CUZPolyTest.nsamples/32-1), ntest_points)
+            test_points = sample(xrange(int(CUZPolyTest.nsamples/32)-1), ntest_points)
             #except ValueError:
               #print "2 sample larger than population " + str(niter)
               #print 
@@ -236,7 +237,7 @@ class CUZPolyTest(unittest.TestCase):
             for i in test_points:
                p_rdc_ntt_all = []
                p_rdc_intt_all = []
-               for j in range(32/(1<<N)):
+               for j in range(int(32/(1<<N))):
                   p_rdc = ZPoly.from_uint256(zpoly_vector[i*32+j*(1<<N):i*32+j*(1<<N)+(1<<N)], reduced=True)
                   p_rdc.ntt_DIF()
                   p_rdc_ntt_all.append(p_rdc.as_uint256())
@@ -262,7 +263,7 @@ class CUZPolyTest(unittest.TestCase):
         ZField.inv_roots[0] = inv_roots_rdc
         CUZPolyTest.nsamples = 1024 
         nsamples = CUZPolyTest.nsamples
-        roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc[::ZUtils.NROOTS/1024]])
+        roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc[::int(ZUtils.NROOTS/1024)]])
 
         kernel_config = {}
         kernel_params = {}
@@ -315,8 +316,8 @@ class CUZPolyTest(unittest.TestCase):
         ZField.inv_roots[0] = inv_roots_rdc
         CUZPolyTest.nsamples = 1024 
         nsamples = CUZPolyTest.nsamples
-        inv_roots_rdc_u256 = np.asarray([x.as_uint256() for x in inv_roots_rdc[::ZUtils.NROOTS/1024]])
-        roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc[::ZUtils.NROOTS/1024]])
+        inv_roots_rdc_u256 = np.asarray([x.as_uint256() for x in inv_roots_rdc[::int(ZUtils.NROOTS/1024)]])
+        roots_rdc_u256 = np.asarray([x.as_uint256() for x in roots_rdc[::int(ZUtils.NROOTS/1024)]])
 
         kernel_config={}
         kernel_params={}
@@ -820,8 +821,8 @@ class CUZPolyTest(unittest.TestCase):
                kernel_params = {}
                X1 = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
                Y1 = cu_zpoly.randu256(CUZPolyTest.nsamples,u256_p)
-               X1[CUZPolyTest.nsamples/2:] = np.zeros((CUZPolyTest.nsamples/2,NWORDS_256BIT),dtype=np.uint32)
-               Y1[CUZPolyTest.nsamples/2:] = np.zeros((CUZPolyTest.nsamples/2,NWORDS_256BIT),dtype=np.uint32)
+               X1[int(CUZPolyTest.nsamples/2):] = np.zeros((int(CUZPolyTest.nsamples/2),NWORDS_256BIT),dtype=np.uint32)
+               Y1[int(CUZPolyTest.nsamples/2):] = np.zeros((int(CUZPolyTest.nsamples/2),NWORDS_256BIT),dtype=np.uint32)
                X2 = np.copy(X1)
                Y2 = np.copy(Y1)
 
@@ -1066,7 +1067,7 @@ class CUZPolyTest(unittest.TestCase):
    
             zpoly_1 = ZPoly.from_uint256(zpoly_vector1, reduced=True)
             n_coeff = zpoly_1.get_degree()+1
-            zpoly_r = ZPoly([c1 * c2 for c1, c2 in zip(zpoly_1.get_coeff()[0:n_coeff/2],zpoly_1.get_coeff()[n_coeff/2:])])
+            zpoly_r = ZPoly([c1 * c2 for c1, c2 in zip(zpoly_1.get_coeff()[0:int(n_coeff/2)],zpoly_1.get_coeff()[int(n_coeff/2):])])
 
             result_mulC_zpoly = ZPoly.from_uint256(result_mulC, reduced=True)
 
@@ -1085,9 +1086,9 @@ class CUZPolyTest(unittest.TestCase):
                  [(kernel_config['blockD'][0] + \
                    (kernel_params['in_length'][0]-1)/kernel_params['stride'][0] - 1)/ kernel_config['blockD'][0]]
             kernel_config['kernel_idx']= [CB_ZPOLY_MULCPREV]
-            result_mulCprev,_ = cu_zpoly.kernelLaunch(zpoly_vector1[:nsamples/2], kernel_config, kernel_params,1)
+            result_mulCprev,_ = cu_zpoly.kernelLaunch(zpoly_vector1[:int(nsamples/2)], kernel_config, kernel_params,1)
    
-            zpoly_1 = ZPoly.from_uint256(zpoly_vector1[:nsamples/2], reduced=True)
+            zpoly_1 = ZPoly.from_uint256(zpoly_vector1[:int(nsamples/2)], reduced=True)
             zpoly_r = ZPoly([c1 * c2 for c1, c2 in zip(zpoly_1.get_coeff(),zpoly_r.get_coeff())])
 
             result_mulCprev_zpoly = ZPoly.from_uint256(result_mulCprev, reduced=True)

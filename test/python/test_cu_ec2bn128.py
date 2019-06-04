@@ -89,7 +89,7 @@ class CUEC2Test(unittest.TestCase):
         r_mul_rdc = npzfile['rmul_rdc']
         # r_mad = npzfile['rmad']
         r_mad_rdc = npzfile['rmad_rdc']
-        nsamples = len(ec2bn128_vector_u256) / ECP_JAC_INDIMS
+        nsamples = int(len(ec2bn128_vector_u256) / ECP_JAC_INDIMS)
 
         """
         TODO : prepare LUT computing all combinations of Sum Pi, for a window
@@ -197,20 +197,20 @@ class CUEC2Test(unittest.TestCase):
     def test_0is_on_curve(self):
   
         #ecbn128_pt_ec = CUEC2Test.ecbn128_ecjac
-        ec2bn128_pt_ec = np.zeros((ECP_JAC_OUTDIMS*CUEC2Test.nsamples,2,NWORDS_256BIT),dtype=np.uint32)
+        ec2bn128_pt_ec = np.zeros((int(ECP_JAC_OUTDIMS*CUEC2Test.nsamples),2,NWORDS_256BIT),dtype=np.uint32)
         ec2bn128_pt_ec[0::3] = CUEC2Test.ec2bn128_vector_u256[0::2]
         ec2bn128_pt_ec[1::3] = CUEC2Test.ec2bn128_vector_u256[1::2]
-        ec2bn128_pt_ec[2::3] = [Z2FieldEl([1,0]).as_uint256()] * (len(CUEC2Test.ec2bn128_vector_u256)/ECP_JAC_INDIMS)
+        ec2bn128_pt_ec[2::3] = [Z2FieldEl([1,0]).as_uint256()] * int(len(CUEC2Test.ec2bn128_vector_u256)/ECP_JAC_INDIMS)
         ec2bn128_pt_ec = ECC.from_uint256(ec2bn128_pt_ec, in_ectype=1, out_ectype=1, reduced=False, ec2=True)
        
         for P in ec2bn128_pt_ec:
             self.assertTrue(P.is_on_curve())
 
         #ecbn128_pt_ec = CUEC2Test.ecbn128_ecjac_rdc
-        ec2bn128_rpt_ec = np.zeros((ECP_JAC_OUTDIMS*CUEC2Test.nsamples,2,NWORDS_256BIT),dtype=np.uint32)
+        ec2bn128_rpt_ec = np.zeros((int(ECP_JAC_OUTDIMS*CUEC2Test.nsamples),2,NWORDS_256BIT),dtype=np.uint32)
         ec2bn128_rpt_ec[0::3] = CUEC2Test.ec2bn128_vector_u256_rdc[0::2]
         ec2bn128_rpt_ec[1::3] = CUEC2Test.ec2bn128_vector_u256_rdc[1::2]
-        ec2bn128_rpt_ec[2::3] = [Z2FieldEl([1,0]).reduce().as_uint256()] * (len(CUEC2Test.ec2bn128_vector_u256)/ECP_JAC_INDIMS)
+        ec2bn128_rpt_ec[2::3] = [Z2FieldEl([1,0]).reduce().as_uint256()] * int(len(CUEC2Test.ec2bn128_vector_u256)/ECP_JAC_INDIMS)
         ec2bn128_rpt_ec = ECC.from_uint256(ec2bn128_rpt_ec, in_ectype=1, out_ectype=1, reduced=True, ec2=True)
 
        
@@ -263,13 +263,13 @@ class CUEC2Test(unittest.TestCase):
             kernel_params['midx'] = [MOD_FIELD]
             kernel_config['gridD'] = [0]
 
-            ec2bn128_vector_ext = np.zeros((nsamples * ECP2_JAC_OUTDIMS, 8), dtype=np.uint32)
+            ec2bn128_vector_ext = np.zeros((int(nsamples * ECP2_JAC_OUTDIMS), 8), dtype=np.uint32)
             ec2bn128_vector_ext[::6] = ec2bn128_vector[::4]
             ec2bn128_vector_ext[1::6] = ec2bn128_vector[1::4]
             ec2bn128_vector_ext[2::6] = ec2bn128_vector[2::4]
             ec2bn128_vector_ext[3::6] = ec2bn128_vector[3::4]
-            ec2bn128_vector_ext[4::6] = np.tile(ZFieldElExt(1).reduce().as_uint256(), (nsamples, 1))
-            ec2bn128_vector_ext[5::6] = np.tile(np.zeros((1, 8), dtype=np.uint32), (nsamples, 1))
+            ec2bn128_vector_ext[4::6] = np.tile(ZFieldElExt(1).reduce().as_uint256(), (int(nsamples), 1))
+            ec2bn128_vector_ext[5::6] = np.tile(np.zeros((1, 8), dtype=np.uint32), (int(nsamples), 1))
             result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_ext, kernel_config, kernel_params)
             self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples / 2)
             self.assertTrue(all(np.concatenate(result == r_add)))

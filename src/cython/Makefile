@@ -39,12 +39,13 @@ CTSRC_PATH = $(CTSRC_PATH)
 PYSRC_PATH = $(PYSRC_PATH)
 LD_FLAGS=$(LD_FLAGS)
 
+PYTHON=python3
 #null :=
 #WS:= $(null) $(null)
 #DEFINE_MACROS:= $(subst $(WS),:,$(DEFINES))
 
 build:
-	python setup.py build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --library-dirs=$(LIB_PATH)
+	$(PYTHON) setup.py build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --library-dirs=$(LIB_PATH)
 
 clean:
 	rm -f $(CTSRC_PATH)/*.cpp $(LIB_PATH)/*.so

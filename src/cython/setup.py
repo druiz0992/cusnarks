@@ -141,7 +141,7 @@ class custom_build_ext(build_ext):
 try:
     CUDA = locate_cuda()
 except EnvironmentError:
-     print "CUDA not installed"
+     print("CUDA not installed")
      CUDA = None
      #sys.exit(1)
 
