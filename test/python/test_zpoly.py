@@ -554,7 +554,7 @@ class ZPolyTest(unittest.TestCase):
             # /
             pn_ext = ZPoly(p1_d)
             pd_ext = ZPoly(p1_d)
-            pr_ext = ZPoly(p1_d/4)
+            pr_ext = ZPoly(int(p1_d/4))
 
             pn_rdc = pn_ext.reduce()
             pd_rdc = pd_ext.reduce()

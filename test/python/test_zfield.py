@@ -71,7 +71,7 @@ class ZFieldTest(unittest.TestCase):
         a_str = "1009"
         ZField(a_str, factor_data = ZUtils.CURVE_DATA['P1009']['curve'])
 
-        self.assertTrue(ZField.get_extended_p().as_long() == long(a_str, 10))
+        self.assertTrue(ZField.get_extended_p().as_long() == int(a_str, 10))
         self.assertTrue(ZField.is_init() == True)
         self.assertTrue(isinstance(ZField.get_extended_p(), BigInt))
         self.assertTrue(isinstance(ZField.get_reduced_p(), BigInt))
@@ -80,14 +80,14 @@ class ZFieldTest(unittest.TestCase):
 
         ## Init given number as hex string
         a_str = "1009"
-        ZField(hex(long(a_str)), ZUtils.CURVE_DATA['P1009']['curve'])
+        ZField(hex(int(a_str)), ZUtils.CURVE_DATA['P1009']['curve'])
 
-        self.assertTrue(ZField.get_extended_p().as_long() == long(a_str, 10))
+        self.assertTrue(ZField.get_extended_p().as_long() == int(a_str, 10))
 
         # Check reduction is correctly initialized 
         # R * Rp - P * Pp = 1
         a_str = "1009"
-        ZField(hex(long(a_str)), ZUtils.CURVE_DATA['P1009']['curve'])
+        ZField(hex(int(a_str)), ZUtils.CURVE_DATA['P1009']['curve'])
 
         r_data = ZField.get_reduction_data()
 
@@ -99,7 +99,7 @@ class ZFieldTest(unittest.TestCase):
         # Check reduction is correctly initialized  - BN128
         # R * Rp - P * Pp = 1
         a_str = ZUtils.CURVE_DATA['BN128']['prime_r']
-        ZField(hex(long(a_str)), ZUtils.CURVE_DATA['BN128']['curve'])
+        ZField(hex(int(a_str)), ZUtils.CURVE_DATA['BN128']['curve'])
 
         r_data = ZField.get_reduction_data()
 
@@ -214,7 +214,7 @@ class ZFieldTest(unittest.TestCase):
         p = ZUtils.CURVE_DATA['BN128']['prime_r']
         ZField(p, ZUtils.CURVE_DATA['BN128']['curve'])
 
-        for i in xrange(ZFieldTest.NROOTS_THR - 1):
+        for i in xrange(1,ZFieldTest.NROOTS_THR - 1):
             nroots = 2 ** (i + 1)
             root, inv_root = ZField.find_roots(nroots)
 

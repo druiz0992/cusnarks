@@ -39,6 +39,7 @@
 import sys
 import unittest
 from random import randint
+from past.builtins import xrange
 
 sys.path.append('../../src/python')
 

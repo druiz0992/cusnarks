@@ -38,6 +38,7 @@
 """
 from random import randint
 import unittest
+from builtins import int
 
 import sys
 sys.path.append('../../src/python')
@@ -56,11 +57,11 @@ class ZFieldElTest(unittest.TestCase):
     SMALL_PRIME_LIST = ZUtils.find_primes(randint(3,MAX_PRIME), MAX_PRIME, cnt=FIND_N_PRIMES)
 
     def test_0init_ext(self):
-        p = 1009
+        p = int(1009)
         ZField(p)
 
         ## Init given number as bignum < prime
-        a = p/2
+        a = int(p/2)
         a_bn = BigInt(a)
         zf  = ZFieldElExt(a_bn)
         self.assertTrue(zf.as_long() == a_bn.as_long())
@@ -161,7 +162,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr + y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -173,7 +174,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr - y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -185,7 +186,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr * y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -234,7 +235,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr ** e_l
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -249,7 +250,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr += y_zr 
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -264,7 +265,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr -= y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -276,7 +277,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = -x_zr 
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -311,7 +312,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr + y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -323,7 +324,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr - y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -335,7 +336,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr * y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -384,7 +385,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr ** e_l
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -399,7 +400,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr += y_zr 
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -414,7 +415,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr -= y_zr
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -426,7 +427,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = -x_zr 
             r2_z  = r_zr.extend()
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_z.as_long() == r2_z.as_long())
             self.assertTrue(x_z.as_long() < prime)
             self.assertTrue(y_z.as_long() < prime)
@@ -457,7 +458,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z << e_l
             r_zr = x_zr << e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
             # >>
@@ -465,7 +466,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z >> e_l
             r_zr = x_zr >> e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
             # <<=
@@ -475,7 +476,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr 
             r_zr <<= e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
             # >>=
@@ -485,7 +486,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr 
             r_zr >>= e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
             # &
@@ -493,7 +494,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z & e_l
             r_zr = x_zr & e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() & e_l) % prime)
 
             # |
@@ -501,7 +502,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z | e_l
             r_zr = x_zr | e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() | e_l) % prime)
 
     def test_7bitwise_large_prime(self):
@@ -528,7 +529,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z << e_l
             r_zr = x_zr << e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
             # >>
@@ -536,7 +537,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z >> e_l
             r_zr = x_zr >> e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
             # <<=
@@ -546,7 +547,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr 
             r_zr <<= e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() << e_l) % prime)
 
             # >>=
@@ -556,7 +557,7 @@ class ZFieldElTest(unittest.TestCase):
             r_zr = x_zr 
             r_zr >>= e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() >> e_l) % prime)
 
             # &
@@ -564,7 +565,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z & e_l
             r_zr = x_zr & e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() & e_l) % prime)
 
             # |
@@ -572,7 +573,7 @@ class ZFieldElTest(unittest.TestCase):
             r_z  = x_z | e_l
             r_zr = x_zr | e_l
 
-            self.assertTrue(r_z.as_long() == long(r_l))
+            self.assertTrue(r_z.as_long() == int(r_l))
             self.assertTrue(r_zr.as_long() == (x_zr.as_long() | e_l) % prime)
 
  

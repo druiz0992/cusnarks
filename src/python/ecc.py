@@ -59,8 +59,10 @@
 
 """
 
+from __future__ import print_function 
 from abc import ABCMeta, abstractmethod
 from random import randint, sample
+from builtins import int 
 
 from zfield import *
 from z2field_element import *
@@ -130,9 +132,9 @@ class ECC(object):
             return
 
         if curve is not None:
-            if not isinstance(curve['a'],int) and not isinstance(curve['a'],long):
+            if not isinstance(curve['a'],int) and not isinstance(curve['a'],int):
                 assert False, "Unexpected curve parameters"
-            elif not isinstance(curve['b'],int) and not isinstance(curve['b'],long):
+            elif not isinstance(curve['b'],int) and not isinstance(curve['b'],int):
                 assert False, "Unexpected curve parameters"
             else:
                 self.init_curve(curve)
@@ -143,7 +145,7 @@ class ECC(object):
             self.FIDX = ZUtils.FEXT
             if isinstance(self.P[ECC.X].P[0], ZFieldElRedc):
                 self.FIDX = ZUtils.FRDC
-        elif isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], long) or isinstance(p_l[ECC.X], ZFieldElExt):
+        elif isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], int) or isinstance(p_l[ECC.X], ZFieldElExt):
             self.P = [ZFieldElExt(x) for x in p_l]
             self.FIDX = ZUtils.FEXT
         elif isinstance(p_l[ECC.X], ZFieldElRedc):
@@ -296,7 +298,7 @@ class ECC(object):
             return [p.as_long() for p in self.P]
 
     def showP(self):
-        print self.as_list()
+        print(self.as_list())
 
     def same_format(self, P2):
         """
@@ -346,7 +348,7 @@ class ECC(object):
           P1 * alpha
           TODO : pending += for ECC points and >>= for BigInt, SLINDING window
         """
-        if isinstance(alpha, int) or isinstance(alpha, long):
+        if isinstance(alpha, int) or isinstance(alpha, int):
             scalar = alpha
         elif isinstance(alpha, ZFieldElRedc):
             assert False, "Unexpected type"
@@ -485,12 +487,12 @@ class ECC(object):
          P.append(P1)
          if verbose is not None:
              if ct%10 == 0:
-                print verbose+str(ct)+"\r",
+                print(verbose+str(ct)+"\r",end='')
                 sys.stdout.flush()
              ct+=1
 
       if verbose is not None:
-          print "\n",
+          print("\n",end='')
 
       return P, P_rdc
 
