@@ -33,6 +33,7 @@
 // ------------------------------------------------------------------
 
 """
+from __future__ import print_function 
 import os.path
 import sys
 import unittest
@@ -113,18 +114,18 @@ class CUEC2Test(unittest.TestCase):
 
     else:
 
-        print "Generating Random scalars....",
+        print("Generating Random scalars....",end='')
         ecbn128_scl = [randint(1, prime - 1) for x in xrange(nsamples)]
-        print "Done\n"
-        print "Converting Random scalars to u256...",
+        print("Done\n")
+        print("Converting Random scalars to u256...",end='')
         ecbn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
-        print "Done\n"
+        print("Done\n")
 
         ec2bn128_ecjac, ec2bn128_ecjac_rdc = np.asarray(
             ECC.rand(nsamples, ectype=1, reduce=True, verbose="Generating Random EC points...\t"))
-        print "Done\n"
+        print("Done\n")
 
-        print "Forming vector...",
+        print("Forming vector...",end='')
         ec2bn128_ecjac_u256 = np.asarray([[x.get_P()[0].as_uint256(),
                                            x.get_P()[1].as_uint256(),
                                            x.get_P()[2].as_uint256()] for x in ec2bn128_ecjac])
@@ -141,27 +142,27 @@ class CUEC2Test(unittest.TestCase):
         # ecbn128_vector_u256_rdc[::3] = ecbn128_scl_u256
         ec2bn128_vector_u256_rdc[::2] = ec2bn128_ecjac_u256_rdc[:, ::3].reshape((-1, 2, NWORDS_256BIT))
         ec2bn128_vector_u256_rdc[1::2] = ec2bn128_ecjac_u256_rdc[:, 1::3].reshape((-1, 2, NWORDS_256BIT))
-        print "Done\n"
+        print("Done\n")
 
-        print "Adding EC points...",
+        print("Adding EC points...",end='')
         r_add = [(x + y) for x, y in zip(ec2bn128_ecjac[::2], ec2bn128_ecjac[1::2])]
         r_add_rdc = [(x + y) for x, y in zip(ec2bn128_ecjac_rdc[::2], ec2bn128_ecjac_rdc[1::2])]
         r_add_u256 = np.concatenate(
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_add])
         r_add_rdc_u256 = np.concatenate(
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_add_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Doubling EC points...",
+        print("Doubling EC points...",end='')
         r_double = [x.double() for x in ec2bn128_ecjac]
         r_double_rdc = [x.reduce() for x in r_double]
         r_double_u256 = np.concatenate(
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_double])
         r_double_rdc_u256 = np.concatenate(
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_double_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Multiplying EC points by scalar...",
+        print("Multiplying EC points by scalar...",end='')
         sys.stdout.flush()
         r_mul = [x * scl for x, scl in zip(ec2bn128_ecjac, ecbn128_scl)]
         r_mul_rdc = [x.reduce() for x in r_mul]
@@ -169,9 +170,9 @@ class CUEC2Test(unittest.TestCase):
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mul])
         r_mul_rdc_u256 = np.concatenate(
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mul_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Multiplying/Add EC points...",
+        print("Multiplying/Add EC points...",end='')
         sys.stdout.flush()
         r_mad = np.copy(r_mul)
         r_mad_rdc = np.copy(r_mul_rdc)
@@ -182,16 +183,16 @@ class CUEC2Test(unittest.TestCase):
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mad])
         r_mad_rdc_u256 = np.concatenate(
             [[x.get_P()[0].as_uint256(), x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mad_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Saving data...\n",
+        print("Saving data...\n",end='')
         np.savez_compressed(EC2BN128_datafile, scl=ecbn128_scl, ecjac=ec2bn128_ecjac, ecjac_rdc=ec2bn128_ecjac_rdc,
                             ecv_u256=ec2bn128_vector_u256, ecv_u256_rdc=ec2bn128_vector_u256_rdc,
                             scl_u256=ecbn128_scl_u256,
                             radd=r_add_u256, radd_rdc=r_add_rdc_u256, rdouble=r_double_u256,
                             rdouble_rdc=r_double_rdc_u256,
                             rmul=r_mul_u256, rmul_rdc=r_mul_rdc_u256, rmad=r_mad_u256, rmad_rdc=r_mad_rdc_u256)
-        print "Done\n"
+        print("Done\n")
 
     def test_0is_on_curve(self):
   

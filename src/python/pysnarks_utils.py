@@ -62,7 +62,7 @@ def json_to_dict(data, labels=None ):
         elif type(data[k]) is dict:
           json_to_dict(data[k])
         elif is_long(v):
-          data[k] = long(v)
+          data[k] = int(v)
 
     return data
 
@@ -74,14 +74,14 @@ def json_to_list(data):
              data[idx] = json_to_dict(el)
          elif type(el) is unicode or type(el) is str:
              if el.isdigit():
-               data[idx] = long(el)
+               data[idx] = int(el)
              else:
                  data[idx] = el
      return
 
 def is_long(input):
         try:
-            num = long(input)
+            num = int(input)
         except ValueError:
             return False
         return True

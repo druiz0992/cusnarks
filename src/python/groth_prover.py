@@ -150,7 +150,7 @@ class GrothProver(object):
            self.witness_scl = [BigInt(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
            f.close()
        else:
-          print "File doesn't exist"
+          print("File doesn't exist")
           assert False
        
     def read_proof_data(self, proving_key_f):
@@ -185,7 +185,7 @@ class GrothProver(object):
            self.vk_proof = json_to_dict(tmp_data)
            f.close()
        else:
-          print "File doesn't exist"
+          print("File doesn't exist")
           assert False
 
 
@@ -503,7 +503,8 @@ class GrothProver(object):
         ps = [str(el.as_long()) for el in self.public_signals]
         j = json.dumps(ps, indent=4).encode('utf8')
         f = open(self.public_f, 'w')
-        print >> f, j
+        #print >> f, j
+        print(j,file=f)
         f.close()
 
         # write proof file
@@ -516,7 +517,8 @@ class GrothProver(object):
         proof = {"pi_a" : pi_a, "pi_b" : pi_b, "pi_c" : pi_c, "protocol" : "groth"}
         j = json.dumps(proof, indent=4).encode('utf8')
         f = open(self.proof_f, 'w')
-        print >> f, j
+        #print >> f, j
+        print(j, file=f)
         f.close()
 
     def calculateH(self, d1, d2, d3):
@@ -1106,8 +1108,8 @@ if __name__ == "__main__":
     for i in range(20):
       t1,t2,t3 = G.gen_proof(witness_f)
       t.append(np.concatenate((t1,t2,t3)))
-      print t[-1]
-    print t
+      print(t[-1])
+    print(t)
      
     #G.write_json()
 

@@ -54,10 +54,12 @@
 // ------------------------------------------------------------------
 
 """
+from __future__ import print_function
 import math
 from random import randint
 import numpy as np
 import os,sys, os.path
+from builtins import int
 
 from zfield import *
 
@@ -97,7 +99,7 @@ class ZPoly(object):
         """
         if not ZField.is_init():
             assert False, "Prime field not initialized"
-        elif isinstance(p, int) or isinstance(p, long) or isinstance(p, BigInt):
+        elif isinstance(p, int) or isinstance(p, int) or isinstance(p, BigInt):
             if p < 0:
                 assert False, "Polynomial needs to be at least degree 0"
             else:
@@ -158,15 +160,15 @@ class ZPoly(object):
             elif isinstance(p[0], ZFieldElRedc):
                 zcoeff = p
                 FIDX = ZUtils.FRDC
-            elif isinstance(p[0], int) or isinstance(p[0], long) or isinstance(p[0], BigInt):
+            elif isinstance(p[0], int) or isinstance(p[0], int) or isinstance(p[0], BigInt):
                 zcoeff = [ZFieldElExt(t) for t in p]
                 FIDX = ZUtils.FEXT
             else:
                 assert False, "Unexpected data type"
         elif type(p) is dict:
-            c = sorted([long(k) for k in p.keys()])
+            c = sorted([int(k) for k in p.keys()])
             if len(c) > 0:
-                degree = long(c[-1])
+                degree = int(c[-1])
             else:
                 # TODO : Improve this. IT will fail if coeffs are ZFieldElRedc. Also, I am using
                 # this case to solve issue win groth protocol when array y sparse polys includes
@@ -180,7 +182,7 @@ class ZPoly(object):
             elif isinstance(p[d_k], ZFieldElRedc):
                 zcoeff = p
                 FIDX = ZUtils.FRDC
-            elif isinstance(p[d_k], int) or isinstance(p[d_k], long) or isinstance(p[d_k], BigInt):
+            elif isinstance(p[d_k], int) or isinstance(p[d_k], int) or isinstance(p[d_k], BigInt):
                 zcoeff = {i: ZFieldElExt(p[i]) for i in p.keys()}
                 FIDX = ZUtils.FEXT
             elif isinstance(p, ZPoly):
@@ -206,7 +208,7 @@ class ZPoly(object):
           Returns dictionary of coeffs to list of coeffs.
         """
 
-        c = sorted([long(k) for k in self.zcoeff.keys()])
+        c = sorted([int(k) for k in self.zcoeff.keys()])
         l = np.asarray(self.zero().get_coeff() * (c[-1] + 1))
         l[c] = [self.zcoeff[str(k)] for k in c]
 
@@ -341,7 +343,7 @@ class ZPoly(object):
          if self.FIDX == ZUtils.FEXT:
             self.zcoeff = [ZFieldElExt(c) for c in p1[::-1]]
          else:
-            self.zcoeff = [ZFieldElExt(c).reduce() for c in p1[::-1]]
+            self.zcoeff = [ZFieldElExt(int(c)).reduce() for c in p1[::-1]]
 
          self.degree = len(self.zcoeff) - 1
 
@@ -355,22 +357,22 @@ class ZPoly(object):
 
         d1 = self.get_degree()
         dtp = 2*d1
-        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+        dt = (1 << int(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
-        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
+        roots_slice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
         # Recompute roots in case nroots changed or format.
         #TODO
         #if len(roots) != dt or not isinstance(roots[0],type(self.zcoeff[0])):
             #roots, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
         self.expand_to_degree(dt, self)
-        self._ntt(roots_slice[:dt/2 + 1])
+        self._ntt(roots_slice[:int(dt/2) + 1])
         #self.zcoeff = np.multiply(self.zcoeff, self.zcoeff).tolist()
         for i in xrange(dt+1):
            self.zcoeff[i] = self.zcoeff[i] ** 2
 
-        self._intt(inv_roots_slice[:dt/2 + 1])
+        self._intt(inv_roots_slice[:int(dt/2) + 1])
         self.expand_to_degree(dtp,self)
 
     def poly_mul_fft(self, p2, skip_fft=False): 
@@ -383,10 +385,10 @@ class ZPoly(object):
         d1 = self.get_degree()
         d2 = p2.get_degree()
         dtp = d1 + d2
-        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+        dt = (1 << int(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
-        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
+        roots_slice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
         # Recompute roots in case nroots changed or format.
         #TODO
         #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
@@ -396,22 +398,22 @@ class ZPoly(object):
         p2.expand_to_degree(dt, p2)
 
         if not skip_fft:
-           self._ntt(roots_slice[:dt/2 + 1])
-           p2._ntt(roots_slice[:dt/2 + 1])
+           self._ntt(roots_slice[:int(dt/2) + 1])
+           p2._ntt(roots_slice[:int(dt/2) + 1])
 
         self.zcoeff = np.multiply(self.zcoeff, p2.zcoeff).tolist()
         #for i in xrange(dt+1):
         #   self.zcoeff[i] *= p2.zcoeff[i]
 
-        self._intt(inv_roots_slice[:dt/2 + 1])
+        self._intt(inv_roots_slice[:int(dt/2) + 1])
         self.expand_to_degree(dtp,self)
 
     @classmethod
     def printM(cls,M):
         for i in xrange(M.shape[0]):
             for j in xrange(M.shape[1]):
-                print M[i,j].as_long(),
-            print "\n"
+                print(M[i,j].as_long(), end='')
+            print("\n")
 
     def ntt_parallel2D(self,nrows,ncols):
         """
@@ -429,31 +431,31 @@ class ZPoly(object):
 
         M = np.asarray(self.zcoeff).reshape((nrows, ncols), order='F')
 
-        roots_Mslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_Mslice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
-        roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
+        roots_Nslice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(ncols))]
 
-        #print M.shape
-        #print ZPoly(roots_Nslice).as_uint256()
+        #print(M.shape)
+        #print(ZPoly(roots_Nslice).as_uint256())
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
             #newP._ntt_DIF(roots_Nslice[:ncols/2+1])
-            #print "IN ROW" +str(i) +": " + str(newP.as_uint256())
-            newP._ntt(roots_Nslice[:ncols/2+1])
-            #print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
+            #print("IN ROW" +str(i) +": " + str(newP.as_uint256()))
+            newP._ntt(roots_Nslice[:int(ncols/2)+1])
+            #print("OUT ROW" +str(i) +": " + str(newP.as_uint256()))
             for k,c in enumerate(newP.get_coeff()):
                 M[i,k] = c * roots_Mslice[i*k]
         
         M = M.transpose()
 
-        roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
+        roots_Nslice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(nrows))]
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
-            #print "IN ROW" +str(i) +": " + str(newP.as_uint256())
+            #print("IN ROW" +str(i) +": " + str(newP.as_uint256()))
             #newP._ntt_DIF(roots_Nslice[:nrows/2+1])
-            newP._ntt(roots_Nslice[:nrows/2+1])
-            #print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
+            newP._ntt(roots_Nslice[:int(nrows/2)+1])
+            #print("OUT ROW" +str(i) +": " + str(newP.as_uint256()))
             M[i] = newP.get_coeff()
 
         self.zcoeff = np.reshape(M,-1,order='F').tolist()
@@ -474,28 +476,28 @@ class ZPoly(object):
 
         M = np.asarray(self.zcoeff).reshape((nrows, ncols), order='F')
 
-        inv_roots_Mslice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_Mslice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
-        inv_roots_Nslice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
+        inv_roots_Nslice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(ncols))]
         scaler = ZFieldElExt(len(inv_roots_Mslice)).inv().reduce()
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
             #newP._ntt_DIF(inv_roots_Nslice[:ncols/2+1])
-            newP._ntt(inv_roots_Nslice[:ncols/2+1])
+            newP._ntt(inv_roots_Nslice[:int(ncols/2)+1])
             for k,c in enumerate(newP.get_coeff()):
                 M[i,k] = c * inv_roots_Mslice[i*k]
 
         M = M.transpose()
 
-        inv_roots_Nslice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
+        inv_roots_Nslice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(nrows))]
 
         for i,rows in enumerate(M):
             newP = ZPoly(rows.tolist())
-            #print "IN ROW" +str(i) +": " + str(newP.as_uint256())
+            #print("IN ROW" +str(i) +": " + str(newP.as_uint256()))
             #newP._ntt_DIF(inv_roots_Nslice[:nrows/2+1])
-            newP._ntt(inv_roots_Nslice[:nrows/2+1])
-            #print "OUT ROW" +str(i) +": " + str(newP.as_uint256())
+            newP._ntt(inv_roots_Nslice[:int(nrows/2)+1])
+            #print("OUT ROW" +str(i) +": " + str(newP.as_uint256()))
             for k,c in enumerate(newP.get_coeff()):
                 M[i,k] = c * scaler
             #M[i] = newP.get_coeff()
@@ -520,7 +522,7 @@ class ZPoly(object):
 
         M = np.asarray(self.zcoeff).reshape((nrows*depthr, ncols*depthc), order='F')
 
-        roots_Mslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_Mslice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
         if depthc != 1:
             for i,rows in enumerate(M):
@@ -530,10 +532,10 @@ class ZPoly(object):
                 for k,c in enumerate(newP.get_coeff()):
                     M[i,k] = c * roots_Mslice[i*k]
         else:
-            roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(ncols)]
+            roots_Nslice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(ncols))]
             for i,rows in enumerate(M):
                 newP = ZPoly(rows.tolist())
-                newP._ntt_DIF(roots_Nslice[:ncols/2+1])
+                newP._ntt_DIF(roots_Nslice[:int(ncols/2)+1])
     
                 for k,c in enumerate(newP.get_coeff()):
                     M[i,k] = c * roots_Mslice[i*k]
@@ -546,10 +548,10 @@ class ZPoly(object):
                 newP.ntt_parallel2D(nrows,depthr)
                 M[i] = newP.get_coeff()
         else:
-            roots_Nslice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(nrows)]
+            roots_Nslice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(nrows))]
             for i,rows in enumerate(M):
                 newP = ZPoly(rows.tolist())
-                newP._ntt_DIF(roots_Nslice[:nrows/2+1])
+                newP._ntt_DIF(roots_Nslice[:int(nrows/2)+1])
                 M[i] = newP.get_coeff()
 
         self.zcoeff = np.reshape(M,-1,order='F').tolist()
@@ -562,9 +564,9 @@ class ZPoly(object):
 
         d1 = self.get_degree()
         dtp = d1
-        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+        dt = (1 << int(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_slice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
         # Recompute roots in case nroots changed or format.
         #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
@@ -572,7 +574,7 @@ class ZPoly(object):
 
         self.expand_to_degree(dt, self)
 
-        self._ntt(roots_slice[:dt/2 + 1])
+        self._ntt(roots_slice[:int(dt/2) + 1])
 
     def ntt_DIF(self): 
         """
@@ -582,9 +584,9 @@ class ZPoly(object):
 
         d1 = self.get_degree()
         dtp = d1
-        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+        dt = (1 << int(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        roots_slice = roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        roots_slice = roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
         # Recompute roots in case nroots changed or format.
         #if len(roots) != dt+1 or not isinstance(roots[0],type(self.zcoeff[0])):
@@ -592,7 +594,7 @@ class ZPoly(object):
 
         self.expand_to_degree(dt, self)
 
-        self._ntt_DIF(roots_slice[:dt/2 + 1])
+        self._ntt_DIF(roots_slice[:int(dt/2) + 1])
 
   
     def intt(self): 
@@ -604,9 +606,9 @@ class ZPoly(object):
 
         d1 = self.get_degree()
         dtp = d1
-        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+        dt = (1 << int(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
         # Recompute roots in case nroots changed or format.
         #TODO
@@ -614,7 +616,7 @@ class ZPoly(object):
         #    _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
-        self._intt(inv_roots_slice[:dt/2 + 1])
+        self._intt(inv_roots_slice[:int(dt/2) + 1])
 
     def intt_DIT(self): 
         """
@@ -625,9 +627,9 @@ class ZPoly(object):
 
         d1 = self.get_degree()
         dtp = d1
-        dt = (1 << long(math.ceil(math.log(dtp+1, 2)))) - 1
+        dt = (1 << int(math.ceil(math.log(dtp+1, 2)))) - 1
 
-        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:ZUtils.NROOTS/(dt+1)]
+        inv_roots_slice = inv_roots[0:ZUtils.NROOTS:int(ZUtils.NROOTS/(dt+1))]
 
         # Recompute roots in case nroots changed or format.
         #TODO
@@ -635,7 +637,7 @@ class ZPoly(object):
         #    _, inv_roots = ZField.find_roots(dt+1, rformat_ext = self.FIDX==ZUtils.FEXT)
 
         self.expand_to_degree(dt, self)
-        self._intt_DIT(inv_roots_slice[:dt/2 + 1])
+        self._intt_DIT(inv_roots_slice[:int(dt/2) + 1])
 
 
 
@@ -661,10 +663,10 @@ class ZPoly(object):
                      right = vector[t] 
                      vector[s] = left + right
                      vector[t] = (left - right) * powtable[(2**i)*k]
-                     #print "L:" + str(i)
-                     #print "s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256())
-                     #print "t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256())
-                     #print "k:" + str((2**i)*k) + " root " +str(powtable[(2**i)*k].as_uint256())
+                     #print("L:" + str(i))
+                     #print("s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256()))
+                     #print("t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256()))
+                     #print("k:" + str((2**i)*k) + " root " +str(powtable[(2**i)*k].as_uint256()))
 
     def _intt_DIT(self, powtable):
         """
@@ -687,10 +689,10 @@ class ZPoly(object):
                      right = vector[t] 
                      vector[s] = left + right * powtable[(2**i)*k]
                      vector[t] = left - right * powtable[(2**i)*k]
-                     #print "L:" + str(i)
-                     #print "s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256())
-                     #print "t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256())
-                     #print "k:" + str((2**i)*k) + " root " +str(powtable[(2**i)*k].as_uint256())
+                     #print("L:" + str(i))
+                     #print("s:" + str(s) + " " + str(left.as_uint256()) +"   -> " +str(vector[s].as_uint256()))
+                     #print("t:" + str(t) + " " + str(right.as_uint256()) +"  -> " +str(vector[t].as_uint256()))
+                     #print("k:" + str((2**i)*k) + " root " +str(powtable[(2**i)*k].as_uint256()))
 
         nroots = ZFieldElExt(len(powtable)*2)
         if self.FIDX == ZUtils.FEXT:
@@ -789,19 +791,19 @@ class ZPoly(object):
         me = m + nd
         ne = n + nd
   
-        #print me, ne
+        #print(me, ne)
 
         if invpol is None:
            s = ve.inv()
         else:
            s = invpol
 
-        #print "UE " 
-        #print ue.as_list()      
-        #print "VE " 
-        #print ve.as_list()
-        #print "S " 
-        #print s.as_list()
+        #print("UE " )
+        #print(ue.as_list())      
+        #print("VE " )
+        #print(ve.as_list())
+        #print("S " )
+        #print(s.as_list())
 
         # handle the case when m>2n
         if me > 2* ne:
@@ -810,8 +812,8 @@ class ZPoly(object):
             s_copy = ZPoly(s)
             s_copy.poly_mul(ve_copy)
             t = ZPoly([ZPoly.one[self.FIDX]]).scale( 2 * ne) - s_copy
-            #print "T "
-            #print t.as_list()[0]
+            #print("T ")
+            #print(t.as_list()[0])
 
         q = self.zero()
         rem = ZPoly(ue)
@@ -823,18 +825,18 @@ class ZPoly(object):
             us.poly_mul(rem_copy)
             us = us.scale(-2*ne)
             q = q + us
-            #print "US "
-            #print us.as_list()[0]
-            #print "Q "
-            #print q.as_list()[0]
+            #print("US ")
+            #print(us.as_list()[0])
+            #print("Q ")
+            #print(q.as_list()[0])
 
             if me > 2 * ne:
                 t_copy = ZPoly(t)
                 rem.poly_mul(t_copy)
                 rem = rem.scale(-2*ne)
                 me = rem.get_degree()
-                #print "REM "
-                #print rem.as_list()[0]
+                #print("REM ")
+                #print(rem.as_list()[0])
             else:
                 done = True
 
@@ -859,9 +861,9 @@ class ZPoly(object):
         me = m + nd
         ne = n + nd
 
-        #print me, ne
-        #print "UE " 
-        #print ue.as_list()      
+        #print(me, ne)
+        #print("UE ")
+        #print(ue.as_list())
 
         # handle the case when m>2n
         q = self.zero()
@@ -872,8 +874,8 @@ class ZPoly(object):
           #t = ZPoly([ZFieldElExt(0) for i in range(n-1)] + [ZFieldElExt(1)])
         #else:
           #t = ZPoly([ZFieldElRedc(0) for i in range(n-1)] + [ZFieldExt(1).reduce()])
-        #print "T "
-        #print t.as_list()
+        #print("T ")
+        #print(t.as_list())
 
         while not done:
             #if len(rem.get_coeff()[2*ne-nd:]) == 0:
@@ -881,17 +883,17 @@ class ZPoly(object):
              #   return q
             us = ZPoly(rem.get_coeff()[ne:]) + ZPoly(rem.get_coeff()[2*ne-nd:]) # degree me - ne
             q = q + us
-            #print "US "
-            #print us.as_list()[0]
-            #print "Q "
-            #print q.as_list()[0]
+            #print("US ")
+            #print(us.as_list()[0])
+            #print("Q ")
+            #print(q.as_list()[0])
 
             if me > 2 * ne:
                 #rem = ZPoly(rem.get_coeff()[ne+1:])
                 rem = rem.scale(-2*n)
                 me = rem.get_degree()
-                #print "REM "
-                #print rem.as_list()[0]
+                #print("REM ")
+                #print(rem.as_list()[0])
             else:
                 done = True
             niter +=1
@@ -914,12 +916,12 @@ class ZPoly(object):
         if k == 1:
             return ZPoly([self.zcoeff[0].inv()])
 
-        npa = self.scale(-k/2)
+        npa = self.scale(int(-k/2))
         q = npa.inv()
         if self.FIDX == ZUtils.FEXT:
-           a = (q << ZPoly.one[self.FIDX]).scale(3*k/2-2)
+           a = (q << ZPoly.one[self.FIDX]).scale(3*int(k/2)-2)
         else :
-           a = ( q * ZPoly.two[self.FIDX]).scale(3*k/2-2)
+           a = ( q * ZPoly.two[self.FIDX]).scale(3*int(k/2)-2)
         q.poly_mul(q)
         b = ZPoly(self)
         b.poly_mul(q)
@@ -966,7 +968,7 @@ class ZPoly(object):
         if d >= 0:
             newP.zcoeff = self.zero().get_coeff() * d + self.get_coeff()
         else:
-            newP.zcoeff = self.get_coeff()[-d:]
+            newP.zcoeff = self.get_coeff()[int(-d):]
 
         newP.FIDX =   self.FIDX
         newP.degree = len(newP.zcoeff)-1
@@ -983,7 +985,7 @@ class ZPoly(object):
         """
          Multiply polynomial p(x) with scalar (constant) 
         """
-        if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
+        if isinstance(a, int) or isinstance(a, int) or isinstance(a, BigInt):
             if a == 0 and self.FIDX == ZUtils.FEXT:
                return ZPoly([0])
             elif a == 0 and self.FIDX == ZUtils.FRDC:
@@ -1040,7 +1042,7 @@ class ZPoly(object):
         """
           << K to all coeffs of poly
         """
-        if isinstance(k,int) or isinstance(k,long) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
+        if isinstance(k,int) or isinstance(k,int) or isinstance(k, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
             return ZPoly([c << k for c in self.get_coeff()])
         else:
             assert False, "Unexpected data type"
@@ -1077,10 +1079,10 @@ class ZPoly(object):
          Print poly
         """
         if type(self.get_coeff()) is list:
-          print [c.as_long() for c in self.get_coeff()]
+          print([c.as_long() for c in self.get_coeff()])
         else :
           l =  self.dict_to_list()
-          print [c.as_long() for c in l]
+          print([c.as_long() for c in l])
 
     def as_uint256(self):
         if type(self.get_coeff()) is list:
@@ -1129,7 +1131,7 @@ class ZPolySparse(ZPoly):
         Normalize poly to have a non zero most significant coefficient
         """
         newP = ZPolySparse(self)
-        coeff = sorted([long(k) for k in newP.zcoeff.keys()])
+        coeff = sorted([int(k) for k in newP.zcoeff.keys()])
 
         if coeff[-1] != 0:
                 return newP
@@ -1198,7 +1200,7 @@ class ZPolySparse(ZPoly):
         """
          Multiply polynomial ``p(x)`` with scalar (constant) ``a``.
         """
-        if isinstance(a, int) or isinstance(a, long) or isinstance(a, BigInt):
+        if isinstance(a, int) or isinstance(a, int) or isinstance(a, BigInt):
             if a == 0 and self.FIDX == ZUtils.FEXT:
                return ZPolySparse({'0':0})
             elif a == 0 and self.FIDX == ZUtils.FRDC:
@@ -1254,7 +1256,7 @@ class ZPolySparse(ZPoly):
             # sparse + dense -> dense
             newP = ZPoly(v)
             self_coeff = self.get_coeff()
-            self_coeff_deg = sorted([long(k) for k in self_coeff.keys()])
+            self_coeff_deg = sorted([int(k) for k in self_coeff.keys()])
             if self_coeff_deg[-1] > newP.get_degree():
                 newP = newP.expand_to_degree(self_coeff_deg[-1])
 
@@ -1279,7 +1281,7 @@ class ZPolySparse(ZPoly):
     def __lshift__(self,x):
         """
         """
-        if isinstance(x,int) or isinstance(x,long) or isinstance(x, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
+        if isinstance(x,int) or isinstance(x,int) or isinstance(x, BigInt) and isinstance(self.zcoeff[0],ZFieldElExt):
             return ZPolySparse({k : self.zcoeff[k] << x for k in self.zcoeff.keys()})
         else:
             assert False, "Unexpected data type"

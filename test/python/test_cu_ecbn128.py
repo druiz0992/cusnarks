@@ -33,6 +33,7 @@
 // ------------------------------------------------------------------
 
 """
+from __future__ import print_function 
 import os,sys, os.path
 import unittest
 import numpy as np
@@ -64,7 +65,7 @@ class CUECTest(unittest.TestCase):
     TEST_ITER = 5000
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = curve_data['prime_r']
-    nsamples = 1024
+    nsamples = int(1024)
     ntest_points = 6
     u256_p = BigInt(prime).as_uint256()
     ZField(prime, curve_data['curve'])
@@ -87,7 +88,7 @@ class CUECTest(unittest.TestCase):
         r_mul_rdc = npzfile['rmul_rdc']
         #r_mad = npzfile['rmad']
         r_mad_rdc = npzfile['rmad_rdc']
-        nsamples = len(ecbn128_vector_u256)/ECP_JAC_INDIMS
+        nsamples = int(len(ecbn128_vector_u256)/ECP_JAC_INDIMS)
 
         """
         TODO : prepare LUT computing all combinations of Sum Pi, for a window
@@ -112,17 +113,17 @@ class CUECTest(unittest.TestCase):
 
     else:
 
-        print "Generating Random scalars....",
+        print("Generating Random scalars....",end='')
         ecbn128_scl =      [randint(1,prime-1) for x in xrange(nsamples)]
-        print "Done\n"
-        print "Converting Random scalars to u256...",
+        print("Done\n")
+        print("Converting Random scalars to u256...",end='')
         ecbn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
-        print "Done\n"
+        print("Done\n")
 
         ecbn128_ecjac, ecbn128_ecjac_rdc  = np.asarray(ECC.rand(nsamples, ectype = 1, reduce=True, verbose="Generating Random EC points...\t"))
-        print "Done\n"
+        print("Done\n")
          
-        print "Forming vector...",
+        print("Forming vector...",end='')
         ecbn128_ecjac_u256 = np.asarray([[x.get_P()[0].as_uint256(),
                                           x.get_P()[1].as_uint256(),
                                           x.get_P()[2].as_uint256()] for x in ecbn128_ecjac])
@@ -139,31 +140,31 @@ class CUECTest(unittest.TestCase):
         #ecbn128_vector_u256_rdc[::3] = ecbn128_scl_u256
         ecbn128_vector_u256_rdc[::2] = ecbn128_ecjac_u256_rdc[:,::3].reshape((-1,NWORDS_256BIT))
         ecbn128_vector_u256_rdc[1::2] = ecbn128_ecjac_u256_rdc[:,1::3].reshape((-1,NWORDS_256BIT))
-        print "Done\n"
+        print("Done\n")
 
-        print "Adding EC points...",
+        print("Adding EC points...",end='')
         r_add     = [(x + y) for x, y in zip(ecbn128_ecjac[::2], ecbn128_ecjac[1::2])]
         r_add_rdc = [(x + y) for x, y in zip(ecbn128_ecjac_rdc[::2], ecbn128_ecjac_rdc[1::2])]
         r_add_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_add])
         r_add_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_add_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Doubling EC points...",
+        print("Doubling EC points...",end='')
         r_double = [x.double() for x in ecbn128_ecjac]
         r_double_rdc = [x.reduce() for x in r_double]
         r_double_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_double])
         r_double_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_double_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Multiplying EC points by scalar...",
+        print("Multiplying EC points by scalar...",end='')
         sys.stdout.flush()
         r_mul = [x * scl for x,scl in zip(ecbn128_ecjac,ecbn128_scl)]
         r_mul_rdc = [x.reduce() for x in r_mul]
         r_mul_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mul])
         r_mul_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mul_rdc])
-        print "Done\n"
+        print("Done\n")
 
-        print "Multiplying/Add EC points...", 
+        print("Multiplying/Add EC points...",end='')
         sys.stdout.flush()
         r_mad = np.copy(r_mul)
         r_mad_rdc = np.copy(r_mul_rdc)
@@ -172,15 +173,15 @@ class CUECTest(unittest.TestCase):
         r_mad_rdc =  [r_mad[0].reduce()]
         r_mad_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mad])
         r_mad_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_mad_rdc])
-        print "Done\n"
+        print("Done\n")
 
 
-        print "Saving data...\n",
+        print("Saving data...\n",end='')
         np.savez_compressed(ECBN128_datafile, scl=ecbn128_scl, ecjac=ecbn128_ecjac, ecjac_rdc=ecbn128_ecjac_rdc,
                                    ecv_u256=ecbn128_vector_u256, ecv_u256_rdc=ecbn128_vector_u256_rdc, scl_u256=ecbn128_scl_u256,
                                    radd=r_add_u256, radd_rdc=r_add_rdc_u256, rdouble=r_double_u256, rdouble_rdc=r_double_rdc_u256,
                                    rmul=r_mul_u256, rmul_rdc=r_mul_rdc_u256, rmad=r_mad_u256, rmad_rdc=r_mad_rdc_u256)
-        print "Done\n"
+        print("Done\n")
 
 
 
@@ -190,7 +191,7 @@ class CUECTest(unittest.TestCase):
         ecbn128_pt_ec = np.zeros((ECP_JAC_OUTDIMS*CUECTest.nsamples,NWORDS_256BIT),dtype=np.uint32)
         ecbn128_pt_ec[0::3] = CUECTest.ecbn128_vector_u256[0::2]
         ecbn128_pt_ec[1::3] = CUECTest.ecbn128_vector_u256[1::2]
-        ecbn128_pt_ec[2::3] = [ZFieldElExt(1).as_uint256()] * (len(CUECTest.ecbn128_vector_u256)/ECP_JAC_INDIMS)
+        ecbn128_pt_ec[2::3] = [ZFieldElExt(1).as_uint256()] * int(len(CUECTest.ecbn128_vector_u256)/ECP_JAC_INDIMS)
         ecbn128_pt_ec = ECC.from_uint256(ecbn128_pt_ec, in_ectype=1, out_ectype=1, reduced=False)
        
         for P in ecbn128_pt_ec:
@@ -200,7 +201,7 @@ class CUECTest(unittest.TestCase):
         ecbn128_pt_ec = np.zeros((ECP_JAC_OUTDIMS*CUECTest.nsamples,NWORDS_256BIT),dtype=np.uint32)
         ecbn128_pt_ec[0::3] = CUECTest.ecbn128_vector_u256_rdc[0::2]
         ecbn128_pt_ec[1::3] = CUECTest.ecbn128_vector_u256_rdc[1::2]
-        ecbn128_pt_ec[2::3] = [ZFieldElExt(1).reduce().as_uint256()] * (len(CUECTest.ecbn128_vector_u256)/ECP_JAC_INDIMS)
+        ecbn128_pt_ec[2::3] = [ZFieldElExt(1).reduce().as_uint256()] * int(len(CUECTest.ecbn128_vector_u256)/ECP_JAC_INDIMS)
         ecbn128_pt_ec = ECC.from_uint256(ecbn128_pt_ec, in_ectype=1, out_ectype=1, reduced=True)
 
        

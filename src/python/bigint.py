@@ -49,7 +49,10 @@
 
 """
 
+from builtins import int
+from past.builtins import long
 from random import randint
+from past.builtins import xrange
 import numpy as np
 
 
@@ -85,20 +88,20 @@ class BigInt(object):
             if isinstance(bignum, str):
                 if min_bignum[:2].upper() == "0X":
                     try:
-                        lthr = long(min_bignum, 16)
+                        lthr = int(min_bignum, 16)
                     except ValueError:
                         assert False, "min_bignum string not a hexadecimal number"
                 else:
                     try:
-                        lthre = long(min_bignum, 10)
+                        lthre = int(min_bignum, 10)
                     except ValueError:
                         assert False, "min_bignum string not a decimal number"
 
             elif isinstance(min_bignum, BigInt):
-                lthr = long(min_bignum.bignum)
+                lthr = int(min_bignum.bignum)
 
-            elif isinstance(min_bignum, long) or isinstance(min_bignum, int):
-                lthr = long(min_bignum)
+            elif isinstance(min_bignum, int) or isinstance(min_bignum, long):
+                lthr = int(min_bignum)
 
             else:
                 assert False, "Invalid type min_bignum"
@@ -107,20 +110,23 @@ class BigInt(object):
         if isinstance(bignum, str):
             if bignum[:2].upper() == "0X":
                 try:
-                    self.bignum = long(bignum, 16)
+                    self.bignum = int(bignum, 16)
                 except ValueError:
                     assert False, "String not a hexadecimal number"
             else:
                 try:
-                    self.bignum = long(bignum, 10)
+                    self.bignum = int(bignum, 10)
                 except ValueError:
                     assert False, "String not a decimal number"
 
         elif isinstance(bignum, BigInt):
             self.bignum = bignum.bignum
 
-        elif isinstance(bignum, long) or isinstance(bignum, int):
-            self.bignum = long(bignum)
+        elif isinstance(bignum, int) or isinstance(bignum, long):
+            self.bignum = int(bignum)
+
+        elif isinstance(bignum, float):
+            self.bignum = int(bignum)
 
         else:
             assert False, "Invalid type"
@@ -137,7 +143,7 @@ class BigInt(object):
         if isinstance(x, BigInt):
             return BigInt(self.bignum + x.bignum)
 
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum + x)
 
         else:
@@ -149,7 +155,7 @@ class BigInt(object):
         """
         if isinstance(x, BigInt):
             return BigInt(self.bignum - x.bignum)
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum - x)
         else:
             assert False, "Invalid type"
@@ -160,7 +166,7 @@ class BigInt(object):
         """
         if isinstance(x, BigInt):
             return BigInt(self.bignum * x.bignum)
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum * x)
         else :
             return x * self
@@ -169,7 +175,7 @@ class BigInt(object):
         """
          X ^ Y
         """
-        if isinstance(x, int) or isinstance(x, long) and x <= BigInt.POW_THR:
+        if isinstance(x, int) or isinstance(x, int) and x <= BigInt.POW_THR:
             return BigInt(self.bignum ** x)
         elif isinstance(x, BigInt) and x <= BigInt.POW_THR:
             return BigInt(self.bignum ** x.bignum)
@@ -180,7 +186,7 @@ class BigInt(object):
         """
          X // Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum // x)
         elif isinstance(x, BigInt):
             return BigInt(self.bignum // x.bignum)
@@ -191,7 +197,7 @@ class BigInt(object):
         """
          X % Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum % x)
         elif isinstance(x, BigInt):
             return BigInt(self.bignum % x.bignum)
@@ -211,7 +217,7 @@ class BigInt(object):
         if isinstance(x, BigInt):
             self.bignum += x.bignum
             return BigInt(self.bignum)
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             self.bignum += x
             return BigInt(self.bignum)
         else:
@@ -224,7 +230,7 @@ class BigInt(object):
         if isinstance(x, BigInt):
             self.bignum -= x.bignum
             return BigInt(self.bignum)
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             self.bignum -= x
             return BigInt(self.bignum)
         else:
@@ -236,7 +242,7 @@ class BigInt(object):
         """
          X << Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum << x)
         elif isinstance(x, BigInt):
             return BigInt(self.bignum << x.bignum)
@@ -247,7 +253,7 @@ class BigInt(object):
         """
          X >> Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum >> x)
         elif isinstance(x, BigInt):
             return BigInt(self.bignum >> x.bignum)
@@ -258,7 +264,7 @@ class BigInt(object):
         """
          X <<= Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             self.bignum <<= x
             return BigInt(self.bignum)
         elif isinstance(x, BigInt):
@@ -271,7 +277,7 @@ class BigInt(object):
         """
          X >>= Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             self.bignum >>= x
             return BigInt(self.bignum)
         elif isinstance(x, BigInt):
@@ -284,7 +290,7 @@ class BigInt(object):
         """
          X & Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum & x)
         elif isinstance(x, BigInt):
             return BigInt(self.bignum & x.bignum)
@@ -295,7 +301,7 @@ class BigInt(object):
         """
          X | Y
         """
-        if isinstance(x, int) or isinstance(x, long):
+        if isinstance(x, int) or isinstance(x, int):
             return BigInt(self.bignum | x)
         elif isinstance(x, BigInt):
             return BigInt(self.bignum | x.bignum)
@@ -311,7 +317,7 @@ class BigInt(object):
         """
         if isinstance(y, BigInt):
             return self.bignum < y.bignum
-        elif isinstance(y, int) or isinstance(y, long):
+        elif isinstance(y, int) or isinstance(y, int):
             return self.bignum < y
         else:
             assert False, "Invalid type"
@@ -322,7 +328,7 @@ class BigInt(object):
         """
         if isinstance(y, BigInt):
             return self.bignum <= y.bignum
-        elif isinstance(y, int) or isinstance(y, long):
+        elif isinstance(y, int) or isinstance(y, int):
             return self.bignum <= y
         else:
             assert False, "Invalid type"
@@ -333,7 +339,7 @@ class BigInt(object):
         """
         if isinstance(y, BigInt):
             return self.bignum == y.bignum
-        elif isinstance(y, int) or isinstance(y, long):
+        elif isinstance(y, int) or isinstance(y, int):
             return self.bignum == y
         else:
             assert False, "Invalid type"
@@ -344,7 +350,7 @@ class BigInt(object):
         """
         if isinstance(y, BigInt):
             return self.bignum != y.bignum
-        elif isinstance(y, int) or isinstance(y, long):
+        elif isinstance(y, int) or isinstance(y, int):
             return self.bignum != y
         else:
             assert False, "Invalid type"
@@ -355,7 +361,7 @@ class BigInt(object):
         """
         if isinstance(y, BigInt):
             return self.bignum > y.bignum
-        elif isinstance(y, int) or isinstance(y, long):
+        elif isinstance(y, int) or isinstance(y, int):
             return self.bignum > y
         else:
             assert False, "Invalid type"
@@ -366,7 +372,7 @@ class BigInt(object):
         """
         if isinstance(y, BigInt):
             return self.bignum >= y.bignum
-        elif isinstance(y, int) or isinstance(y, long):
+        elif isinstance(y, int) or isinstance(y, int):
             return self.bignum >= y
         else:
             assert False, "Invalid type"
@@ -375,13 +381,13 @@ class BigInt(object):
         """
           print bignum
         """
-        print self.bignum
+        print(self.bignum)
 
     def as_long(self):
         """
            return bignum as long
         """
-        return long(self.bignum)
+        return int(self.bignum)
 
     @classmethod
     def from_uint256(cls, bn_uint256):
@@ -394,7 +400,7 @@ class BigInt(object):
         elif bn_uint256.ndim != 1 or bn_uint256.shape[0] != BigInt.WORDS_IN_256BN:
             assert False, "Unexpected dimensions"
 
-        n = [long(long(x) << (32 * i)) for i, x in enumerate(bn_uint256)]
+        n = [int(int(x) << (32 * i)) for i, x in enumerate(bn_uint256)]
         return BigInt( sum(n))
 
     @classmethod

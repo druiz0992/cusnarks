@@ -127,7 +127,7 @@ class Z2FieldEl(ZFieldEl):
             else:
                 #newz = (self.bignum + x.bignum)
                 newz = self + x
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             newz = (self.bignum + x)
         else:
             assert False, "Invalid type"
@@ -152,7 +152,7 @@ class Z2FieldEl(ZFieldEl):
             else:
                 newz = self - x
                 #newz = (self.bignum - x.bignum)
-        elif isinstance(x, int) or isinstance(x, long):
+        elif isinstance(x, int) or isinstance(x, int):
             newz = (self.bignum - x)
         else:
             assert False, "Invalid type"
@@ -202,7 +202,7 @@ class Z2FieldEl(ZFieldEl):
             newZ2.P[1] = ((self.P[0] + self.P[1]) * (other.P[0] + other.P[1])) - aA - bB
 
             return newZ2
-        elif isinstance(other, int) or isinstance(other, long) or isinstance(other, BigInt) or \
+        elif isinstance(other, int) or isinstance(other, int) or isinstance(other, BigInt) or \
                 (isinstance(other, ZFieldElRedc) and isinstance(self.P[0], ZFieldElRedc)) or \
                 (isinstance(other, ZFieldElExt) and isinstance(self.P[0], ZFieldElExt)):
 
@@ -228,7 +228,7 @@ class Z2FieldEl(ZFieldEl):
         return self * alpha
 
     def __lshift__(self, scalar):
-        if isinstance(scalar, int) or isinstance(scalar, long) or isinstance(scalar, BigInt):
+        if isinstance(scalar, int) or isinstance(scalar, int) or isinstance(scalar, BigInt):
             newZ2 = Z2FieldEl(self)
             newZ2.P[0] = newZ2.P[0] << scalar
             newZ2.P[1] = newZ2.P[1] << scalar

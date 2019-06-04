@@ -145,21 +145,21 @@ class GrothSetup(object):
 
         ret_v, polsA = r1cs_to_mpoly_h(self.R1CSA, self.header, pout_len, 1)
         if ret_v > 0:
-           print "increase MAX_R1CSPOLYTMP_NWORDS" 
+           print("increase MAX_R1CSPOLYTMP_NWORDS" )
         elif ret_v < 0:
-           print "increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v)
+           print("increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v))
 
         ret_v, polsB = r1cs_to_mpoly_h(self.R1CSB, self.header, pout_len, 0)
         if ret_v > 0:
-           print "increase MAX_R1CSPOLYTMP_NWORDS" 
+           print("increase MAX_R1CSPOLYTMP_NWORDS" )
         elif ret_v < 0:
-           print "increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v)
+           print("increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v))
 
         ret_v, polsC = r1cs_to_mpoly_h(self.R1CSC, self.header, pout_len, 0)
         if ret_v > 0:
-           print "increase MAX_R1CSPOLYTMP_NWORDS" 
+           print("increase MAX_R1CSPOLYTMP_NWORDS" )
         elif ret_v < 0:
-           print "increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v)
+           print("increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v))
 
     def calculateEncryptedValuesAtT(self, cirvars,toxic):
        return
@@ -340,10 +340,10 @@ class GrothSetup(object):
 
 
 if __name__ == "__main__":
-    #in_circuit_f = '../../data/prove-kyc.json'
-    #out_circuit_f = '../../data/prove-kyc.bin'
-    #GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f)
+    in_circuit_f = '../../data/prove-kyc.json'
+    out_circuit_f = '../../data/prove-kyc.bin'
+    GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f)
 
-    in_circuit_f = '../../data/prove-kyc.bin'
-    GS = GrothSetup(in_circuit_f=in_circuit_f)
-    GS.setup()
+    #in_circuit_f = '../../data/prove-kyc.bin'
+    #GS = GrothSetup(in_circuit_f=in_circuit_f)
+    #GS.setup()
