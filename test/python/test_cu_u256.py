@@ -53,9 +53,9 @@ sys.path.append('../../src/python')
 from bigint import *
 
 class CUU256Test(unittest.TestCase):
-    TEST_ITER = 1000
+    TEST_ITER = 100
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
-    nsamples = 1024*128
+    nsamples = int(1024*128)
     ntest_points = 10000
     u256_p = BigInt(prime).as_uint256()
     u256 = U256(nsamples, seed=560)
@@ -79,7 +79,7 @@ class CUU256Test(unittest.TestCase):
         u256_p = CUU256Test.u256_p
         kernel_config = {'blockD' : [U256_BLOCK_DIM] }
         kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [1], 'in_length' : [CUU256Test.nsamples], 'stride' : [1], 'out_length' : CUU256Test.nsamples}
-        for iter in xrange(CUU256Test.TEST_ITER):
+        for niter in xrange(CUU256Test.TEST_ITER):
             #if iter%CUU256Test.TEST_ITER == 0:
 
               ##first_sample = np.copy(u256_p)
@@ -137,7 +137,7 @@ class CUU256Test(unittest.TestCase):
             self.assertTrue(len(result) == CUU256Test.nsamples)
             self.assertTrue(all(np.concatenate(result[test_points]) == np.concatenate(r_shl)))
             # Test addm kernel:
-            test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
+            test_points = sample(xrange(int(CUU256Test.nsamples/2)-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
             kernel_params['in_length'] = [CUU256Test.nsamples]
@@ -159,7 +159,7 @@ class CUU256Test(unittest.TestCase):
             kernel_config['smemS'] = [0]
             kernel_config['blockD'] = [U256_BLOCK_DIM]
             kernel_config['kernel_idx'] = [CB_U256_SUBM]
-            test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
+            test_points = sample(xrange(int(CUU256Test.nsamples/2)-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
             result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params )
@@ -180,7 +180,7 @@ class CUU256Test(unittest.TestCase):
             #kernel_config = {'blockD' : 1, 'gridD' : 1 }
             #kernel_params['length'] = CUU256Test.nsamples/2
             #kernel_params['stride'] = 2
-            test_points = sample(xrange(CUU256Test.nsamples/2-2), ntest_points)
+            test_points = sample(xrange(int(CUU256Test.nsamples/2)-2), ntest_points)
             test_points2 = np.multiply(test_points,2)
 
             #u256_vector[0] = np.asarray([1895965571, 2509118507, 1177768607,   19354091,         0,         0,
