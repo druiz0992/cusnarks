@@ -393,6 +393,7 @@ def readU256CircuitFileHeader_h(bytes fname):
                 'nOutputs' : header.nOutputs,
                 'nVars' : header.nVars,
                 'nConstraints' : header.nConstraints,
+                'format' : header.format,
                 'R1CSA_nWords' : header.R1CSA_nWords,
                 'R1CSB_nWords' : header.R1CSB_nWords,
                 'R1CSC_nWords' : header.R1CSC_nWords }
@@ -418,6 +419,7 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.
     header_c.nOutputs = header['nOutputs']
     header_c.nVars = header['nVars']
     header_c.nConstraints = header['nConstraints']
+    header_c.format = header['format']
     header_c.R1CSC_nWords = header['R1CSA_nWords']
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
