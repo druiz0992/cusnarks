@@ -468,12 +468,12 @@ class CUZPolyTest(unittest.TestCase):
             self.assertTrue(all(np.concatenate(zpoly_vector == r1_u256)))
 
             if not os.path.exists(ZPOLY_input_datafile_1M):
-               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_1M)
+               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_1M.encode("UTF-8"))
                np.savez_compressed(ZPOLY_input_npz_datafile_1M, in_data=zpoly_vector)
 
             if not os.path.exists(ZPOLY_output_datafile_1M):
-               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_1M)
-               cu_zpoly.saveFile(result_fft3d.reshape(-1), ZPOLY_output_datafile_1M)
+               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_1M.encode("UTF-8"))
+               cu_zpoly.saveFile(result_fft3d.reshape(-1), ZPOLY_output_datafile_1M.encode("UTF-8"))
 
     def test_07ifft3D_1M(self):
 
@@ -661,9 +661,9 @@ class CUZPolyTest(unittest.TestCase):
             self.assertTrue(all(np.concatenate(result_fft3d == r_u256)))
 
             if not os.path.exists(ZPOLY_output_datafile_65K):
-               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_65K)
+               cu_zpoly.saveFile(zpoly_vector.reshape(-1), ZPOLY_input_datafile_65K.encode("UTF-8"))
                np.savez_compressed(ZPOLY_input_npz_datafile_65K, in_data=zpoly_vector)
-               cu_zpoly.saveFile(result_fft3d.reshape(-1), ZPOLY_output_datafile_65K)
+               cu_zpoly.saveFile(result_fft3d.reshape(-1), ZPOLY_output_datafile_65K.encode("UTF-8"))
 
     def test_09ifft3D_65K(self):
 

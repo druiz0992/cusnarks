@@ -5,6 +5,7 @@
 
 
 const char input_file[] = "../../data/prove-kyc.bin";
+//const char input_file[] = "../../data/circuit.bin";
 int main()
 {
   uint32_t *constraints;

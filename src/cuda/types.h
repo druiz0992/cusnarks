@@ -38,8 +38,13 @@
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE              (30)
-#define MAX_R1CSPOLY_NWORDS  (10000)
+#if 1
+#define MAX_R1CSPOLY_NWORDS  (10000000)
+#define MAX_R1CSPOLYTMP_NWORDS  (100000)
+#else
+#define MAX_R1CSPOLY_NWORDS  (100000)
 #define MAX_R1CSPOLYTMP_NWORDS  (10000)
+#endif
 
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
@@ -302,6 +307,7 @@ typedef struct{
   uint32_t nOutputs;
   uint32_t nVars;
   uint32_t nConstraints;
+  uint32_t tformat;
   uint32_t R1CSA_nWords;
   uint32_t R1CSB_nWords;
   uint32_t R1CSC_nWords;
@@ -310,7 +316,7 @@ typedef struct{
 
 typedef enum{
   CIRBIN_H_NWORDS_OFFSET = 0,
-  CIRBIN_H_NPUBINPUTS_OFFSET_,
+  CIRBIN_H_NPUBINPUTS_OFFSET,
   CIRBIN_H_NOUTPUTS_OFFSET,
   CIRBIN_H_NVARS_OFFSET,
   CIRBIN_H_NCONSTRAINTS_OFFSET,

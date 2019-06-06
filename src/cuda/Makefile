@@ -25,8 +25,8 @@ LOG_LEVEL=$(LOG_LEVEL)
 NVCC = nvcc
 CC  = g++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
-#CFLAGS=-c -g -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
-CFLAGS=-c -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
+CFLAGS=-c -g -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
+#CFLAGS=-c -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
 #CFLAGS=-c -DLINUXINTEL64 -g -G -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
 EXTRA_CFLAGS2=-I $(AUX_INCLUDES) -shared -fPIC
@@ -50,18 +50,27 @@ CUSRC = cusnarks_kernel.cu \
 	zpoly.cu \
 	zpoly_device.cu \
         z1_device.cu \
-        z2_device.cu \
-        log.cu
+        z2_device.cu 
 
 CSRC = rng.cpp \
        utils_host.cpp \
        constants.cpp
 
+#Check if CUDA tools are installed.
+CUDA = $(shell which $(NVCC))
+
+ifeq ($(CUDA),)
+CSRC += log.cpp
+else
+CUSRC += log.cpp
+endif
+
+
 NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
 CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
 
 
-CUDA_INSTALLED := $(shell which $(NVCC))
+CUDA_INSTALLED = $(shell which $(NVCC))
 
 ifeq ($(CUDA_INSTALLED),)
 OBJ= $(CSRC:.cpp=.o)
@@ -72,6 +81,9 @@ endif
 
 clean:
 	rm -f *.o *.cubin *.asm *.cuobj
+	echo "CUDA_INSTALLED : $(CUDA_INSTALLED)"
+	echo "CSRC : $(CSRC)"
+	echo "CUSRC : $(CUSRC)"
 
 build : so
 

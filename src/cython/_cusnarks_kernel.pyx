@@ -250,6 +250,13 @@ def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1,
         return out_vec
 
 
+def addm_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+
+        uh.caddm_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
+  
+        return out_vec
+
 def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
           np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
 
@@ -393,7 +400,7 @@ def readU256CircuitFileHeader_h(bytes fname):
                 'nOutputs' : header.nOutputs,
                 'nVars' : header.nVars,
                 'nConstraints' : header.nConstraints,
-                'format' : header.format,
+                'tformat' : header.tformat,
                 'R1CSA_nWords' : header.R1CSA_nWords,
                 'R1CSB_nWords' : header.R1CSB_nWords,
                 'R1CSC_nWords' : header.R1CSC_nWords }
@@ -412,19 +419,21 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
     #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(MAX_R1CSPOLY_NWORDS*NWORDS_256BIT,dtype=np.uint32)
-    cdef ct.uint32_t ret_val
+    cdef ct.int32_t ret_val
 
     header_c.nWords = header['nWords']
     header_c.nPubInputs = header['nPubInputs']
     header_c.nOutputs = header['nOutputs']
     header_c.nVars = header['nVars']
     header_c.nConstraints = header['nConstraints']
-    header_c.format = header['format']
+    header_c.tformat = header['tformat']
     header_c.R1CSC_nWords = header['R1CSA_nWords']
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
 
     ret_val = uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
-    
-    return ret_val, pout
+    free(header_c)
+     
+    ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
+    return ret_val, pout[:ncoeff+1]
 
