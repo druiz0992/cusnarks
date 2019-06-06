@@ -57,7 +57,9 @@ from zfield import *
 from ecc import *
 from zpoly import *
 from constants import *
+from cuda_wrapper import *
 from pysnarks_utils import *
+
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 try:
@@ -176,22 +178,30 @@ class GrothSetup(object):
        m = 1 << bits
        tm = (t ** m) 
        u_u256 = np.zeros((m,NWORDS_256BIT),dtype=np.uint32)
+       t_u256 = t.as_uint256()
       
        #TODO : slice to get only m roots
-       roots_rdc, _ = ZField.find_roots(m, find_inv_roots = False, rformat_ext=False)
-       omega = roots_rdc[1]
+       if os.path.exists(ROOTS_1M_filename):
+           npzfile = np.load(ROOTS_1M_filename)
+           roots_rdc_u256 = npzfile['roots_rdc_u256'][::1<<(20-bits)]
+       else :
+           roots_rdc_u256, _ = ZField.find_roots(m, find_inv_roots = False, rformat_ext=False)
+           roots_rdc_u256 = roots_rdc_u256[::1<<(20-bits)]
+           roots_rdc_u256 = np.asarray([r.as_uint256() for r in roots_rdc_u256],dtype=np.uint32)
+
+       omega = ZFieldElRedc.from_uint256(roots_rdc_u256[1])
 
        z = tm - 1
        if tm == ZFieldElExt(1).reduce():
          for i in xrange(m): 
            #TODO : roots[0] is always 1. Does this make any sense? check javascript version
-           if roots_rdc[0] == t:
+           if roots_rdc_u256[0] == t_u256:
              u_u256[i] = ZFieldElExt(1).reduce().as_uint256()
              return z, u_u256
 
        l = z * ZFieldElExt(m).inv().reduce()
        for i in xrange(m):
-         x = t - roots_rdc[i]
+         x = t - ZFieldRedc.from_u256(roots_rdc_u256[i])
          x_inv = x.inv()
          u_u256[i] = (l * x_inv).as_uint256()
          l = l * omega
