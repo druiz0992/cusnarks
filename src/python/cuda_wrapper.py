@@ -382,6 +382,27 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
 
      return result,t
 
+def u256_mul_cuda(pysnark, vectorA, vectorB, fidx):
+     vector = np.zeros((int(2*len(vectorA)), NWORDS_256BIT),dtype=np.uint32)
+     vector[::2] = vectorA
+     vector[1::2] = vectorB
+  
+     kernel_params={}
+     kernel_config={}
+
+     kernel_params['in_length'] = [len(vector)]
+     kernel_params['midx'] = [fidx]
+     kernel_params['out_length'] = len(vector)/2
+     kernel_params['stride'] = [2]
+     kernel_config['smemS'] = [0]
+     kernel_config['blockD'] = [U256_BLOCK_DIM]
+     kernel_config['kernel_idx'] = [CB_U256_MULM]
+
+     result, t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,2 )
+
+     return result, t
+
+
 def zpoly_mulK_cuda(pysnark, vectorA, K, fidx):  
      #TODO revie
      vector =np.concatenate((K, vector))
