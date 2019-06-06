@@ -656,7 +656,14 @@ class ECCAffine(ECC):
         Xsq = X * X
         Y = self.P[ECC.Y]
 
+        if isinstance(self.P[0],Z2FieldEl):
+           ECC.a = [Z2FieldEl([curve_params['ax1'], curve_params['ax2']]),
+                     Z2FieldEl([curve_params['ax1'], curve_params['ax2']]).reduce()] 
+        else:
+           ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
+
         a = ECC.a[self.FIDX]
+
         one = ECC.one[self.FIDX]
         two = ECC.two[self.FIDX]
         three = ECC.three[self.FIDX]

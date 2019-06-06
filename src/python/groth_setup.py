@@ -57,7 +57,7 @@ from zfield import *
 from ecc import *
 from zpoly import *
 from constants import *
-from cuda_wrapper import *
+#from cuda_wrapper import *
 from pysnarks_utils import *
 
 
@@ -262,9 +262,10 @@ class GrothSetup(object):
 
        for s in xrange(self.nVars):
          offsetA += self.polsA[s+1]
-         for i in xrange(self.polsA[s+1]):
-             v = montmult_h(self.polsA[offsetA+i*NWORDS_256BIT:offsetA+(i+1)*NWORDS_256BIT],u[i],pidx)
-             a_t_u256[s] = addm_h(a_t_u256[s] , v, pidx)
+         a_t_u256[s] = madd_h(self.polsA[offsetA:offsetA+self.polsA[s+1]*NWORDS_256BIT, u.reshape(-1), pidx)
+         #for i in xrange(self.polsA[s+1]):
+             #v = montmult_h(self.polsA[offsetA+i*NWORDS_256BIT:offsetA+(i+1)*NWORDS_256BIT],u[i],pidx)
+             #a_t_u256[s] = addm_h(a_t_u256[s] , v, pidx)
  
          offsetB += self.polsB[s+1]
          for i in xrange(self.polsB[s+1]):

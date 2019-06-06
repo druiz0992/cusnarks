@@ -414,27 +414,54 @@ void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_
     zcoeff_d_offset = accum_n_zcoeff*(NWORDS_256BIT+1) +1 + n_zpoly;
   }
 }
-# if 0
+
+void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
+{
+  uint32_t n_coeff,i,j, poly_idx, prev_n_coeff, const_offset;
+
+  const_offset = cin[0]+1;
+  prev_n_coeff = 0;
+
+  for (i=0; i < header->nConstraints; i++){
+     n_coeff = cin[1+i];
+     for (j=0; j < n_coeff - prev_n_coeff ;j++){
+       poly_idx = cin[const_offset+j];
+       coeff_len[poly_idx]++;
+     }
+     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
+     prev_n_coeff = n_coeff;
+  }
+
+  if (extend){
+    for (i=0; i < header->nPubInputs + header->nOutputs + 1; i++){
+       coeff_len[i]++;
+    }
+  }
+}
+
+# if 1
 /*
   pout : 
    [0] ........... N Polys = Nvars
    [1 .. NVars] .. N coeff Poly[0..NVars-1] 
    [NVars + 1 .. NcoeffPoly[0]]
 */
-int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
+void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
 {
-  uint32_t **tmp_poly;
-  uint32_t i,j,k;
+  uint32_t *tmp_poly, *cum_poly;
+  uint32_t i,j;
   uint32_t poly_idx, const_offset, n_coeff,prev_n_coeff, coeff_offset, coeff_idx;
-  uint32_t final_poly_size=0;
   const uint32_t *One = CusnarksOneGet();
 
-  tmp_poly = (uint32_t **) calloc(header->nVars,sizeof(uint32_t *));
+  tmp_poly = (uint32_t *) calloc(header->nVars,sizeof(uint32_t *));
+  cum_poly = (uint32_t *) calloc(header->nVars+1,sizeof(uint32_t *));
 
-  for (i=0; i < header->nVars; i++){
-     tmp_poly[i] = (uint32_t *)calloc(MAX_R1CSPOLYTMP_NWORDS * NWORDS_256BIT, sizeof(uint32_t));
+  cum_poly[0] = pout[0];
+
+  for (i=1; i < header->nVars+1;i++){
+    cum_poly[i] = pout[i] + cum_poly[i-1];
   }
-   
+
   const_offset = cin[0]+1;
   prev_n_coeff = 0;
 
@@ -443,18 +470,9 @@ int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint3
      coeff_offset = const_offset + n_coeff - prev_n_coeff;
      for (j=0; j < n_coeff - prev_n_coeff ;j++){
        poly_idx = cin[const_offset+j];
-       //if (poly_idx==0){ printf("%d\n",i);}
-       coeff_idx = tmp_poly[poly_idx][0]++;
-       final_poly_size++;
-       if (coeff_idx >= (MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1))/NWORDS_256BIT - 1){
-           for(k=0;k < header->nVars;k++){
-              free(tmp_poly[k]);
-           }
-           free(tmp_poly);
-           return coeff_idx*NWORDS_256BIT/(NWORDS_256BIT-1);
-       }
-       tmp_poly[poly_idx][1+coeff_idx]=i;
-       memcpy(&tmp_poly[poly_idx][1+MAX_R1CSPOLYTMP_NWORDS+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       coeff_idx = tmp_poly[poly_idx]++;
+       pout[cum_poly[poly_idx]+coeff_idx+1]=i;
+       memcpy(&pout[cum_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
        coeff_offset += NWORDS_256BIT;
      }
      const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
@@ -463,73 +481,14 @@ int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint3
 
   if (extend){
     for (i=0; i < header->nPubInputs + header->nOutputs + 1; i++){
-       coeff_idx = tmp_poly[i][0]++;
-       final_poly_size++;
-       if (coeff_idx >= MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1)/NWORDS_256BIT - 1){
-           for(k=0;k < header->nVars;k++){
-              free(tmp_poly[k]);
-           }
-           free(tmp_poly);
-           return coeff_idx*NWORDS_256BIT/(NWORDS_256BIT-1);
-       }
-       tmp_poly[i][1+coeff_idx]=i + header->nConstraints;
-       memcpy(&tmp_poly[i][1+MAX_R1CSPOLYTMP_NWORDS+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+       coeff_idx = tmp_poly[i]++;
+       pout[cum_poly[i]+1+coeff_idx]=i + header->nConstraints;
+       memcpy(&pout[cum_poly[i]+1+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
     }
-  }
-  #if 0
-  for (j=0; j < header->nVars; j++){
-    printf("\n\nPoly : %d\n",j);
-    for (i=0; i <= tmp_poly[j][0]; i++){
-      printf("%d\n",tmp_poly[j][i]);
-      //if (i % 200 == 0) { printf("\n");}
-    }
-  }
-  printf("\n\nEND\n");
-  #endif
-
-  final_poly_size = final_poly_size*(NWORDS_256BIT+1)+ header->nVars +1;
- 
-  if (MAX_R1CSPOLY_NWORDS*NWORDS_256BIT <= final_poly_size){
-      for(k=0;k < header->nVars;k++){
-         free(tmp_poly[k]);
-      }
-      free(tmp_poly);
-      return -(final_poly_size/NWORDS_256BIT);
-  } 
-
-  poly_idx = 0;
-  for (i=0; i<header->nVars;i++){
-    coeff_idx = tmp_poly[i][0];
-    //if (coeff_idx == 0) {
-    //  continue;
-    //}
-    pout[1+poly_idx++] = coeff_idx;
-  }
-  pout[0] = poly_idx;
-
-  const_offset = 0;
-  for (i=0; i<header->nVars;i++){
-    coeff_idx = tmp_poly[i][0];
-    //if (coeff_idx == 0) {
-    //  continue;
-    //}
-    memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[i][1],sizeof(uint32_t)*coeff_idx);
-    const_offset += coeff_idx;
-    memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[i][1+MAX_R1CSPOLYTMP_NWORDS],sizeof(uint32_t)*NWORDS_256BIT*coeff_idx);
-    const_offset += (NWORDS_256BIT*coeff_idx);
-    free(tmp_poly[i]);
   }
 
   free(tmp_poly);
-
-  #if 0 
-  for (i=0; i< final_poly_size; i++){
-    //if (i % 200 == 0) { printf("\n");}
-    //if (i== pout[0]+1) { printf("\nVals\n");}
-    printf("%d\n",r1cs[i]);
-  }
-  #endif
-  return 0;
+  free(cum_poly);
 }
 #else
 int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
@@ -541,7 +500,7 @@ int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint3
   const uint32_t *One = CusnarksOneGet();
 
   tmp_poly = (uint32_t *)calloc(MAX_R1CSPOLYTMP_NWORDS * NWORDS_256BIT, sizeof(uint32_t));
-   
+
   const_offset = cin[0]+1;
   prev_n_coeff = 0;
 
@@ -558,7 +517,6 @@ int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint3
      for (j=0; j < n_coeff - prev_n_coeff ;j++){
        poly_idx = cin[const_offset+j];
        if (poly_idx != w){continue;}
-       //if (w==0){ printf("%d\n",i);}
        coeff_idx = tmp_poly[0]++;
        final_poly_size++;
        if (coeff_idx >= (MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1))/NWORDS_256BIT - 1){
@@ -644,6 +602,7 @@ int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint3
   }
   memmove(&pout[1+w],&pout[1+MAX_R1CSPOLYTMP_NWORDS],final_offset*sizeof(uint32_t));
   free(tmp_poly);
+  free(tmp_coeff);
 
   #if 0 
   for (i=0; i< final_poly_size; i++){
