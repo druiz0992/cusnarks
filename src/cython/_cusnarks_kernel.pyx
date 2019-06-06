@@ -431,9 +431,21 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
 
-    ret_val = uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
+    uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
+    #ret_val = uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
     free(header_c)
      
     ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
     return ret_val, pout[:ncoeff+1]
 
+def madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(int(len(in_veca)/NWORDS_256BIT), dtype=np.uint32)
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_vec = np.zeros(NWORDS_256BIT, dtype=np.uint32)
+        cdef ct.uint32_t i
+
+        uh.cmontmult_h(&out_vec[0], &in_veca[i*NWORDS_256BIT], &in_vecb[i*NWORDS_256BIT], pidx)
+        for i xrange(len(out_vec)/NWORDS_256BIT-1):
+           uh.cmontmult_h(&tmp_vec[0], &in_veca[i*NWORDS_256BIT], &in_vecb[i*NWORDS_256BIT], pidx)
+           uh.caddm_h(&out_vec[0], &out_vec[0], &tmp_vec[0], pidx)
+  
+        return out_vec
