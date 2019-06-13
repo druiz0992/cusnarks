@@ -448,18 +448,22 @@ void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *hea
 */
 void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
 {
-  uint32_t *tmp_poly, *cum_poly;
+  uint32_t *tmp_poly, *cum_c_poly, *cum_v_poly;
   uint32_t i,j;
   uint32_t poly_idx, const_offset, n_coeff,prev_n_coeff, coeff_offset, coeff_idx;
+  uint32_t c_offset, v_offset;
   const uint32_t *One = CusnarksOneGet();
 
   tmp_poly = (uint32_t *) calloc(header->nVars,sizeof(uint32_t *));
-  cum_poly = (uint32_t *) calloc(header->nVars+1,sizeof(uint32_t *));
+  cum_c_poly = (uint32_t *) calloc(header->nVars+1,sizeof(uint32_t *));
+  cum_v_poly = (uint32_t *) calloc(header->nVars+1,sizeof(uint32_t *));
 
-  cum_poly[0] = pout[0];
+  cum_c_poly[0] = pout[0];
+  cum_v_poly[0] = pout[0] + pout[1];
 
   for (i=1; i < header->nVars+1;i++){
-    cum_poly[i] = pout[i] + cum_poly[i-1];
+    cum_c_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_c_poly[i-1];
+    cum_v_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_v_poly[i-1];
   }
 
   const_offset = cin[0]+1;
@@ -471,8 +475,8 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
      for (j=0; j < n_coeff - prev_n_coeff ;j++){
        poly_idx = cin[const_offset+j];
        coeff_idx = tmp_poly[poly_idx]++;
-       pout[cum_poly[poly_idx]+coeff_idx+1]=i;
-       memcpy(&pout[cum_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       pout[cum_c_poly[poly_idx]+coeff_idx+1]=i;
+       memcpy(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
        coeff_offset += NWORDS_256BIT;
      }
      const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
@@ -482,13 +486,14 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
   if (extend){
     for (i=0; i < header->nPubInputs + header->nOutputs + 1; i++){
        coeff_idx = tmp_poly[i]++;
-       pout[cum_poly[i]+1+coeff_idx]=i + header->nConstraints;
-       memcpy(&pout[cum_poly[i]+1+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+       pout[cum_c_poly[i]+1+coeff_idx]=i + header->nConstraints;
+       memcpy(&pout[cum_v_poly[i]+1+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
     }
   }
 
   free(tmp_poly);
-  free(cum_poly);
+  free(cum_c_poly);
+  free(cum_v_poly);
 }
 #else
 int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
@@ -1749,3 +1754,134 @@ void find_roots_h(uint32_t *roots, const uint32_t *primitive_root, uint32_t nroo
   return;
 }
 
+void divmod_u256_h(uint32_t *q, uint32_t *r, uint32_t *n, uint32_t *d)
+{ 
+  uint32_t msb_d, msb_r;
+  int shift;
+  uint32_t d2[NWORDS_256BIT];
+
+  memcpy(r, n, NWORDS_256BIT * sizeof(uint32_t));
+  
+  if (compu256_h(r, d) >= 0){ 
+      msb_r = msb_u256_h(r);
+      msb_d = msb_u256_h(d);
+      shift = msb_r - msb_d;
+      memcpy(d2, d, NWORDS_256BIT * sizeof(uint32_t));
+      shll_u256_h(d2, d, shift);
+
+      for (; shift >=0; shift--){
+         if (compu256_h(r, d2) >= 0){
+           sub_u256_h(r, r, d2);
+           setbit_u256_h(q,shift);
+         }
+         shlr_u256_h(d2,d2,1);
+      }
+  }
+}
+
+uint32_t msb_u256_h(uint32_t *x)
+{
+  int i;
+  uint32_t b;
+
+  for (i=NWORDS_256BIT*NBITS_WORD; i >=0; i++){
+     if(getbit_u256_h(x,i)) {
+        return (uint32_t)i;
+     }
+  }
+}
+
+void shll_u256_h(uint32_t *y, uint32_t *x, uint32_t count)
+{
+ uint64_t t,carry;
+ int i, places=0;
+
+ if(count >= NBITS_WORD) {
+  places = count / NBITS_WORD;
+
+  for(i = NWORDS_256BIT-1; i >=  places; i--) {
+   x[i] = x[i - places];
+  }
+
+  for(; i >= 0; i--){
+   x[i] = 0;
+  }
+
+  count -= places * NBITS_WORD;
+  if(count == 0) {
+   return;
+  }
+ }
+
+ /* Shift bits. */
+ for(i = carry = 0; i < NWORDS_256BIT; i++)
+ {
+  t = (x[i] << count) | carry;
+  x[i] = t & 0xFFFFFFFF;
+  carry = t >> NBITS_WORD;
+ }
+}
+
+void shlr_u256_h(uint32_t *y, uint32_t *x, uint32_t count)
+{
+  uint64_t t, carry
+  int i;
+  uint32_t places;
+
+  if(count >= NBITS_WORD) {
+   places = count / NBITS_WORD;
+  }
+
+  if(places > s)
+  {
+   memset(x, 0, s * sizeof *x);
+   return;
+  }
+  for(i = 0; i < (int) (s - places); i++)
+   x[i] = x[i + places];
+  for(; i < (int) s; i++)
+   x[i] = 0;
+  count -= places * CHAR_BIT * sizeof *x;
+  if(count == 0)
+   return;
+ }
+ /* Shift any remaining bits. */
+ for(i = s - 1, carry = 0; i >= 0; i--)
+ {
+ #ifdef VBIGDIG_64
+  t = (uint64_t)(x[i]) << (CHAR_BIT * sizeof *x);
+  #else
+  t = x[i] << (CHAR_BIT * sizeof *x);
+  #endif
+  t >>= count;
+  t |= carry;
+  carry = (t & MAX_DIG) << (CHAR_BIT * sizeof *x);
+  x[i] = t >> (CHAR_BIT * sizeof *x);
+ }
+
+}
+
+void sub_u256_h(uint32_t *z, uint32_t *x, uint32_t *y)
+{
+  mpSubtract(z, x, y, NWORDS_256BIT);
+}
+
+void setbit_u256_h(uint32_t *x, uint32_t n)
+{
+  uint32_t w, b;
+  
+  w = NWORDS_256BIT * NBITS_WORD / n;
+  b = NWORDS_256BIT * NBITS_WORD % n;
+
+  x[w] |=  (1 << b);
+}
+
+uint32_t getbit_u256_h(uint32_t *x, uint32_t n)
+{
+  uint32_t w, b;
+  
+  w = NWORDS_256BIT * NBITS_WORD / n;
+  b = NWORDS_256BIT * NBITS_WORD % n;
+
+  return ( (x[w] >> b) & 0x1);
+}
