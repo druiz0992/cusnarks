@@ -415,11 +415,8 @@ def readU256CircuitFile_h(bytes fname):
 
     return cir_data
 
-def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t extend):
+def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict header, ct.uint32_t extend):
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
-    #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(MAX_R1CSPOLY_NWORDS*NWORDS_256BIT,dtype=np.uint32)
-    cdef ct.int32_t ret_val
 
     header_c.nWords = header['nWords']
     header_c.nPubInputs = header['nPubInputs']
@@ -431,25 +428,52 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
 
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] plen_out = np.zeros(header_c.nVars,dtype=np.uint32)
+    uh.cr1cs_to_mpoly_len_h(&plen_out[0], &r1cs_len[0], header_c, extend)
+    free(header_c)
+     
+    return plen_out
+
+def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen, 
+                    np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t extend):
+
+    cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
+    #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
+    #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(MAX_R1CSPOLY_NWORDS*NWORDS_256BIT,dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(int(1 + np.sum(plen)*(NWORDS_256BIT+2)),dtype=np.uint32)
+
+    header_c.nWords = header['nWords']
+    header_c.nPubInputs = header['nPubInputs']
+    header_c.nOutputs = header['nOutputs']
+    header_c.nVars = header['nVars']
+    header_c.nConstraints = header['nConstraints']
+    header_c.tformat = header['tformat']
+    header_c.R1CSC_nWords = header['R1CSA_nWords']
+    header_c.R1CSB_nWords = header['R1CSB_nWords']
+    header_c.R1CSC_nWords = header['R1CSC_nWords']
+
+    pout[0] = header_c.nVars
+    pout[1:header_c.nVars+1] = plen
+
     uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
     #ret_val = uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
     free(header_c)
      
-    ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
-    return ret_val, pout[:ncoeff+1]
+    #ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
+    return pout
 
-def madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(int(len(in_veca)/NWORDS_256BIT), dtype=np.uint32)
+def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_vec = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_veca = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_vecb = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-        cdef ct.uint32_t i
+        cdef ct.uint32_t i, j,idx, offset=in_veca[0]+1
 
-        uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
-        for i in xrange(len(out_vec)/NWORDS_256BIT-1):
-           tmp_veca = in_veca[i*NWORDS_256BIT:(i+1)*NWORDS_256BIT]
-           tmp_vecb = in_vecb[i*NWORDS_256BIT:(i+1)*NWORDS_256BIT]
-           uh.cmontmult_h(&tmp_vec[0], &tmp_veca[0], &tmp_vecb[0], pidx)
-           uh.caddm_h(&out_vec[0], &out_vec[0], &tmp_vec[0], pidx)
+        for j in xrange(nVars):
+           offset += in_veca[j+1]
+
+           uh.cmontmult_h(&out_vec[j], &in_veca[offset], &in_vecb[offset], pidx)
+           for i in xrange(len(out_vec)/NWORDS_256BIT-1):
+             idx = (i+1) *NWORDS_256BIT
+             uh.cmontmult_h(&tmp_vec[0], &in_veca[idx+offset], &in_vecb[idx+offset], pidx)
+             uh.caddm_h(&out_vec[j], &out_vec[j], &tmp_vec[0], pidx)
   
         return out_vec

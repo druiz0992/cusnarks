@@ -155,25 +155,16 @@ class GrothSetup(object):
     def _calculatePoly(self):
         self._computeHeader()
 
-        ret_v, self.polsA = r1cs_to_mpoly_h(self.R1CSA, self.header, 1)
-        if ret_v > 0:
-           print("increase MAX_R1CSPOLYTMP_NWORDS" )
-        elif ret_v < 0:
-           print("increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v))
+        polyA_len = r1cs_to_mpoly_len_h(self.R1CSA, self.header, 1)
+        self.polsA = r1cs_to_mpoly_h(polyA_len,self.R1CSA, self.header, 1)
         self.R1CSA = None
 
-        ret_v, self.polsB = r1cs_to_mpoly_h(self.R1CSB, self.header, 0)
-        if ret_v > 0:
-           print("increase MAX_R1CSPOLYTMP_NWORDS" )
-        elif ret_v < 0:
-           print("increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v))
+        polyB_len = r1cs_to_mpoly_len_h(self.R1CSB, self.header, 0)
+        self.polsB = r1cs_to_mpoly_h(polyB_len,self.R1CSB, self.header, 0)
         self.R1CSB = None
 
-        ret_v, self.polsC = r1cs_to_mpoly_h(self.R1CSC, self.header, 0)
-        if ret_v > 0:
-           print("increase MAX_R1CSPOLYTMP_NWORDS" )
-        elif ret_v < 0:
-           print("increase MAX_R1CSPOLY_NWORDS to " + str(-ret_v))
+        polyC_len = r1cs_to_mpoly_len_h(self.R1CSC, self.header, 0)
+        self.polsC = r1cs_to_mpoly_h(polyC_len,self.R1CSC, self.header, 0)
         self.R1CSC = None
 
     def _evalLagrangePoly(self, bits, t):
@@ -251,18 +242,22 @@ class GrothSetup(object):
     def _calculateValuesAtT(self, toxic_t):
        z_t, u = self._evalLagrangePoly(self.domainBits, toxic_t)
 
-       a_t_u256 = np.zeros((self.nVars, NWORDS_256BIT), dtype=np.uint32)
-       b_t_u256 = np.zeros((self.nVars, NWORDS_256BIT), dtype=np.uint32)
-       c_t_u256 = np.zeros((self.nVars, NWORDS_256BIT), dtype=np.uint32)
+       #a_t_u256 = np.zeros((self.nVars, NWORDS_256BIT), dtype=np.uint32)
+       #b_t_u256 = np.zeros((self.nVars, NWORDS_256BIT), dtype=np.uint32)
+       #c_t_u256 = np.zeros((self.nVars, NWORDS_256BIT), dtype=np.uint32)
 
-       offsetA = self.polsA[0]+1
-       offsetB = self.polsB[0]+1
-       offsetC = self.polsC[0]+1
+       #offsetA = self.polsA[0]+1
+       #offsetB = self.polsB[0]+1
+       #offsetC = self.polsC[0]+1
        pidx = ZField.get_field()
 
+       a_t_u256 = mpoly_madd_h(self.polsA, u.reshape(-1), self.nVars, pidx)
+       b_t_u256 = mpoly_madd_h(self.polsB, u.reshape(-1), self.nVars, pidx)
+       c_t_u256 = mpoly_madd_h(self.polsC, u.reshape(-1), self.nVars, pidx)
+       """
        for s in xrange(self.nVars):
          offsetA += self.polsA[s+1]
-         a_t_u256[s] = madd_h(self.polsA[offsetA:offsetA+self.polsA[s+1]*NWORDS_256BIT, u.reshape(-1), pidx)
+         a_t_u256[s] = mpoly_madd_h(self.polsA[offsetA:offsetA+self.polsA[s+1]*NWORDS_256BIT, u.reshape(-1), pidx)
          #for i in xrange(self.polsA[s+1]):
              #v = montmult_h(self.polsA[offsetA+i*NWORDS_256BIT:offsetA+(i+1)*NWORDS_256BIT],u[i],pidx)
              #a_t_u256[s] = addm_h(a_t_u256[s] , v, pidx)
@@ -276,6 +271,7 @@ class GrothSetup(object):
          for i in xrange(self.polsC[s+1]):
              v = montmult_h(self.polsC[offsetC+i*NWORDS_256BIT:offsetC+(i+1)*NWORDS_256BIT],u[i],pidx)
              c_t_u256[s] = addm_h(c_t_u256[s] , v, pidx)
+         """
 
 
        return a_t_u256, b_t_u256, c_t_u256, z_t
