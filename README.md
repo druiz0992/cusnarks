@@ -1,9 +1,9 @@
 # CUSNARKS Overview
-Optimized CUDA implementation of SNARK Groth16 prover based on [snarkjs][] designed with the objective of computing proofs for up
-to 2^27 number of constraints in only few seconds. Cusnarks is expected to work with [circom][] for the generation and compilation
-of circuits, and with [snarkjs][] for the computation of the trusted setup, witnesses and verification of the proof
+Optimized CUDA implementation of SNARK Groth setup and prover based on [snarkjs][] designed with the objective of computing proofs for up
+to 2^27 number of constraints very fast. Cusnarks is expected to work with [circom][] for the generation and compilation
+of circuits, and with [snarkjs][] for the computation of the trusted setup, witnesses and verification of the proof.
 
-Host side has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof script is launched. Computation intensive functionality on the host side has been written in C/C++. Cython is used to build wrappers around C functions so that they can be
+Host side has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and setup scripts are launched. Computation intensive functionality on the host side has been written in C/C++. Cython is used to build wrappers around C functions so that they can be
 called from Python.
 
 Elliptic curve scalar multiplication and reduction and polynomial multiplication, the heaviest functionality in terms of 
@@ -25,7 +25,7 @@ Two libraries are generated :
 
 Modules are divided into 4 categories depending on functionality:
 
-1. **Infrastructure Layer** : Modules in this class have no dependencies and perform basic functionality commong to all project (constants and type defitiontion).  Infrastructure modules can be accessed by both host and device.
+1. **Infrastructure Layer** : Modules in this class have no dependencies and perform basic functionality common to all project (constants and type defitiontion).  Infrastructure modules can be accessed by both host and device.
 
 2. **Service Layer** : Modules in this class Implement non core functionality used by higher layerts (logging, random number generation or CUDA kernel launch abstraction). Service modules are implemented in C or CUDA C. All services layer modules are accessible by host side. Logging can be access by both host and device.
 
@@ -34,67 +34,6 @@ Modules are divided into 4 categories depending on functionality:
 4. **Applications Layer** : User applications. For now only prover functionality is included, but in the future witness generation and trusted setup implemention will be in this layer. Application layer modules are implemented in Python and can launch CUDA kernels via cusnarks_kernel module and host side accelerated C functions via utils_host Cython wrapped module
 
 ![Architecture](doc/architecture.png)
-
-## Modules
-
-### Python
-
-#### bigint.py
-
-#### constants.py
-
-#### ecc.py
-
-#### groth_protocol.py
-
-Diagram showing functionality and how everything is run 
-
-#### zfield.py
-
-#### z2field_element.py
-
-#### zpoly.py
-
-#### zutils.py
-
-### C
-
-#### constants.cpp
-
-#### cuda.h
-
-#### utils_host.cpp
-
-#### utils_device.h
-
-#### rng.cpp
-
-#### types.h
-
-### Cython
-Function wrappers are defined in .pxd files and implemented in .pyx
-
-#### cusnarks_kernel.pyx
-
-### CUDA
-
-#### cusnarks_kernel.cu
-
-#### log.cu
-
-#### ecbn128.cu / ecbn128_device.cu
-
-#### ec2bn128.cu / ec2bn128_device.cu
-
-#### u256.cu / u256_device.cu
-
-#### zpoly.cu / zpoly_device.cu
-
-#### z1_device.cu
-
-#### z2_device.cu
-
-## Data Types
 
 ## Installation
 1. Download repository www.github.com/iden3/cusnarks.git

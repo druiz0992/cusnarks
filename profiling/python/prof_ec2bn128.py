@@ -71,7 +71,7 @@ def profile_ec2bn128():
     nkernels = 1
 
     #my_kernels = [CB_EC2_JACAFF_ADD , CB_EC2_JAC_ADD , CB_EC2_JACAFF_DOUBLE,
-                  #CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MAD_SHFL]
+                  #CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CM_EC2_JAC_MUL1, CB_EC2_JAC_MAD_SHFL]
     my_kernels = [CB_EC_JAC_MAD_SHFL]
     #my_kernels = [CB_EC_JAC_DOUBLE]
 

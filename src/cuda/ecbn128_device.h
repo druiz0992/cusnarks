@@ -38,6 +38,7 @@ __global__ void addecjac_kernel(uint32_t   *out_vector, uint32_t *in_vector, ker
 __global__ void doublecjacaff_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void doublecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void sc1mulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
@@ -46,6 +47,7 @@ __global__ void addec2jac_kernel(uint32_t   *out_vector, uint32_t *in_vector, ke
 __global__ void doublec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void doublec2jacaff_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void scmulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void sc1mulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madec2jac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 

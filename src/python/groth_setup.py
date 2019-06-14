@@ -114,6 +114,7 @@ class GrothSetup(object):
         self.polsA      =  None
         self.polsB      =  None
         self.polsC      =  None
+        self.hExps      =  None  
 
 
         if in_circuit_f is not None:
@@ -197,11 +198,17 @@ class GrothSetup(object):
              return z, u_u256()
 
        l = z * ZFieldElExt(int(m)).inv().reduce()
+       l_u256 = l.as_uint256()
+       """
        for i in xrange(m):
          x = t - ZFieldElRedc(BigInt.from_uint256(roots_rdc_u256[i]))
          x_inv = x.inv()
          u_u256[i] = (l * x_inv).as_uint256()
          l = l * omega
+       """
+
+       pidx = ZField.get_field()
+       u_u256 = evalLagrangePoly_h(t_u256,l_u256, roots_rdc_u256, pidx)
 
        return z, u_u256
    
@@ -236,6 +243,53 @@ class GrothSetup(object):
       
       self.vk_beta_2 = ECCAffine([G2x, G2y]) * toxic_kbeta
       self.vk_delta_2 = ECCAffine([G2x, G2y]) * toxic_kdelta
+    
+      """
+      for (let s=0; s<circuit.nVars; s++) {
+
+        const A = G1.affine(G1.mulScalar(G1.g, v.a_t[s]));
+
+        setup.vk_proof.A[s] = A;
+
+        const B1 = G1.affine(G1.mulScalar(G1.g, v.b_t[s]));
+
+        setup.vk_proof.B1[s] = B1;
+
+        const B2 = G2.affine(G2.mulScalar(G2.g, v.b_t[s]));
+
+        setup.vk_proof.B2[s] = B2;
+       }
+ 
+      ZPoly.init(GrothSetup.FieldIDX)
+      pidx = ZField.get_field()
+      ps = GrothSetupComputePS(toxic_kalfa, toxic_kbeta, toxic_invDelta,
+                               a_t_u256, b_t_u256, c_t_u256, self.nPublic, pidx )
+
+      ZPoly.init(GrothSetup.GroupIDX)
+      for (let s=setup.vk_proof.nPublic+1; s<circuit.nVars; s++) {
+        const C = G1.affine(G1.mulScalar(G1.g, ps));
+        setup.vk_proof.C[s]=C;
+      }
+
+      maxH = self.domainSize+1;
+
+      self.hExps = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
+
+      ZPoly.init(GrothSetup.FieldIDX)
+      pidx = ZField.get_field()
+      zod = montmult_h(toxic_invDelta, z_t, pidx);
+      eT = GrothSetupComputeeT(toxic_t, zod, maxH, pidx)
+
+      ZPoly.init(GrothSetup.GroupIDX)
+      setup.vk_proof.hExps[0] = G1.affine(G1.mulScalar(G1.g, zod));
+
+      for (let i=1; i<maxH; i++) {
+        setup.vk_proof.hExps[i] = G1.affine(G1.mulScalar(G1.g, F.mul(eT, zod)));
+        eT = F.mul(eT, setup.toxic.t);
+      }
+      """
+
+
 
 
 

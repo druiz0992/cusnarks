@@ -46,7 +46,7 @@
 using namespace std;
 
 static kernel_cb ecbn128_2_kernel_callbacks[] = {addec2jacaff_kernel, addec2jac_kernel, doublec2jacaff_kernel, doublec2jac_kernel,
-                                                 scmulec2jac_kernel, madec2jac_kernel, madec2jac_shfl_kernel};
+                                                 scmulec2jac_kernel, sc1mulec2jac_kernel, madec2jac_kernel, madec2jac_shfl_kernel};
 
 EC2BN128::EC2BN128 (uint32_t len) : CUSnarks( len * ECP2_JAC_INDIMS, NWORDS_256BIT * sizeof(uint32_t) * len *  ECP2_JAC_INDIMS,
 		                            len * ECP2_JAC_OUTDIMS,  NWORDS_256BIT * sizeof(uint32_t) * len * ECP2_JAC_OUTDIMS, 
