@@ -469,37 +469,37 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     #ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
     return pout
 
-def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
+def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
+                  np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_vec = np.zeros(NWORDS_256BIT, dtype=np.uint32)
         cdef ct.uint32_t i, j,idx, offset=in_veca[0]+1
 
         for j in xrange(nVars):
            offset += in_veca[j+1]
 
-           uh.cmontmult_h(&out_vec[j], &in_veca[offset], &in_vecb[offset], pidx)
-           for i in xrange(len(out_vec)/NWORDS_256BIT-1):
+           uh.cmontmult_h(&out_vec[j,0], &in_veca[offset], &in_vecb[offset], pidx)
+           for i in xrange(len(out_vec)-1):
              idx = (i+1) *NWORDS_256BIT
              uh.cmontmult_h(&tmp_vec[0], &in_veca[idx+offset], &in_vecb[idx+offset], pidx)
-             uh.caddm_h(&out_vec[j], &out_vec[j], &tmp_vec[0], pidx)
+             uh.caddm_h(&out_vec[j,0], &out_vec[j,0], &tmp_vec[0], pidx)
   
         return out_vec
 
 def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,
                        np.ndarray[ndim=1, dtype=np.uint32_t] in_l,
-                       np.ndarray[ndim=1, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((len(in_roots),NWORDS_256BIT), dtype=np.uint32)
+                       np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((len(in_roots)*NWORDS_256BIT), dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] x = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] x_inv = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] l = in_l
-     cdef int i,m = len(in_roots), offset=0
+     cdef int i,m = len(in_roots)
 
      for i in xrange(m):
-        offset= offset + i*NWORDS_256BIT
-        uh.csubm_h(&x[0],&in_t[0], &in_roots[offset],pidx)
+        uh.csubm_h(&x[0],&in_t[0], &in_roots[i,0],pidx)
         uh.cmontinv_h(&x_inv[0],&x[0], pidx)
         uh.cmontmult_h(&out_vec[i],&l[0],&x_inv[0],pidx)
-        uh.cmontmult_h(&l[0],&l[0],&in_roots[<int>NWORDS_256BIT],pidx)
+        uh.cmontmult_h(&l[0],&l[0],&in_roots[1,0],pidx)
 
      return out_vec
 
