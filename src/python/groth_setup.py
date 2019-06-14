@@ -68,7 +68,8 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-ROOTS_1M_filename = '../../data/zpoly_data_1M.npz'
+ROOTS_1M_filename_npz = '../../data/zpoly_data_1M.npz'
+ROOTS_1M_filename_bin = '../../data/zpoly_roots_1M.bin'
 
 class GrothSetup(object):
     
@@ -179,8 +180,8 @@ class GrothSetup(object):
        t_u256 = t.as_uint256()
       
        #TODO : slice to get only m roots
-       if os.path.exists(ROOTS_1M_filename):
-           npzfile = np.load(ROOTS_1M_filename)
+       if os.path.exists(ROOTS_1M_filename_npz):
+           npzfile = np.load(ROOTS_1M_filename_npz)
            roots_rdc_u256 = npzfile['roots_rdc_u256'][::1<<(20-bits)]
        else :
            roots_rdc_u256, _ = ZField.find_roots(m, find_inv_roots = False, rformat_ext=False)
@@ -305,9 +306,9 @@ class GrothSetup(object):
        #offsetC = self.polsC[0]+1
        pidx = ZField.get_field()
 
-       a_t_u256 = mpoly_madd_h(self.polsA, u.reshape(-1), self.nVars, pidx)
-       b_t_u256 = mpoly_madd_h(self.polsB, u.reshape(-1), self.nVars, pidx)
-       c_t_u256 = mpoly_madd_h(self.polsC, u.reshape(-1), self.nVars, pidx)
+       a_t_u256 = mpoly_madd_h(self.polsA, u, self.nVars, pidx)
+       b_t_u256 = mpoly_madd_h(self.polsB, u, self.nVars, pidx)
+       c_t_u256 = mpoly_madd_h(self.polsC, u, self.nVars, pidx)
        """
        for s in xrange(self.nVars):
          offsetA += self.polsA[s+1]
@@ -535,6 +536,6 @@ if __name__ == "__main__":
     #out_circuit_f = '../../data/circuit.bin'
     #GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f, in_format=ZUtils.FEXT, out_format=ZUtils.FEXT)
 
-    #in_circuit_f = '../../data/prove-kyc.bin'
+    in_circuit_f = '../../data/prove-kyc.bin'
     GS = GrothSetup(in_circuit_f=out_circuit_f)
     GS.setup()

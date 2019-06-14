@@ -329,7 +329,7 @@ class ZField(object):
         idx = ZField.active_prime_idx
         gamma = int(1)
         prime = ZField.get_extended_p().as_long()
-        for i in xrange(len(ZField.factor_data[idx]['factors'])):
+        for i in xrange(int(len(ZField.factor_data[idx]['factors']))):
             beta = int(1)
             prime_factor = ZField.factor_data[idx]['factors'][i]
             exponent = ZField.factor_data[idx]['exponents'][i]
