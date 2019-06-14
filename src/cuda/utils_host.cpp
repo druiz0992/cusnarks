@@ -103,6 +103,7 @@ int spMultiply(uint32_t p[2], uint32_t x, uint32_t y);
 int mpMultiply(uint32_t p[3], uint32_t x[2], uint32_t y);
 int mpCompare(const uint32_t a[], const uint32_t b[], size_t ndigits);
 uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t ndigits);
+void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx);
 
 // FFT helper functions
 uint32_t reverse(uint32_t x, uint32_t bits);
@@ -909,7 +910,17 @@ void subu256_h(uint32_t *x, const uint32_t *y)
 
    mpSubtract(z, x, y, NWORDS_256BIT);
    memcpy(x,z,sizeof(uint32_t)*NWORDS_256BIT);
+} 
+  
+void addu256_h(uint32_t *x, const uint32_t *y)
+{
+   uint32_t z[NWORDS_256BIT];
+
+   mpAdd(z, x, y, NWORDS_256BIT);
+   memcpy(x,z,sizeof(uint32_t)*NWORDS_256BIT);
 }   
+
+/****************************************************************************/
 /****************************************************************************/
 /** [1]
 *
@@ -1754,134 +1765,170 @@ void find_roots_h(uint32_t *roots, const uint32_t *primitive_root, uint32_t nroo
   return;
 }
 
-void divmod_u256_h(uint32_t *q, uint32_t *r, uint32_t *n, uint32_t *d)
-{ 
-  uint32_t msb_d, msb_r;
-  int shift;
-  uint32_t d2[NWORDS_256BIT];
 
-  memcpy(r, n, NWORDS_256BIT * sizeof(uint32_t));
-  
-  if (compu256_h(r, d) >= 0){ 
-      msb_r = msb_u256_h(r);
-      msb_d = msb_u256_h(d);
-      shift = msb_r - msb_d;
-      memcpy(d2, d, NWORDS_256BIT * sizeof(uint32_t));
-      shll_u256_h(d2, d, shift);
-
-      for (; shift >=0; shift--){
-         if (compu256_h(r, d2) >= 0){
-           sub_u256_h(r, r, d2);
-           setbit_u256_h(q,shift);
-         }
-         shlr_u256_h(d2,d2,1);
-      }
-  }
-}
-
-uint32_t msb_u256_h(uint32_t *x)
-{
-  int i;
-  uint32_t b;
-
-  for (i=NWORDS_256BIT*NBITS_WORD; i >=0; i++){
-     if(getbit_u256_h(x,i)) {
-        return (uint32_t)i;
-     }
-  }
-}
-
-void shll_u256_h(uint32_t *y, uint32_t *x, uint32_t count)
+void shllu256_h(uint32_t *y, uint32_t *x, uint32_t count)
 {
  uint64_t t,carry;
- int i, places=0;
+ int i, places=0, sh;
+
+ sh = count - count/NBITS_WORD * NBITS_WORD;
+ /* Shift bits. */
+ for(i = carry = 0; i < NWORDS_256BIT; i++)
+ {
+  t = ((uint64_t)(x[i]) << sh ) | carry;
+  y[i] = t & 0xFFFFFFFF;
+  carry = t >> NBITS_WORD;
+ }
 
  if(count >= NBITS_WORD) {
   places = count / NBITS_WORD;
 
   for(i = NWORDS_256BIT-1; i >=  places; i--) {
-   x[i] = x[i - places];
+   y[i] = y[i - places];
   }
 
   for(; i >= 0; i--){
-   x[i] = 0;
+   y[i] = 0;
   }
 
-  count -= places * NBITS_WORD;
-  if(count == 0) {
+  if(sh == 0) {
    return;
   }
- }
+ } 
 
- /* Shift bits. */
- for(i = carry = 0; i < NWORDS_256BIT; i++)
- {
-  t = (x[i] << count) | carry;
-  x[i] = t & 0xFFFFFFFF;
-  carry = t >> NBITS_WORD;
- }
 }
 
-void shlr_u256_h(uint32_t *y, uint32_t *x, uint32_t count)
+void shlru256_h(uint32_t *y, uint32_t *x, uint32_t count)
 {
-  uint64_t t, carry
+  uint64_t t, carry;
   int i;
-  uint32_t places;
+  uint32_t places=0, sh;
+
+  sh = count - count / NBITS_WORD * NBITS_WORD;
+  
+  if (count >= NWORDS_256BIT * NBITS_WORD) { 
+    memset(y,0,NWORDS_256BIT*sizeof(uint32_t));
+  }
+
+  /* Shift any remaining bits. */
+  for(i = NWORDS_256BIT - 1, carry = 0; i >= 0; i--)
+  {
+   t = (uint64_t)(x[i]) << NBITS_WORD;
+   t >>= sh;
+   t |= carry;
+   carry = (t & 0xFFFFFFFF) << NBITS_WORD;
+   y[i] = t >> NBITS_WORD;
+  }
 
   if(count >= NBITS_WORD) {
-   places = count / NBITS_WORD;
-  }
+    places = count / NBITS_WORD;
 
-  if(places > s)
-  {
-   memset(x, 0, s * sizeof *x);
-   return;
-  }
-  for(i = 0; i < (int) (s - places); i++)
-   x[i] = x[i + places];
-  for(; i < (int) s; i++)
-   x[i] = 0;
-  count -= places * CHAR_BIT * sizeof *x;
-  if(count == 0)
-   return;
- }
- /* Shift any remaining bits. */
- for(i = s - 1, carry = 0; i >= 0; i--)
- {
- #ifdef VBIGDIG_64
-  t = (uint64_t)(x[i]) << (CHAR_BIT * sizeof *x);
-  #else
-  t = x[i] << (CHAR_BIT * sizeof *x);
-  #endif
-  t >>= count;
-  t |= carry;
-  carry = (t & MAX_DIG) << (CHAR_BIT * sizeof *x);
-  x[i] = t >> (CHAR_BIT * sizeof *x);
- }
+    if(places > NWORDS_256BIT) {
+      memset(y, 0, NWORDS_256BIT * sizeof(uint32_t));
+      return;
+    }
 
+    for(i = 0; i < (int) (NWORDS_256BIT - places); i++){
+      y[i] = y[i + places];
+    }
+    for(; i < NWORDS_256BIT; i++) {
+      y[i] = 0;
+    }
+
+  } 
 }
 
-void sub_u256_h(uint32_t *z, uint32_t *x, uint32_t *y)
+void subu256_h(uint32_t *z, uint32_t *x, uint32_t *y)
 {
   mpSubtract(z, x, y, NWORDS_256BIT);
 }
+void addu256_h(uint32_t *z, uint32_t *x, uint32_t *y)
+{
+  mpAdd(z, x, y, NWORDS_256BIT);
+}
 
-void setbit_u256_h(uint32_t *x, uint32_t n)
+void setbitu256_h(uint32_t *x, uint32_t n)
 {
   uint32_t w, b;
-  
-  w = NWORDS_256BIT * NBITS_WORD / n;
-  b = NWORDS_256BIT * NBITS_WORD % n;
+ 
+  w = n / NBITS_WORD;
+  b = n % NBITS_WORD;
 
   x[w] |=  (1 << b);
 }
 
-uint32_t getbit_u256_h(uint32_t *x, uint32_t n)
+uint32_t getbitu256_h(uint32_t *x, uint32_t n)
 {
   uint32_t w, b;
   
-  w = NWORDS_256BIT * NBITS_WORD / n;
-  b = NWORDS_256BIT * NBITS_WORD % n;
+  w = n / NBITS_WORD;
+  b = n % NBITS_WORD;
 
   return ( (x[w] >> b) & 0x1);
 }
+/*
+  Montgomery Modular Inverse - Revisited
+  E. Savas, C.K.Koc
+  IEEE trasactions on Computers Vol49, No 7. July 2000
+*/
+void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
+{
+   uint32_t k;
+   uint32_t t[] = {1,0,0,0,0,0,0,0};
+
+   almmontinv_h(y,&k, x, pidx);
+   if ( k <= NWORDS_256BIT*NBITS_WORD){
+      to_montgomery_h(y,y,pidx);
+      k+=NWORDS_256BIT*NBITS_WORD;
+   }
+   shllu256_h(t,t,2 * NWORDS_256BIT * NBITS_WORD - k);
+   to_montgomery_h(t,t,pidx);
+   montmult_h(y, y,t,pidx);
+}
+void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
+{
+  const uint32_t *P = CusnarksPGet((mod_t)pidx);
+
+  uint32_t u[NWORDS_256BIT], v[NWORDS_256BIT];
+  uint32_t s[] = {1,0,0,0,0,0,0,0};
+  uint32_t r1[] = {0,0,0,0,0,0,0,0};
+  uint32_t i = 0;
+
+  const uint32_t *zero = CusnarksZeroGet();
+  
+  memcpy(u,P,NWORDS_256BIT*sizeof(uint32_t));
+  memcpy(v,a,NWORDS_256BIT*sizeof(uint32_t));
+  *k = 0;
+
+  //Phase 1 - ALmost inverse r = a^(-1) * 2 ^k, n<=k<=2n
+  // u is  < 256bits
+  // v is < 256 bits, < u
+  // s is  1     
+  // r1 is 0
+  while(compu256_h(v,zero) != 0){
+     if (getbitu256_h(u,0) == 0){
+        shlru256_h(u,u,1);
+        shllu256_h(s,s,1);
+     } else if (getbitu256_h(v,0) == 0){
+        shlru256_h(v,v,1);
+        shllu256_h(r1,r1,1);
+     } else if (compu256_h(u,v) > 0) {
+        subu256_h(u,v);
+        shlru256_h(u,u,1);
+        addu256_h(r1,s);
+        shllu256_h(s,s,1);
+     } else {
+        subu256_h(v,u);
+        shlru256_h(v,v,1);
+        addu256_h(s,r1);
+        shllu256_h(r1,r1,1);
+     }
+     (*k)++;
+  }
+  
+  if (compu256_h(r1,P) >= 0){
+      subu256_h(r1,P);
+  }
+  subu256_h(r, (uint32_t *)P,r1);
+}
+

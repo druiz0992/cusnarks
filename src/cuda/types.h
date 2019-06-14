@@ -37,8 +37,8 @@
 #define NWORDS_256BIT           (8)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
-#define PRIME_BASE              (30)
-#define NBITS_WORD     (32)
+#define PRIME_BASE           (30)
+#define NBITS_WORD           (32)
 #if 1
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
@@ -114,6 +114,7 @@ typedef struct {
    uint32_t p_[NWORDS_256BIT];
    uint32_t r_[NWORDS_256BIT];
    uint32_t nonres[NWORDS_256BIT];
+   uint32_t r2modp[NWORDS_256BIT];
    // r =  1 << 256
    // p * p_ - r * r_ = 1 
 
@@ -160,6 +161,16 @@ typedef enum{
    MOD_N
 
 }mod_t;
+
+typedef enum{
+  MOD_INFO_P,
+  MOD_INFO_P_,
+  MOD_INFO_R_,
+  MOD_INFO_NONRES,
+  MOD_INFO_R2MODP,
+  MOD_INFO_N
+
+}mod_info_name_t;
 
 typedef enum {
   FMT_EXT = 0,
@@ -256,6 +267,7 @@ typedef enum{
    CB_EC_JACAFF_DOUBLE,
    CB_EC_JAC_DOUBLE,
    CB_EC_JAC_MUL,
+   CB_EC_JAC_MUL1,
    CB_EC_JAC_MAD,
    CB_EC_JAC_MAD_SHFL,
    CB_EC_N
@@ -269,6 +281,7 @@ typedef enum{
    CB_EC2_JACAFF_DOUBLE,
    CB_EC2_JAC_DOUBLE,
    CB_EC2_JAC_MUL,
+   CB_EC2_JAC_MUL1,
    CB_EC2_JAC_MAD,
    CB_EC2_JAC_MAD_SHFL,
    CB_EC2_N

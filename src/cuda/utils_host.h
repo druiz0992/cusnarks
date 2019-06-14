@@ -48,7 +48,6 @@ void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 int compu256_h(const uint32_t *x, const uint32_t *y);
 bool ltu256_h(const uint32_t *x, const uint32_t *y);
-void subu256_h(uint32_t *x, const uint32_t *y);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
 void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len);
@@ -66,4 +65,13 @@ void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwo
 void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx);
 void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
 void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
+void shlru256_h(uint32_t *y, uint32_t *x, uint32_t count);
+void shllu256_h(uint32_t *y, uint32_t *x, uint32_t count);
+void subu256_h(uint32_t *x, const uint32_t *y);
+void addu256_h(uint32_t *x, const uint32_t *y);
+void subu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
+void addu256_h(uint32_t *x, const uint32_t *y);
+void setbitu256_h(uint32_t *x, uint32_t n);
+uint32_t getbitu256_h(uint32_t *x, uint32_t n);;
+void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx);
 #endif

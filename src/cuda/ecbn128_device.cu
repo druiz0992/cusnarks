@@ -225,6 +225,25 @@ __global__ void scmulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
    return;
 }
 
+__global__ void sc1mulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+   int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+   uint32_t __restrict__ *scl;
+ 
+   if(tid >= (params->in_length-1)/2) {
+     return;
+   }
+
+   scl = (uint32_t *) &in_vector[ECP_SCLOFFSET];
+   Z1_t x1(&in_vector[NWORDS_256BIT + tid * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]);
+   Z1_t xr(&out_vector[tid * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
+  
+   scmulecjac<Z1_t, uint256_t>(&xr,0, &x1,0, scl,  params->midx);
+
+   return;
+}
+
 __global__ void scmulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
    int tid = threadIdx.x + blockDim.x * blockIdx.x;
@@ -244,6 +263,24 @@ __global__ void scmulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
    return;
 }
 
+__global__ void sc1mulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+   int tid = threadIdx.x + blockDim.x * blockIdx.x;
+
+   uint32_t __restrict__ *scl;
+ 
+   if(tid >= (params->in_length-1)/4) {
+     return;
+   }
+
+   scl = (uint32_t *) &in_vector[ECP_SCLOFFSET];
+   Z2_t x1(&in_vector[NWORDS_256BIT+ tid * ECP2_JAC_INOFFSET + ECP2_JAC_INXOFFSET]);
+   Z2_t xr(&out_vector[tid * ECP2_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
+  
+   scmulecjac<Z2_t, uint512_t>(&xr,0, &x1,0, scl,  params->midx);
+
+   return;
+}
 
 __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
