@@ -94,7 +94,48 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
 
      return result_snarks_complete, t
  
-           
+def ec2_sc1mul_cuda(pysnark, vector, fidx):
+     kernel_params={}
+     kernel_config={}
+     nsamples = len(vector)
+
+     kernel_params['stride'] = [ECP2_JAC_INDIMS]
+     kernel_config['smemS'] =  [0]
+     kernel_config['blockD'] = [256]
+     kernel_params['premul'] = [0]
+     kernel_params['premod'] = [0]
+     kernel_params['midx'] = [fidx]
+     kernel_config['kernel_idx'] = [CB_EC2_MUL1]
+     kernel_params['in_length'] = [nsamples]
+     kernel_params['out_length'] = nsaples-1
+     kernel_params['padding_idx'] = [0]
+     kernel_config['gridD'] = [0]
+     kernel_config['return_val']=[1]
+
+     result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
+     
+     return result,t
+     
+def ec_sc1mul_cuda(pysnark, vector, fidx):
+     kernel_params={}
+     kernel_config={}
+     nsamples = len(vector)
+
+     kernel_params['stride'] = [ECP_JAC_INDIMS]
+     kernel_config['smemS'] =  [0]
+     kernel_config['blockD'] = [256]
+     kernel_params['premul'] = [0]
+     kernel_params['premod'] = [0]
+     kernel_params['midx'] = [fidx]
+     kernel_config['kernel_idx'] = [CB_EC_MUL1]
+     kernel_params['in_length'] = [nsamples]
+     kernel_params['out_length'] = nsaples-1
+     kernel_params['padding_idx'] = [0]
+     kernel_config['gridD'] = [0]
+     kernel_config['return_val']=[1]
+
+     result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
+
 def ec2_mad_cuda(pysnark, vector, fidx):
      kernel_params={}
      kernel_config={}

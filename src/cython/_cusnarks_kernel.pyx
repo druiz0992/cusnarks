@@ -447,7 +447,7 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
     #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
     #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(MAX_R1CSPOLY_NWORDS*NWORDS_256BIT,dtype=np.uint32)
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(int(1 + np.sum(plen)*(NWORDS_256BIT+2)),dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(int(1 + np.sum(plen)*(NWORDS_256BIT+1)+ plen.shape[0]),dtype=np.uint32)
 
     header_c.nWords = header['nWords']
     header_c.nPubInputs = header['nPubInputs']
@@ -473,17 +473,24 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
                   np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
         cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_vec = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-        cdef ct.uint32_t i, j,idx, offset=in_veca[0]+1
+        cdef ct.uint32_t i, j,idx, v_offset=in_veca[0]+1, c_offset=1+in_veca[0], offset
 
         for j in xrange(nVars):
-           offset += in_veca[j+1]
+           if in_veca[j+1] == 0: 
+              continue
+           v_offset += in_veca[j+1]
+           offset = in_veca[c_offset]*NWORDS_256BIT
 
-           uh.cmontmult_h(&out_vec[j,0], &in_veca[offset], &in_vecb[offset], pidx)
-           for i in xrange(len(out_vec)-1):
-             idx = (i+1) *NWORDS_256BIT
-             uh.cmontmult_h(&tmp_vec[0], &in_veca[idx+offset], &in_vecb[idx+offset], pidx)
+           uh.cmontmult_h(&out_vec[j,0], &in_veca[v_offset], &in_vecb[offset], pidx)
+           for i in xrange(in_veca[j+1]-1):
+             v_offset += NWORDS_256BIT
+             c_offset +=1
+             offset = in_veca[c_offset]*NWORDS_256BIT
+             uh.cmontmult_h(&tmp_vec[0], &in_veca[v_offset], &in_vecb[offset], pidx)
              uh.caddm_h(&out_vec[j,0], &out_vec[j,0], &tmp_vec[0], pidx)
   
+           v_offset += NWORDS_256BIT
+           c_offset = v_offset
         return out_vec
 
 def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,
@@ -503,7 +510,7 @@ def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,
 
      return out_vec
 
-def GrothSetupComputePS( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
+def GrothSetupComputePS_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_kB,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_invD,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_veca,
@@ -526,7 +533,7 @@ def GrothSetupComputePS( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
      return out_vec
 
 
-def GrothSetupComputeeT( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
+def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_z,
                         ct.uint32_t maxH, ct.uint32_t pidx):
      cdef ct.uint32_t s, offset=0

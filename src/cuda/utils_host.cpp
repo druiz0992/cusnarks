@@ -464,7 +464,8 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
 
   for (i=1; i < header->nVars+1;i++){
     cum_c_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_c_poly[i-1];
-    cum_v_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_v_poly[i-1];
+    //cum_v_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_v_poly[i-1];
+    cum_v_poly[i] = cum_c_poly[i] + pout[i+1];
   }
 
   const_offset = cin[0]+1;

@@ -57,7 +57,7 @@ from zfield import *
 from ecc import *
 from zpoly import *
 from constants import *
-#from cuda_wrapper import *
+from cuda_wrapper import *
 from pysnarks_utils import *
 
 
@@ -83,7 +83,7 @@ class GrothSetup(object):
         ZField(self.curve_data['prime'])
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
-        ECC.init(self.curve_data['curve_params'])
+        ECC.init(self.curve_data)
         ZPoly.init(GrothSetup.FieldIDX)
 
         self.nWords       = None
@@ -115,7 +115,10 @@ class GrothSetup(object):
         self.polsA      =  None
         self.polsB      =  None
         self.polsC      =  None
-        self.hExps      =  None  
+        self.hExps      =  None 
+
+        self.ecbn128    = None 
+        self.ec2bn128   = None 
 
 
         if in_circuit_f is not None:
@@ -238,60 +241,48 @@ class GrothSetup(object):
       G2x = Z2FieldEl([curve_params_g2['Gx1'], curve_params_g2['Gx2']])
       G2y = Z2FieldEl([curve_params_g2['Gy1'], curve_params_g2['Gy2']])
 
-      self.vk_alfa_1 = ECCAffine([Gx,Gy]) * toxic_kalfa
-      self.vk_beta_1 = ECCAffine([Gx,Gy]) * toxic_kbeta
-      self.vk_delta_1 = ECCAffine([Gx,Gy]) * toxic_kdelta
+      G1 = ECCAffine([Gx,Gy)]
+      G2 = ECCAffine([G2x, G2y])
+
+      self.vk_alfa_1 = G1 * toxic_kalfa
+      self.vk_beta_1 = G1 * toxic_kbeta
+      self.vk_delta_1 = G1 * toxic_kdelta
       
-      self.vk_beta_2 = ECCAffine([G2x, G2y]) * toxic_kbeta
-      self.vk_delta_2 = ECCAffine([G2x, G2y]) * toxic_kdelta
+      self.vk_beta_2 = G2 * toxic_kbeta
+      self.vk_delta_2 = G2 * toxic_kdelta
     
-      """
-      for (let s=0; s<circuit.nVars; s++) {
+      self.ecbn128    =  ECBN128(self.nVars+1,seed=1)
+      self.ecb2n128    = EC2BN128(self.nVars+1,seed=1)
 
-        const A = G1.affine(G1.mulScalar(G1.g, v.a_t[s]));
+      ecbn128_samples = np.concatenate((G1.as_uint256, a_t_u256))
+      self.A = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+     
+      ecbn128_samples[16:] = b_t_u256
+      self.B1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
 
-        setup.vk_proof.A[s] = A;
+      ec2bn128_samples = np.concatenate((G2.as_uint256, b_t_u256))
+      self.B2 = ec2_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field())
 
-        const B1 = G1.affine(G1.mulScalar(G1.g, v.b_t[s]));
-
-        setup.vk_proof.B1[s] = B1;
-
-        const B2 = G2.affine(G2.mulScalar(G2.g, v.b_t[s]));
-
-        setup.vk_proof.B2[s] = B2;
-       }
- 
       ZPoly.init(GrothSetup.FieldIDX)
       pidx = ZField.get_field()
-      ps = GrothSetupComputePS(toxic_kalfa, toxic_kbeta, toxic_invDelta,
+      ps = GrothSetupComputePS_h(toxic_kalfa, toxic_kbeta, toxic_invDelta,
                                a_t_u256, b_t_u256, c_t_u256, self.nPublic, pidx )
-
       ZPoly.init(GrothSetup.GroupIDX)
-      for (let s=setup.vk_proof.nPublic+1; s<circuit.nVars; s++) {
-        const C = G1.affine(G1.mulScalar(G1.g, ps));
-        setup.vk_proof.C[s]=C;
-      }
+      ecbn128_samples[16:] = c_t_u256
+      self.C = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+
 
       maxH = self.domainSize+1;
-
       self.hExps = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
 
       ZPoly.init(GrothSetup.FieldIDX)
       pidx = ZField.get_field()
       zod = montmult_h(toxic_invDelta, z_t, pidx);
-      eT = GrothSetupComputeeT(toxic_t, zod, maxH, pidx)
+      eT = GrothSetupComputeeT_h(toxic_t, zod, maxH, pidx)
 
       ZPoly.init(GrothSetup.GroupIDX)
-      setup.vk_proof.hExps[0] = G1.affine(G1.mulScalar(G1.g, zod));
-
-      for (let i=1; i<maxH; i++) {
-        setup.vk_proof.hExps[i] = G1.affine(G1.mulScalar(G1.g, F.mul(eT, zod)));
-        eT = F.mul(eT, setup.toxic.t);
-      }
-      """
-
-
-
+      ecbn128_samples[16:] = zod
+      self.hExps = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
 
 
     def _calculateValuesAtT(self, toxic_t):
