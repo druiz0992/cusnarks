@@ -78,6 +78,7 @@ class ECC(object):
     Z = 2
 
     constants_init = False
+
     zero = [None, None]
     one = [None, None]
     two = [None, None]
@@ -85,10 +86,10 @@ class ECC(object):
     four = [None, None]
     eight = [None, None]
 
-    a = [None, None]
-    b = [None, None]
-    Gx = None
-    Gy = None
+    a = [[None, None], [None, None]]
+    b = [[None, None], [None, None]]
+    Gx = [None, None]
+    Gy = [None,None]
 
     def __init__(self, p, curve=None):
         """
@@ -132,12 +133,7 @@ class ECC(object):
             return
 
         if curve is not None:
-            if not isinstance(curve['a'],int) and not isinstance(curve['a'],int):
-                assert False, "Unexpected curve parameters"
-            elif not isinstance(curve['b'],int) and not isinstance(curve['b'],int):
-                assert False, "Unexpected curve parameters"
-            else:
-                self.init_curve(curve)
+           self.init_curve(curve)
 
         # p can be a list of int, long, BigInt
         if isinstance(p_l[ECC.X], Z2FieldEl) or type(p_l[ECC.X]) is list:
@@ -157,7 +153,7 @@ class ECC(object):
 
     @classmethod
     def is_curve_init(cls):
-        return ECC.a[ZUtils.FEXT] is not None and ECC.b[ZUtils.FEXT] is not None
+        return ECC.a[ZUtils.FEXT][0] is not None and ECC.b[ZUtils.FEXT][0] is not None
 
     @classmethod
     def init(cls, curve_params, extended=False):
@@ -179,18 +175,29 @@ class ECC(object):
 
     @classmethod
     def init_curve(cls, curve_params, extended=False):
-        if not extended:
-           ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
-           ECC.b = [ZFieldElExt(curve_params['b']), ZFieldElExt(curve_params['b']).reduce()]
-           ECC.Gx = ZFieldElExt(curve_params['Gx'])
-           ECC.Gy = ZFieldElExt(curve_params['Gy'])
-        else :
-           ECC.a = [Z2FieldEl([curve_params['ax1'], curve_params['ax2']]),
-                   Z2FieldEl([curve_params['ax1'], curve_params['ax2']]).reduce()] 
-           ECC.b = [Z2FieldEl([curve_params['bx1'], curve_params['bx2']]),
-                    Z2FieldEl([curve_params['bx1'], curve_params['bx2']]).reduce()]
-           ECC.Gx = Z2FieldEl([curve_params['Gx1'], curve_params['Gx2']])
-           ECC.Gy = Z2FieldEl([curve_params['Gy1'], curve_params['Gy2']])
+        if 'curve_params' in curve_params:
+           cp = curve_params['curve_params']
+        else:
+           cp = curve_params
+
+        ECC.a[0] = [ZFieldElExt(cp['a']), ZFieldElExt(cp['a']).reduce()]
+        ECC.b[0] = [ZFieldElExt(cp['b']), ZFieldElExt(cp['b']).reduce()]
+        ECC.Gx[0] = ZFieldElExt(cp['Gx'])
+        ECC.Gy[0] = ZFieldElExt(cp['Gy'])
+
+        if 'curve_params_g2' in curve_params:
+           cp = curve_params['curve_params_g2']
+        elif 'ax1' in curve_params:
+           cp = curve_params
+        else:
+           return
+
+        ECC.a[1] = [Z2FieldEl([cp['ax1'], cp['ax2']]),
+                   Z2FieldEl([cp['ax1'], cp['ax2']]).reduce()]
+        ECC.b[1] = [Z2FieldEl([cp['bx1'], cp['bx2']]),
+                  Z2FieldEl([cp['bx1'], cp['bx2']]).reduce()]
+        ECC.Gx[1] = Z2FieldEl([cp['Gx1'], cp['Gx2']])
+        ECC.Gy[1] = Z2FieldEl([cp['Gy1'], cp['Gy2']])
 
     @classmethod
     def p_zero(cls, ext_field=False):
@@ -467,7 +474,10 @@ class ECC(object):
          k = randint(1,p-1)  # generate random number between 1 and p-1
 
          #P1 = ECCJacobian([ECC.Gx,ECC.Gy, 1])
-         P1 = ECCJacobian([ECC.Gx,ECC.Gy])
+         if isinstance(self.P[0],Z2FieldEl):
+             P1 = ECCJacobian([ECC.Gx[1],ECC.Gy[1]])
+         else :
+             P1 = ECCJacobian([ECC.Gx[0],ECC.Gy[0]])
          P1 = k * P1
          P1 = P1.to_affine()
 
@@ -583,10 +593,13 @@ class ECCAffine(ECC):
           True of point is on curve
           False otherwise
         """
+        idx=0
+        if isinstance(self.P[0],Z2FieldEl):
+          idx=1
         return not self.is_inf() and \
                (self.P[ECC.Y] * self.P[ECC.Y]) == \
                (self.P[ECC.X] * self.P[ECC.X] * self.P[ECC.X]) + \
-               (ECC.a[self.FIDX] * self.P[ECC.X]) + ECC.b[self.FIDX]
+               (ECC.a[idx][self.FIDX] * self.P[ECC.X]) + ECC.b[idx][self.FIDX]
  
       
     # Arithmetic operators
@@ -657,12 +670,10 @@ class ECCAffine(ECC):
         Y = self.P[ECC.Y]
 
         if isinstance(self.P[0],Z2FieldEl):
-           ECC.a = [Z2FieldEl([curve_params['ax1'], curve_params['ax2']]),
-                     Z2FieldEl([curve_params['ax1'], curve_params['ax2']]).reduce()] 
+           a = ECC.a[1][self.FIDX]
         else:
-           ECC.a = [ZFieldElExt(curve_params['a']), ZFieldElExt(curve_params['a']).reduce()]
+           a = ECC.a[0][self.FIDX]
 
-        a = ECC.a[self.FIDX]
 
         one = ECC.one[self.FIDX]
         two = ECC.two[self.FIDX]
@@ -753,10 +764,12 @@ class ECCProjective(ECC):
           True of point is on curve
           False otherwise
         """
+        if isinstance(self.P[0],Z2FieldEl):
+          idx=1
         return not self.is_inf() and \
                self.P[ECC.Y] * self.P[ECC.Y] * self.P[ECC.Z] == self.P[ECC.X] * self.P[ECC.X] * self.P[ECC.X] + \
-               ECC.a[self.FIDX] * self.P[ECC.X] * self.P[ECC.Z] * self.P[ECC.Z] + \
-               ECC.b[self.FIDX] * self.P[ECC.Z] * self.P[ECC.Z] * self.P[ECC.Z]
+               ECC.a[idx][self.FIDX] * self.P[ECC.X] * self.P[ECC.Z] * self.P[ECC.Z] + \
+               ECC.b[idx][self.FIDX] * self.P[ECC.Z] * self.P[ECC.Z] * self.P[ECC.Z]
 
     # Arithmetic operators
     # +, - , neg, *
@@ -838,7 +851,11 @@ class ECCProjective(ECC):
 
         X,Y,Z = self.P
 
-        a = ECC.a[self.FIDX]
+        if isinstance(self.P[0],Z2FieldEl):
+           a = ECC.a[1][self.FIDX]
+        else:
+           a = ECC.a[0][self.FIDX]
+
         one = ECC.one[self.FIDX]
         two = ECC.two[self.FIDX]
         three = ECC.three[self.FIDX]
@@ -1045,7 +1062,12 @@ class ECCJacobian(ECC):
             #S = S * ECC.four[self.FIDX]
             S = (S + S + S + S)
 
-        if ECC.a[self.FIDX] == -ECC.three[self.FIDX]:
+        if isinstance(self.P[0],Z2FieldEl):
+           a = ECC.a[1][self.FIDX]
+        else:
+           a = ECC.a[0][self.FIDX]
+
+        if a == -ECC.three[self.FIDX]:
             M1 = (X + Zsq) * (X - Zsq)
             if self.FIDX == ZUtils.FEXT:
                 M  = (M1 << ECC.one[self.FIDX])
@@ -1061,7 +1083,7 @@ class ECCJacobian(ECC):
             else:
                 #M = ECC.three[self.FIDX] * M1
                 M = (M1 + M1 + M1)
-            M = M + ECC.a[self.FIDX] * Zsq * Zsq
+            M = M + a * Zsq * Zsq
 
         X3 = M * M
         Z3 = Y * Z
@@ -1073,10 +1095,10 @@ class ECCJacobian(ECC):
             #X3 = X3 - (S * ECC.two[self.FIDX])
             X3 = X3 - (S + S)
             #Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
-            a = Ysqsq + Ysqsq
-            a = a + a
-            a = a + a
-            Y3 = M * (S - X3) - a
+            t = Ysqsq + Ysqsq
+            t = t + t
+            t = t + t
+            Y3 = M * (S - X3) - t
             #Z3 = Z3 * ECC.two[self.FIDX]
             Z3 = Z3 + Z3 
 
