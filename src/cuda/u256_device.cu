@@ -642,6 +642,7 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
     uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
     uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT],tmp4[NWORDS_256BIT];
 
+    #if 0
     mulmontu256(tmp1, A,B,midx);                  
     mulmontu256(tmp2, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
 
@@ -650,6 +651,18 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
 
     submu256(U, tmp1, tmp2, midx);   
     addmu256(&U[NWORDS_256BIT], tmp3, tmp4, midx);                
+    #else
+    mulmontu256(tmp1, A,B,midx);                  
+    mulmontu256(tmp2, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
+
+    addmu256(tmp3,A,&A[NWORDS_256BIT], midx);                
+    addmu256(tmp4,B,&B[NWORDS_256BIT], midx);                
+    mulmontu256(tmp3, tmp3,tmp4,midx); 
+    submu256(U, tmp1, tmp2, midx);   
+    addmu256(&U[NWORDS_256BIT], tmp1, tmp2, midx);                
+    submu256(&U[NWORDS_256BIT], tmp3, &U[NWORDS_256BIT], midx);                
+
+    #endif
  
     /* 
     addmu256(tmp1, A, &A[NWORDS_256BIT], midx);                // tmp1 = X[0] + X[1]

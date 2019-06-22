@@ -41,12 +41,12 @@
 import copy
 
 from zfield import *
+from random import randint
 
 
 class Z2FieldEl(ZFieldEl):
     init = False
     zero = [[None, None], [None, None]]
-    non_residue = [None, None]
 
     def __init__(self, el, force_init=False):
         """
@@ -58,8 +58,6 @@ class Z2FieldEl(ZFieldEl):
 
         if Z2FieldEl.init == False or force_init:
             Z2FieldEl.zero = [[ZFieldElExt(0), ZFieldElExt(0)], [ZFieldElRedc(0), ZFieldElRedc(0)]]
-            Z2FieldEl.non_residue = [ZFieldElExt(ZField.get_extended_p() - 1),
-                                     ZFieldElExt(ZField.get_extended_p() - 1).reduce()]
             Z2FieldEl.init = True
 
         if isinstance(el, Z2FieldEl):
@@ -165,16 +163,16 @@ class Z2FieldEl(ZFieldEl):
         return self
 
     def square(self):
-        idx = 0
+        nr = ZFieldElExt(ZField.get_extended_p()-1)
         if isinstance(self.P[0], ZFieldElRedc):
-            idx = 1
+            nr= nr.reduce()
 
         newZ2 = Z2FieldEl(self)
         ab = self.P[0] * self.P[1]
         newZ2.P[1] = ab + ab
-        t1 = self.P[0] + Z2FieldEl.non_residue[idx] * self.P[1]
+        t1 = self.P[0] + nr * self.P[1]
         a2 = self.P[0] + self.P[1]
-        newZ2.P[0] = t1 * a2 - (ab + Z2FieldEl.non_residue[idx] * ab)
+        newZ2.P[0] = t1 * a2 - (ab + nr * ab)
 
         return newZ2
 
@@ -183,7 +181,9 @@ class Z2FieldEl(ZFieldEl):
           X * Y
         """
         idx = 0
+        nr = ZFieldElExt(ZField.get_extended_p()-1)
         if isinstance(self.P[0], ZFieldElRedc):
+            nr= nr.reduce()
             idx = 1
 
         if isinstance(other, Z2FieldEl):
@@ -198,7 +198,7 @@ class Z2FieldEl(ZFieldEl):
             bB = self.P[1] * other.P[1]
 
             newZ2 = Z2FieldEl(self)
-            newZ2.P[0] = aA + Z2FieldEl.non_residue[idx] * bB
+            newZ2.P[0] = aA + nr * bB
             newZ2.P[1] = ((self.P[0] + self.P[1]) * (other.P[0] + other.P[1])) - aA - bB
 
             return newZ2
@@ -285,13 +285,13 @@ class Z2FieldEl(ZFieldEl):
         return
 
     def inv(self):
-        idx = 0
+        nr = ZFieldElExt(ZField.get_extended_p()-1)
         if isinstance(self.P[0], ZFieldElRedc):
-            idx = 1
+            nr= nr.reduce()
 
         t0 = self.P[0] * self.P[0]
         t1 = self.P[1] * self.P[1]
-        t2 = t0 - Z2FieldEl.non_residue[idx] * t1
+        t2 = t0 - nr * t1
         t3 = t2.inv()
 
         newZ2 = Z2FieldEl(self)
@@ -303,4 +303,23 @@ class Z2FieldEl(ZFieldEl):
     def as_uint256(self):
        x = self.as_list()
        return  [BigInt(x[0]).as_uint256(), BigInt(x[1]).as_uint256()]
+
+    @classmethod
+    def rand(cls,n, reduced=False):
+      p = ZField.get_extended_p().as_long()
+      l = []
+      for i in xrange(n):
+        x1 = randint(1, p-1)
+        x2 = randint(1, p-1)
+        el = Z2FieldEl([x1, x2])
+        if reduced:
+          el = el.reduce()
+        l.append(el)
+
+      if n==1:
+        return l[0]
+      else:
+        return l
+      
+      
 

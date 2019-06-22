@@ -84,11 +84,12 @@ class GrothSetup(object):
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data)
-        ZPoly.init(GrothSetup.GroupIDX)
-        self.group_p        = ZField.get_extended_p().as_uint256()
-
         ZPoly.init(GrothSetup.FieldIDX)
 
+        ZField.set_field(GrothSetup.GroupIDX)
+        self.group_p        = ZField.get_extended_p().as_uint256()
+
+        ZField.set_field(GrothSetup.FieldIDX)
         self.field_p        = ZField.get_extended_p().as_uint256()
    
         self.protocol     = PROTOCOL_T_GROTH  # Groth
@@ -150,7 +151,7 @@ class GrothSetup(object):
         self._ciru256_to_vars(cir_u256)
 
     def setup(self):
-        ZPoly.init(GrothSetup.FieldIDX)
+        ZField.set_field(GrothSetup.FieldIDX)
         self.domainBits =  np.uint32(math.ceil(math.log(self.nConstraints+ 
                                            self.nPubInputs + 
                                            self.nOutputs,2)))
@@ -247,7 +248,7 @@ class GrothSetup(object):
       toxic_invDelta = toxic_kdelta.inv()
 
 
-      ZPoly.init(GrothSetup.GroupIDX)
+      ZField.set_field(GrothSetup.GroupIDX)
       Gx = ZFieldElExt(curve_params['Gx'])
       Gy = ZFieldElExt(curve_params['Gy'])
       G2x = Z2FieldEl([curve_params_g2['Gx1'], curve_params_g2['Gx2']])
@@ -299,12 +300,12 @@ class GrothSetup(object):
       self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))[unsorted_idx]
       self.B2 = np.reshape(self.B2,(-1,NWORDS_256BIT))
 
-      ZPoly.init(GrothSetup.FieldIDX)
+      ZField.set_field(GrothSetup.FieldIDX)
       pidx = ZField.get_field()
       ps_u256 = GrothSetupComputePS_h(toxic_kalfa.reducce().as_uint256(), toxic_kbeta.reduce().as_uint256(),
                                       toxic_invDelta.reduce().as_uint256(),
                                a_t_u256, b_t_u256, c_t_u256, self.nPublic, pidx )
-      ZPoly.init(GrothSetup.GroupIDX)
+      ZField.set_field(GrothSetup.GroupIDX)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.C,t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
@@ -317,12 +318,12 @@ class GrothSetup(object):
       maxH = self.domainSize+1;
       self.hExps = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
 
-      ZPoly.init(GrothSetup.FieldIDX)
+      ZField.set_field(GrothSetup.FieldIDX)
       pidx = ZField.get_field()
       zod_u256 = montmult_h(toxic_invDelta.reduce().as_uint256(), z_t.as_uint256(), pidx)
       eT_u256 = GrothSetupComputeeT_h(toxic_trdc.as_uint256(), zod_u256, maxH, pidx)
 
-      ZPoly.init(GrothSetup.GroupIDX)
+      ZField.set_field(GrothSetup.GroupIDX)
       sorted_idx = sortu256_idx_h(eT_u256)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.hExps,t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
@@ -352,7 +353,6 @@ class GrothSetup(object):
 
     def _vars_to_pkdict(self):
         pk_dict={}
-                   self.ec_format)
         pk_dict['protocol'] = "groth"
         pk_dict['field_p'] = str(ZFieldElExt.from_uint256(self.field_p))
         pk_dict['group_p'] = str(ZFieldElExt.from_uint256(self.group_p))

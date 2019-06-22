@@ -826,6 +826,8 @@ void addu256_h(uint32_t *x, const uint32_t *y)
 *****************************************************************************/
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
 {
+  montmult_h2(U,A,B,pidx);
+  #if 0
   int i, j;
   uint32_t S, C, C1, C2, M[2], X[2];
   uint32_t T[NWORDS_256BIT_FIOS];
@@ -909,26 +911,31 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
   }
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
+  #endif
 }
+
 void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
   uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
+  uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
 
   montmult_h(t0,x,y,pidx);
   montmult_h(t1,&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
-  subm_h(z,t0,t1,pidx);
 
+  addm_h(t2,x,&x[NWORDS_256BIT],pidx);
+  addm_h(t3,y,&y[NWORDS_256BIT],pidx);
+  montmult_h(t2,t2,t3,pidx);
+  subm_h(z,t0,t1,pidx);
   addm_h(&z[NWORDS_256BIT],t0,t1,pidx);
-  addm_h(t0,x,&x[NWORDS_256BIT],pidx);
-  addm_h(t1,y,&y[NWORDS_256BIT],pidx);
-  montmult_h(t0,t0,t1,pidx);
-  subm_h(&z[NWORDS_256BIT],t0,&z[NWORDS_256BIT],pidx);
+  subm_h(&z[NWORDS_256BIT],t2,&z[NWORDS_256BIT],pidx);
   
 }
 
 // I am leaving this as a separate function to test both implementations are equal
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
+  montmult_h2(U,A,A,pidx);
+  #if 0
   int i, j;
   uint32_t S, C, C1, C2, M[2], X[2], X1[2], carry;
   uint32_t T[NWORDS_256BIT_FIOS];
@@ -1019,6 +1026,7 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
   }
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
+  #endif
 }
 
 
@@ -1836,7 +1844,7 @@ void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
   
   montmult_h(y,x,t0,pidx);
   montmult_h(&y[NWORDS_256BIT],&x[NWORDS_256BIT],t0,pidx);
-  addm_h(&y[NWORDS_256BIT],Zero,&y[NWORDS_256BIT],pidx);
+  subm_h(&y[NWORDS_256BIT],Zero,&y[NWORDS_256BIT],pidx);
 }
 
 void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
