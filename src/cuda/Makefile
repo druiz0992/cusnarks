@@ -101,7 +101,11 @@ endif
 
 ##################################################
 log.o : log.cpp
-	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) -x cu $(CUFLAGS) $*.cpp -o $*.o	
+ifneq ($(CUDA_INSTALLED),)
+	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) -x cu $(CUFLAGS) $*.cpp -o $*.o
+else
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS2) $*.cpp -o $*.o	
+endif	
 
 %.o : %.cpp
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS2) $*.cpp -o $*.o	
