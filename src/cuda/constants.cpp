@@ -394,7 +394,7 @@ const uint32_t * CusnarksOneGet(void)
 {
   return One;
 }
-const uint32_t * CusnarksOnMonteGet(uint32_t pidx)
+const uint32_t * CusnarksOneMontGet(uint32_t pidx)
 {
   return &OneMont[pidx*NWORDS_256BIT];
 }

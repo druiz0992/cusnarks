@@ -321,7 +321,7 @@ typedef struct{
   uint32_t nOutputs;
   uint32_t nVars;
   uint32_t nConstraints;
-  uint32_t tformat;
+  uint32_t cirformat;
   uint32_t R1CSA_nWords;
   uint32_t R1CSB_nWords;
   uint32_t R1CSC_nWords;
@@ -342,4 +342,18 @@ typedef enum{
 
 }cirbin_hfile_offset_t;
 
+typedef enum{
+  PROTOCOL_T_NORMAL=0,
+  PROTOCOL_T_GROTH,
+  PROTOCOL_T_N,
+
+}t_protocol;
+
+typedef enum{
+  EC_T_PROJECTIVE = 0,
+  EC_T_JACOBIAN,
+  EC_T_AFFINE,
+  EC_T_N
+
+}t_ec_format;
 #endif

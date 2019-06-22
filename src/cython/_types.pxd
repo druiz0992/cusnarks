@@ -117,7 +117,7 @@ cdef extern from "types.h":
      uint32_t nOutputs
      uint32_t nVars
      uint32_t nConstraints
-     uint32_t tformat
+     uint32_t cirformat
      uint32_t R1CSA_nWords
      uint32_t R1CSB_nWords
      uint32_t R1CSC_nWords

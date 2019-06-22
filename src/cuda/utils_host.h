@@ -34,6 +34,7 @@
 #define _UTILS_HOST_H_
 
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
+void montmult_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
@@ -74,4 +75,7 @@ void addu256_h(uint32_t *x, const uint32_t *y);
 void setbitu256_h(uint32_t *x, uint32_t n);
 uint32_t getbitu256_h(uint32_t *x, uint32_t n);;
 void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx);
+void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx);
+void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx);
+void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx);
 #endif

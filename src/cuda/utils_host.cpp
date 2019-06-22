@@ -440,7 +440,6 @@ void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *hea
   }
 }
 
-# if 1
 /*
   pout : 
    [0] ........... N Polys = Nvars
@@ -497,130 +496,7 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
   free(cum_c_poly);
   free(cum_v_poly);
 }
-#else
-int r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
-{
-  uint32_t *tmp_poly;
-  uint32_t i,j,k,w;
-  uint32_t poly_idx, const_offset, n_coeff,prev_n_coeff, coeff_offset, coeff_idx, final_offset=0;
-  uint32_t final_poly_size=0;
-  const uint32_t *One = CusnarksOneGet();
 
-  tmp_poly = (uint32_t *)calloc(MAX_R1CSPOLYTMP_NWORDS * NWORDS_256BIT, sizeof(uint32_t));
-
-  const_offset = cin[0]+1;
-  prev_n_coeff = 0;
-
-  for (w=0; w < header->nVars; w++){
-    //printf("%d/%d\n",w, header->nVars);
-    memset(tmp_poly,0,MAX_R1CSPOLYTMP_NWORDS*NWORDS_256BIT*sizeof(uint32_t));
-    final_poly_size = 0;
-    const_offset = cin[0]+1;
-    prev_n_coeff = 0;
-
-    for (i=0; i < header->nConstraints; i++){
-     n_coeff = cin[1+i];
-     coeff_offset = const_offset + n_coeff - prev_n_coeff;
-     for (j=0; j < n_coeff - prev_n_coeff ;j++){
-       poly_idx = cin[const_offset+j];
-       if (poly_idx != w){continue;}
-       coeff_idx = tmp_poly[0]++;
-       final_poly_size++;
-       if (coeff_idx >= (MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1))/NWORDS_256BIT - 1){
-           free(tmp_poly);
-           return coeff_idx*NWORDS_256BIT/(NWORDS_256BIT-1);
-       }
-       tmp_poly[1+coeff_idx]=i;
-       memcpy(&tmp_poly[1+MAX_R1CSPOLYTMP_NWORDS+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
-       coeff_offset += NWORDS_256BIT;
-     }
-     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
-     prev_n_coeff = n_coeff;
-  }
-
-  if (extend){
-     for (i=0; i < header->nPubInputs + header->nOutputs + 1; i++){
-       if (i == w and i < header->nPubInputs + header->nOutputs +1){ 
-       coeff_idx = tmp_poly[0]++;
-       final_poly_size++;
-       if (coeff_idx >= MAX_R1CSPOLYTMP_NWORDS*(NWORDS_256BIT-1)/NWORDS_256BIT - 1){
-           free(tmp_poly);
-           return coeff_idx*NWORDS_256BIT/(NWORDS_256BIT-1);
-       }
-       tmp_poly[1+coeff_idx]=i + header->nConstraints;
-       memcpy(&tmp_poly[1+MAX_R1CSPOLYTMP_NWORDS+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
-       }
-    }
-  }
-  #if 0
-  for (j=0; j < header->nVars; j++){
-    printf("\n\nPoly : %d\n",j);
-    for (i=0; i <= tmp_poly[j][0]; i++){
-      printf("%d\n",tmp_poly[j][i]);
-      //if (i % 200 == 0) { printf("\n");}
-    }
-  }
-  printf("\n\nEND\n");
-  #endif
-
-  final_poly_size = final_poly_size*(NWORDS_256BIT+1)+ header->nVars +1;
- 
-  if (MAX_R1CSPOLY_NWORDS*NWORDS_256BIT <= final_poly_size){
-      free(tmp_poly);
-      return -(final_poly_size/NWORDS_256BIT);
-  } 
-
-  pout[1+w] = tmp_poly[0];
-  if (1+w >= MAX_R1CSPOLYTMP_NWORDS){
-      free(tmp_poly);
-      return w;
-  }
-  memcpy(&pout[1+MAX_R1CSPOLYTMP_NWORDS+final_offset],&tmp_poly[1],sizeof(uint32_t)*tmp_poly[0]);
-  final_offset += tmp_poly[0];
-  memcpy(&pout[1+MAX_R1CSPOLYTMP_NWORDS+final_offset],&tmp_poly[1+MAX_R1CSPOLYTMP_NWORDS],sizeof(uint32_t)*NWORDS_256BIT*tmp_poly[0]);
-  final_offset += (NWORDS_256BIT*tmp_poly[0]);
-
-  pout[0] = w+1;
-
-  /*
-  poly_idx = 0;
-  for (i=0; i<header->nVars;i++){
-    coeff_idx = tmp_poly[0];
-    if (coeff_idx == 0) {
-      continue;
-    }
-    pout[1+poly_idx++] = coeff_idx;
-  }
-  pout[0] = poly_idx;
-
-  const_offset = 0;
-  for (i=0; i<header->nVars;i++){
-    coeff_idx = tmp_poly[0];
-    if (coeff_idx == 0) {
-      continue;
-    }
-    memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[1],sizeof(uint32_t)*coeff_idx);
-    const_offset += coeff_idx;
-    memcpy(&pout[1+poly_idx+const_offset],&tmp_poly[1+MAX_R1CSPOLYTMP_NWORDS],sizeof(uint32_t)*NWORDS_256BIT*coeff_idx);
-    const_offset += (NWORDS_256BIT*coeff_idx);
-    free(tmp_poly[i]);
-  }
-  */
-  }
-  memmove(&pout[1+w],&pout[1+MAX_R1CSPOLYTMP_NWORDS],final_offset*sizeof(uint32_t));
-  free(tmp_poly);
-  free(tmp_coeff);
-
-  #if 0 
-  for (i=0; i< final_poly_size; i++){
-    //if (i % 200 == 0) { printf("\n");}
-    //if (i== pout[0]+1) { printf("\nVals\n");}
-    printf("%d\n",r1cs[i]);
-  }
-  #endif
-  return 0;
-}
-#endif
 /*
   Read header circuit binary file
 
@@ -636,7 +512,7 @@ void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename)
   fread(&hfile->nOutputs, sizeof(uint32_t), 1, ifp); 
   fread(&hfile->nVars, sizeof(uint32_t), 1, ifp); 
   fread(&hfile->nConstraints, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->tformat, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->cirformat, sizeof(uint32_t), 1, ifp); 
   fread(&hfile->R1CSA_nWords, sizeof(uint32_t), 1, ifp); 
   fread(&hfile->R1CSB_nWords, sizeof(uint32_t), 1, ifp); 
   fread(&hfile->R1CSC_nWords, sizeof(uint32_t), 1, ifp); 
@@ -1033,6 +909,21 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
   }
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
+}
+void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
+{
+  uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
+
+  montmult_h(t0,x,y,pidx);
+  montmult_h(t1,&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
+  subm_h(z,t0,t1,pidx);
+
+  addm_h(&z[NWORDS_256BIT],t0,t1,pidx);
+  addm_h(t0,x,&x[NWORDS_256BIT],pidx);
+  addm_h(t1,y,&y[NWORDS_256BIT],pidx);
+  montmult_h(t0,t0,t1,pidx);
+  subm_h(&z[NWORDS_256BIT],t0,&z[NWORDS_256BIT],pidx);
+  
 }
 
 // I am leaving this as a separate function to test both implementations are equal
@@ -1755,7 +1646,7 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 void find_roots_h(uint32_t *roots, const uint32_t *primitive_root, uint32_t nroots, uint32_t pidx)
 {
   uint32_t i;
-  const uint32_t *_1 = CusnarksOnMonteGet((mod_t)pidx);
+  const uint32_t *_1 = CusnarksOneMontGet((mod_t)pidx);
   
   memcpy(roots,_1,sizeof(uint32_t)*NWORDS_256BIT);
   memcpy(&roots[NWORDS_256BIT],primitive_root,sizeof(uint32_t)*NWORDS_256BIT);
@@ -1933,3 +1824,51 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
   subu256_h(r, (uint32_t *)P,r1);
 }
 
+void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
+{
+  uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
+  const uint32_t *Zero = CusnarksZeroGet();
+
+  montsquare_h(t0,x,pidx);
+  montsquare_h(t1,&x[NWORDS_256BIT], pidx);
+  addm_h(t0,t0,t1,pidx);
+  montinv_h(t0,t0,pidx);
+  
+  montmult_h(y,x,t0,pidx);
+  montmult_h(&y[NWORDS_256BIT],&x[NWORDS_256BIT],t0,pidx);
+  addm_h(&y[NWORDS_256BIT],Zero,&y[NWORDS_256BIT],pidx);
+}
+
+void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
+{
+  uint32_t i, zinv[NWORDS_256BIT], zinv_sq[NWORDS_256BIT];
+  const uint32_t *One = CusnarksOneMontGet(pidx);
+
+  for (i=0; i< n; i++){
+     montinv_h(zinv, &x[2*NWORDS_256BIT+i*3*NWORDS_256BIT],pidx);
+     montsquare_h(zinv_sq, zinv, pidx);
+     montmult_h(zinv, zinv_sq, zinv, pidx);
+     montmult_h(&y[i*3*NWORDS_256BIT], &x[i*3*NWORDS_256BIT], zinv_sq, pidx);
+     montmult_h(&y[NWORDS_256BIT + i*3*NWORDS_256BIT], &x[NWORDS_256BIT + i*3*NWORDS_256BIT], zinv, pidx);
+     memcpy(&y[2*NWORDS_256BIT+i*3*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    
+  }
+}
+
+void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
+{
+  uint32_t i, zinv[2*NWORDS_256BIT], zinv_sq[2*NWORDS_256BIT];
+  const uint32_t *One = CusnarksOneMontGet(pidx);
+
+  for (i=0; i< n; i++){
+     montinv_ext_h(zinv, &x[4*NWORDS_256BIT+i*6*NWORDS_256BIT],pidx);
+
+     montmult_ext_h(zinv_sq, zinv, zinv, pidx);
+     montmult_ext_h(zinv, zinv_sq, zinv, pidx);
+
+     montmult_ext_h(&y[i*6*NWORDS_256BIT], &x[i*6*NWORDS_256BIT], zinv_sq, pidx);
+     montmult_ext_h(&y[2*NWORDS_256BIT + i*6*NWORDS_256BIT], &x[2*NWORDS_256BIT + i*6*NWORDS_256BIT], zinv, pidx);
+     memcpy(&y[4*NWORDS_256BIT+i*6*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+     memset(&y[5*NWORDS_256BIT+i*6*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+  }
+}

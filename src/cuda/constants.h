@@ -40,7 +40,7 @@ const uint32_t * CusnarksNPGet(mod_t type);
 const uint32_t * CusnarksIScalerGet(fmt_t type);
 const uint32_t * CusnarksZeroGet(void);
 const uint32_t * CusnarksOneGet(void);
-const uint32_t * CusnarksOnMonteGet(uint32_t pidx);
+const uint32_t * CusnarksOneMontGet(uint32_t pidx);
 const uint32_t * CusnarksEcbn128ParamsGet(void);
 const uint32_t * CusnarksModInfoGet(void);
 const uint32_t * CusnarksMiscKGet(void);
