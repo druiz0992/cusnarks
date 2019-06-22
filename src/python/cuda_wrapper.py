@@ -99,17 +99,18 @@ def ec2_sc1mul_cuda(pysnark, vector, fidx):
      kernel_config={}
      nsamples = len(vector)
 
-     kernel_params['stride'] = [ECP2_JAC_INDIMS]
+     kernel_params['stride'] = [1]
      kernel_config['smemS'] =  [0]
      kernel_config['blockD'] = [256]
-     kernel_params['premul'] = [0]
+     kernel_params['premul'] = [1]
      kernel_params['premod'] = [0]
      kernel_params['midx'] = [fidx]
-     kernel_config['kernel_idx'] = [CB_EC2_MUL1]
+     kernel_config['kernel_idx'] = [CB_EC2_JAC_MUL1]
      kernel_params['in_length'] = [nsamples]
-     kernel_params['out_length'] = nsaples-1
+     kernel_params['out_length'] = (nsamples-ECP2_JAC_INDIMS)*ECP2_JAC_OUTDIMS
      kernel_params['padding_idx'] = [0]
-     kernel_config['gridD'] = [0]
+     kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-ECP2_JAC_INDIMS) /
+                                kernel_config['blockD'][0])]
      kernel_config['return_val']=[1]
 
      result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
@@ -121,20 +122,23 @@ def ec_sc1mul_cuda(pysnark, vector, fidx):
      kernel_config={}
      nsamples = len(vector)
 
-     kernel_params['stride'] = [ECP_JAC_INDIMS]
+     kernel_params['stride'] = [1]
      kernel_config['smemS'] =  [0]
      kernel_config['blockD'] = [256]
-     kernel_params['premul'] = [0]
+     kernel_params['premul'] = [1]
      kernel_params['premod'] = [0]
      kernel_params['midx'] = [fidx]
-     kernel_config['kernel_idx'] = [CB_EC_MUL1]
+     kernel_config['kernel_idx'] = [CB_EC_JAC_MUL1]
      kernel_params['in_length'] = [nsamples]
-     kernel_params['out_length'] = nsaples-1
+     kernel_params['out_length'] = (nsamples-ECP_JAC_INDIMS)*ECP_JAC_OUTDIMS
      kernel_params['padding_idx'] = [0]
-     kernel_config['gridD'] = [0]
+     kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-ECP_JAC_INDIMS-1) /
+                                kernel_config['blockD'][0])]
      kernel_config['return_val']=[1]
 
      result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
+
+     return result,t
 
 def ec2_mad_cuda(pysnark, vector, fidx):
      kernel_params={}

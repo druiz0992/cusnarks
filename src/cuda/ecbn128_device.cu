@@ -231,12 +231,19 @@ __global__ void sc1mulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
 
    uint32_t __restrict__ *scl;
  
-   if(tid >= (params->in_length-1)/2) {
+   if(tid >= params->in_length-ECP_JAC_INDIMS) {
      return;
    }
 
-   scl = (uint32_t *) &in_vector[ECP_SCLOFFSET];
-   Z1_t x1(&in_vector[NWORDS_256BIT + tid * ECP_JAC_INOFFSET + ECP_JAC_INXOFFSET]);
+   scl = (uint32_t *) &in_vector[tid * NWORDS_256BIT + ECP_SCLOFFSET];
+
+   // confert from montgomery if necessary
+   if (params->premul){
+      uint32_t One[NWORDS_256BIT] = {1,0,0,0,0,0,0,0};
+      mulmontu256(scl, scl, One, params->midx);
+   }
+
+   Z1_t x1(&in_vector[(params->in_length-2)*NWORDS_256BIT + ECP_JAC_INXOFFSET]);
    Z1_t xr(&out_vector[tid * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
   
    scmulecjac<Z1_t, uint256_t>(&xr,0, &x1,0, scl,  params->midx);
@@ -269,14 +276,19 @@ __global__ void sc1mulec2jac_kernel(uint32_t *out_vector, uint32_t *in_vector, k
 
    uint32_t __restrict__ *scl;
  
-   if(tid >= (params->in_length-1)/4) {
+   if(tid >= params->in_length-ECP2_JAC_INDIMS) {
      return;
    }
 
-   scl = (uint32_t *) &in_vector[ECP_SCLOFFSET];
-   Z2_t x1(&in_vector[NWORDS_256BIT+ tid * ECP2_JAC_INOFFSET + ECP2_JAC_INXOFFSET]);
-   Z2_t xr(&out_vector[tid * ECP2_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);
-  
+   scl = (uint32_t *) &in_vector[tid * NWORDS_256BIT + ECP_SCLOFFSET];
+   // confert from montgomery if necessary
+   if (params->premul){
+      uint32_t One[NWORDS_256BIT] = {1,0,0,0,0,0,0,0};
+      mulmontu256(scl, scl, One, params->midx);
+   }
+   Z2_t x1(&in_vector[(params->in_length-4)*NWORDS_256BIT + ECP2_JAC_INXOFFSET]);
+   Z2_t xr(&out_vector[tid * ECP2_JAC_OUTOFFSET + ECP2_JAC_OUTXOFFSET]);
+
    scmulecjac<Z2_t, uint512_t>(&xr,0, &x1,0, scl,  params->midx);
 
    return;

@@ -1,3 +1,4 @@
+#cython: language_level=3
 """
     Copyright 2018 0kims association.
 
@@ -169,7 +170,7 @@ IF CUDA_DEF:
        
       def saveFile(self, np.ndarray[ndim=1, dtype=np.uint32_t] samples, bytes fname):
           cdef char *fname_c = fname
-          self._cusnarks_ptr.saveFile(&samples[0],len(samples)/8, fname_c)
+          self._cusnarks_ptr.saveFile(&samples[0],<int>(len(samples)/8), fname_c)
           
       def getDeviceInfo(self):
          self._cusnarks_ptr.getDeviceInfo()
@@ -407,7 +408,7 @@ def readU256CircuitFileHeader_h(bytes fname):
                 'nOutputs' : header.nOutputs,
                 'nVars' : header.nVars,
                 'nConstraints' : header.nConstraints,
-                'tformat' : header.tformat,
+                'cirformat' : header.cirformat,
                 'R1CSA_nWords' : header.R1CSA_nWords,
                 'R1CSB_nWords' : header.R1CSB_nWords,
                 'R1CSC_nWords' : header.R1CSC_nWords }
@@ -430,7 +431,7 @@ def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict hea
     header_c.nOutputs = header['nOutputs']
     header_c.nVars = header['nVars']
     header_c.nConstraints = header['nConstraints']
-    header_c.tformat = header['tformat']
+    header_c.cirformat = header['cirformat']
     header_c.R1CSC_nWords = header['R1CSA_nWords']
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
@@ -454,7 +455,7 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     header_c.nOutputs = header['nOutputs']
     header_c.nVars = header['nVars']
     header_c.nConstraints = header['nConstraints']
-    header_c.tformat = header['tformat']
+    header_c.cirformat = header['cirformat']
     header_c.R1CSC_nWords = header['R1CSA_nWords']
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
@@ -513,21 +514,20 @@ def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,
 def GrothSetupComputePS_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_kB,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_invD,
-                        np.ndarray[ndim=1, dtype=np.uint32_t]in_veca,
-                        np.ndarray[ndim=1, dtype=np.uint32_t]in_vecb,
-                        np.ndarray[ndim=1, dtype=np.uint32_t]in_vecc, ct.uint32_t nP, ct.uint32_t pidx):
-     cdef ct.uint32_t s, offset=0, n=0
+                        np.ndarray[ndim=2, dtype=np.uint32_t]in_veca,
+                        np.ndarray[ndim=2, dtype=np.uint32_t]in_vecb,
+                        np.ndarray[ndim=2, dtype=np.uint32_t]in_vecc, ct.uint32_t nP, ct.uint32_t pidx):
+     cdef ct.uint32_t s,n=0
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t1 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t2 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((len(in_veca)-nP,NWORDS_256BIT), dtype=np.uint32)
+     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((len(in_veca)-nP,NWORDS_256BIT), dtype=np.uint32)
 
      for s in xrange(nP+1,len(in_veca)):
-        offset= offset + s*NWORDS_256BIT
-        uh.cmontmult_h(&t1[0],&in_veca[offset],&in_kB[0], pidx)
-        uh.cmontmult_h(&t2[0],&in_vecb[offset],&in_kA[0], pidx)
+        uh.cmontmult_h(&t1[0],&in_veca[s,0],&in_kB[0], pidx)
+        uh.cmontmult_h(&t2[0],&in_vecb[s,0],&in_kA[0], pidx)
         uh.caddm_h(&t1[0],&t1[0], &t2[0], pidx)
-        uh.caddm_h(&t1[0],&t1[0], &in_vecc[offset], pidx)
-        uh.cmontmult_h(&out_vec[n],&t1[0],&in_invD[0], pidx)
+        uh.caddm_h(&t1[0],&t1[0], &in_vecc[s,0], pidx)
+        uh.cmontmult_h(&out_vec[n,0],&t1[0],&in_invD[0], pidx)
         n+=1
 
      return out_vec
@@ -536,15 +536,55 @@ def GrothSetupComputePS_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
 def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_z,
                         ct.uint32_t maxH, ct.uint32_t pidx):
-     cdef ct.uint32_t s, offset=0
+     cdef ct.uint32_t s
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t1 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((maxH,NWORDS_256BIT), dtype=np.uint32)
+     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((maxH,NWORDS_256BIT), dtype=np.uint32)
 
      t1 = in_t
 
-     for s in xrange(1,maxH):
-        offset= offset + s*NWORDS_256BIT
-        uh.cmontmult_h(&out_vec[offset],&t1[0],&in_z[0], pidx)
+     for s in xrange(0,maxH):
+        uh.cmontmult_h(&out_vec[s,0],&t1[0],&in_z[0], pidx)
         uh.cmontmult_h(&t1[0],&t1[0],&in_t[0], pidx)
 
      return out_vec
+
+def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
+     cdef ct.uint32_t lenv = <int>(len(in_v)/24)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
+    
+     uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+
+     return out_vec.reshape((-1,NWORDS_256BIT))
+
+def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
+     cdef ct.uint32_t lenv = <int>(len(in_v)/48)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
+    
+     uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+
+     return out_vec.reshape((-1,NWORDS_256BIT))
+
+def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
+    cdef list sp_poly_list=[]
+    cdef dict sp_poly={}
+
+    cdef ct.uint32_t npoly = in_mpoly[0]
+    cdef ct.uint32_t i,j, c_offset = 1 + npoly, v_offset = 1 + npoly , ncoeff 
+
+    for i in xrange(npoly):
+       ncoeff = in_mpoly[i+1]
+       if ncoeff==0:
+          c_offset+=1
+          continue
+       v_offset += ncoeff
+       sp_poly={}
+       for j in xrange(ncoeff):
+           sp_poly[str(in_mpoly[c_offset])] = in_mpoly[v_offset:v_offset+ct.NWORDS_256BIT]
+           c_offset +=1
+           v_offset +=ct.NWORDS_256BIT
+       sp_poly_list.append(sp_poly)
+       c_offset = v_offset
+  
+    return sp_poly_list
+
+

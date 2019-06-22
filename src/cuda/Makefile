@@ -25,8 +25,8 @@ LOG_LEVEL=$(LOG_LEVEL)
 NVCC = nvcc
 CC  = g++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
-CFLAGS=-c -g -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
-#CFLAGS=-c -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
+#CFLAGS=-c -g -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
+CFLAGS=-c -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
 #CFLAGS=-c -DLINUXINTEL64 -g -G -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
 EXTRA_CFLAGS2=-I $(AUX_INCLUDES) -shared -fPIC
@@ -54,29 +54,22 @@ CUSRC = cusnarks_kernel.cu \
 
 CSRC = rng.cpp \
        utils_host.cpp \
-       constants.cpp
+       constants.cpp \
+       log.cpp
 
 #Check if CUDA tools are installed.
-CUDA = $(shell which $(NVCC))
-
-ifeq ($(CUDA),)
-CSRC += log.cpp
-else
-CUSRC += log.cpp
-endif
+CUDA_INSTALLED = $(shell which $(NVCC))
 
 
 NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
 CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
 
 
-CUDA_INSTALLED = $(shell which $(NVCC))
-
 ifeq ($(CUDA_INSTALLED),)
 OBJ= $(CSRC:.cpp=.o)
 else
 OBJ=$(CUSRC:.cu=.o) \
-    $(CSRC:.cpp=.o)
+    $(CSRC:.cpp=.o) 
 endif
 
 clean:
@@ -107,9 +100,8 @@ ifneq ($(CUDA_INSTALLED),)
 endif
 
 ##################################################
+log.o : log.cpp
+	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) -x cu $(CUFLAGS) $*.cpp -o $*.o	
+
 %.o : %.cpp
-ifeq ($(CUDA_INSTALLED),)
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS2) $*.cpp -o $*.o	
-else
-	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS) $*.cpp -o $*.o	
-endif
