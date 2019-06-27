@@ -70,7 +70,7 @@ class CUEC2Test(unittest.TestCase):
     nsamples = 1024
     u256_p = BigInt(prime).as_uint256()
     ZField(prime, curve_data['curve'])
-    ECC.init(curve_data['curve_params_g2'], extended=True)
+    ECC.init(curve_data, extended=True)
 
     if os.path.exists(EC2BN128_datafile):
         npzfile = np.load(EC2BN128_datafile)
