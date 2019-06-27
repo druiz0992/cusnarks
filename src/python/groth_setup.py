@@ -60,6 +60,7 @@ from constants import *
 from cuda_wrapper import *
 from pysnarks_utils import *
 
+toxic_vals={}
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 try:
@@ -133,6 +134,14 @@ class GrothSetup(object):
 
         self.toxic_k = toxic_k
 
+        if toxic_k is not None:
+            self.toxic_k = {}
+            self.toxic_k['t'] = ZFieldElExt(67169787496919339585645799176647542838773026531300456920521553057205406683097)
+            self.toxic_k['alfa'] = ZFieldElExt(1134518151820358108612679249377700122751010564182468716727759040085489907696)
+            self.toxic_k['beta'] = ZFieldElExt(71597143887803798208943903498218823267880122178160557862817991965517792985211)
+            self.toxic_k['gamma'] = ZFieldElExt(41541454976197163914017137424922699722177499042836566579394654366564582315971)
+            self.toxic_k['delta'] = ZFieldElExt(58716679712109974585925593920469714547076106422413006398768003444697698366456)
+
         if in_circuit_f is not None:
            self.circuitRead(in_circuit_f, in_circuit_format, out_circuit_format, out_circuit_f)
 
@@ -161,10 +170,10 @@ class GrothSetup(object):
         self.domainSize = 1 << self.domainBits
 
         prime = ZField.get_extended_p()
-        if toxic_k is None:
+        if self.toxic_k is None:
            toxic_trdc = ZFieldElRedc(randint(1,prime.as_long()-1))
         else:
-           toxic_trdc = ZFieldElExt(toxic_k['t']).reduce()
+           toxic_trdc = ZFieldElExt(self.toxic_k['t']).reduce()
 
         self._calculatePoly()
         self._calculateEncryptedValuesAtT(toxic_trdc)
@@ -233,17 +242,17 @@ class GrothSetup(object):
       curve_params_g2 = self.curve_data['curve_params_g2']
 
       # Tocix k extended
-      if toxic_k is None:
+      if self.toxic_k is None:
         toxic_kalfa = ZFieldElExt(randint(1,prime.as_long()-1))
         toxic_kbeta = ZFieldElExt(randint(1,prime.as_long()-1))
         toxic_kgamma = ZFieldElExt(randint(1,prime.as_long()-1))
         toxic_kdelta = ZFieldElExt(randint(1,prime.as_long()-1))
 
       else:
-        toxic_kalfa = ZFieldElExt(toxic_k['alfa'])
-        toxic_kbeta = ZFieldElExt(toxic_k['beta'])
-        toxic_kgamma = ZFieldElExt(toxic_k['gamma'])
-        toxic_kdelta = ZFieldElExt(toxic_k['delta'])
+        toxic_kalfa = ZFieldElExt(self.toxic_k['alfa'])
+        toxic_kbeta = ZFieldElExt(self.toxic_k['beta'])
+        toxic_kgamma = ZFieldElExt(self.toxic_k['gamma'])
+        toxic_kdelta = ZFieldElExt(self.toxic_k['delta'])
 
       toxic_invDelta = toxic_kdelta.inv()
 
@@ -660,16 +669,22 @@ class GrothSetup(object):
          writeU256CircuitFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
 
 
+
 if __name__ == "__main__":
     in_circuit_f = '../../data/prove-kyc.json'
     out_circuit_f = '../../data/prove-kyc.bin'
     #in_circuit_f = '../../data/circuit.json'
     #out_circuit_f = '../../data/circuit.bin'
     out_pk_f = '../../data/proving_key_prove-kyc.json'
+
+    GS = GrothSetup(in_circuit_f=out_circuit_f, out_pk_f=out_pk_f, out_pk_binformat=FMT_EXT, out_pk_ecformat=EC_T_AFFINE, toxic_k=toxic_vals)
+
+    """
     if os.path.isfile(out_circuit_f):
        GS = GrothSetup(in_circuit_f=out_circuit_f)
     else:
        GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f, in_circuit_format=FMT_EXT, out_circuit_format=FMT_MONT, out_pk_f=out_pk_f, out_pk_binformat=FMT_MONT, out_pk_ecformat=EC_T_AFFINE, toxic_k=None)
+    """
 
     GS.setup()
 
