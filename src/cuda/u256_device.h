@@ -258,6 +258,40 @@ __forceinline__ __device__ void movu256(uint32_t *d_out, uint32_t *d_in)
     */
 }
 
+__forceinline__ __device__ void movu256x6(uint32_t *d_out, uint32_t *d_in)
+{
+    uint32_t i;
+    ulonglong4 *out = (ulonglong4 *)d_out;
+    ulonglong4 *in =  (ulonglong4 *)d_in;
+
+    #pragma unroll
+    for(i=0; i < 6; i++){
+      out->x = in->x;
+      out->y = in->y;
+      out->z = in->z;
+      out->w = in->w;
+      out++;
+      in++;
+    }
+}
+
+__forceinline__ __device__ void movu256x2(uint32_t *d_out, uint32_t *d_in)
+{
+    uint32_t i;
+    ulonglong4 *out = (ulonglong4 *)d_out;
+    ulonglong4 *in =  (ulonglong4 *)d_in;
+
+    #pragma unroll
+    for(i=0; i < 2; i++){
+      out->x = in->x;
+      out->y = in->y;
+      out->z = in->z;
+      out->w = in->w;
+      out++;
+      in++;
+    }
+}
+
 __forceinline__ __device__ void set0u256(uint32_t *d_out)
 {
   #if 0

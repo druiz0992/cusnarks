@@ -33,7 +33,7 @@ int main()
 
   memcpy(&poly[1], poly_len,header.nVars*sizeof(uint32_t));
 
-  r1cs_to_mpoly_h(poly,&constraints[CIRBIN_H_N_OFFSET], &header,1); 
+  r1cs_to_mpoly_h(poly,&constraints[CIRBIN_H_N_OFFSET], &header,0, 0, 1); 
   free(constraints);
   free(poly);
   free(poly_len);

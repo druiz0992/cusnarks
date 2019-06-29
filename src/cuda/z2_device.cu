@@ -69,15 +69,15 @@ __device__ uint32_t * Z2_t::get2u256(uint32_t offset)
 
 __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
 { 
-  // memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-    //     &y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-      //   3 * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
-   movu256(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
-   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+3)*NWORDS_256BIT],&y->el[(yoffset+3)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+4)*NWORDS_256BIT],&y->el[(yoffset+4)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+5)*NWORDS_256BIT],&y->el[(yoffset+5)*NWORDS_256BIT]);
+   //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+         //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+         //3 * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
+   movu256x6(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+3)*NWORDS_256BIT],&y->el[(yoffset+3)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+4)*NWORDS_256BIT],&y->el[(yoffset+4)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+5)*NWORDS_256BIT],&y->el[(yoffset+5)*NWORDS_256BIT]);
 }
 
 __device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
@@ -85,12 +85,12 @@ __device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
     //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
            //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
            //3* ECP2_JAC_N256W * NWORDS_256BIT * sizeof(uint32_t));
-   movu256(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
-   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+3)*NWORDS_256BIT],&y[(yoffset+3)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+4)*NWORDS_256BIT],&y[(yoffset+4)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+5)*NWORDS_256BIT],&y[(yoffset+5)*NWORDS_256BIT]);
+   movu256x6(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+3)*NWORDS_256BIT],&y[(yoffset+3)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+4)*NWORDS_256BIT],&y[(yoffset+4)*NWORDS_256BIT]);
+   //movu256(&el[(xoffset+5)*NWORDS_256BIT],&y[(yoffset+5)*NWORDS_256BIT]);
 }
 
 __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize)

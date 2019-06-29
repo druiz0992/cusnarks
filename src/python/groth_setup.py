@@ -183,18 +183,24 @@ class GrothSetup(object):
 
     def _calculatePoly(self):
         self._computeHeader()
-
+  
+        to_mont = 0
+        pidx = ZField.get_field()
+        if self.cirformat == ZUtils.FEXT:
+           to_mont = 1
+     
         polyA_len = r1cs_to_mpoly_len_h(self.R1CSA, self.header, 1)
-        self.polsA = r1cs_to_mpoly_h(polyA_len,self.R1CSA, self.header, 1)
+        self.polsA = r1cs_to_mpoly_h(polyA_len,self.R1CSA, self.header, to_mont, pidx, 1)
         self.R1CSA = None
 
         polyB_len = r1cs_to_mpoly_len_h(self.R1CSB, self.header, 0)
-        self.polsB = r1cs_to_mpoly_h(polyB_len,self.R1CSB, self.header, 0)
+        self.polsB = r1cs_to_mpoly_h(polyB_len,self.R1CSB, self.header, to_mont, pidx, 0)
         self.R1CSB = None
 
         polyC_len = r1cs_to_mpoly_len_h(self.R1CSC, self.header, 0)
-        self.polsC = r1cs_to_mpoly_h(polyC_len,self.R1CSC, self.header, 0)
+        self.polsC = r1cs_to_mpoly_h(polyC_len,self.R1CSC, self.header, to_mont, pidx, 0)
         self.R1CSC = None
+
 
     def _evalLagrangePoly(self, bits, t_rdc):
        """
@@ -245,13 +251,11 @@ class GrothSetup(object):
       if self.toxic_k is None:
         toxic_kalfa = ZFieldElExt(randint(1,prime.as_long()-1))
         toxic_kbeta = ZFieldElExt(randint(1,prime.as_long()-1))
-        toxic_kgamma = ZFieldElExt(randint(1,prime.as_long()-1))
         toxic_kdelta = ZFieldElExt(randint(1,prime.as_long()-1))
 
       else:
         toxic_kalfa = ZFieldElExt(self.toxic_k['alfa'])
         toxic_kbeta = ZFieldElExt(self.toxic_k['beta'])
-        toxic_kgamma = ZFieldElExt(self.toxic_k['gamma'])
         toxic_kdelta = ZFieldElExt(self.toxic_k['delta'])
 
       toxic_invDelta = toxic_kdelta.inv()
@@ -274,12 +278,14 @@ class GrothSetup(object):
       self.vk_alfa_1 = ec_jac2aff_h(G1.as_uint256(self.vk_alfa_1).reshape(-1),ZField.get_field())
       self.vk_beta_1 = ec_jac2aff_h(G1.as_uint256(self.vk_beta_1).reshape(-1),ZField.get_field())
       self.vk_delta_1 = ec_jac2aff_h(G1.as_uint256(self.vk_delta_1).reshape(-1),ZField.get_field())
-      
+    
+      """ 
       self.vk_beta_2 = G2 * toxic_kbeta
       self.vk_delta_2 = G2 * toxic_kdelta
     
       self.vk_beta_2 = ec2_jac2aff_h(G2.as_uint256(self.vk_beta_2).reshape(-1),ZField.get_field())
       self.vk_delta_2 = ec2_jac2aff_h(G2.as_uint256(self.vk_delta_2).reshape(-1),ZField.get_field())
+      """
 
       self.ecbn128    =  ECBN128(self.domainSize+3,seed=1)
       self.ec2bn128    = EC2BN128(self.nVars+1,seed=1)
@@ -293,6 +299,8 @@ class GrothSetup(object):
       unsorted_idx = np.argsort(sorted_idx)
       self.A = np.reshape(self.A,(-1,3,NWORDS_256BIT))[unsorted_idx]
       self.A = np.reshape(self.A,(-1,NWORDS_256BIT))
+
+      return
 
       sorted_idx = sortu256_idx_h(b_t_u256)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
@@ -311,7 +319,7 @@ class GrothSetup(object):
 
       ZField.set_field(GrothSetup.FieldIDX)
       pidx = ZField.get_field()
-      ps_u256 = GrothSetupComputePS_h(toxic_kalfa.reducce().as_uint256(), toxic_kbeta.reduce().as_uint256(),
+      ps_u256 = GrothSetupComputePS_h(toxic_kalfa.reduce().as_uint256(), toxic_kbeta.reduce().as_uint256(),
                                       toxic_invDelta.reduce().as_uint256(),
                                a_t_u256, b_t_u256, c_t_u256, self.nPublic, pidx )
       ZField.set_field(GrothSetup.GroupIDX)
@@ -343,7 +351,7 @@ class GrothSetup(object):
 
 
     def _calculateValuesAtT(self, toxic_trdc):
-       # Required z_t, u, polsA/B/C are in montgomery format
+       # Required z_t, u, polsA/B/C are in MONT format
        z_t, u = self._evalLagrangePoly(self.domainBits, toxic_trdc)
 
        pidx = ZField.get_field()
@@ -369,7 +377,7 @@ class GrothSetup(object):
            pk_dict['binFormat'] = "normal"
         else:
            pk_dict['binFormat'] = "montgomery"
-        pk_dict['Rbitlen'] = str(Zfield.get_reduction_data()['Rbitlen'])
+        pk_dict['Rbitlen'] = str(ZField.get_reduction_data()['Rbitlen'])
 
         if self.out_pk_ecformat == EC_T_AFFINE:
            pk_dict['ecFormat'] = "affine"
@@ -388,14 +396,15 @@ class GrothSetup(object):
            b_reduce=True
         else:
            b_reduce = False
-  
+ 
+        """ 
         if self.out_pk_binformat == FMT_EXT:
           spoly = mpoly_to_sparseu256_h(self.polsA)
-          pk_dict['polsA'] = [{k : ZFieldElRedc.from_uint256(p[k]).extend().as_long() for  k in p.keys()} for p in spoly]
+          pk_dict['polsA'] = [{k : ZFieldElRedc(BigInt.from_uint256(p[k])).extend().as_long() for  k in p.keys()} for p in spoly]
           spoly = mpoly_to_sparseu256_h(self.polsB)
-          pk_dict['polsB'] = [{k : ZFieldElRedc.from_uint256(p[k]).extend().as_long() for  k in p.keys()} for p in spoly]
+          pk_dict['polsB'] = [{k : ZFieldElRedc(BigInt.from_uint256(p[k])).extend().as_long() for  k in p.keys()} for p in spoly]
           spoly = mpoly_to_sparseu256_h(self.polsC)
-          pk_dict['polsC'] = [{k : ZFieldElRedc.from_uint256(p[k]).extend().as_long() for  k in p.keys()} for p in spoly]
+          pk_dict['polsC'] = [{k : ZFieldElRedc(BigInt.from_uint256(p[k])).extend().as_long() for  k in p.keys()} for p in spoly]
         else:
           spoly = mpoly_to_sparseu256_h(self.polsA)
           pk_dict['polsA'] = [{k : BigInt.from_uint256(p[k]).as_long() for  k in p.keys()} for p in spoly]
@@ -403,25 +412,54 @@ class GrothSetup(object):
           pk_dict['polsB'] = [{k : BigInt.from_uint256(p[k]).as_long() for  k in p.keys()} for p in spoly]
           spoly = mpoly_to_sparseu256_h(self.polsC)
           pk_dict['polsC'] = [{k : BigInt.from_uint256(p[k]).as_long() for  k in p.keys()} for p in spoly]
+        """
 
 
-        P = ECC.from_uint256(self.A, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)
-        pk_dict['A'] = [x.as_list() for x in P]
-        P = ECC.from_uint256(self.B1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)
-        pk_dict['B1'] = [x.as_list() for x in P]
-        P = ECC.from_uint256(self.B2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce, ec2=True)
-        pk_dict['B2'] = [x.as_list() for x in P]
-        P = ECC.from_uint256(self.C, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)
-        pk_dict['C'] = [x.as_list() for x in P]
+        P = ECC.from_uint256(self.A, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)
+        if not b_reduce:
+           pk_dict['A'] = [x.extend().as_list() for x in P]
+        else:
+           pk_dict['A'] = [x.as_list() for x in P]
 
-        pk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)[0].as_list()
-        pk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)[0].as_list()
-        pk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)[0].as_list()
-        pk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce, ec2=True)[0].as_list()
-        pk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce, ec2=True)[0].as_list()
+        """
+        P = ECC.from_uint256(self.B1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)
+        if not b_reduce:
+          pk_dict['B1'] = [x.extend().as_list() for x in P]
+        else:
+          pk_dict['B1'] = [x.as_list() for x in P]
 
-        P = ECC.from_uint256(self.hExps, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=b_reduce)
-        pk_dict['hExps'] = [x.as_list() for x in P]
+        P = ECC.from_uint256(self.B2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True, ec2=True)
+        if not b_reduce:
+          pk_dict['B2'] = [x.extend().as_list() for x in P]
+        else:
+          pk_dict['B2'] = [x.as_list() for x in P]
+
+        P = ECC.from_uint256(self.C, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)
+        if not b_reduce:
+          pk_dict['C'] = [x.extend().as_list() for x in P]
+        else:
+          pk_dict['C'] = [x.as_list() for x in P]
+
+        if not b_reduce:
+          pk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)[0].extend().as_list()
+          pk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)[0].extend().as_list()
+          pk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)[0].extend().as_list()
+          pk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True, ec2=True)[0].extend().as_list()
+          pk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True, ec2=True)[0].extend().as_list()
+
+        else:
+          pk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)[0].as_list()
+          pk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)[0].as_list()
+          pk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)[0].as_list()
+          pk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True, ec2=True)[0].as_list()
+          pk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True, ec2=True)[0].as_list()
+
+        P = ECC.from_uint256(self.hExps, in_ectype=EC_T_AFFINE, out_ectype=self.out_pk_ecformat, reduced=True)
+        if not b_reduce:
+          pk_dict['hExps'] = [x.extend().as_list() for x in P]
+        else:
+          pk_dict['hExps'] = [x.as_list() for x in P]
+        """
        
         return pk_dict
  
@@ -432,7 +470,7 @@ class GrothSetup(object):
                    self.field_p,
                    self.group_p,
                    self.pk_format,
-                   np.asarray(Zfield.get_reduction_data()['Rbitlen'],dtype=np.uint32),
+                   np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32),
                    self.ec_format)
 
         pk_bin = np.concatenate(
@@ -659,9 +697,9 @@ class GrothSetup(object):
     def write_pk(self):
        if self.out_pk_f.endswith('.json') :
          pk_dict = self._vars_to_pkdict()
-         pk_json = json.dumps(pk_dict, indent=4).encode('utf8')
+         pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
          f = open(self.out_pk_f, 'w')
-         print(j, file=f)
+         print(pk_json, file=f)
          f.close()
 
        elif self.out_pk_f.endswith('bin') :

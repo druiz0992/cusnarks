@@ -443,7 +443,7 @@ def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict hea
     return plen_out
 
 def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen, 
-                    np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t extend):
+                    np.ndarray[ndim=1, dtype=np.uint32_t] r1cs, dict header, ct.uint32_t to_mont, ct.uint32_t pidx, ct.uint32_t extend):
 
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
     #cdef np.ndarray[ndim=1, dtype=np.uint32_t] pout = np.zeros(pwords*(NWORDS_256BIT+1)+1,dtype=np.uint32)
@@ -463,7 +463,7 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     pout[0] = header_c.nVars
     pout[1:header_c.nVars+1] = plen
 
-    uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
+    uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, to_mont, pidx, extend)
     #ret_val = uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, extend)
     free(header_c)
      
@@ -574,7 +574,8 @@ def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     for i in xrange(npoly):
        ncoeff = in_mpoly[i+1]
        if ncoeff==0:
-          c_offset+=1
+          #c_offset+=1
+          sp_poly_list.append({})
           continue
        v_offset += ncoeff
        sp_poly={}
@@ -587,4 +588,18 @@ def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
   
     return sp_poly_list
 
+def to_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx ):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
+     cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
 
+     uh.cto_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
+
+     return out_v.reshape((-1,ct.NWORDS_256BIT))
+    
+def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx ):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
+     cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
+
+     uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
+
+     return out_v.reshape((-1,ct.NWORDS_256BIT))

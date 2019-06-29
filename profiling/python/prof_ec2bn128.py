@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 /*
     Copyright 2018 0kims association.
@@ -58,7 +59,7 @@ ZPOLY_datafile = '../../data/zpoly_data_1M.npz'
 
 def profile_ec2bn128():
 
-    niter = 10
+    niter = 2
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = ZUtils.CURVE_DATA['BN128']['prime']
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
@@ -72,8 +73,9 @@ def profile_ec2bn128():
 
     #my_kernels = [CB_EC2_JACAFF_ADD , CB_EC2_JAC_ADD , CB_EC2_JACAFF_DOUBLE,
                   #CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CM_EC2_JAC_MUL1, CB_EC2_JAC_MAD_SHFL]
-    my_kernels = [CB_EC_JAC_MAD_SHFL]
-    #my_kernels = [CB_EC_JAC_DOUBLE]
+    my_kernels = [CB_EC2_JAC_MAD_SHFL]
+    #my_kernels = [CB_EC2_JAC_ADD, CB_EC2_JAC_DOUBLE]
+    #my_kernels = [CB_EC2_JAC_DOUBLE]
 
     for k in my_kernels:
       kernel_params = {}
@@ -82,7 +84,7 @@ def profile_ec2bn128():
 
       # Test ECBN kernel:
       kernel_config['smemS'] = [0]
-      kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+      kernel_config['blockD'] = [128]
       kernel_params['padding_idx'] = [0]
       kernel_params['premod'] = [0]
       kernel_params['midx'] = [MOD_FIELD]
@@ -118,7 +120,7 @@ def profile_ec2bn128():
   
       if kernel_config['kernel_idx'][0] == CB_EC2_JAC_MAD_SHFL:
          kernel_params['stride'] = [ECP2_JAC_INDIMS + U256_NDIMS, ECP2_JAC_OUTDIMS, ECP2_JAC_OUTDIMS]
-         kernel_config['blockD'] = [256,128,32]
+         kernel_config['blockD'] = [128,128,64]
          kernel_params['premul'] = [1,0,0]
          kernel_params['premod'] = [0,0,0]
          kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD]

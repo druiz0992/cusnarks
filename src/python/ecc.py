@@ -764,6 +764,7 @@ class ECCProjective(ECC):
           True of point is on curve
           False otherwise
         """
+        idx=0
         if isinstance(self.P[0],Z2FieldEl):
           idx=1
         return not self.is_inf() and \

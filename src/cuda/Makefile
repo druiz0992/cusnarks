@@ -24,15 +24,16 @@ LOG_LEVEL=$(LOG_LEVEL)
 
 NVCC = nvcc
 CC  = g++
-GENCODE_ARCH_COMPUTE=-gencode arch=compute_60,code=sm_60
+GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
 #CFLAGS=-c -g -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
 CFLAGS=-c -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
 #CFLAGS=-c -DLINUXINTEL64 -g -G -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
 EXTRA_CFLAGS2=-I $(AUX_INCLUDES) -shared -fPIC
-CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
+#CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -maxrregcount=64 -lineinfo -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
+CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -lineinfo -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
-LINKFLAGS= -arch=sm_60 --shared -o 
+LINKFLAGS= -arch=sm_61 --shared -o 
 LINKFLAGS2=--shared -o 
 LDFLAGS=-lm -lcudart
 LDFLAGS2=-lm

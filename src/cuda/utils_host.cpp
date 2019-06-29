@@ -446,13 +446,15 @@ void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *hea
    [1 .. NVars] .. N coeff Poly[0..NVars-1] 
    [NVars + 1 .. NcoeffPoly[0]]
 */
-void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend)
+void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t to_mont, uint32_t pidx, uint32_t extend)
 {
   uint32_t *tmp_poly, *cum_c_poly, *cum_v_poly;
   uint32_t i,j;
   uint32_t poly_idx, const_offset, n_coeff,prev_n_coeff, coeff_offset, coeff_idx;
   uint32_t c_offset, v_offset;
-  const uint32_t *One = CusnarksOneGet();
+  const uint32_t *One;
+  
+  One = CusnarksOneMontGet((mod_t)pidx);
 
   tmp_poly = (uint32_t *) calloc(header->nVars,sizeof(uint32_t *));
   cum_c_poly = (uint32_t *) calloc(header->nVars+1,sizeof(uint32_t *));
@@ -477,7 +479,12 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
        poly_idx = cin[const_offset+j];
        coeff_idx = tmp_poly[poly_idx]++;
        pout[cum_c_poly[poly_idx]+coeff_idx+1]=i;
-       memcpy(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       if (to_mont){
+         to_montgomery_h(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT],
+                         &cin[coeff_offset], pidx);
+       } else {
+         memcpy(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+       }
        coeff_offset += NWORDS_256BIT;
      }
      const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
@@ -714,6 +721,14 @@ void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
   const uint32_t *R2 = CusnarksR2Get((mod_t)pidx);
   montmult_h(z,x,R2, pidx);
 }
+void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
+{
+  uint32_t i;
+
+  for(i=0; i<n;i++){
+    to_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+  }
+}
 
 /* 
    Convert 256 bit number from montgomery representation of one of the two prime 
@@ -730,6 +745,15 @@ void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
   montmult_h(z,x,one, pidx);
 }
 
+
+void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
+{
+  uint32_t i;
+
+  for(i=0; i<n;i++){
+    from_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+  }
+}
 
 /*
     Removes higher order coefficient equal to 0
@@ -934,8 +958,9 @@ void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t 
 // I am leaving this as a separate function to test both implementations are equal
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
+  #if 1
   montmult_h2(U,A,A,pidx);
-  #if 0
+  #else
   int i, j;
   uint32_t S, C, C1, C2, M[2], X[2], X1[2], carry;
   uint32_t T[NWORDS_256BIT_FIOS];
@@ -945,24 +970,29 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
   memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
 
   for(i=0; i<NWORDS_256BIT; i++) {
-    // (C,S) = t[0] + a[0]*b[i], worst case 2 words
+    // (C,S) = t[i] + a[i]*a[i], worst case 2 words
     spMultiply(X, A[i], A[i]); // X[Upper,Lower] = a[0]*b[i]
-    C = mpAdd(&S, T+0, X+0, 1); // [C,S] = t[0] + X[Lower]
+    C = mpAdd(&S, &T[i], X+0, 1); // [C,S] = t[0] + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper], No carry
+ 
+    T[i] = S;
+    C1 = C;
+    
+    // q = T[0]*n'[0] mod W, where W=2^32
+    spMultiply(M, T[0], NPrime[0]);
 
-    // ADD(t[1],C)
-    mpAddWithCarryProp(T, C, 1, NWORDS_256BIT_FIOS);
-    //carry = mpAdd(&T[1], &T[1], &C, 1); 
-
-    // m = S*n'[0] mod W, where W=2^32
-    // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-    spMultiply(M, S, NPrime[0]);
-
-    // (C,S) = S + m*n[0], worst case 2 words
+    // (C,S) = T[0] + q*n[0], worst case 2 words
     spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
-    C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
+    C = mpAdd(&S, &T, X+0, 1); // [C,S] = S + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
     
+    for (j=1; j < i+1; j++){
+    // (C,S) =  M*N[j]+T[j] + C, worst case 2 words
+    spMultiply(X1, M[0], N[j]);
+    C1 = mpAdd(&S, &T[j], &C, 1);  // (C1,S) = t[i+1] + C
+    C2 = mpAdd(&S, &S, X1+0, 1);  // (C2,S) = S + X[Lower]
+    mpAdd(&C, &C1, X1+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
+    }
     
     // (C,S) = t[j] + a[i+1]*a[i+1] + C, worst case 2 words
     spMultiply(X1, A[i+1], A[i]);

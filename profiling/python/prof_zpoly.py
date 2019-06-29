@@ -134,7 +134,7 @@ def profile_zpoly_1M():
          roots_rdc_u256 = npzfile['roots_rdc_u256']
        
     else:
-      print "Error. File not found"
+      print ("Error. File not found")
       return
           
 

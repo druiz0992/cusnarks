@@ -83,8 +83,9 @@
         logBigNumber(str, n);
      }
   #if defined (LOG_TID) && defined (__CUDACC__)
-    __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, uint32_t *n)
+    __device__ void logDebugBigNumberTid(uint32_t nelems, char *str, uint32_t *n)
     {
+       int tid = threadIdx.x + blockDim.x * blockIdx.x;
        if (tid == LOG_TID){
          uint32_t i;
          for (i=0; i< nelems; i++){
@@ -93,8 +94,9 @@
        }
     }
     
-    __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, Z1_t *n)
+    __device__ void logDebugBigNumberTid(uint32_t nelems, char *str, Z1_t *n)
     {
+       int tid = threadIdx.x + blockDim.x * blockIdx.x;
        if (tid == LOG_TID){
          uint32_t i;
          for (i=0; i< nelems; i++){
@@ -102,8 +104,9 @@
          }
        }
     }
-    __device__ void logDebugBigNumberTid(int tid,uint32_t nelems, char *str, Z2_t *n)
+    __device__ void logDebugBigNumberTid(uint32_t nelems, char *str, Z2_t *n)
     {
+       int tid = threadIdx.x + blockDim.x * blockIdx.x;
        if (tid == LOG_TID){
          uint32_t i;
          for (i=0; i< nelems/2; i++){
@@ -111,8 +114,9 @@
          }
        }
     }
-    __device__ void logDebugTid(int tid, uint32_t nelems, const char *f,uint32_t args )
+    __device__ void logDebugTid(uint32_t nelems, const char *f,uint32_t args )
     {
+       int tid = threadIdx.x + blockDim.x * blockIdx.x;
        if (tid == LOG_TID){
           printf(f,args);
        }
@@ -130,8 +134,9 @@
         logBigNumber(str, n);
      }
   #if defined (LOG_TID) && defined (__CUDACC__)
-      __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, uint32_t *n)
+      __device__ void logInfoBigNumberTid(uint32_t nelems, char *str, uint32_t *n)
       {
+         int tid = threadIdx.x + blockDim.x * blockIdx.x;
          if (tid == LOG_TID){
            uint32_t i;
            for (i=0; i< nelems; i++){
@@ -139,8 +144,9 @@
            }
          }
       }
-     __device__ void logInfoBigNumberTid(int tid, uint32_t nelems, char *str, Z1_t *n)
+     __device__ void logInfoBigNumberTid(uint32_t nelems, char *str, Z1_t *n)
       {
+         int tid = threadIdx.x + blockDim.x * blockIdx.x;
          if (tid == LOG_TID){
            uint32_t i;
            for (i=0; i< nelems; i++){
@@ -148,8 +154,9 @@
            }
          }
       }
-    __device__ void logInfoBigNumberTid(int tid,uint32_t nelems, char *str, Z2_t *n)
+    __device__ void logInfoBigNumberTid(uint32_t nelems, char *str, Z2_t *n)
     {
+       int tid = threadIdx.x + blockDim.x * blockIdx.x;
        if (tid == LOG_TID){
          uint32_t i;
          for (i=0; i< nelems/2; i++){
@@ -158,8 +165,9 @@
        }
     }
     //template <typename  Args> 
-     __device__ char * logInfoTid(int tid, const char *f, uint32_t args)
+     __device__ char * logInfoTid(const char *f, uint32_t args)
     {
+       int tid = threadIdx.x + blockDim.x * blockIdx.x;
        if (tid == LOG_TID){
           printf(f,args);
        }
