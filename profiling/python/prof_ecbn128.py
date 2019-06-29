@@ -58,7 +58,7 @@ ZPOLY_datafile = '../../data/zpoly_data_1M.npz'
 
 def profile_ecbn128():
 
-    niter = 10
+    niter = 2
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = ZUtils.CURVE_DATA['BN128']['prime']
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
@@ -72,8 +72,9 @@ def profile_ecbn128():
 
     #my_kernels = [CB_EC_JACAFF_ADD , CB_EC_JAC_ADD , CB_EC_JACAFF_DOUBLE,
                   #CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MUL1, CB_EC_JAC_MAD_SHFL]
+    #my_kernels = [CB_EC_JAC_MAD_SHFL]
+    #my_kernels = [CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE]
     my_kernels = [CB_EC_JAC_MAD_SHFL]
-    #my_kernels = [CB_EC_JAC_DOUBLE]
 
     for k in my_kernels:
       kernel_params = {}
@@ -127,8 +128,8 @@ def profile_ecbn128():
       for i in range(niter):
          ecbn128_vector = cu_ecbn128.randu256(3*nsamples,pu256)
          idx_v = sortu256_idx_h(ecbn128_vector[:nsamples])
-         ecbn128_vector = np.concatenate((ecbn128_vector[:nsamples][idx_v], ecbn128_vector[nsamples:]))
-         _,kernel_time = cu_ecbn128.kernelLaunch(ecbn128_vector[idx_v], kernel_config, kernel_params,nkernels)
+         input_vector = np.concatenate((ecbn128_vector[:nsamples][idx_v], ecbn128_vector[nsamples:]))
+         _,kernel_time = cu_ecbn128.kernelLaunch(input_vector, kernel_config, kernel_params,nkernels)
          if i :
              kernel_stats.append(kernel_time)
   

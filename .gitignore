@@ -12,6 +12,9 @@
 *.pyc
 *.so
 
+#profiler
+*.nvvp
+
 # Precompiled Headers
 *.gch
 *.pch

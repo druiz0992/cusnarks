@@ -87,8 +87,9 @@ class ECCTest(unittest.TestCase):
         a, b = ECC.get_curve()
 
         self.assertTrue(ECC.is_curve_init() == False)
-        self.assertTrue(a is None)
-        self.assertTrue(b is None)
+
+        self.assertTrue(a[0] is None)
+        self.assertTrue(b[0] is None)
 
         ## Init ECC 
         # F ext
@@ -102,8 +103,8 @@ class ECCTest(unittest.TestCase):
         r1_extj = p1_extj.get_P()
 
         self.assertTrue(ECC.is_curve_init() == True)
-        self.assertTrue(a.as_long() == c['curve_params']['a'])
-        self.assertTrue(b.as_long() == c['curve_params']['b'])
+        self.assertTrue(a[0].as_long() == c['curve_params']['a'])
+        self.assertTrue(b[0].as_long() == c['curve_params']['b'])
 
         self.assertTrue([r.as_long() for r in r1_exta] == p1_exta.as_list())
         self.assertTrue([r.as_long() for r in r1_extp] == p1_extp.as_list())
@@ -649,7 +650,7 @@ class ECCTest(unittest.TestCase):
             zely_exta = [k * c['curve_params_g2']['Gy1'], k * c['curve_params_g2']['Gy2']]
             zelz_exta = [1, 0]
 
-            p1_exta = ECCJacobian([zelx_exta, zely_exta, zelz_exta], c['curve_params'], force_init=True)
+            p1_exta = ECCJacobian([zelx_exta, zely_exta, zelz_exta], curve=c, force_init=True)
             while True:
                 z1 = ZFieldElExt(randint(0, p - 1))
                 z2 = ZFieldElExt(randint(0, p - 1))

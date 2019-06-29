@@ -55,7 +55,9 @@ void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len);
 void setRandom(uint32_t *x, const uint32_t);
 void setRandom256(uint32_t *x, uint32_t nsamples, const uint32_t *p);
 void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
+void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx);
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
+void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx);
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void printU256Number(const uint32_t *x);
@@ -64,7 +66,7 @@ void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nw
 void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename);
 void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
 void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx);
-void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
+void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t to_mont, uint32_t pidx, uint32_t extend);
 void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
 void shlru256_h(uint32_t *y, uint32_t *x, uint32_t count);
 void shllu256_h(uint32_t *y, uint32_t *x, uint32_t count);
