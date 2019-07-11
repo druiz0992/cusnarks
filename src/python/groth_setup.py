@@ -76,9 +76,12 @@ class GrothSetup(object):
     
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
-                 out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, toxic_f=None,
-                 benchmark_f=None):
-  
+                 out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
+                 benchmark_f=None, seed=None):
+ 
+        if seed is not None:
+          random.seed(seed) 
+
         self.worker = [mp.Pool() for p in range(mp.cpu_count()-1)]
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group 
@@ -135,26 +138,47 @@ class GrothSetup(object):
         self.out_k_binformat = out_k_binformat
         self.out_k_ecformat = out_k_ecformat
 
-        self.toxic_f = toxic_f
+        self.test_f = test_f
         self.toxic = {}
+ 
+        self.in_circuit_f = in_circuit_f
+        self.out_circuit_f = out_circuit_f
+        self.out_circuit_format = out_circuit_format
+        self.in_circuit_format = FMT_EXT
 
-        if in_circuit_f is not None:
-           self.circuitRead(in_circuit_f, out_circuit_format, out_circuit_f)
+        if self.in_circuit_f is not None:
+           self.circuitRead()
+        else:
+           print("Input circuit is required\n")
 
-    def circuitRead(self,in_circuit_f, out_circuit_format, out_circuit_f=None):
+    def circuitRead(self):
         # cir Json to u256
-        if in_circuit_f.endswith('.json'):
-           cir_u256 = self._cirjson_to_u256(in_circuit_f, out_circuit_format=out_circuit_format)
+        if self.in_circuit_f.endswith('.json'):
+           cir_u256 = self._cirjson_to_u256()
 
            #u256 to bin
-           if out_circuit_f is not None:
-              self._ciru256_to_bin(cir_u256, out_circuit_f)
+           if self.out_circuit_f is not None:
+              self._ciru256_to_bin(cir_u256)
 
-        elif in_circuit_f.endswith('.bin'):
-             cir_u256 = self._cirbin_to_u256(in_circuit_f)
+        elif self.in_circuit_f.endswith('.bin'):
+             cir_u256 = self._cirbin_to_u256()
 
         self._ciru256_to_vars(cir_u256)
 
+    def launch_snarkjs(self):
+        # snarkjs setup is launched with circuit.json, format extended. Convert input file if necessary
+        if self.in_circuit_f.endswith('.json') and self.in_circuit_format == FMT_EXT
+           circuit_file = self.in_circuit_f
+        else :
+           print("To launch snarkjs, input circuit needs to be a json file and format cannot be Montgomery")
+           return
+        
+        tmp_pk_f = self.out_pk_f
+        tmp_vk_f = self.out_vk_f   
+        call(["snarkjs", "setup", "-c", circuit_file, "--pk", tmp_pk_f, "--vk", tmp_vk_f, "--protocol", "groth"])
+
+        return tmp_pk_f, tmp_vk_f
+   
     def setup(self):
         ZField.set_field(MOD_FIELD)
         self.domainBits =  np.uint32(math.ceil(math.log(self.nConstraints+ 
@@ -171,6 +195,15 @@ class GrothSetup(object):
 
         self._calculatePoly()
         self._calculateEncryptedValuesAtT()
+
+        self.write_pk()
+        self.write_vk()
+
+        if self.test_f is not None:
+          self.write_toxic()
+          tmp_pk_f, tmp_vk_f = self.launch_snarkjs("setup")
+          self.compare_pk(tmp_pk_f)
+          self.compare_vk(tmp_vk_f)
 
         return 
 
@@ -321,7 +354,7 @@ class GrothSetup(object):
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
-      ps_u256 = GrothSetupComputePS_h(self.toxic'kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
+      ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
                                       toxic_invDelta.reduce().as_uint256(),
                                       a_t_u256, b_t_u256, c_t_u256, self.nPublic, pidx )
       ZField.set_field(MOD_GROUP)
@@ -381,11 +414,11 @@ class GrothSetup(object):
 
        return a_t_u256, b_t_u256, c_t_u256, z_t_u256
 
-    def _cirbin_to_u256(self, circuit_f):
-        return readU256CircuitFile_h(circuit_f.encode("UTF-8"))
+    def _cirbin_to_u256(self):
+        return readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
 
-    def _ciru256_to_bin(self, ciru256_data, circuit_f):
-        writeU256CircuitFile_h(ciru256_data, circuit_f.encode("UTF-8"))
+    def _ciru256_to_bin(self, ciru256_data):
+        writeU256CircuitFile_h(ciru256_data, self.out_circuit_f.encode("UTF-8"))
 
     def _vars_to_toxicdict(self):
       toxic_dict = self.toxic
@@ -586,7 +619,7 @@ class GrothSetup(object):
                   'R1CSB_nWords' : self.R1CSB_nWords,
                   'R1CSC_nWords' : self.R1CSC_nWords}
 
-    def _cirjson_to_u256(self,circuit_f, out_circuit_format=ZUtils.FEXT):
+    def _cirjson_to_u256(self,circuit_f):
         """
           Converts from circom .json output file to binary format required to 
             calculate snarks setup. Only the following entries are used:
@@ -655,13 +688,11 @@ class GrothSetup(object):
         f.close()
 
         if 'cirformat' in cir_data:
-            in_circuit_format = cir_data['cirformat']
-        else:
-            in_circuit_format = FMT_EXT
+            self.in_circuit_format = cir_data['cirformat']
 
-        if in_circuit_format == out_circuit_format:
+        if self.in_circuit_format == self.out_circuit_format:
           R1CSA_u256 = [ZPolySparse(coeff[0]).as_uint256() for coeff in cir_data['constraints']]
-        elif in_circuit_format == ZUtils.FEXT:
+        elif self.in_circuit_format == ZUtils.FEXT:
           R1CSA_u256 = [ZPolySparse(coeff[0]).reduce().as_uint256() for coeff in cir_data['constraints']]
         else :
           R1CSA_u256 = [ZPolySparse(coeff[0]).extend().as_uint256() for coeff in cir_data['constraints']]
@@ -679,9 +710,9 @@ class GrothSetup(object):
         R1CSA_len = R1CSA_u256.shape[0]
                 
 
-        if in_circuit_format == out_circuit_format:
+        if self.in_circuit_format == self.out_circuit_format:
           R1CSB_u256 = [ZPolySparse(coeff[1]).as_uint256() for coeff in cir_data['constraints']]
-        elif in_circuit_format == ZUtils.FEXT:
+        elif self.in_circuit_format == ZUtils.FEXT:
           R1CSB_u256 = [ZPolySparse(coeff[1]).reduce().as_uint256() for coeff in cir_data['constraints']]
         else :
           R1CSB_u256 = [ZPolySparse(coeff[1]).extend().as_uint256() for coeff in cir_data['constraints']]
@@ -698,9 +729,9 @@ class GrothSetup(object):
                                                   dtype=np.uint32)
         R1CSB_len = R1CSB_u256.shape[0]
 
-        if in_circuit_format == out_circuit_format:
+        if self.in_circuit_format == self.out_circuit_format:
           R1CSC_u256 = [ZPolySparse(coeff[2]).as_uint256() for coeff in cir_data['constraints']]
-        elif in_circuit_format == ZUtils.FEXT:
+        elif self.in_circuit_format == ZUtils.FEXT:
           R1CSC_u256 = [ZPolySparse(coeff[2]).reduce().as_uint256() for coeff in cir_data['constraints']]
         else :
           R1CSC_u256 = [ZPolySparse(coeff[2]).extend().as_uint256() for coeff in cir_data['constraints']]
@@ -725,7 +756,7 @@ class GrothSetup(object):
         self.nOutputs     =  np.uint32(cir_data['nOutputs'])
         self.nVars        =  np.uint32(cir_data['nVars'])
         self.nConstraints =  np.uint32(len(cir_data['constraints']))
-        self.cirformat       =  np.uint32(out_circuit_format)
+        self.cirformat       =  np.uint32(self.out_circuit_format)
         self.R1CSA_nWords =  np.uint32(R1CSA_len)
         self.R1CSB_nWords =  np.uint32(R1CSB_len)
         self.R1CSC_nWords =  np.uint32(R1CSC_len)
@@ -736,29 +767,30 @@ class GrothSetup(object):
         return  self._cirvarsPack()
 
     def write_pk(self):
-       if self.out_pk_f.endswith('.json') :
+       out_pk_f = self.out_pk_f
+       if self.test_f is not None:
+         out_pk_f = './data/xxx.json'
+
+       if out_pk_f.endswith('.json') :
          pk_dict = self._vars_to_pkdict()
          pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
          f = open(self.out_pk_f, 'w')
          print(pk_json, file=f)
          f.close()
 
-       elif self.out_pk_f.endswith('bin') :
+       if self.out_pk_f.endswith('bin') :
          pk_bin = self._vars_to_pkbin()
          writeU256CircuitFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
 
+
     def write_toxic(self)
-       if self.toxic_f:
-         toxic_dict = self._vars_to_toxicdict()
-         toxic_json = json.dumps(toxic_dic, indent=4, sort_keys=True)
-         f = open(self.toxic_f, 'w')
-         print(toxic_json, file=f)
-         f.close()
+       toxic_dict = self._vars_to_toxicdict()
+       toxic_json = json.dumps(toxic_dic, indent=4, sort_keys=True)
+       f = open(self.test_f, 'w')
+       print(toxic_json, file=f)
+       f.close()
 
     def write_vk(self):
-       if self.out_vk_f is None
-          return
-
        self._gen_vk_alfabeta_12()
        if self.out_vk_f.endswith('.json') :
          vk_dict = self._vars_to_vkdict()
@@ -769,61 +801,42 @@ class GrothSetup(object):
 
        elif self.out_vk_f.endswith('bin') :
          vk_bin = self._vars_to_vkbin()
-         writeU256CircuitFile_h(vk_bin, self.out_vk_f.encode("UTF-8"))
+
+         if vk_bin is not None:
+            writeU256CircuitFile_h(vk_bin, self.out_vk_f.encode("UTF-8"))
 
     def _vars_to_vkdict(self):
+      # TODO : only suported formats for vk are .json, affine and extended 
       vk_dict = {}
       vk_dict['protocol'] = "groth"
       vk_dict['field_p'] = str(ZFieldElExt.from_uint256(self.field_p).as_long())
       vk_dict['group_p'] = str(ZFieldElExt.from_uint256(self.group_p).as_long())
-      if self.out_k_binformat == FMT_EXT:
-           vk_dict['binFormat'] = "normal"
-           b_reduce = False
-      else:
-           vk_dict['binFormat'] = "montgomery"
-           b_reduce=True
+      vk_dict['binFormat'] = "normal"
 
       vk_dict['Rbitlen'] = int(self.Rbitlen)
+      vk_dict['ecFormat'] = "affine"
 
-      if self.out_k_ecformat == EC_T_AFFINE:
-           vk_dict['ecFormat'] = "affine"
-      elif self.out_k_ecformat == EC_T_JACOBIAN: 
-           vk_dict['ecFormat'] = "jacobian"
-      else :
-           vk_dict['ecFormat'] = "projective"
-
-           
       vk_dict['nVars'] = int(self.nVars)
       vk_dict['nPublic'] = int(self.nPublic)
       vk_dict['domainBits'] = int(self.domainBits)
       vk_dict['domainSize'] = int(self.domainSize)
 
       ZField.set_field(MOD_FIELD)
-      if not b_reduce:
-        vk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].extend().as_str()
-        vk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].extend().as_str()
-        vk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].extend().as_str()
-        vk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].extend().as_str()
-        vk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].extend().as_str()
-
-      else:
-        vk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].as_str()
-        vk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].as_str()
-        vk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].as_str()
-        vk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].as_str()
-          pk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].as_str()
+      vk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
+      vk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
+      vk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
+      vk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
+      vk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
 
       ZField.set_field(MOD_GROUP)
-      P = ECC.from_uint256(self.IC, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)
-      if not b_reduce:
-         vk_dict['IC'] = [x.extend().as_str() for x in P]
-      else:
-         vk_dict['IC'] = [x.as_str() for x in P]
+      P = ECC.from_uint256(self.IC, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+      vk_dict['IC'] = [x.extend().as_str() for x in P]
 
       return vk_dict
 
     def _vars_to_vkbin(self):
-      
+      print("Verifying Key can only be saved as .json\n");
+      vk_bin=None
       return vk_bin
 
 
@@ -837,20 +850,19 @@ if __name__ == "__main__":
     #GS = GrothSetup(in_circuit_f = in_circuit_f, out_circuit_f = out_circuit_f,
     GS = GrothSetup(in_circuit_f = out_circuit_f,
                     out_circuit_format=FMT_EXT, out_pk_f=out_pk_f, 
-                    out_k_binformat=FMT_EXT, out_k_ecformat=EC_T_AFFINE, toxic_f=None)
+                    out_k_binformat=FMT_EXT, out_k_ecformat=EC_T_AFFINE, test_f=None)
     """
     if os.path.isfile(out_circuit_f):
        GS = GrothSetup(in_circuit_f=out_circuit_f, 
                        out_pk_f=out_pk_f, out_k_binformat=FMT_MONT,
-                       out_k_ecformat=EC_T_AFFINE, toxic_k=toxic_vals)
+                       out_k_ecformat=EC_T_AFFINE, test_f=toxic_vals)
     else:
        GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f, 
                        out_circuit_format=FMT_MONT, out_pk_f=out_pk_f, out_k_binformat=FMT_MONT,
-                       out_k_ecformat=EC_T_AFFINE, toxic_k=toxic_vals)
+                       out_k_ecformat=EC_T_AFFINE, test_f=toxic_vals)
     """
 
     GS.setup()
-    GS.write_pk()
-    GS.write_vk()
-    GS.write_toxic()
+
+   
 
