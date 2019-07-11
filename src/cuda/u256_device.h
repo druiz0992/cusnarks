@@ -37,7 +37,7 @@
 #define U256_BSELM (1)
 #define  U256_MBSCLUSTER (2)
 
-//#include "log.h"
+#include "log.h"
 
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
@@ -169,7 +169,7 @@ __forceinline__ __device__ uint32_t eq0u256(T1 *x)
   }
  #else
   ulonglong4 *x4 = (ulonglong4 *)x;
-  if (x4->x == 0 && x4->y == 0 and x4->z==0 and x4->w == 0){
+  if (x4->x == 0 && x4->y == 0 && x4->z==0 && x4->w == 0){
      return 1;
   } else {
      return 0;
@@ -178,6 +178,27 @@ __forceinline__ __device__ uint32_t eq0u256(T1 *x)
   
 }
 
+/*
+   x == 1 for 256 bit numbers
+*/
+template <typename T1>
+__forceinline__ __device__ uint32_t eq1u256(T1 *x)
+{
+ #if 1
+  if (x[0] == 1 && x[1] ==  0 && x[2] == 0 && x[3] == 0 && x[4] == 0 && x[5] == 0 && x[6] == 0 && x[7] == 0){
+    return 1;
+  } else { 
+    return 0;
+  }
+ #else
+  ulonglong4 *x4 = (ulonglong4 *)x;
+  if (x4->x == 1 && x4->y == 0 && x4->z==0 && x4->w == 0){
+     return 1;
+  } else {
+     return 0;
+  }
+  #endif
+}  
 
 /*
    x < y
@@ -346,15 +367,18 @@ __device__ void submu256(T1 *z, T2 *x, T3 *y, mod_t midx)
   uint32_t const __restrict__ *p = mod_info_ct[midx].p;
   uint32_t tmp[NWORDS_256BIT];
 
-  //logInfoBigNumberTid(tid,1,"x:\n",(uint32_t *)x);
-  //logInfoBigNumberTid(tid,1,"y:\n",(uint32_t *)y);
+  //logInfoBigNumberTid(1,"x:\n",(uint32_t *)x);
+  //logInfoBigNumberTid(1,"y:\n",(uint32_t *)y);
   subu256(tmp,x,y);
   if (tmp[NWORDS_256BIT-1] > p[NWORDS_256BIT-1]){
   //if (ltu256(p,tmp)){
+      //logInfoBigNumberTid(1,"tmp1:\n",(uint32_t *)tmp);
       addu256(tmp,tmp,p);
   } 
+  //logInfoBigNumberTid(1,"p:\n",(uint32_t *)p);
+  //logInfoBigNumberTid(1,"tmp:\n",(uint32_t *)tmp);
   movu256((uint32_t *) z,tmp);
-  //logInfoBigNumberTid(tid,1,"z:\n",(uint32_t *)z);
+  //logInfoBigNumberTid(1,"z:\n",(uint32_t *)z);
 
 }
 #endif

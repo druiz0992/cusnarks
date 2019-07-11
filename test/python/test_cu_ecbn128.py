@@ -46,6 +46,7 @@ from zutils import *
 from zfield import *
 from constants import *
 from ecc import *
+from cuda_wrapper import *
 
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
@@ -66,10 +67,9 @@ class CUECTest(unittest.TestCase):
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = curve_data['prime_r']
     nsamples = int(1024)
-    ntest_points = 6
     u256_p = BigInt(prime).as_uint256()
     ZField(prime, curve_data['curve'])
-    ECC.init(curve_data['curve_params'])
+    ECC.init(curve_data)
 
     if os.path.exists(ECBN128_datafile):
         npzfile = np.load(ECBN128_datafile)
@@ -114,13 +114,15 @@ class CUECTest(unittest.TestCase):
     else:
 
         print("Generating Random scalars....",end='')
-        ecbn128_scl =      [randint(1,prime-1) for x in xrange(nsamples)]
+        ecbn128_scl = []
+        for x in xrange(nsamples):
+           ecbn128_scl.append(randint(1,prime-1))
         print("Done\n")
         print("Converting Random scalars to u256...",end='')
         ecbn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
         print("Done\n")
 
-        ecbn128_ecjac, ecbn128_ecjac_rdc  = np.asarray(ECC.rand(nsamples, ectype = 1, reduce=True, verbose="Generating Random EC points...\t"))
+        ecbn128_ecjac, ecbn128_ecjac_rdc  = np.asarray(ECC.rand(nsamples, ectype = 1, reduce=True, ec2=False, verbose="Generating Random EC points...\t"))
         print("Done\n")
          
         print("Forming vector...",end='')
@@ -182,6 +184,10 @@ class CUECTest(unittest.TestCase):
                                    radd=r_add_u256, radd_rdc=r_add_rdc_u256, rdouble=r_double_u256, rdouble_rdc=r_double_rdc_u256,
                                    rmul=r_mul_u256, rmul_rdc=r_mul_rdc_u256, rmad=r_mad_u256, rmad_rdc=r_mad_rdc_u256)
         print("Done\n")
+        r_add_rdc = r_add_rdc_u256
+        r_double_rdc = r_double_rdc_u256
+        r_mul_rdc = r_mul_rdc_u256
+        r_mad_rdc = r_mad_rdc_u256
 
 
 
@@ -239,6 +245,15 @@ class CUECTest(unittest.TestCase):
         self.assertTrue(len(result)/ECP_JAC_OUTDIMS == nsamples/2)
         self.assertTrue(all(np.concatenate(result == r_add)))
 
+        r = np.zeros((1536*2,8),dtype=np.uint32)
+        r = r.reshape((-1,3,8))
+        r[:,0] = ecbn128_vector[::2]
+        r[:,1] = ecbn128_vector[1::2]
+        r[:,2] = ZFieldElExt(1).reduce().as_uint256()
+        re = ECC.from_uint256(r.reshape((-1,8)), in_ectype=1, out_ectype=2, reduced=True)
+        re1 = [x.to_jacobian()+y.to_jacobian() for x,y in zip(re[::2], re[1::2])]
+        re2 = ECC.from_uint256(r_add, in_ectype=1, out_ectype=2, reduced=True)
+        re3 = ECC.from_uint256(result, in_ectype=1, out_ectype=2, reduced=True)
         # Test add jac
 
         kernel_params['in_length'] = [nsamples  * ECP_JAC_OUTDIMS]
@@ -259,6 +274,8 @@ class CUECTest(unittest.TestCase):
         result,_ = ecbn128.kernelLaunch(ecbn128_vector_ext, kernel_config, kernel_params )
         self.assertTrue(len(result)/ECP_JAC_OUTDIMS == nsamples/2)
         self.assertTrue(all(np.concatenate(result == r_add)))
+
+
 
         # Test double jacaff
         kernel_params['in_length'] = [nsamples  * ECP_JAC_INDIMS]
@@ -376,86 +393,71 @@ class CUECTest(unittest.TestCase):
 
         for niter in xrange(CUECTest.TEST_ITER):
             # Test mad jac shuffle
-            kernel_params['stride'] = [ECP_JAC_INDIMS + U256_NDIMS, ECP_JAC_OUTDIMS, ECP_JAC_OUTDIMS]
-            kernel_config['blockD'] = [256, 256,32]
-            kernel_params['premul'] = [0,0,0]
-            kernel_params['premod'] = [0,0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD]
-            kernel_config['smemS'] = [0,
-                                      kernel_config['blockD'][1]/32 * NWORDS_256BIT * ECP_JAC_OUTDIMS * 4,
-                                      kernel_config['blockD'][2]/32 * NWORDS_256BIT * ECP_JAC_OUTDIMS * 4]
-            kernel_config['kernel_idx'] = [CB_EC_JAC_MUL, CB_EC_JAC_MAD_SHFL, CB_EC_JAC_MAD_SHFL]
-            out_len1 = ECP_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS) -1) /
-                                          (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS))
-            kernel_params['in_length'] = [nsamples * (ECP_JAC_INDIMS +U256_NDIMS), nsamples * (ECP_JAC_OUTDIMS), out_len1]
-            kernel_params['out_length'] = 1 * ECP_JAC_OUTDIMS
-            kernel_params['padding_idx'] = [0,0,0]
-            kernel_config['gridD'] = [0,0,1]
-            min_length = [ECP_JAC_OUTDIMS * \
-                    (kernel_config['blockD'][idx] * kernel_params['stride'][idx]/ECP_JAC_OUTDIMS) for idx in range(len(kernel_params['stride']))]
-            nkernels = 3
-
             idx_v = sortu256_idx_h(ecbn128_vector_mad[:nsamples])
             sorted_scl_vector = ecbn128_vector_mad[:nsamples][idx_v]
             tmp_v = np.reshape(ecbn128_vector_mad[nsamples:],(-1,2,8))
             sorted_ecc_vector = np.reshape(tmp_v[idx_v],(-1,8))
             sorted_ecbn128_vector_mad = np.concatenate((sorted_scl_vector,sorted_ecc_vector))
 
-            result,_ = ecbn128.kernelLaunch(sorted_ecbn128_vector_mad, kernel_config, kernel_params,nkernels )
+            result, _ = ec_mad_cuda(ecbn128, sorted_ecbn128_vector_mad, MOD_FIELD)
 
             result2 = 0
             #debugReducedECCAddShfl(r_mul, result, result2)
 
             # I need to convert to EC point, as u256 representation can be different for same EC point
-            result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
-            r_mad_ec = ECC.from_uint256(r_mad, in_ectype=1, out_ectype=1, reduced=True)
-            self.assertTrue(len(result) == kernel_params['out_length'])
+            result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=2, reduced=True)
+            r_mad_ec = ECC.from_uint256(r_mad, in_ectype=1, out_ectype=2, reduced=True)
             self.assertTrue(result_ec == r_mad_ec)
 
 def debugReducedECCAddShfl(r_mul, result1, result2):
 
    tt = ECC.from_uint256(r_mul,in_ectype=1, out_ectype=1, reduced=True)
+   tty = tt[16]
    # 32 -> 16 
-   for i in range(len(tt)/32):
+   for i in range(int(len(tt)/32)):
       tt[16*i:16*(i+1)] = [x + y for x,y in zip(tt[2*i*16:2*i*16+16],tt[2*i*16+16:2*i*16+32])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
+   tty = tt[8]
    # 16 -> 8 
-   for i in range(len(tt)/16):
+   for i in range(int(len(tt)/16)):
       tt[8*i:8*(i+1)] = [x + y for x,y in zip(tt[2*i*8:2*i*8+8],tt[2*i*8+8:2*i*8+16])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
+   tty = tt[4]
    # 8 -> 4 
-   for i in range(len(tt)/8):
+   for i in range(int(len(tt)/8)):
       tt[4*i:4*(i+1)] = [x + y for x,y in zip(tt[2*i*4:2*i*4+4],tt[2*i*4+4:2*i*4+8])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
+   tty = tt[2]
    # 4 -> 2 
-   for i in range(len(tt)/4):
+   for i in range(int(len(tt)/4)):
       tt[2*i:2*(i+1)] = [x + y for x,y in zip(tt[2*i*2:2*i*2+2],tt[2*i*2+2:2*i*2+4])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
+   tty = tt[1]
    # 2 -> 1 
-   for i in range(len(tt)/2):
+   for i in range(int(len(tt)/2)):
       tt[i:(i+1)] = [x + y for x,y in zip(tt[2*i:2*i+1],tt[2*i+1:2*i+2])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
 
    # 8 -> 4 
-   for i in range(len(tt)/8):
+   for i in range(int(len(tt)/8)):
       tt[4*i:4*(i+1)] = [x + y for x,y in zip(tt[2*i*4:2*i*4+4],tt[2*i*4+4:2*i*4+8])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
    # 4 -> 2 
-   for i in range(len(tt)/4):
+   for i in range(int(len(tt)/4)):
       tt[2*i:2*(i+1)] = [x + y for x,y in zip(tt[2*i*2:2*i*2+2],tt[2*i*2+2:2*i*2+4])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
    # 2 -> 1 
-   for i in range(len(tt)/2):
+   for i in range(int(len(tt)/2)):
       tt[i:(i+1)] = [x + y for x,y in zip(tt[2*i:2*i+1],tt[2*i+1:2*i+2])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
 
 
    # stride reduction
    tt = [x + y for x,y in zip(tt[::2],tt[1::2])]
    # 64 -> 32
-   for i in range(len(tt)/64):
+   for i in range(int(len(tt)/64)):
       tt[32*i:32*(i+1)] = [x + y for x,y in zip(tt[2*i*32:2*i*32+32],tt[2*i*32+32:2*i*32+64])]
-   tt = tt[:len(tt)/2]
+   tt = tt[:int(len(tt)/2)]
    # 32 -> 16
    for i in range(len(tt)/32):
       tt[16*i:16*(i+1)] = [x + y for x,y in zip(tt[2*i*16:2*i*16+16],tt[2*i*16+16:2*i*16+32])]

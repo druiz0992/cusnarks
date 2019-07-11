@@ -370,7 +370,7 @@ class ZField(object):
         return ZField.roots[idx], ZField.inv_roots[idx]
 
     @classmethod
-    def find_roots(cls, nroots, find_inv_roots=True, rformat_ext=True):
+    def find_roots(cls, nroots, find_inv_roots=True, rformat_ext=True, primitive_root=None):
         """
           Computes and returns nroots of unity. If find_inv_roots is True, inverse roots are
             also computed
@@ -383,7 +383,15 @@ class ZField(object):
 
         idx = ZField.active_prime_idx
         # initialize roots
-        ZField.roots[idx] = [ZFieldElExt(1), ZField.find_primitive_root(nroots)]
+     
+        if primitive_root is None: 
+          ZField.roots[idx] = [ZFieldElExt(1), ZField.find_primitive_root(nroots)]
+        elif isinstance(primitive_root,ZFieldElRedc):
+          ZField.roots[idx] = [ZFieldElExt(1), primitive_root.extend()]
+        elif isinstance(primitive_root,ZFieldElExt):
+          ZField.roots[idx] = [ZFieldElExt(1), primitive_root]
+        else:
+          ZField.roots[idx] = [ZFieldElExt(1), ZFieldElExt(primitive_root)]
 
         root_1 = ZField.roots[idx][1]
         for i in xrange(nroots - 2):

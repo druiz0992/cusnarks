@@ -47,6 +47,7 @@ const uint32_t * CusnarksMiscKGet(void);
 const uint32_t * CusnarksW32RootsGet(void);
 const uint32_t * CusnarksIW32RootsGet(void);
 const uint32_t * CusnarksIW32NRootsGet(void);
+const uint32_t * CusnarksPrimitiveRootsFieldGet(uint32_t nbits);
 
 #endif
 

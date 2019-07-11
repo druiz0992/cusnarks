@@ -35,6 +35,7 @@ cimport _types as ct
 cdef extern from "../cuda/utils_host.h":
     void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void caddm_h "addm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
+    void caddu256_h "addu256_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B)
     void csubm_h "subm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void cntt_h "ntt_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t L, ct.uint32_t pidx)
     void cintt_h "intt_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t fmat, ct.uint32_t L, ct.uint32_t pidx)
@@ -45,10 +46,11 @@ cdef extern from "../cuda/utils_host.h":
     void crangeu256_h "rangeu256_h" (ct.uint32_t *samples, ct.uint32_t nsamples, ct.uint32_t  *start, ct.uint32_t inc, ct.uint32_t *mod)
     ct.uint32_t czpoly_norm_h "zpoly_norm_h" (ct.uint32_t *pin, ct.uint32_t cidx)
     void csortu256_idx_h "sortu256_idx_h" (ct.uint32_t *idx, ct.uint32_t *v, ct.uint32_t l)
+    void creadU256DataFile_h "readU256DataFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t insize, ct.uint32_t outsize)
     void cwriteU256CircuitFile_h "writeU256CircuitFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256CircuitFile_h "readU256CircuitFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256CircuitFileHeader_h "readU256CircuitFileHeader_h"( ct.cirbin_hfile_t *hfile, const char *filename)
-    void cmpoly_eval_h "mpoly_eval_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx)
+    void cmpoly_eval_h "mpoly_eval_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t reduce_coeff, ct.uint32_t last_idx, ct.uint32_t pidx)
     void cr1cs_to_mpoly_h "r1cs_to_mpoly_h" (ct.uint32_t *pout, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t to_mont, ct.uint32_t pidx, ct.uint32_t extend)
     void cr1cs_to_mpoly_len_h "r1cs_to_mpoly_len_h" (ct.uint32_t *plen_out, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t extend)
     void cmontinv_h "montinv_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t pidx)
@@ -56,5 +58,7 @@ cdef extern from "../cuda/utils_host.h":
     void cec2_jac2aff_h "ec2_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx)
     void cto_montgomeryN_h "to_montgomeryN_h"(ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx)
     void cfrom_montgomeryN_h "from_montgomeryN_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx)
-
+    void cfield_roots_compute_h "field_roots_compute_h" (ct.uint32_t *roots, ct.uint32_t nbits)
+    void cmpoly_from_montgomery_h "mpoly_from_montgomery_h" (ct.uint32_t *x, ct.uint32_t pidx)
+    void cmpoly_to_montgomery_h "mpoly_to_montgomery_h" (ct.uint32_t *x, ct.uint32_t pidx)
   

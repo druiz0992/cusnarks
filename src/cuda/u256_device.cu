@@ -744,32 +744,32 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     LOG_TID;
-    logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
-    logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
+    //logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
+    //logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
     #pragma unroll
     for(i=0; i<NWORDS_256BIT; i++)
     {
       // (C,S) = t[0] + a[0]*b[i], worst case 2 words
       madcu32(&C,&S,Ar[0],Br[i],T[0]);
-      logInfoTid("0 - C:%u\n",C);
-      logInfoTid("0 - S:%u\n",S);
+      //logInfoTid("0 - C:%u\n",C);
+      //logInfoTid("0 - S:%u\n",S);
 
       // ADD(t[1],C)
       //propcu32(T, C, 1);
       addcu32(&C3, &T[1], T[1], C);
-      logInfoTid("C3: %u\n",C3);
-      logInfoBigNumberTid(1,"T\n",T);
+      //logInfoTid("C3: %u\n",C3);
+      //logInfoBigNumberTid(1,"T\n",T);
 
        // m = S*n'[0] mod W, where W=2^32
        // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
        mulu32(M, S, PN_u256[0]);
-       logInfoTid("M[0]: %u\n", M[0]);
-       logInfoTid("M[1]: %u\n", M[1]);
+       //logInfoTid("M[0]: %u\n", M[0]);
+       //logInfoTid("M[1]: %u\n", M[1]);
 
        // (C,S) = S + m*n[0], worst case 2 words
        madcu32(&C,&S,M[0],P_u256[0],S);
-       logInfoTid("1 - C: %u\n",C );
-       logInfoTid("1 - S: %u\n", S);
+       //logInfoTid("1 - C: %u\n",C );
+       //logInfoTid("1 - S: %u\n", S);
   
        #pragma unroll
        for(j=1; j<NWORDS_256BIT; j++)
@@ -777,39 +777,39 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
          // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
          mulu32(X, Ar[j], Br[i]);
          addcu32(&C1, &S, T[j], C);
-         logInfoTid("2 - C1: %u\n",C1 );
-         logInfoTid("2 - S: %u\n",S );
+         //logInfoTid("2 - C1: %u\n",C1 );
+         //logInfoTid("2 - S: %u\n",S );
          addcu32(&C2, &S, S, X[0]);
-         logInfoTid("3 - C2: %u\n",C2 );
-         logInfoTid("3 - S: %u\n",S );
-         logInfoTid("X[0]: %u\n",X[0] );
-         logInfoTid("X[1]: %u\n",X[1] );
+         //logInfoTid("3 - C2: %u\n",C2 );
+         //logInfoTid("3 - S: %u\n",S );
+         //logInfoTid("X[0]: %u\n",X[0] );
+         //logInfoTid("X[1]: %u\n",X[1] );
          addcu32(&X[0], &C, C1, X[1]);
-         logInfoTid("4 - C: %u\n",C );
+         //logInfoTid("4 - C: %u\n",C );
          addcu32(&X[0], &C, C, C2);
-         logInfoTid("5 - C: %u\n",C );
+         //logInfoTid("5 - C: %u\n",C );
   
          // ADD(t[j+1],C)
          C +=C3;
          addcu32(&C3, &T[j+1], T[j+1], C);
          //propcu32(T,C,j+1);
-         logInfoBigNumberTid(1,"T\n",T);
+         //logInfoBigNumberTid(1,"T\n",T);
   
          // (C,S) = S + m*n[j]
          madcu32(&C,&S,M[0], P_u256[j],S);
-         logInfoTid("6 - C: %u\n",C );
-         logInfoTid("6 - S: %u\n",S );
+         //logInfoTid("6 - C: %u\n",C );
+         //logInfoTid("6 - S: %u\n",S );
   
          // t[j-1] = S
          T[j-1] = S;
-         logInfoBigNumberTid(1,"T\n",T);
+         //logInfoBigNumberTid(1,"T\n",T);
        }
 
        propcu32_extend(T,C3);
        // (C,S) = t[s] + C
        addcu32(&C,&S, T[NWORDS_256BIT], C);
-       logInfoTid("6 - C: %u\n",C );
-       logInfoTid("6 - S: %u\n",S );
+       //logInfoTid("6 - C: %u\n",C );
+       //logInfoTid("6 - S: %u\n",S );
        // t[s-1] = S
        T[NWORDS_256BIT-1] = S;
        // t[s] = t[s+1] + C
@@ -1202,9 +1202,9 @@ __device__ uint32_t clzMu256(const uint32_t __restrict__ *x)
    
    #pragma unroll
    for (i=0; i< U256_BSELM; i++){
-     c = 31;    
+     c = 32;    
      rc = 0;
-     for (j=NWORDS_256BIT; j >= 1 && c == 31; j--){
+     for (j=NWORDS_256BIT; j >= 1 && c == 32; j--){
         asm("{                                    \n\t"
             "   clz.b32           %0,%2;          \n\t"
             "   add.u32           %1, %3, %0;     \n\t"      
