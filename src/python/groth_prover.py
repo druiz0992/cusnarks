@@ -77,17 +77,16 @@ DEFAULT_PROOF_LOC =  "../../data/proof.json"
 DEFAULT_PUBLIC_LOC =  "../../data/public.json"
 DATA_FOLDER = "../../data/"
 
-ROOTS_1M_filename = '../../data/zpoly_data_1M.npz'
+ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
 
 class GrothProver(object):
     
     GroupIDX = 0
     FieldIDX = 1
 
-    def __init__(self, proving_key_f, curve='BN128',  proof_f = DEFAULT_PROOF_LOC, public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, accel = True):
+    def __init__(self, proving_key_f, curve='BN128',  proof_f = DEFAULT_PROOF_LOC, public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, accel = True, inrand=False):
 
         self.accel = accel
-        data_init = self.read_proof_data(proving_key_f)
 
         self.proof_f = proof_f
         self.public_f = public_f
@@ -96,13 +95,12 @@ class GrothProver(object):
         ZField(self.curve_data['prime'])
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
-        ECC.init(self.curve_data['curve_params'])
+        ECC.init(self.curve_data)
         ZPoly.init(GrothProver.FieldIDX)
 
-        # TODO : Not sure if default represenation is relly used
-        ZUtils.set_default_in_p_format(in_point_fmt)  # FEXT
-        ZUtils.set_default_in_rep_format(in_coor_fmt) # AFFINE/PROJECTIVE/JACOBIAN
+        self.inrand = inrand
 
+        data_init = self.load_pkdata(proving_key_f)
         if not data_init:
           #init class variables
           self.init_vars()
@@ -111,41 +109,16 @@ class GrothProver(object):
              self.init_u256_vars(proving_key_f)
 
         if use_pycusnarks and self.accel:
-          npzfile = np.load(ROOTS_1M_filename)
-          self.roots1M_rdc_u256 = npzfile['roots_rdc_u256']
-          #TODO : Temp nVars
-          self.oldnVars = self.vk_proof['nVars']
-          self.vk_proof['nVars'] = 512*1024
-          self.ecbn128 = ECBN128(self.vk_proof['nVars'] + 2,   seed=1)
-          self.ec2bn128 = EC2BN128(2*self.vk_proof['nVars'] + 2, seed=1)
-          self.cuzpoly = ZCUPoly(4*self.vk_proof['nVars']+2, seed=1)
+          self.roots1M_rdc_u256 = readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20)
+
+          self.nVars = self.vk_proof['nVars']
+          self.batch_size = 1<<20
+          self.ecbn128 = ECBN128(self.batch_size + 2,   seed=1)
+          self.ec2bn128 = EC2BN128(self.batch_size + 2, seed=1)
+          self.cuzpoly = ZCUPoly(self.batch_size, seed=1)
           
-          """
-          nroots = 1 << int(np.ceil(np.log2(self.vk_proof['nVars'])))
-          nroots = 1024
-          self.roots1_u256 = self.get_roots_u256(nroots)
-          #TODO Inv roots = [roots[0], roots[-1], root[-2],...]
-          #self.inv_roots
-          self.roots2_u256 = self.get_roots_u256(nroots*2)
-
-          #TODO Check this
-          #store inv x^(n-1)-1 where n =vk_proof['domain_bits']
-          # it seems the answer is always x^(n-1)+1. If this is the case, then it is easy
-          #m = self.vk_proof['domainSize']
-          #self.inv_poly_u256 = self.get_invpoly_u256(m)
-          """
-
-
     def read_witness_data(self, witness_f):
        ## Open and parse witness data
-       """
-       witness_fnpz = witness_f[:-4] + 'npz'
-       if use_pycusnarks and os.path.isfile(witness_fnpz)  and self.accel:
-          npzfile = np.load(witness_fnpz)
-          self.witness_scl_u256 = npzfile['witness_u256']
-       
-       elif os.path.isfile(witness_f):
-       """
        if os.path.isfile(witness_f):
            f = open(witness_f,'r')
            self.witness_scl = [BigInt(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
@@ -154,7 +127,7 @@ class GrothProver(object):
           print("File doesn't exist")
           assert False
        
-    def read_proof_data(self, proving_key_f):
+    def load_pkdata(self, proving_key_f):
        proving_key_fnpz = proving_key_f[:-4] + 'npz'
        data_init = False
        if use_pycusnarks and os.path.isfile(proving_key_fnpz) and self.accel:
@@ -193,9 +166,6 @@ class GrothProver(object):
        return data_init
 
     def init_u256_vars(self, proving_key_f):
-       #self.witness_scl_u256 = \
-          #np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
-
        ZField.set_field(GrothProver.GroupIDX)
        self.vk_alfa_1_eccf1_u256 = ECC.as_uint256(self.vk_alfa_1_eccf1,remove_last=True, as_reduced=True)
        self.vk_beta_1_eccf1_u256 = ECC.as_uint256(self.vk_beta_1_eccf1,remove_last=True, as_reduced=True )
@@ -240,10 +210,8 @@ class GrothProver(object):
                                     np.concatenate((np.cumsum(polsC_l),np.concatenate(polsC_p))))),dtype=np.uint32)
 
        
-       #witness_fnpz = witness_f[:-4] + 'npz'
        proving_key_fnpz = proving_key_f[:-4] + 'npz'
 
-       #np.savez_compressed(witness_fnpz, witness_u256=self.witness_scl_u256)
        np.savez_compressed(proving_key_fnpz, alfa_1_u256 =  self.vk_alfa_1_eccf1_u256,
                              beta_1_u256 = self.vk_beta_1_eccf1_u256, delta_1_u256 = self.vk_delta_1_eccf1_u256,
                              beta_2_u256 = self.vk_beta_2_eccf2_u256, delta_2_u256 = self.vk_delta_2_eccf2_u256,
@@ -275,23 +243,6 @@ class GrothProver(object):
 
        return inv_poly_u256
  
-    def get_roots_u256(self, nroots):
-       fidx = ZField.get_field()
-
-       ZField.set_field(GrothProver.FieldIDX)
-       root_fnpz = DATA_FOLDER + "root_"+str(nroots)+".npz"
-       if not os.path.isfile(root_fnpz):
-         proot = ZField.find_primitive_root(nroots).reduce().as_uint256()
-         roots = find_roots_h( proot, nroots, ZField.get_field())
-         np.savez_compressed(root_fnpz, root_data=roots)
-       else:  
-          npzfile = np.load(root_fnpz)
-          roots = npzfile['root_data']
-
-       ZField.set_field(fidx)
-
-       return roots
-
     def init_vars(self):
         # Init witness to Field El.
         # TODO :  I am assuming that all field el are FielElExt (witness_scl, polsA_sps, polsB_sps, polsC_sps, alfa1...
@@ -315,11 +266,11 @@ class GrothProver(object):
 
         self.public_signals = None
 
-        self.A_eccf1     = map(ECC_F1,self.vk_proof['A'])
-        self.B1_eccf1    = map(ECC_F1,self.vk_proof['B1'])
-        self.B2_eccf2    = map(ECC_F2, self.vk_proof['B2'])
-        self.C_eccf1     = map(ECC_F1,self.vk_proof['C'])
-        self.hExps_eccf1 = map(ECC_F1,self.vk_proof['hExps'])
+        self.A_eccf1     = [ECC_F1(p) for p in self.vk_proof['A']]
+        self.B1_eccf1    = [ECC_F1(p) for p in self.vk_proof['B1']]
+        self.B2_eccf2    = [ECC_F2(p) for p in self.vk_proof['B2']]
+        self.C_eccf1     = [ECC_F1(p) for p in self.vk_proof['C']]
+        self.hExps_eccf1 = [ECC_F1(p) for p in self.vk_proof['hExps']]
 
 
         ZField.set_field(GrothProver.FieldIDX)
@@ -331,12 +282,6 @@ class GrothProver(object):
         self.polsB_sps = [ZPolySparse(el) if el is not {} else ZPolySparse({'0':0}) for el in self.vk_proof['polsB']]
         self.polsC_sps = [ZPolySparse(el) if el is not {} else ZPolySparse({'0':0}) for el in self.vk_proof['polsC']]
 
-        #TODO
-        """"
-        if self.in_point_fmt == FRDC:
-            r_scl = r_scl.reduce()
-            s_scl = s_scl.reduce()
-        """
 
     def gen_proof(self, witness_f):
         """
@@ -351,35 +296,23 @@ class GrothProver(object):
 
         ZField.set_field(GrothProver.FieldIDX)
         # Init r and s scalars
-        self.r_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
-        self.s_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
+        if self.inrand:
+          self.r_scl = BigInt(16261132245285695825038220026199411981758970481965022651127483492661266665974)
+          self.s_scl = BigInt(54329550134654175536209911923112271011239733092116208039419485066137536819441)
+        else:
+          self.r_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
+          self.s_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
+
         if use_pycusnarks and self.accel:
            self.r_scl_u256 = self.r_scl.as_uint256()
            self.s_scl_u256 = self.s_scl.as_uint256()
            self.witness_scl_u256 = \
              np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
-           nVars = self.oldnVars
+           nVars = self.nVars
            nPublic = self.vk_proof['nPublic']
            self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl_u256[:nVars])
            self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl_u256[nPublic+1:nVars])
 
-
-        # init Pi B1 ECC point
-        #pi_a, pi_b, pi_c, pib1 F (mod q)
-        #pib1_eccf1 = ECC_F1()
-
-        #TODO -> extend length to desired test length
-        if use_pycusnarks and self.accel:
-          self.witness_scl_u256=np.tile(self.witness_scl_u256,(self.vk_proof['nVars']//len(self.witness_scl_u256)+1,1))
-          nVars = self.vk_proof['nVars']
-          nPublic = int(self.vk_proof['nPublic'])
-          self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl_u256[:nVars])
-          self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl_u256[nPublic+1:nVars])
-
-          self.A_eccf1_u256 = np.tile(self.A_eccf1_u256,(2*self.vk_proof['nVars']//len(self.A_eccf1_u256)+1,1))
-          self.B2_eccf2_u256 = np.tile(self.B2_eccf2_u256,(4*self.vk_proof['nVars']//len(self.B2_eccf2_u256)+1,1))
-          self.B1_eccf1_u256 = np.tile(self.B1_eccf1_u256,(2*self.vk_proof['nVars']//len(self.B1_eccf1_u256)+1,1))
-          self.C_eccf1_u256 = np.tile(self.C_eccf1_u256,(2*self.vk_proof['nVars']//len(self.C_eccf1_u256)+1,1))
 
         # Accumulate multiplication of S EC points and S scalar. Parallelization
         # can be accomplised by each thread performing a multiplication and storing
@@ -405,9 +338,16 @@ class GrothProver(object):
           pib1_eccf1 = ECC.from_uint256(pib1_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
           pib1_eccf1 = ECC.as_uint256(pib1_eccf1, remove_last = True)
 
-          K = np.concatenate((polH,[self.s_scl_u256],[self.r_scl_u256],[d4_u256]))
-          P = np.concatenate((self.hExps_eccf1_u256[:2*len(polH)], self.pi_a_eccf1, pib1_eccf1, self.vk_delta_1_eccf1_u256))
+          one = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
+          self.pi_c_eccf1 = ECC.from_uint256(self.pi_c_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
+          self.pi_c_eccf1 = ECC.as_uint256(self.pi_c_eccf1, remove_last = True)
+          sorted_H_idx = sortu256_idx_h(polH)
+
+          K = np.concatenate((polH[sorted_H_idx],[one],[self.s_scl_u256],[self.r_scl_u256],[d4_u256]))
+          sorted_hExps = np.reshape(self.hExps_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[sorted_H_idx]
+          P = np.concatenate((np.reshape(sorted_hExps,(-1,NWORDS_256BIT)),self.pi_c_eccf1, self.pi_a_eccf1, pib1_eccf1, self.vk_delta_1_eccf1_u256))
           ecbn128_samples = np.concatenate((K,P))
+
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
           self.pi_c_eccf1 = ECC.from_uint256(self.pi_c_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
@@ -433,6 +373,7 @@ class GrothProver(object):
           self.public_signals = self.witness_scl[1:self.vk_proof['nPublic']+1]
 
         return self.t_EC, self.t_P, self.t_GP
+ 
 
     def findECPoints(self):
         nVars = self.vk_proof['nVars']
@@ -443,7 +384,7 @@ class GrothProver(object):
         if use_pycusnarks and self.accel:
           start_ec = time.time()
           #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P 
-          one = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
+          one = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
           sorted_scl = self.witness_scl_u256[:nVars][self.sorted_witness1_idx]
           sorted_A_ecc = np.reshape(self.A_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
           K = np.concatenate((sorted_scl,[one], [self.r_scl_u256]))
@@ -453,19 +394,17 @@ class GrothProver(object):
           self.t_EC.append(t1)
 
           # pi_b = pi_b + beta2 + delta2 * s
-          #K = np.concatenate((self.witness_scl_u256[:nVars],[one], [self.s_scl_u256]))
           K[-1] = self.s_scl_u256
           sorted_B2_ecc = np.reshape(self.B2_eccf2_u256[:4*nVars],(-1,4,NWORDS_256BIT))[self.sorted_witness1_idx]
           P = np.concatenate((np.reshape(sorted_B2_ecc,(-1,NWORDS_256BIT)),self.vk_beta_2_eccf2_u256, self.vk_delta_2_eccf2_u256))
           ec2bn128_samples = np.concatenate((K,P))
-          self.pi_b_eccf2, t1 = ec2_mad_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field())
+          self.pi_b_eccf2, t1 = ec_mad_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
           self.t_EC.append(t1)
           
 
           # pib1 = pib1 + beta1 + delta1 * s
           sorted_B1_ecc = np.reshape(self.B1_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
           P = np.concatenate((np.reshape(sorted_B1_ecc,(-1,NWORDS_256BIT)),self.vk_beta_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
-          #ecbn128_samples = np.concatenate((self.witness_scl_u256[:nVars], self.B1_eccf1_u256[:2*nVars]))
           ecbn128_samples = np.concatenate((K,P))
           pib1_eccf1, t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
@@ -523,12 +462,9 @@ class GrothProver(object):
         f.close()
 
     def calculateH(self, d1, d2, d3):
-        #d1 = PolF.F.zero, d2 = PolF.F.zero, d3 = PolF.F.zero);
-
         ZField.set_field(GrothProver.FieldIDX)
-        m = self.vk_proof['domainSize']
-        #nVars = self.vk_proof['nVars']
-        nVars = self.oldnVars
+        m = np.int32(self.vk_proof['domainSize'])
+        nVars = self.nVars
         self.t_P = []
 
         if use_pycusnarks and self.accel:
@@ -544,20 +480,14 @@ class GrothProver(object):
           pidx = ZField.get_field()
           # Convert witness to montgomery in zpoly_maddm_h
           #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-          polA_T = mpoly_eval_h(self.witness_scl_u256,self.polsA_sps_u256, nVars, nVars-1, pidx)
-          polB_T = mpoly_eval_h(self.witness_scl_u256,self.polsB_sps_u256, nVars, nVars-1, pidx)
-          polC_T = mpoly_eval_h(self.witness_scl_u256,self.polsC_sps_u256, nVars, nVars-1, pidx)
+          reduce_coeff = 0
+          polA_T = mpoly_eval_h(self.witness_scl_u256,self.polsA_sps_u256, reduce_coeff, m, nVars-1, pidx)
+          polB_T = mpoly_eval_h(self.witness_scl_u256,self.polsB_sps_u256, reduce_coeff, m, nVars-1, pidx)
+          polC_T = mpoly_eval_h(self.witness_scl_u256,self.polsC_sps_u256, reduce_coeff, m, nVars-1, pidx)
           end = time.time()
           self.t_P.append(end-start)
           end_h = time.time()
           t_h = end_h - start_h
-
-          #TODO remove
-          polA_T = np.tile(polA_T,(self.vk_proof['nVars']/len(polA_T),1))
-          polB_T = np.tile(polB_T,(self.vk_proof['nVars']/len(polB_T),1))
-          polC_T = np.tile(polC_T,(self.vk_proof['nVars']/len(polC_T),1))
-          nVars = self.vk_proof['nVars']
-
 
           start_h = time.time()
           ifft_params = ntt_build_h(polA_T.shape[0]);
@@ -575,66 +505,29 @@ class GrothProver(object):
           mul_params = ntt_build_h(polA_S.shape[0]*2)
           #polAB_S is extended -> use extended scaler
           # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
-          polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, polA_S[:nVars],polB_S[:nVars],mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
+          polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, polA_S,polB_S,mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
           self.t_P.append(t1)
+          polAB_S = polAB_S[:zpoly_norm_h(polAB_S)]
 
           # polABC_S is extended
           # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
           # TODO : perform several sub operations per thread to improve efficiency
           polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, polAB_S, polC_S, ZField.get_field(), vectorA_len = 0, return_val=1)
           self.t_P.append(t1)
+          polABC_S = polABC_S[:zpoly_norm_h(polABC_S)]
 
           # polABC_S, polH_S are extended
-          # TODO : polABC_S is stored in mem already. Only prepend padding if necessary. Do not retur value
-          polH_S, t1 = zpoly_div_cuda(self.cuzpoly, polABC_S,int(m), ZField.get_field())
-          self.t_P.append(t1)
+          polH_S = polABC_S[m:]
 
-          if d2 != 0:
-            #TODO : to do all this path 
-            polH_S = zpoly_mad_cuda(self.cuzpoly,[[polH_S], [polA_S, d2_u256], [polB_S, d2_u256]], ZField.get_field())
-            self.t_P.append(t1)
-
-            #polA_S out is extended, d2_u256 is montgomery. polA_S in is extended
-            polA_S, t1 = zpoly_mulK_cuda(self.cuzpoly, polA_S,d2_u256, ZField.get_field())
-            self.t_P.append(t1)
-
-            #polB_S out is extended, d2_u256 is montgomery. polB_S in is extended
-            polB_S, t1 = zpoly_mulK_cuda(self.cuzpoly, polB_S,d2_u256, ZField.get_field())
-            self.t_P.append(t1)
-
-            #polH_S out is extended, polH_S, polA_S ad polB_S in are extended
-            polH_S = zpoly_addN_cuda(self.cuzpoly,[polH_S, polA_S, polB_S], ZField.get_field())
-            self.t_P.append(t1)
-
-            polH_S[0] = (ZFieldElExt.from_uint256(polH_S[0]) + _d3_d1d2).as_uint256()
-            polH_S[int(m)] = (ZFieldElExt.from_uint256(polH_S[int(m)]) + d1d2).as_uint256()
-          
-          else :
-            self.t_P.append(0)
-            self.t_P.append(0)
-            self.t_P.append(0)
-
+          #TODO : d1, d2 and d3 assumed to be zero
           start = time.time()
-          polH_S_idx = zpoly_norm_h(polH_S,int(m)+1)
-          polH_S = polH_S[:polH_S_idx]
+          polH_S_idx = zpoly_norm_h(polH_S)
+          polH_S = polH_S[:zpoly_norm_h(polH_S)]
           end = time.time()
           self.t_P.append(end-start)
           end_h = time.time()
           self.t_P.append(end_h - start_h + t_h)
   
-          #polA_S = ZPoly.from_uint256(polA_S)
-          #polB_S = ZPoly.from_uint256(polB_S)
-          #polC_S = ZPoly.from_uint256(polC_S)
-          #return polABC_S
-          #polABC_S = ZPoly.from_uint256(polABC_S)
-          #nroots = 2 << int(np.ceil(np.log2(self.vk_proof['nVars'])))
-          #polABC_S = polABC_S.expand_to_degree(nroots-1)
-          #polABC_S = ZPoly(20000)
-          
-          #inv_pol = ZPoly.from_uint256(self.inv_poly_u256)
-          #inv_pol = None
-        
-
         else:
           # Init dense poly of degree m-1 (all zero)
           polA_T = ZPoly([ZFieldElExt(0) for i in xrange(m)])
@@ -721,7 +614,8 @@ if __name__ == "__main__":
     t = []
     witness_f=DEFAULT_WITNESS_LOC
     proving_key_f = DEFAULT_PROVING_KEY_LOC
-    G = GrothProver(proving_key_f)
+
+    G = GrothProver(proving_key_f, inrand=True)
     for i in range(20):
       t1,t2,t3 = G.gen_proof(witness_f)
       t.append(np.concatenate((t1,t2,t3)))

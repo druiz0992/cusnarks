@@ -47,6 +47,7 @@
 import os.path
 import numpy as np
 import time
+import math
 
 from zutils import ZUtils
 from random import randint
@@ -72,7 +73,8 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
      kernel_config={}
      kernel_params={}
      kernel_params['in_length'] = [nsamples]
-     kernel_params['out_length'] = nsamples - 2*ne + nd 
+     #kernel_params['out_length'] = nsamples - 2*ne + nd 
+     kernel_params['out_length'] = len(poly) - n
      kernel_params['stride'] = [1]
      kernel_params['premod'] = [0]
      kernel_params['midx'] = [fidx]
@@ -81,9 +83,10 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
 
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [256]
-     kernel_config['gridD'] = \
-                 [(kernel_config['blockD'][0] + \
-                   kernel_params['in_length'][0]-2*ne+nd - 1)/ kernel_config['blockD'][0]]
+     kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-1) / kernel_config['blockD'][0])]
+     #kernel_config['gridD'] = \
+                 #[int((kernel_config['blockD'][0] + \
+                   #kernel_params['in_length'][0]-2*ne+nd - 1)/ kernel_config['blockD'][0])]
      kernel_config['kernel_idx']= [CB_ZPOLY_DIVSNARKS]
 
      result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
@@ -92,134 +95,133 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
      result_snarks_complete[:nsamples-2*ne+nd] = result_snarks
      result_snarks_complete[nsamples-2*ne+nd:] = zpoly_vector[-ne+nd:]
 
+     ### DEBUG
+     #ZUtils.NROOTS = 8192 * 2
+     #proot = 20619701001583904760601357484951574588621083236087856586626117568842480512645
+     #roots_ext, inv_roots_ext = ZField.find_roots(ZUtils.NROOTS, rformat_ext=True, primitive_root=proot) 
+     zpoly_1 = ZPoly.from_uint256(poly)
+     #zpoly_2 = np.zeros(n,dtype=np.int32)
+     #zpoly_2[0] = -1
+     #zpoly_2[-1] = 1
+     #zpoly_2 = ZPoly(zpoly_2.tolist())
+     #r = zpoly_1.poly_div(zpoly_2)
+     r = zpoly_1.poly_div_snarks(n-1)
+     r2 = zpoly_div_h(zpoly_vector, n, fidx);
+     
+
      return result_snarks_complete, t
  
-def ec2_sc1mul_cuda(pysnark, vector, fidx):
-     kernel_params={}
-     kernel_config={}
-     nsamples = len(vector)
+def ec_sc1mul_cuda(pysnark, vector, fidx, ex2=False, premul=False ):
+    kernel_params={}
+    kernel_config={}
+   
+    if ec2:
+      outdims = ECP2_JAC_OUTDIMS
+      indims = ECP2_JAC_INDIMS
+      indims_e = ECP2_JAC_INDIMS + U256_NDIMS
+      factor = 2
+      kernel = CB_EC2_JAC_MUL1
+    else:
+      outdims = ECP_JAC_OUTDIMS 
+      indims = ECP_JAC_INDIMS
+      indims_e = ECP_JAC_INDIMS + U256_NDIMS
+      factor = 1
+      kernel = CB_EC_JAC_MUL1
 
-     kernel_params['stride'] = [1]
-     kernel_config['smemS'] =  [0]
-     kernel_config['blockD'] = [256]
-     kernel_params['premul'] = [1]
-     kernel_params['premod'] = [0]
-     kernel_params['midx'] = [fidx]
-     kernel_config['kernel_idx'] = [CB_EC2_JAC_MUL1]
-     kernel_params['in_length'] = [nsamples]
-     kernel_params['out_length'] = (nsamples-ECP2_JAC_INDIMS)*ECP2_JAC_OUTDIMS
-     kernel_params['padding_idx'] = [0]
-     kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-ECP2_JAC_INDIMS) /
+    nsamples = len(vector)
+
+    kernel_params['stride'] = [1]
+    kernel_config['smemS'] =  [0]
+    kernel_config['blockD'] = [256]
+    kernel_params['premul'] = [0]
+    if premul:
+      kernel_params['premul'] = [1]
+
+    kernel_params['premod'] = [0]
+    kernel_params['midx'] = [fidx]
+    kernel_config['kernel_idx'] = [kernel]
+    kernel_params['in_length'] = [nsamples]
+    kernel_params['out_length'] = (nsamples-indims)*outdims
+    kernel_params['padding_idx'] = [0]
+    kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-indims-1) /
                                 kernel_config['blockD'][0])]
-     kernel_config['return_val']=[1]
+    kernel_config['return_val']=[1]
 
-     result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
-     
-     return result,t
-     
-def ec_sc1mul_cuda(pysnark, vector, fidx):
-     kernel_params={}
-     kernel_config={}
-     nsamples = len(vector)
+    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
 
-     kernel_params['stride'] = [1]
-     kernel_config['smemS'] =  [0]
-     kernel_config['blockD'] = [256]
-     kernel_params['premul'] = [1]
-     kernel_params['premod'] = [0]
-     kernel_params['midx'] = [fidx]
-     kernel_config['kernel_idx'] = [CB_EC_JAC_MUL1]
-     kernel_params['in_length'] = [nsamples]
-     kernel_params['out_length'] = (nsamples-ECP_JAC_INDIMS)*ECP_JAC_OUTDIMS
-     kernel_params['padding_idx'] = [0]
-     kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-ECP_JAC_INDIMS-1) /
-                                kernel_config['blockD'][0])]
-     kernel_config['return_val']=[1]
+    return result,t
 
-     result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
-
-     return result,t
-
-def ec2_mad_cuda(pysnark, vector, fidx):
-     kernel_params={}
-     kernel_config={}
-     nsamples = len(vector)/5
-
-     kernel_params['stride'] = [ECP2_JAC_INDIMS+U256_NDIMS, ECP2_JAC_OUTDIMS, ECP2_JAC_OUTDIMS]
-     #kernel_config['blockD'] = [256,32]
-     kernel_config['blockD'] = [256,128,32]
-     kernel_params['premul'] = [1,0, 0]
-     kernel_params['premod'] = [0,0, 0]
-     kernel_params['midx'] = [fidx, fidx, fidx]
-     kernel_config['smemS'] = [kernel_config['blockD'][0]/32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4, \
-                               kernel_config['blockD'][1]/32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4, \
-                               kernel_config['blockD'][2]/32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4]
-     kernel_config['kernel_idx'] = [CB_EC2_JAC_MAD_SHFL, CB_EC2_JAC_MAD_SHFL, CB_EC2_JAC_MAD_SHFL]
-     out_len1 = ECP2_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP2_JAC_OUTDIMS) -1) /
-                                   (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP2_JAC_OUTDIMS))
-     out_len2 = ECP2_JAC_OUTDIMS * ((out_len1 + (kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP2_JAC_OUTDIMS) -1) /
-                                   (kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP2_JAC_OUTDIMS))
-     kernel_params['in_length'] = [nsamples * (ECP2_JAC_INDIMS+U256_NDIMS), out_len1, out_len2]
-     kernel_params['out_length'] = 1 * ECP2_JAC_OUTDIMS
-     kernel_params['padding_idx'] = [0,0, 0]
-     kernel_config['gridD'] = [0,1, 1]
-     kernel_config['return_val']=[1,1,1]
-     min_length = [ECP2_JAC_OUTDIMS * \
-             (kernel_config['blockD'][idx] * kernel_params['stride'][idx]/ECP2_JAC_OUTDIMS) for idx in range(len(kernel_params['stride']))]
-
-     v_mad = np.copy(vector)
-     for bidx, l in enumerate(kernel_params['in_length']):
-        if l < min_length[bidx]:
-           if bidx == 0:
-              zeros = np.zeros((min_length[bidx] - kernel_params['in_length'][bidx],NWORDS_256BIT), dtype=np.uint32)
-              v_mad = np.concatenate((vector,zeros))
-              kernel_params['in_length'][bidx] = min_length[bidx]
-           else:
-              kernel_params['in_length'][bidx] = min_length[bidx]
-              kernel_params['padding_idx'][bidx] = l/ECP2_JAC_OUTDIMS
-
-     result,t = pysnark.kernelLaunch(v_mad, kernel_config, kernel_params,3 )
-     
-     return result,t
-     
-def ec_mad_cuda(pysnark, vector, fidx):
+def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    kernel_params={}
    kernel_config={}
-   nsamples = len(vector)/3
+   
+   if ec2:
+      outdims = ECP2_JAC_OUTDIMS
+      indims = ECP2_JAC_INDIMS
+      indims_e = ECP2_JAC_INDIMS + U256_NDIMS
+      factor = 2
+      kernel = CB_EC2_JAC_MAD_SHFL
+   else:
+      outdims = ECP_JAC_OUTDIMS 
+      indims = ECP_JAC_INDIMS
+      indims_e = ECP_JAC_INDIMS + U256_NDIMS
+      factor = 1
+      kernel = CB_EC_JAC_MAD_SHFL
 
-   kernel_params['stride'] = [ECP_JAC_OUTDIMS, ECP_JAC_OUTDIMS, ECP_JAC_OUTDIMS]
-   #kernel_config['blockD'] = [256,32]
-   kernel_config['blockD'] = [256,128,32]
-   kernel_params['premul'] = [1,0,0]
-   kernel_params['premod'] = [0,0,0]
-   kernel_params['midx'] = [fidx, fidx, fidx]
-   kernel_config['smemS'] = [kernel_config['blockD'][0]/32 * NWORDS_256BIT * ECP_JAC_OUTDIMS * 4, \
-                             kernel_config['blockD'][1]/32 * NWORDS_256BIT * ECP_JAC_OUTDIMS * 4, \
-                             kernel_config['blockD'][2]/32 * NWORDS_256BIT * ECP_JAC_OUTDIMS * 4]
-   kernel_config['kernel_idx'] = [CB_EC_JAC_MAD_SHFL, CB_EC_JAC_MAD_SHFL, CB_EC_JAC_MAD_SHFL]
-   out_len1 = ECP_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS) -1) /
-                                 (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS))
-   out_len2 = ECP_JAC_OUTDIMS * ((out_len1 + (kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP_JAC_OUTDIMS) -1) /
-                                 (kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP_JAC_OUTDIMS))
-   kernel_params['in_length'] = [nsamples * (ECP_JAC_INDIMS+U256_NDIMS), out_len1, out_len2]
-   kernel_params['out_length'] = 1 * ECP_JAC_OUTDIMS
-   kernel_params['padding_idx'] = [0,0,0]
-   kernel_config['gridD'] = [0,1,1]
-   min_length = [ECP_JAC_OUTDIMS * \
-           (kernel_config['blockD'][idx] * kernel_params['stride'][idx]/ECP_JAC_OUTDIMS) for idx in range(len(kernel_params['stride']))]
+ 
+   nsamples = int(len(vector)/indims_e)
+   
+   kernel_config['blockD']    = get_shfl_blockD(nsamples)
+   nkernels = len(kernel_config['blockD'])
+   new_nsamples = np.product(kernel_config['blockD'])
+   new_vector = np.zeros((indims_e*new_nsamples,NWORDS_256BIT), dtype=np.uint32)
+   new_vector[new_nsamples-nsamples:new_nsamples] = vector[:nsamples]
+   new_vector[new_nsamples+indims*(new_nsamples -nsamples):] = vector[nsamples:]
+   nsamples = np.product(kernel_config['blockD'])
+   #new_vector = np.copy(vector)
+   kernel_params['stride']    = [outdims] * nkernels
+   kernel_params['stride'][0]    =  indims_e
+   kernel_params['premul']    = [0] * nkernels
+   kernel_params['premul'][0] = 1
+   kernel_params['premod']    = [0] * nkernels
+   kernel_params['midx']      = [fidx] * nkernels
+   kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
+   kernel_config['kernel_idx'] =[kernel] * nkernels
+   #out_len1 = ECP_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS) -1) /
+                                 #(kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS))
+   #out_len2 = ECP_JAC_OUTDIMS * ((out_len1 + (kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP_JAC_OUTDIMS) -1) /
+                                 #(kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP_JAC_OUTDIMS))
+   kernel_params['in_length'] = [nsamples* indims_e]*nkernels 
+   for l in xrange(1,nkernels):
+      #kernel_params['in_length'][l] = int(kernel_params['in_length'][l-1]/(kernel_config['blockD'][l-1]))
+      kernel_params['in_length'][l] = outdims * (
+             int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
+             (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
 
-   v_mad = np.copy(vector)
-   for bidx, l in enumerate(kernel_params['in_length']):
-      if l < min_length[bidx]:
-         if bidx == 0:
-            zeros = np.zeros((min_length[bidx] - kernel_params['in_length'][bidx],NWORDS_256BIT), dtype=np.uint32)
-            v_mad = np.concatenate((vector,zeros))
-            kernel_params['in_length'][bidx] = min_length[bidx]
-         else:
-            kernel_params['in_length'][bidx] = min_length[bidx]
-            kernel_params['padding_idx'][bidx] = l/ECP_JAC_OUTDIMS
+   kernel_params['out_length'] = 1 * outdims
+   #kernel_params['out_length'] = nsamples * outdims
+   kernel_params['padding_idx'] = [0] * nkernels
+   kernel_config['gridD'] = [0] * nkernels
+   kernel_config['gridD'][nkernels-1] = 1
+   min_length = [outdims * \
+                    int(kernel_config['blockD'][idx]) for idx in range(nkernels)]
+   for i in xrange(1,nkernels):
+       if min_length[i] > kernel_params['in_length'][i]:
+           kernel_params['padding_idx'][i] = int(kernel_params['in_length'][i]/outdims)
+           kernel_params['in_length'][i] = min_length[i]
+    
+   result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,nkernels )
+   #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,1 )
 
-   result,t = pysnark.kernelLaunch(v_mad, kernel_config, kernel_params,3 )
+   #new_vector = new_vector.reshape((-1,8))
+   #Kp = [ZFieldElExt(BigInt.from_uint256(k)) for k in new_vector[:new_nsamples]]
+   #Pp = np.zeros((new_nsamples, 3, 8), dtype=np.uint32)
+   #Pp[:,0] = np.reshape(new_vector[new_nsamples:],(-1,2,8))[:,0]
+   #Pp[:, 1] = np.reshape(new_vector[new_nsamples:], (-1, 2, 8))[:, 1]
+   #Pp[:, 2, 0] = np.ones(new_nsamples,dtype=np.uint32)
+   #Pp = ECC.from_uint256(np.reshape(Pp,(-1,NWORDS_256BIT)), in_ectype=1, out_ectype=2, reduced=True)
+   #NPp = np.multiply(Kp, Pp)
+   #NPp = np.sum(np.multiply(Kp, Pp))
    
    return result, t
 
@@ -267,6 +269,7 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
         else :
              zpoly_vector = expanded_vector
 
+        np.savez_compressed('../../test/python/aux_data/ifft_data.npz',ifft_data=vector)
         Nrows = ifft_params['fft_N'][(1<<FFT_T_3D)-1]
         Ncols = ifft_params['fft_N'][(1<<FFT_T_3D)-2]
         fft_yx = ifft_params['fft_N'][(1<<FFT_T_3D)-3]
@@ -276,14 +279,15 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
         n_kernels1 = 4
         kernel_config={}
         kernel_params={}
-        
+       
+        #kernel_params['padding_idx'] = [2*nsamples+2] * n_kernels1 
         kernel_params['in_length'] = [nsamples] * n_kernels1
-        kernel_params['in_length'][0] = 2*nsamples+1
+        kernel_params['in_length'][0] = 2*nsamples+2
         kernel_params['out_length'] = nsamples+out_extra_len
         kernel_params['stride'] = [1] * n_kernels1
         kernel_params['stride'][0] = 2
         kernel_params['premod'] = [0] * n_kernels1
-        kernel_params['midx'] = [MOD_FIELD]  * n_kernels1
+        kernel_params['midx'] = [fidx]  * n_kernels1
         kernel_params['N_fftx'] = [Ncols] * n_kernels1
         kernel_params['N_ffty'] = [Nrows] * n_kernels1
         kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
@@ -293,8 +297,7 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
   
         kernel_config['smemS'] = [0] * n_kernels1
         kernel_config['blockD'] = [256] * n_kernels1
-        kernel_config['gridD'] = [(kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]*n_kernels1
-        kernel_config['gridD'][0] = 0
+        kernel_config['gridD'] = [int((kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0])]*n_kernels1
         kernel_config['return_val'] = [return_val] * n_kernels1
 
         kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
@@ -302,6 +305,18 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
         result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
         if return_val == 0:
            result = nsamples
+
+        ### DEBUG
+        #ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
+        #roots = readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20)
+        #expanded_roots = roots[::1<<(20-ifft_params['levels'])]
+        #inv_roots = np.copy(expanded_roots)
+        #inv_roots[1:] = expanded_roots[::-1][:-1]
+        #result2 = intt_h(expanded_vector,inv_roots,1,fidx)
+        #result3 = ntt_h(result2,expanded_roots,fidx)
+        #result3 = ntt_h(result,expanded_roots,fidx)
+         
+
 
         return result,t
 
@@ -334,22 +349,24 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
     n_kernels2= 5
 
     kernel_params['in_length'] = [nsamples] * n_kernels1
-    kernel_params['in_length'][0] = 2*nsamples+1
+    kernel_params['in_length'][0] = 2*nsamples+2
+    kernel_params['padding_idx'] = [2*nsamples+2] * n_kernels1
     kernel_params['out_length'] = nsamples
     kernel_params['stride'] = [1] * n_kernels1
     kernel_params['stride'][0] = 2
     kernel_params['premod'] = [0] * n_kernels1
-    kernel_params['midx'] = [MOD_FIELD]  * n_kernels1
+    kernel_params['midx'] = [fidx]  * n_kernels1
     kernel_params['N_fftx'] = [Ncols] * n_kernels1
     kernel_params['N_ffty'] = [Nrows] * n_kernels1
     kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
     kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
     kernel_params['forward'] = [1] * n_kernels1
+    kernel_params['as_mont'] = [1] * n_kernels1
   
     kernel_config['smemS'] = [0] * n_kernels1
     kernel_config['blockD'] = [256] * n_kernels1
-    kernel_config['gridD'] = [(kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]*n_kernels1
-    kernel_config['gridD'][0] = 0
+    kernel_config['gridD'] = [int((kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0])]*n_kernels1
+    #kernel_config['gridD'][0] = 0
     kernel_config['return_val'] = [1] * n_kernels1
 
     kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
@@ -358,15 +375,16 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
 
     kernel_params['in_length'][0] = nsamples
     kernel_params['stride'][0] = 1
-    kernel_config['return_val'][0] = 0
+    kernel_config['return_val'][0] = 1
 
     Y1S,t2 = pysnark.kernelLaunch(zpoly_vectorB, kernel_config, kernel_params,n_kernels1)
 
+    kernel_params['padding_idx'] = [2*nsamples+2] * n_kernels2
     kernel_params['in_length'] = [nsamples] * n_kernels2
     kernel_params['out_length'] = nsamples
     kernel_params['stride'] = [1] * n_kernels2
     kernel_params['premod'] = [0] * n_kernels2
-    kernel_params['midx'] = [MOD_FIELD]  * n_kernels2
+    kernel_params['midx'] = [fidx]  * n_kernels2
     kernel_params['N_fftx'] = [Ncols] * n_kernels2
     kernel_params['N_ffty'] = [Nrows] * n_kernels2
     kernel_params['fft_Nx'] = [0,fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
@@ -376,8 +394,7 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
   
     kernel_config['smemS'] = [0] * n_kernels2
     kernel_config['blockD'] = [256] * n_kernels2
-    kernel_config['gridD'] = [(kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0]]*n_kernels2
-    kernel_config['gridD'][0] = 0
+    kernel_config['gridD'] = [int((kernel_config['blockD'][0] + nsamples-1)/kernel_config['blockD'][0])]*n_kernels2
     kernel_config['return_val'] = [return_val] * n_kernels2
     kernel_config['kernel_idx']= [CB_ZPOLY_MULCPREV,
                                   CB_ZPOLY_FFT3DXXPREV, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY ]
@@ -385,6 +402,18 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
     fftmul_result,t3 = pysnark.kernelLaunch(X1S, kernel_config, kernel_params,n_kernels2)
     if return_val == 0:
       fftmul_result = nsamples
+
+    ## DEBUG
+    #X2S = ntt_h(expanded_vectorA,expanded_roots,fidx)
+    #Y2S = ntt_h(expanded_vectorB,expanded_roots,fidx)
+    #C = np.copy(Y2S)
+    #idx = 0
+    #inv_roots = np.copy(expanded_roots)
+    #inv_roots[1:] = expanded_roots[::-1][:-1]
+    #for c1,c2 in zip(X2S, Y2S):
+         #C[idx] = montmult_h(c1, c2,1)
+         #idx+=1
+    #result = intt_h(C,inv_roots,1,fidx)
   
     return fftmul_result, t1+t2+t3
 
@@ -393,6 +422,7 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
      kernel_config={}
      kernel_params={}
 
+     """
      if vectorA_len is 0:
 
         #TODO revie
@@ -410,7 +440,22 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
         nsamples = len(vector)
         kernel_params['out_length'] = vectorA_len
         kernel_params['stride'] = [1]
+     """
          
+     if len(vectorB) <= len(vectorA): 
+         vector =np.concatenate((vectorA[:int(len(vectorB))], vectorB))
+         copy = 1
+     else:
+         vector = np.zeros((2*vectorB.shape[0],vectorB.shape[1]), dtype=np.uint32)
+         vector[:len(vectorA)] = vectorA
+         vector[len(vectorB):] = vectorB
+         copy = 0
+
+     nsamples = len(vector)
+     kernel_params['out_length'] = nsamples/2
+     kernel_params['stride'] = [2]
+     #kernel_params['padding_idx'] = [min(len(vectorA),len(vectorB))]
+     kernel_params['padding_idx'] = [nsamples/2]
      kernel_params['premod'] = [0]
      kernel_params['in_length'] = [nsamples]
      kernel_params['midx'] = [fidx]
@@ -424,6 +469,8 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
 
      if return_val == 0:
         result = kernel_params['out_length']
+     elif copy:
+        result = np.concatenate((result,vectorA[int(len(vectorB)):]))
 
      return result,t
 
@@ -507,3 +554,20 @@ def zpoly_mad_cuda(pysnark, vectors, fidx):
 
      return vector,t
      """
+
+def get_shfl_blockD(nsamples):
+   minb = 32
+   maxb = 256
+   blockD = [minb]
+   rsamples = math.ceil(nsamples/minb)
+   while rsamples > maxb:
+      blockD.append(maxb)
+   lastb = max(math.ceil(math.log2(rsamples)),5)
+   blockD.append(1<<lastb)
+   blockD.sort()
+ 
+   return blockD[::-1]
+    
+   
+   
+

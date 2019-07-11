@@ -48,6 +48,7 @@ import json,ast
 import os.path
 import numpy as np
 import time
+import sys
 
 from random import randint
 
@@ -72,10 +73,17 @@ def json_to_list(data):
              json_to_list(el)
          elif type(el) is dict:
              data[idx] = json_to_dict(el)
-         elif type(el) is unicode or type(el) is str:
-             if el.isdigit():
-               data[idx] = int(el)
-             else:
+         elif sys.version_info[0] == 2:
+           if type(el) is unicode or type(el) is str:
+              if el.isdigit():
+                data[idx] = int(el)
+              else:
+                 data[idx] = el
+         elif sys.version_info[0] >= 3:
+           if  type(el) is str:
+              if el.isdigit():
+                data[idx] = int(el)
+              else:
                  data[idx] = el
      return
 

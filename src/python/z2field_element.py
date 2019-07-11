@@ -201,7 +201,18 @@ class Z2FieldEl(ZFieldEl):
             newZ2.P[0] = aA + nr * bB
             newZ2.P[1] = ((self.P[0] + self.P[1]) * (other.P[0] + other.P[1])) - aA - bB
 
+            """
+            newZ3 = Z2FieldEl(self)
+            ab = self.P[0] + self.P[1]
+            AB = other.P[0] + other.P[1]
+            ab = ab * AB
+            newZ3.P[0] = aA - bB
+            newZ3.P[1] = aA + bB
+            newZ3.P[1] = ab - newZ3.P[1]
+            """
+
             return newZ2
+
         elif isinstance(other, int) or isinstance(other, int) or isinstance(other, BigInt) or \
                 (isinstance(other, ZFieldElRedc) and isinstance(self.P[0], ZFieldElRedc)) or \
                 (isinstance(other, ZFieldElExt) and isinstance(self.P[0], ZFieldElExt)):
@@ -275,6 +286,12 @@ class Z2FieldEl(ZFieldEl):
     def as_long(self):
         return self.as_list()
     """
+
+    def __truediv__(self, x):
+        """
+         X / Y (mod P) : Defined in child classes
+        """
+        pass
 
     def __div__(self, other):
         assert False, "Operation not supported"

@@ -341,7 +341,7 @@ class ZPoly(object):
          p1 = np.polymul(p1[::-1], p2[::-1])
 
          if self.FIDX == ZUtils.FEXT:
-            self.zcoeff = [ZFieldElExt(c) for c in p1[::-1]]
+            self.zcoeff = [ZFieldElExt(int(c)) for c in p1[::-1]]
          else:
             self.zcoeff = [ZFieldElExt(int(c)).reduce() for c in p1[::-1]]
 
@@ -803,14 +803,13 @@ class ZPoly(object):
         #print("VE " )
         #print(ve.as_list())
         #print("S " )
-        #print(s.as_list())
-
+        #print(s.a
         # handle the case when m>2n
         if me > 2* ne:
             # t = x^2n - s*v
             ve_copy = ZPoly(ve)
             s_copy = ZPoly(s)
-            s_copy.poly_mul(ve_copy)
+            s_copy.poly_mul_normal(ve_copy)
             t = ZPoly([ZPoly.one[self.FIDX]]).scale( 2 * ne) - s_copy
             #print("T ")
             #print(t.as_list()[0])
@@ -822,7 +821,7 @@ class ZPoly(object):
         while not done:
             us = ZPoly(s)
             rem_copy = ZPoly(rem)
-            us.poly_mul(rem_copy)
+            us.poly_mul_normal(rem_copy)
             us = us.scale(-2*ne)
             q = q + us
             #print("US ")
@@ -832,7 +831,7 @@ class ZPoly(object):
 
             if me > 2 * ne:
                 t_copy = ZPoly(t)
-                rem.poly_mul(t_copy)
+                rem.poly_mul_normal(t_copy)
                 rem = rem.scale(-2*ne)
                 me = rem.get_degree()
                 #print("REM ")
@@ -922,9 +921,9 @@ class ZPoly(object):
            a = (q << ZPoly.one[self.FIDX]).scale(3*int(k/2)-2)
         else :
            a = ( q * ZPoly.two[self.FIDX]).scale(3*int(k/2)-2)
-        q.poly_mul(q)
+        q.poly_mul_normal(q)
         b = ZPoly(self)
-        b.poly_mul(q)
+        b.poly_mul_normal(q)
 
         r = a - b 
         r.scale(-k + 2, r)

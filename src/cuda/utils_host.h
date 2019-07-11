@@ -65,7 +65,7 @@ void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize
 void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
 void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename);
 void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
-void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx);
+void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t reduce_coeff, uint32_t last_idx, uint32_t pidx);
 void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t to_mont, uint32_t pidx, uint32_t extend);
 void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
 void shlru256_h(uint32_t *y, uint32_t *x, uint32_t count);
@@ -73,11 +73,17 @@ void shllu256_h(uint32_t *y, uint32_t *x, uint32_t count);
 void subu256_h(uint32_t *x, const uint32_t *y);
 void addu256_h(uint32_t *x, const uint32_t *y);
 void subu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
-void addu256_h(uint32_t *x, const uint32_t *y);
+void addu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
+void mulu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
 void setbitu256_h(uint32_t *x, uint32_t n);
 uint32_t getbitu256_h(uint32_t *x, uint32_t n);;
 void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx);
 void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx);
 void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx);
 void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx);
+void field_roots_compute_h(uint32_t *roots, uint32_t nbits);
+void mpoly_from_montgomery_h(uint32_t *x, uint32_t pidx);
+void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx);
+void swapu256_h(uint32_t *a, uint32_t *b);
+void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots);
 #endif

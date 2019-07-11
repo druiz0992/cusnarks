@@ -115,6 +115,7 @@ typedef struct {
    uint32_t r_[NWORDS_256BIT];
    uint32_t nonres[NWORDS_256BIT];
    uint32_t r2modp[NWORDS_256BIT];
+   uint32_t r2[NWORDS_256BIT];
    // r =  1 << 256
    // p * p_ - r * r_ = 1 
 
@@ -140,6 +141,13 @@ typedef struct {
   uint32_t _inf2[6*NWORDS_256BIT];
 
 }misc_const_t;
+
+typedef enum{
+  MISC_K_1 = 0,
+  MISC_K_INF = 2, 
+  MISC_K_INF2 = 5,
+  MISC_K_N = 11
+}misc_const_len_t;
 /**
  * Holds the parameters necessary to "launch" a CUDA kernel (i.e. schedule it for
  * execution on some stream of some device).
@@ -168,6 +176,7 @@ typedef enum{
   MOD_INFO_R_,
   MOD_INFO_NONRES,
   MOD_INFO_R2MODP,
+  MOD_INFO_R2,
   MOD_INFO_N
 
 }mod_info_name_t;

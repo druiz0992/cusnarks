@@ -48,6 +48,7 @@ from zutils import *
 from zfield import *
 from constants import *
 from ecc import *
+from cuda_wrapper import *
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 try:
@@ -64,9 +65,9 @@ EC2BN128_datafile = './aux_data/ec2bn128_data_210.npz'
 
 
 class CUEC2Test(unittest.TestCase):
-    TEST_ITER = 1
+    TEST_ITER = 5000
     curve_data = ZUtils.CURVE_DATA['BN128']
-    prime = curve_data['prime_r']
+    prime = curve_data['prime']
     nsamples = 1024
     u256_p = BigInt(prime).as_uint256()
     ZField(prime, curve_data['curve'])
@@ -113,16 +114,18 @@ class CUEC2Test(unittest.TestCase):
 
 
     else:
-
         print("Generating Random scalars....",end='')
-        ecbn128_scl = [randint(1, prime - 1) for x in xrange(nsamples)]
+        ecbn128_scl = []
+        for x in xrange(nsamples):
+           ecbn128_scl.append(randint(1, prime-1))
+        #ecbn128_scl = [randint(1, prime - 1) for x in xrange(nsamples)]
         print("Done\n")
         print("Converting Random scalars to u256...",end='')
-        ecbn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
+        ec2bn128_scl_u256 = [BigInt(x_).as_uint256() for x_ in ecbn128_scl]
         print("Done\n")
 
         ec2bn128_ecjac, ec2bn128_ecjac_rdc = np.asarray(
-            ECC.rand(nsamples, ectype=1, reduce=True, verbose="Generating Random EC points...\t"))
+            ECC.rand(nsamples, ectype=1, reduce=True, ec2=True, verbose="Generating Random EC points...\t"))
         print("Done\n")
 
         print("Forming vector...",end='')
@@ -188,14 +191,17 @@ class CUEC2Test(unittest.TestCase):
         print("Saving data...\n",end='')
         np.savez_compressed(EC2BN128_datafile, scl=ecbn128_scl, ecjac=ec2bn128_ecjac, ecjac_rdc=ec2bn128_ecjac_rdc,
                             ecv_u256=ec2bn128_vector_u256, ecv_u256_rdc=ec2bn128_vector_u256_rdc,
-                            scl_u256=ecbn128_scl_u256,
+                            scl_u256=ec2bn128_scl_u256,
                             radd=r_add_u256, radd_rdc=r_add_rdc_u256, rdouble=r_double_u256,
                             rdouble_rdc=r_double_rdc_u256,
                             rmul=r_mul_u256, rmul_rdc=r_mul_rdc_u256, rmad=r_mad_u256, rmad_rdc=r_mad_rdc_u256)
-        print("Done\n")
+
+        r_add_rdc = r_add_rdc_u256
+        r_double_rdc = r_double_rdc_u256
+        r_mul_rdc = r_mul_rdc_u256
+        r_mad_rdc = r_mad_rdc_u256
 
     def test_0is_on_curve(self):
-  
         #ecbn128_pt_ec = CUEC2Test.ecbn128_ecjac
         ec2bn128_pt_ec = np.zeros((int(ECP_JAC_OUTDIMS*CUEC2Test.nsamples),2,NWORDS_256BIT),dtype=np.uint32)
         ec2bn128_pt_ec[0::3] = CUEC2Test.ec2bn128_vector_u256[0::2]
@@ -230,205 +236,133 @@ class CUEC2Test(unittest.TestCase):
         ec2bn128 = EC2BN128(nsamples*2, seed=1)
 
         kernel_config = {'blockD': [ECBN128_BLOCK_DIM]}
-        kernel_params = {'midx': [MOD_FIELD], 'premod': [0], 'in_length': [nsamples], 'stride': [1],
+        kernel_params = {'midx': [MOD_GROUP], 'premod': [0], 'in_length': [nsamples], 'stride': [1],
                          'out_length': nsamples}
+
+        # Test add jacff
+
+        kernel_params['in_length'] = [nsamples * ECP2_JAC_INDIMS]
+        kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS) / 2
+        kernel_params['stride'] = [2 * ECP2_JAC_INDIMS]
+        kernel_config['smemS'] = [0]
+        kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+        kernel_config['kernel_idx'] = [CB_EC2_JACAFF_ADD]
+        kernel_params['padding_idx'] = [0]
+        kernel_params['premod'] = [0]
+        kernel_params['midx'] = [MOD_GROUP]
+        kernel_config['gridD'] = [0]
+
+        result, _ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params)
+        self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples / 2)
+        self.assertTrue(all(np.concatenate(result == r_add)))
+
+                       # Test add jac
+
+        kernel_params['in_length'] = [nsamples * ECP2_JAC_OUTDIMS]
+        kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS) / 2
+        kernel_params['stride'] = [2 * ECP2_JAC_OUTDIMS]
+        kernel_config['smemS'] = [0]
+        kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+        kernel_config['kernel_idx'] = [CB_EC2_JAC_ADD]
+        kernel_params['padding_idx'] = [0]
+        kernel_params['premod'] = [0]
+        kernel_params['midx'] = [MOD_GROUP]
+        kernel_config['gridD'] = [0]
+
+        ec2bn128_vector_ext = np.zeros((int(nsamples * ECP2_JAC_OUTDIMS), 8), dtype=np.uint32)
+        ec2bn128_vector_ext[::6] = ec2bn128_vector[::4]
+        ec2bn128_vector_ext[1::6] = ec2bn128_vector[1::4]
+        ec2bn128_vector_ext[2::6] = ec2bn128_vector[2::4]
+        ec2bn128_vector_ext[3::6] = ec2bn128_vector[3::4]
+        ec2bn128_vector_ext[4::6] = np.tile(ZFieldElExt(1).reduce().as_uint256(), (int(nsamples), 1))
+        ec2bn128_vector_ext[5::6] = np.tile(np.zeros((1, 8), dtype=np.uint32), (int(nsamples), 1))
+        result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_ext, kernel_config, kernel_params)
+        self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples / 2)
+        self.assertTrue(all(np.concatenate(result == r_add)))
+
+
+        # Test double jac
+        kernel_params['in_length'] = [nsamples * ECP2_JAC_INDIMS]
+        kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
+        kernel_params['stride'] = [1 * ECP2_JAC_INDIMS]
+        kernel_config['smemS'] = [0]
+        kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+        kernel_config['kernel_idx'] = [CB_EC2_JACAFF_DOUBLE]
+        kernel_params['padding_idx'] = [0]
+        kernel_params['premod'] = [0]
+        kernel_config['gridD'] = [0]
+        kernel_params['midx'] = [MOD_GROUP]
+
+        """
+        ec2bn128_vector[::3] = ec2bn128_vector[1::3]
+        ec2bn128_vector[1::3] = ec2bn128_vector[2::3]
+        ec2bn128_vector[2::3] = np.tile(ZFieldElExt(1).reduce().as_uint256(),(1024,1))
+        """
+        result, _ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params)
+        self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples)
+        self.assertTrue(all(np.concatenate(result == r_double)))
+
+        # Test double jac
+        kernel_params['in_length'] = [nsamples * ECP2_JAC_OUTDIMS]
+        kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
+        kernel_params['stride'] = [1 * ECP2_JAC_OUTDIMS]
+        kernel_config['smemS'] = [0]
+        kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+        kernel_config['kernel_idx'] = [CB_EC2_JAC_DOUBLE]
+        kernel_params['padding_idx'] = [0]
+        kernel_params['premod'] = [0]
+        kernel_config['gridD'] = [0]
+        kernel_params['midx'] = [MOD_GROUP]
+
+        ec2bn128_vector_ext = np.zeros((nsamples * ECP2_JAC_OUTDIMS, 8), dtype=np.uint32)
+        ec2bn128_vector_ext[::6] = ec2bn128_vector[::4]
+        ec2bn128_vector_ext[1::6] = ec2bn128_vector[1::4]
+        ec2bn128_vector_ext[2::6] = ec2bn128_vector[2::4]
+        ec2bn128_vector_ext[3::6] = ec2bn128_vector[3::4]
+        ec2bn128_vector_ext[4::6] = np.tile(ZFieldElExt(1).reduce().as_uint256(), (nsamples, 1))
+        ec2bn128_vector_ext[5::6] = np.tile(np.zeros((1, 8), dtype=np.uint32), (nsamples, 1))
+        result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_ext, kernel_config, kernel_params)
+        # result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
+        self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples)
+        self.assertTrue(all(np.concatenate(result == r_double)))
+
+        # Test sc mul jac
+        kernel_params['in_length'] = [nsamples * (ECP2_JAC_INDIMS + U256_NDIMS)]
+        kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
+        kernel_params['stride'] = [1 * (ECP2_JAC_INDIMS + U256_NDIMS)]
+        kernel_config['smemS'] = [0]
+        kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
+        kernel_config['kernel_idx'] = [CB_EC2_JAC_MUL]
+        kernel_params['padding_idx'] = [0]
+        kernel_params['premod'] = [0]
+        kernel_params['midx'] = [MOD_GROUP]
+        kernel_config['gridD'] = [0]
+
+        result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_full, kernel_config, kernel_params)
+        # result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
+        self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples)
+        self.assertTrue(ECC.from_uint256(np.reshape(result,(-1,2,8)), in_ectype=1, out_ectype=1, reduced=True,ec2=True) ==
+                        ECC.from_uint256(np.reshape(r_mul,(-1,2,8)), in_ectype=1, out_ectype=1, reduced=True, ec2=True))
+
+        alpha = ZFieldElExt(BigInt.from_uint256(CUEC2Test.ec2bn128_scl_u256[0]))
+        x1 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[0]))
+        x2 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[1]))
+        x = Z2FieldEl([x1, x2])
+        y1 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[2]))
+        y2 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[3]))
+        y = Z2FieldEl([y1, y2])
+        z = Z2FieldEl([ZFieldElExt(1).reduce(), ZFieldElExt(0).reduce()])
+        P1 = ECCJacobian([x, y, z])
+        P3 = alpha * P1
+
+        # Test mad jac shuffle
         for iter in xrange(CUEC2Test.TEST_ITER):
-
-            # Test add jacff
-
-            kernel_params['in_length'] = [nsamples * ECP2_JAC_INDIMS]
-            kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS) / 2
-            kernel_params['stride'] = [2 * ECP2_JAC_INDIMS]
-            kernel_config['smemS'] = [0]
-            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC2_JACAFF_ADD]
-            kernel_params['padding_idx'] = [0]
-            kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
-            kernel_config['gridD'] = [0]
-
-            result, _ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params)
-            self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples / 2)
-            self.assertTrue(all(np.concatenate(result == r_add)))
-            # Test add jac
-
-            kernel_params['in_length'] = [nsamples * ECP2_JAC_OUTDIMS]
-            kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS) / 2
-            kernel_params['stride'] = [2 * ECP2_JAC_OUTDIMS]
-            kernel_config['smemS'] = [0]
-            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC2_JAC_ADD]
-            kernel_params['padding_idx'] = [0]
-            kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
-            kernel_config['gridD'] = [0]
-
-            ec2bn128_vector_ext = np.zeros((int(nsamples * ECP2_JAC_OUTDIMS), 8), dtype=np.uint32)
-            ec2bn128_vector_ext[::6] = ec2bn128_vector[::4]
-            ec2bn128_vector_ext[1::6] = ec2bn128_vector[1::4]
-            ec2bn128_vector_ext[2::6] = ec2bn128_vector[2::4]
-            ec2bn128_vector_ext[3::6] = ec2bn128_vector[3::4]
-            ec2bn128_vector_ext[4::6] = np.tile(ZFieldElExt(1).reduce().as_uint256(), (int(nsamples), 1))
-            ec2bn128_vector_ext[5::6] = np.tile(np.zeros((1, 8), dtype=np.uint32), (int(nsamples), 1))
-            result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_ext, kernel_config, kernel_params)
-            self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples / 2)
-            self.assertTrue(all(np.concatenate(result == r_add)))
-
-
-            # Test double jac
-            kernel_params['in_length'] = [nsamples * ECP2_JAC_INDIMS]
-            kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
-            kernel_params['stride'] = [1 * ECP2_JAC_INDIMS]
-            kernel_config['smemS'] = [0]
-            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC2_JACAFF_DOUBLE]
-            kernel_params['padding_idx'] = [0]
-            kernel_params['premod'] = [0]
-            kernel_config['gridD'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
-
-            """
-            ec2bn128_vector[::3] = ec2bn128_vector[1::3]
-            ec2bn128_vector[1::3] = ec2bn128_vector[2::3]
-            ec2bn128_vector[2::3] = np.tile(ZFieldElExt(1).reduce().as_uint256(),(1024,1))
-            """
-            result, _ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params)
-            self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples)
-            self.assertTrue(all(np.concatenate(result == r_double)))
-
-            # Test double jac
-            kernel_params['in_length'] = [nsamples * ECP2_JAC_OUTDIMS]
-            kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
-            kernel_params['stride'] = [1 * ECP2_JAC_OUTDIMS]
-            kernel_config['smemS'] = [0]
-            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC2_JAC_DOUBLE]
-            kernel_params['padding_idx'] = [0]
-            kernel_params['premod'] = [0]
-            kernel_config['gridD'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
-
-            ec2bn128_vector_ext = np.zeros((nsamples * ECP2_JAC_OUTDIMS, 8), dtype=np.uint32)
-            ec2bn128_vector_ext[::6] = ec2bn128_vector[::4]
-            ec2bn128_vector_ext[1::6] = ec2bn128_vector[1::4]
-            ec2bn128_vector_ext[2::6] = ec2bn128_vector[2::4]
-            ec2bn128_vector_ext[3::6] = ec2bn128_vector[3::4]
-            ec2bn128_vector_ext[4::6] = np.tile(ZFieldElExt(1).reduce().as_uint256(), (nsamples, 1))
-            ec2bn128_vector_ext[5::6] = np.tile(np.zeros((1, 8), dtype=np.uint32), (nsamples, 1))
-            result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_ext, kernel_config, kernel_params)
-            # result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
-            self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples)
-            self.assertTrue(all(np.concatenate(result == r_double)))
-
-            # Test sc mul jac
-            kernel_params['in_length'] = [nsamples * (ECP2_JAC_INDIMS + U256_NDIMS)]
-            kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
-            kernel_params['stride'] = [1 * (ECP2_JAC_INDIMS + U256_NDIMS)]
-            kernel_config['smemS'] = [0]
-            kernel_config['blockD'] = [ECBN128_BLOCK_DIM]
-            kernel_config['kernel_idx'] = [CB_EC2_JAC_MUL]
-            kernel_params['padding_idx'] = [0]
-            kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
-            kernel_config['gridD'] = [0]
-
-            result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_full, kernel_config, kernel_params)
-            # result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
-            self.assertTrue(len(result) / ECP2_JAC_OUTDIMS == nsamples)
-            self.assertTrue(ECC.from_uint256(np.reshape(result,(-1,2,8)), in_ectype=1, out_ectype=1, reduced=True,ec2=True) ==
-                            ECC.from_uint256(np.reshape(r_mul,(-1,2,8)), in_ectype=1, out_ectype=1, reduced=True, ec2=True))
-
-            alpha = ZFieldElExt(BigInt.from_uint256(CUEC2Test.ec2bn128_scl_u256[0]))
-            x1 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[0]))
-            x2 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[1]))
-            x = Z2FieldEl([x1, x2])
-            y1 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[2]))
-            y2 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[3]))
-            y = Z2FieldEl([y1, y2])
-            z = Z2FieldEl([ZFieldElExt(1).reduce(), ZFieldElExt(0).reduce()])
-            P1 = ECCJacobian([x, y, z])
-            P3 = alpha * P1
-
-            # Test mad jac
-            #kernel_params['stride'] = [ECP2_JAC_INDIMS + U256_NDIMS, ECP2_JAC_INDIMS + U256_NDIMS]
-            #kernel_config['blockD'] = [64, 64]
-            #kernel_params['premul'] = [1, 0]
-            #kernel_config['gridD'] = [0, 1]
-            #kernel_config['smemS'] = [kernel_config['blockD'][0] * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4, \
-                                      #kernel_config['blockD'][1] * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4]
-            #kernel_config['kernel_idx'] = [CB_EC2_JAC_MAD, CB_EC2_JAC_MAD]
-            #out_len1 = ECP2_JAC_OUTDIMS * (
-                    #(nsamples + (kernel_config['blockD'][0] * kernel_params['stride'][0] / ECP2_JAC_OUTDIMS) - 1) /
-                    #(kernel_config['blockD'][0] * kernel_params['stride'][0] / ECP2_JAC_OUTDIMS))
-            #kernel_params['in_length'] = [nsamples * (ECP2_JAC_INDIMS + U256_NDIMS), out_len1]
-            #kernel_params['out_length'] = 1 * ECP2_JAC_OUTDIMS
-            #kernel_params['padding_idx'] = [0, 0]
-            #kernel_params['premod'] = [0, 0]
-            #kernel_params['midx'] = [MOD_FIELD, MOD_FIELD]
-            #min_length = [ECP2_JAC_OUTDIMS * \
-                          #(kernel_config['blockD'][idx] * kernel_params['stride'][idx] / ECP2_JAC_OUTDIMS) for idx in
-                          #range(len(kernel_params['stride']))]
-#
-            #ec2bn128_vector_mad = np.copy(ec2bn128_vector_full)
-            #for bidx, l in enumerate(kernel_params['in_length']):
-                #if l < min_length[bidx]:
-                    #if bidx == 0:
-                        #zeros = np.zeros((min_length[bidx] - kernel_params['in_length'][bidx], NWORDS_256BIT),
-                                         #dtype=np.uint32)
-                        #ec2bn128_vector_mad = np.concatenate((ec2bn128_vector_full, zeros))
-                        #kernel_params['in_length'][bidx] = min_length[bidx]
-                    #else:
-                        #kernel_params['in_length'][bidx] = min_length[bidx]
-                        #kernel_params['padding_idx'][bidx] = l / ECP2_JAC_OUTDIMS
-#
-            #result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_mad, kernel_config, kernel_params, 2)
-#
-            # a = ZFieldElExt(BigInt.from_uint256(ec2bn128_vector[0]))
-            # x1 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[1]))
-            # y1 = ZFieldElRedc(BigInt.from_uint256(ec2bn128_vector[2]))
-            # P1 = ECCJacobian([x1,y1,ZFieldElExt(1).reduce()])
-            # P2 = a * P1
-
-            # debugReducedECCAdd(r_mul, result, result2)
-
-            ## I need to convert to EC point, as u256 representation can be different for same EC point
-            #result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=1, reduced=True)
-            #r_mad_ec = ECC.from_uint256(r_mad, in_ectype=1, out_ectype=1, reduced=True)
-            # self.assertTrue(len(result) == kernel_params['out_length'])
-            # self.assertTrue(result_ec == r_mad_ec)
-
-            # Test mad jac shuffle
-            kernel_params['stride'] = [ECP2_JAC_INDIMS + U256_NDIMS, ECP2_JAC_OUTDIMS]
-            kernel_config['blockD'] = [256, 32]
-            kernel_params['premul'] = [1, 0]
-            kernel_params['premod'] = [0, 0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD]
-            kernel_config['smemS'] = [kernel_config['blockD'][0] / 32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4, \
-                                      kernel_config['blockD'][1] / 32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4]
-            kernel_config['kernel_idx'] = [CB_EC2_JAC_MAD_SHFL, CB_EC2_JAC_MAD_SHFL]
-            out_len1 = ECP2_JAC_OUTDIMS * (
-                    (nsamples + (kernel_config['blockD'][0] * kernel_params['stride'][0] / (ECP2_JAC_INDIMS + U256_NDIMS)) - 1) /
-                    (kernel_config['blockD'][0] * kernel_params['stride'][0] / (ECP2_JAC_INDIMS + U256_NDIMS)))
-            kernel_params['in_length'] = [nsamples * (ECP2_JAC_INDIMS + U256_NDIMS), out_len1]
-            kernel_params['out_length'] = 1 * ECP2_JAC_OUTDIMS
-            kernel_params['padding_idx'] = [0, 0]
-            kernel_config['gridD'] = [0, 1]
-            min_length = [ECP2_JAC_OUTDIMS * \
-                          (kernel_config['blockD'][idx] ) for idx in range(len(kernel_params['stride']))]
-
-            ec2bn128_vector_mad = np.copy(ec2bn128_vector_full)
-            for bidx, l in enumerate(kernel_params['in_length']):
-                if l < min_length[bidx]:
-                    if bidx == 0:
-                        zeros = np.zeros((min_length[bidx] - kernel_params['in_length'][bidx], NWORDS_256BIT),
-                                         dtype=np.uint32)
-                        ec2bn128_vector_mad = np.concatenate((ec2bn128_vector_full, zeros))
-                        kernel_params['in_length'][bidx] = min_length[bidx]
-                    else:
-                        kernel_params['in_length'][bidx] = min_length[bidx]
-                        kernel_params['padding_idx'][bidx] = l / ECP2_JAC_OUTDIMS
-
-            result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_mad, kernel_config, kernel_params, 2)
+            idx_v = sortu256_idx_h(ec2bn128_vector_full[:nsamples])
+            sorted_scl_vector = ec2bn128_vector_full[:nsamples][idx_v]
+            tmp_v = np.reshape(ec2bn128_vector_full[nsamples:],(-1,4,8))
+            sorted_ecc_vector = np.reshape(tmp_v[idx_v],(-1,8))
+            sorted_ec2bn128_vector_mad = np.concatenate((sorted_scl_vector,sorted_ecc_vector))
+            result, _ = ec_mad_cuda(ec2bn128, sorted_ec2bn128_vector_mad, MOD_GROUP, ec2=True)
 
             result2 = 0
             #debugReducedECCAddShfl(r_mul, result, result2)
@@ -436,7 +370,6 @@ class CUEC2Test(unittest.TestCase):
             # I need to convert to EC point, as u256 representation can be different for same EC point
             result_ec = ECC.from_uint256(np.reshape(result,(-1,2,8)), in_ectype=1, out_ectype=1, reduced=True, ec2=True)
             r_mad_ec = ECC.from_uint256(np.reshape(r_mad,(-1,2,8)), in_ectype=1, out_ectype=1, reduced=True, ec2 = True)
-            self.assertTrue(len(result) == kernel_params['out_length'])
             self.assertTrue(result_ec == r_mad_ec)
 
 

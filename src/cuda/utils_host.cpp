@@ -347,7 +347,7 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
 /*
   TODO
 */
-void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t ncoeff, uint32_t last_idx, uint32_t pidx)
+void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t reduce_coeff, uint32_t last_idx, uint32_t pidx)
 {
   uint32_t n_zpoly = pin[0];
   uint32_t zcoeff_d_offset = 1 + n_zpoly;
@@ -396,6 +396,9 @@ void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_
        }
        */
        montmult_h(zcoeff_v_in, zcoeff_v_in, scl, pidx);
+       if(reduce_coeff){
+         to_montgomery_h(zcoeff_v_in, zcoeff_v_in, pidx);
+       }
        /*
        if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
          printf("V[%d] in after mult \n", zcoeff_d);
@@ -1881,15 +1884,25 @@ void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
 {
   uint32_t i, zinv[NWORDS_256BIT], zinv_sq[NWORDS_256BIT];
   const uint32_t *One = CusnarksOneMontGet(pidx);
+  const uint32_t *ECOne = CusnarksMiscKGet();
 
   for (i=0; i< n; i++){
+     if (!memcmp(&x[i*3*NWORDS_256BIT],&ECOne[(pidx*MISC_K_N+MISC_K_INF)*NWORDS_256BIT],sizeof(uint32_t) * 3 * NWORDS_256BIT)) {
+        memmove(&y[i*3*NWORDS_256BIT], &x[i*3*NWORDS_256BIT],sizeof(uint32_t)*3*NWORDS_256BIT);
+        continue;
+     }
+     //zinv = x[Z].inv()
      montinv_h(zinv, &x[2*NWORDS_256BIT+i*3*NWORDS_256BIT],pidx);
+     //zinv_sq = zinv * zinv
      montsquare_h(zinv_sq, zinv, pidx);
+     // zinv = zinv_sq * zinv
      montmult_h(zinv, zinv_sq, zinv, pidx);
+     // y[X] = x[X] * zinv_sq
      montmult_h(&y[i*3*NWORDS_256BIT], &x[i*3*NWORDS_256BIT], zinv_sq, pidx);
+     // y[Y] = x[Y] * zinv
      montmult_h(&y[NWORDS_256BIT + i*3*NWORDS_256BIT], &x[NWORDS_256BIT + i*3*NWORDS_256BIT], zinv, pidx);
+     // y[Z] = 1
      memcpy(&y[2*NWORDS_256BIT+i*3*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
-    
   }
 }
 
@@ -1897,8 +1910,14 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
 {
   uint32_t i, zinv[2*NWORDS_256BIT], zinv_sq[2*NWORDS_256BIT];
   const uint32_t *One = CusnarksOneMontGet(pidx);
+  const uint32_t *ECOne = CusnarksMiscKGet();
+
 
   for (i=0; i< n; i++){
+     if (!memcmp(&x[i*6*NWORDS_256BIT],&ECOne[(pidx*MISC_K_N+MISC_K_INF2)*NWORDS_256BIT],sizeof(uint32_t) * 6 * NWORDS_256BIT)) {
+        memmove(&y[i*6*NWORDS_256BIT], &x[i*6*NWORDS_256BIT],sizeof(uint32_t)*6*NWORDS_256BIT);
+        continue;
+     }
      montinv_ext_h(zinv, &x[4*NWORDS_256BIT+i*6*NWORDS_256BIT],pidx);
 
      montmult_ext_h(zinv_sq, zinv, zinv, pidx);
@@ -1908,5 +1927,90 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
      montmult_ext_h(&y[2*NWORDS_256BIT + i*6*NWORDS_256BIT], &x[2*NWORDS_256BIT + i*6*NWORDS_256BIT], zinv, pidx);
      memcpy(&y[4*NWORDS_256BIT+i*6*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
      memset(&y[5*NWORDS_256BIT+i*6*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+  }
+}
+
+void field_roots_compute_h(uint32_t *roots, uint32_t nbits)
+{
+  uint32_t i, pidx = MOD_FIELD;
+  const  uint32_t *One = CusnarksOneMontGet((mod_t)pidx);
+  const uint32_t *proots = CusnarksPrimitiveRootsFieldGet(nbits);
+  
+  memcpy(roots, One, NWORDS_256BIT*sizeof(uint32_t));
+  if (nbits > 1){
+    memcpy(&roots[NWORDS_256BIT], proots, NWORDS_256BIT*sizeof(uint32_t));
+  }
+
+  for(i=2; i < (1 << nbits); i++){
+     montmult_h(&roots[i*NWORDS_256BIT],&roots[(i-1)*NWORDS_256BIT], proots, pidx);
+  }
+}
+
+void mulu256_h(uint32_t *z, uint32_t *x, uint32_t *y)
+{
+  uint32_t i,j, carry;
+  uint64_t t;
+
+  memset(z,0,NWORDS_256BIT*sizeof(uint32_t));
+  for (i=0; i< NWORDS_256BIT; i++){
+    for (j=0; j< NWORDS_256BIT-i-1; j++){
+       t = (uint64_t)x[i*NWORDS_256BIT] * (uint64_t)y[j*NWORDS_256BIT];
+       carry = (t >> 32) & 0xFFFFFFFF;
+       z[(i+j)*NWORDS_256BIT]+= (t& 0xFFFFFFFF);
+       z[(i+j+1)*NWORDS_256BIT]+= carry;
+    }
+    t = (uint64_t)x[i*NWORDS_256BIT] * (uint64_t)y[j*NWORDS_256BIT];
+    carry = (t >> 32) & 0xFFFFFFFF;
+    z[(i+j)*NWORDS_256BIT] += (t& 0xFFFFFFFF);
+  }
+}
+
+void mpoly_from_montgomery_h(uint32_t *x, uint32_t pidx)
+{
+  uint32_t i;
+  uint32_t offset = 1 + x[0];
+
+  for (i=0; i < x[0];i++){
+    offset += x[i+1];
+    from_montgomeryN_h(&x[offset], &x[offset], x[i+1], pidx);
+    offset += (x[i+1]*NWORDS_256BIT);
+  }
+}
+
+void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx)
+{
+  uint32_t i;
+  uint32_t offset = 1 + x[0];
+
+  for (i=0; i < x[0];i++){
+    offset += x[i+1];
+    to_montgomeryN_h(&x[offset], &x[offset], x[i+1], pidx);
+    offset += (x[i+1]*NWORDS_256BIT);
+  }
+}
+
+void swapu256_h(uint32_t *a, uint32_t *b)
+{
+  uint32_t x[NWORDS_256BIT];
+
+  memcpy(x,a,NWORDS_256BIT*sizeof(uint32_t));
+  memcpy(a,b,NWORDS_256BIT*sizeof(uint32_t));
+  memcpy(b,x,NWORDS_256BIT*sizeof(uint32_t));
+  
+}
+
+void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots)
+{
+  uint32_t i;
+
+  if (roots == iroots){
+    for(i=1; i<nroots/2; i++){
+      swapu256_h(&iroots[i*NWORDS_256BIT], &roots[(32-i)*NWORDS_256BIT]);
+    }
+  } else {
+    memcpy(iroots, roots,NWORDS_256BIT*sizeof(uint32_t));
+    for (i=1; i<nroots; i++){
+      memcpy(&iroots[i*NWORDS_256BIT], &roots[(32-i)*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
+    }
   }
 }

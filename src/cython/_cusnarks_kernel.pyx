@@ -41,6 +41,7 @@ cimport _utils_host as uh
 from cython cimport view
 from constants import *
 from libc.stdlib cimport malloc, free
+from libc.math cimport log2, ceil
 
 IF CUDA_DEF:
   from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
@@ -258,6 +259,13 @@ def addm_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dty
   
         return out_vec
 
+def addu256_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+
+        uh.caddu256_h(&out_vec[0], &in_veca[0], &in_vecb[0])
+  
+        return out_vec
+
 def subm_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
@@ -369,20 +377,21 @@ def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] star
      return out_samples.reshape((-1,ct.NWORDS_256BIT))
 
 def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
-              ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
+              ct.uint32_t reduce_coeff, ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
 
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(ncoeff*8,dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] sclflat = np.zeros(scldata.shape[0] * scldata.shape[1],dtype=np.uint32)
      sclflat = np.reshape(scldata,-1)
          
-     uh.cmpoly_eval_h(&outd[0],&sclflat[0], &pdata[0], ncoeff, last_idx, pidx)
+     uh.cmpoly_eval_h(&outd[0],&sclflat[0], &pdata[0], reduce_coeff, last_idx, pidx)
 
      return np.reshape(outd,(-1,8))
 
-def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data, ct.uint32_t pidx):
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(pin_data.shape[0] * pin_data.shape[1],dtype=np.uint32)
+def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
+    cdef ct.uint32_t ncoeff = pin_data.shape[0]
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(ncoeff * pin_data.shape[1],dtype=np.uint32)
     pin_data_flat = np.reshape(pin_data,-1)
-    cdef ct.uint32_t idx = uh.czpoly_norm_h(&pin_data_flat[0],pidx)
+    cdef ct.uint32_t idx = uh.czpoly_norm_h(&pin_data_flat[0],ncoeff)
 
     return idx
 
@@ -398,6 +407,13 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 
 def writeU256CircuitFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     uh.cwriteU256CircuitFile_h(&vin[0], <char *>fname, vin.shape[0])
+
+def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(outsize * NWORDS_256BIT,dtype=np.uint32)
+
+    uh.creadU256DataFile_h(&vout[0], <char *>fname, insize, outsize)
+
+    return vout.reshape((-1,NWORDS_256BIT))
 
 def readU256CircuitFileHeader_h(bytes fname):
     cdef ct.cirbin_hfile_t header
@@ -474,7 +490,10 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
                   np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
         cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] tmp_vec = np.zeros(NWORDS_256BIT, dtype=np.uint32)
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] one = np.zeros(NWORDS_256BIT, dtype=np.uint32)
         cdef ct.uint32_t i, j,idx, v_offset=in_veca[0]+1, c_offset=1+in_veca[0], offset
+
+        one[0] = 1;
 
         for j in xrange(nVars):
            if in_veca[j+1] == 0: 
@@ -490,6 +509,7 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
              uh.cmontmult_h(&tmp_vec[0], &in_veca[v_offset], &in_vecb[offset], pidx)
              uh.caddm_h(&out_vec[j,0], &out_vec[j,0], &tmp_vec[0], pidx)
   
+           uh.cmontmult_h(&out_vec[j,0], &out_vec[j,0], &one[0], pidx)
            v_offset += NWORDS_256BIT
            c_offset = v_offset
         return out_vec
@@ -497,7 +517,7 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
 def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,
                        np.ndarray[ndim=1, dtype=np.uint32_t] in_l,
                        np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros((len(in_roots)*NWORDS_256BIT), dtype=np.uint32)
+     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((len(in_roots),NWORDS_256BIT), dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] x = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] x_inv = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] l = in_l
@@ -506,10 +526,10 @@ def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,
      for i in xrange(m):
         uh.csubm_h(&x[0],&in_t[0], &in_roots[i,0],pidx)
         uh.cmontinv_h(&x_inv[0],&x[0], pidx)
-        uh.cmontmult_h(&out_vec[i],&l[0],&x_inv[0],pidx)
+        uh.cmontmult_h(&out_vec[i,0],&l[0],&x_inv[0],pidx)
         uh.cmontmult_h(&l[0],&l[0],&in_roots[1,0],pidx)
 
-     return out_vec
+     return out_vec.reshape((-1,NWORDS_256BIT))
 
 def GrothSetupComputePS_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_kB,
@@ -520,7 +540,7 @@ def GrothSetupComputePS_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
      cdef ct.uint32_t s,n=0
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t1 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t2 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((len(in_veca)-nP,NWORDS_256BIT), dtype=np.uint32)
+     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((len(in_veca)-nP-1,NWORDS_256BIT), dtype=np.uint32)
 
      for s in xrange(nP+1,len(in_veca)):
         uh.cmontmult_h(&t1[0],&in_veca[s,0],&in_kB[0], pidx)
@@ -540,9 +560,10 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t1 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((maxH,NWORDS_256BIT), dtype=np.uint32)
 
-     t1 = in_t
+     t1 = np.copy(in_t)
+     out_vec[0] = np.copy(in_z)
 
-     for s in xrange(0,maxH):
+     for s in xrange(1,maxH):
         uh.cmontmult_h(&out_vec[s,0],&t1[0],&in_z[0], pidx)
         uh.cmontmult_h(&t1[0],&t1[0],&in_t[0], pidx)
 
@@ -567,7 +588,8 @@ def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx )
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]
     cdef dict sp_poly={}
-
+    cdef ct.uint32_t n_keys=0
+    cdef ct.uint32_t k,sumc=0
     cdef ct.uint32_t npoly = in_mpoly[0]
     cdef ct.uint32_t i,j, c_offset = 1 + npoly, v_offset = 1 + npoly , ncoeff 
 
@@ -579,11 +601,18 @@ def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
           continue
        v_offset += ncoeff
        sp_poly={}
+       n_keys=0
        for j in xrange(ncoeff):
-           sp_poly[str(in_mpoly[c_offset])] = in_mpoly[v_offset:v_offset+ct.NWORDS_256BIT]
+           sumc=0
+           for k in xrange(v_offset,v_offset+ct.NWORDS_256BIT):
+              sumc += in_mpoly[k]
+           if sumc != 0:
+              sp_poly[str(in_mpoly[c_offset])] = in_mpoly[v_offset:v_offset+ct.NWORDS_256BIT]
+              n_keys+=1
            c_offset +=1
            v_offset +=ct.NWORDS_256BIT
-       sp_poly_list.append(sp_poly)
+       if n_keys > 0:
+          sp_poly_list.append(sp_poly)
        c_offset = v_offset
   
     return sp_poly_list
@@ -603,3 +632,19 @@ def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pi
      uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
+
+def field_roots_compute_h(ct.uint32_t nbits):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros((1<<nbits) * NWORDS_256BIT, dtype=np.uint32)
+     
+     uh.cfield_roots_compute_h(&out_v[0], nbits)
+     return out_v.reshape((-1,ct.NWORDS_256BIT))
+     
+
+def mpoly_to_montgomery_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_vec, ct.uint32_t pidx):
+     uh.cmpoly_to_montgomery_h(&in_vec[0], pidx)
+     return
+
+def mpoly_from_montgomery_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_vec, ct.uint32_t pidx):
+     uh.cmpoly_from_montgomery_h(&in_vec[0], pidx)
+     return
+
