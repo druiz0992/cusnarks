@@ -181,10 +181,6 @@ class Z2FieldEl(ZFieldEl):
           X * Y
         """
         idx = 0
-        nr = ZFieldElExt(ZField.get_extended_p()-1)
-        if isinstance(self.P[0], ZFieldElRedc):
-            nr= nr.reduce()
-            idx = 1
 
         if isinstance(other, Z2FieldEl):
             if self == other:
@@ -193,6 +189,11 @@ class Z2FieldEl(ZFieldEl):
             elif not ((isinstance(self.P[0], ZFieldElExt) and isinstance(self.P[1], ZFieldElExt)) or \
                     (isinstance(self.P[0], ZFieldElRedc) and isinstance(self.P[1], ZFieldElRedc))):
                 assert False, "Invalid type"
+      
+            nr = ZFieldElExt(ZField.get_extended_p()-1)
+            if isinstance(self.P[0], ZFieldElRedc):
+              nr= nr.reduce()
+              idx = 1
 
             aA = self.P[0] * other.P[0]
             bB = self.P[1] * other.P[1]

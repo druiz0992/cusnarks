@@ -39,6 +39,10 @@
 """
 
 import argparse
+from subprocess import call
+
+from groth_prover import *
+from groth_setup import *
 
 CUMODE_SETUP  = 0
 CUMODE_PROOF  = 1
@@ -54,8 +58,10 @@ def get_args():
     opt['verification_key_f'] = './data/verification_key.bin'
     opt['keys_format'] = FMT_MONT
     opt['benchmark_f'] = None
-    opt['toxic_f'] = None
-    opt['runs'] = 10
+    opt['test_mode'] = 0
+    opt['n_runs'] = 10
+    opt['temp_f'] = './data/tmp_vals.json'
+    opt['seed'] = None
 
 
     parser = argparse.ArgumentParser(
@@ -92,9 +98,13 @@ def get_args():
     parser.add_argument(
        '-b', '--benchmark', type=str, help=help_str, required=False)  
 
-    help_str = 'Keep toxic values file (for debug only) Default : not used'
+    help_str = 'Enables test mode. It will launch snarkjs with known toxic values and will compare output file (disabled: 0, enabled: 1) Default : ' + opt['test_mode']
     parser.add_argument(
-       '-t', '--toxic', type=str, help=help_str, required=False)  
+       '-t', '--test', type=int, help=help_str, required=False)  
+
+    help_str = 'Sets seed for random number generator : Default : not set'
+    parser.add_argument(
+       '-seed', '--seed', type=int, help=help_str, required=False)  
 
     args = parser.parse_args{}
   
@@ -125,16 +135,17 @@ def get_args():
       if args.benchmark is not None:
         opt['benchmark_f'] = args.benchmark
 
-      if args.toxic is not None:
-        opt['toxic_f'] = args.toxic
+      if args.test_mode is 1:
+         opt['test_f'] = opt['temp_f']
+      else :
+         opt['test_f'] = None
 
       GS = GrothSetup(in_circuit_f = opt['input_circuit_f'], out_circuit_f=opt['output_circuit_f']
-                    out_circuit_format= opt['out_circuit_format'], out_pk_f=opt['proving_key_f'], 
+                    out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
-                    out_k_ecformat=EC_T_AFFINE, toxic_f=opt['toxic_f'], benchmark_f=opt['benckmark_f'])
+                    out_k_ecformat=EC_T_AFFINE, test_f=opt['test_f'], benchmark_f=opt['benckmark_f'], seed=opt['seed'])
       
       GS.setup()
-      GS.write_pk()
 
        
 
