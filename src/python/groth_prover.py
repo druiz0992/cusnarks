@@ -73,8 +73,8 @@ DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_pedersen.json"
 #DEFAULT_WITNESS_LOC = "../../data/witness_multiplier.json"
 #DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_multiplier.json"
 #Output files
-DEFAULT_PROOF_LOC =  "../../data/proof.json"
-DEFAULT_PUBLIC_LOC =  "../../data/public.json"
+DEFAULT_PROOF_LOC =  "../../data/proof.bin"
+DEFAULT_PUBLIC_LOC =  "../../data/public.bin"
 DATA_FOLDER = "../../data/"
 
 ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
@@ -84,12 +84,12 @@ class GrothProver(object):
     GroupIDX = 0
     FieldIDX = 1
 
-    def __init__(self, proving_key_f, curve='BN128',  proof_f = DEFAULT_PROOF_LOC, public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, accel = True, inrand=False):
+    def __init__(self, proving_key_f, curve='BN128',  out_proof_f = DEFAULT_PROOF_LOC, out_public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, accel = True, inrand=False):
 
         self.accel = accel
 
-        self.proof_f = proof_f
-        self.public_f = public_f
+        self.out_proof_f = out_proof_f
+        self.out_public_f = out_public_f
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group 
         ZField(self.curve_data['prime'])
@@ -330,28 +330,22 @@ class GrothProver(object):
           d4_u256  = ZFieldElExt(-self.r_scl * self.s_scl).as_uint256()
 
           ZField.set_field(GrothProver.GroupIDX)
-          self.pi_a_eccf1 = ECC.from_uint256(self.pi_a_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
-          self.pi_a_eccf1 = ECC.as_uint256(self.pi_a_eccf1, remove_last=True)
-          self.pi_b_eccf2 = ECC.from_uint256(np.reshape(self.pi_b_eccf2,(3,2,-1)),
-                                             in_ectype =1, out_ectype=2, reduced = True, ec2=True)[0]
-          self.pi_b_eccf2 = ECC.as_uint256(self.pi_b_eccf2, remove_last=True)
-          pib1_eccf1 = ECC.from_uint256(pib1_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
-          pib1_eccf1 = ECC.as_uint256(pib1_eccf1, remove_last = True)
+          self.pi_a_eccf1 = ec_jac2aff_h(self.pi_a_eccf1.reshape(-1),ZField.get_field())
+          self.pi_b_eccf2 = ec2_jac2aff_h(self.pi_b_eccf2.reshape(-1),ZField.get_field())
+          pib1_eccf1  = ec2_jac2aff_h(pib1_eccf1.reshape(-1), ZField.get_field())
+          self.pi_c_eccf1 = ec_jac2aff_h(self.pi_c_eccf1.reshape(-1),ZField.get_field())
 
           one = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
-          self.pi_c_eccf1 = ECC.from_uint256(self.pi_c_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
-          self.pi_c_eccf1 = ECC.as_uint256(self.pi_c_eccf1, remove_last = True)
           sorted_H_idx = sortu256_idx_h(polH)
 
           K = np.concatenate((polH[sorted_H_idx],[one],[self.s_scl_u256],[self.r_scl_u256],[d4_u256]))
           sorted_hExps = np.reshape(self.hExps_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[sorted_H_idx]
-          P = np.concatenate((np.reshape(sorted_hExps,(-1,NWORDS_256BIT)),self.pi_c_eccf1, self.pi_a_eccf1, pib1_eccf1, self.vk_delta_1_eccf1_u256))
+          P = np.concatenate((np.reshape(sorted_hExps,(-1,NWORDS_256BIT)),self.pi_c_eccf1[:2], self.pi_a_eccf1[:2], pib1_eccf1[:2], self.vk_delta_1_eccf1_u256))
           ecbn128_samples = np.concatenate((K,P))
 
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
-          self.pi_c_eccf1 = ECC.from_uint256(self.pi_c_eccf1, in_ectype =1, out_ectype=2, reduced = True)[0]
-          self.pi_c_eccf1 = ECC.as_uint256(self.pi_c_eccf1, remove_last = True)
+          self.pi_c_eccf1 = ec_jac2aff_h(self.pi_c_eccf1.reshape(-1),ZField.get_field())
           self.public_signals = self.witness_scl_u256[1:self.vk_proof['nPublic']+1]
           end = time.time()
           self.t_GP.append(end - start)
@@ -438,28 +432,48 @@ class GrothProver(object):
 
         return pib1_eccf1
 
-    def write_json(self):
-        # Write public file
-        ps = [str(el.as_long()) for el in self.public_signals]
-        j = json.dumps(ps, indent=4).encode('utf8')
-        f = open(self.public_f, 'w')
-        #print >> f, j
-        print(j,file=f)
-        f.close()
 
-        # write proof file
-        pi_a = [str(el) for el in self.pi_a_eccf1.to_affine().as_list()]
-        pi_c = [str(el) for el in self.pi_c_eccf1.to_affine().as_list()]
-        pi_b = []
-        pi_b_els = [el for el in self.pi_b_eccf2.to_affine().as_list()]
-        for i in range(len(pi_b_els)):
-           pi_b.append([str(el) for el in pi_b_els[i]])
-        proof = {"pi_a" : pi_a, "pi_b" : pi_b, "pi_c" : pi_c, "protocol" : "groth"}
-        j = json.dumps(proof, indent=4).encode('utf8')
-        f = open(self.proof_f, 'w')
-        #print >> f, j
-        print(j, file=f)
-        f.close()
+    def write_proof(self):
+        if self.out_public_f.endswith('.json'):
+           # Write public file
+           ZField.set_field(GrothProver.FieldIDX)
+           ps = [str(BigInt.from_uint256(el).as_long()) for el in self.public_signals]
+           j = json.dumps(ps, indent=4)
+           f = open(self.out_public_f, 'w')
+           print(j,file=f)
+           f.close()
+        elif self.out_public_f.endswith('bin') :
+           public_bin = np.concatenate((
+                   np.asarray([self.public_signals.shape[0]], dtype=np.uint32),
+                   np.reshape(self.public_signals,(-1))))
+           writeU256CircuitFile_h(public_bin, self.out_public_f.encode("UTF-8"))
+
+        if self.out_proof_f.endswith('.json'):
+           ZField.set_field(GrothProver.GroupIDX)
+           # write proof file
+           P = ECC.from_uint256(self.pi_a_eccf1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+           pi_a = [el.extend().as_str() for el in P]
+   
+           P = ECC.from_uint256(self.pi_c_eccf1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+           pi_c = [el.extend().as_str() for el in P]
+   
+           P = ECC.from_uint256(np.reshape(self.pi_b_eccf2,(-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)
+           pi_b = [el.extend().as_str() for el in P]
+           proof = {"pi_a" : pi_a, "pi_b" : pi_b, "pi_c" : pi_c, "protocol" : "groth"}
+           j = json.dumps(proof, indent=4, sort_keys=True)
+           f = open(self.out_proof_f, 'w')
+           print(j, file=f)
+           f.close()
+        elif self.out_proof_f.endswith('.bin'):
+           self.pi_a_eccf1 = from_montgomeryN_h(np.reshape(self.pi_a_eccf1,(-1)), GrothProver.GroupIDX)
+           self.pi_b_eccf2 = from_montgomeryN_h(np.reshape(self.pi_b_eccf2,(-1)), GrothProver.GroupIDX)
+           self.pi_c_eccf1 = from_montgomeryN_h(np.reshape(self.pi_c_eccf1,(-1)), GrothProver.GroupIDX)
+           proof_bin = np.concatenate((
+                    self.pi_a_eccf1, 
+                    self.pi_b_eccf2,
+                    self.pi_c_eccf1))
+           writeU256CircuitFile_h(proof_bin, self.out_public_f.encode("UTF-8"))
+               
 
     def calculateH(self, d1, d2, d3):
         ZField.set_field(GrothProver.FieldIDX)
@@ -616,13 +630,13 @@ if __name__ == "__main__":
     proving_key_f = DEFAULT_PROVING_KEY_LOC
 
     G = GrothProver(proving_key_f, inrand=True)
-    for i in range(20):
+    for i in range(1):
       t1,t2,t3 = G.gen_proof(witness_f)
       t.append(np.concatenate((t1,t2,t3)))
       print(t[-1])
     print(t)
      
-    #G.write_json()
+    G.write_proof()
 
 
 """  
