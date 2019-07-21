@@ -83,6 +83,7 @@ __constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
 
 __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];
 
+uint32_t CUSnarks::init_constants=0;
 /*
     Constructor : Reserves global (vector) and constant (prime info) memory 
     Arguments :
@@ -105,6 +106,11 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
                     kernel_cb *kcb,uint32_t seed) : 
                        kernel_callbacks(kcb)
 {
+  if (CUSnarks::init_constants==0){
+    CUSnarks::init_constants = 1;
+    CCHECK(cudaDeviceReset());
+    CUSnarks::allocateCudaCteResources();
+  }
   in_vector_device.data = NULL;
   in_vector_device.length = in_len;
   in_vector_device.size = in_size;
@@ -128,7 +134,10 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
 
   // Allocate kernel params in global memory 
   CCHECK(cudaMalloc((void**) &this->params_device, sizeof(kernel_params_t)));
+}
 
+void CUSnarks::allocateCudaCteResources()
+{
   // Copy modulo info to device constant
   CCHECK(cudaMemcpyToSymbol(mod_info_ct,       CusnarksModInfoGet(),     MOD_N * sizeof(mod_info_t)));  // prime info
   CCHECK(cudaMemcpyToSymbol(ecbn128_params_ct, CusnarksEcbn128ParamsGet(), MOD_N * sizeof(ecbn128_t)));   // ecbn128

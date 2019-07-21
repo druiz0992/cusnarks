@@ -50,9 +50,10 @@ import json,ast
 import os.path
 import numpy as np
 import time
+import random
+from subprocess import call
 
 from zutils import ZUtils
-from random import randint
 from zfield import *
 from ecc import *
 from zpoly import *
@@ -77,12 +78,15 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None):
+                 benchmark_f=None, seed=None, snarkjs=None):
  
         if seed is not None:
+          self.seed = seed
           random.seed(seed) 
+        else:
+          self.seed = random.randint(0,1<<32)
 
-        self.worker = [mp.Pool() for p in range(mp.cpu_count()-1)]
+        #self.worker = [mp.Pool() for p in range(mp.cpu_count()-1)]
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group 
         ZField(self.curve_data['prime'])
@@ -91,158 +95,244 @@ class GrothSetup(object):
         ECC.init(self.curve_data)
         ZPoly.init(MOD_FIELD)
 
-        ZField.set_field(MOD_GROUP)
-        self.group_p        = ZField.get_extended_p().as_uint256()
-
         ZField.set_field(MOD_FIELD)
-        self.field_p        = ZField.get_extended_p().as_uint256()
-        self.Rbitlen        = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
-   
-        self.protocol     = PROTOCOL_T_GROTH  # Groth
-        self.nWords       = None
-        self.nPubInputs   = None
-        self.nOutputs     = None
-        self.nVars        = None
-        self.nConstraints = None
-        self.cirformat       = None
-        self.R1CSA_nWords = None
-        self.R1CSB_nWords = None
-        self.R1CSC_nWords = None
-        self.R1CSA        = None
-        self.R1CSB        = None
-        self.R1CSC        = None
-        self.header       = None
+        self.cir = getCircuit()
 
-        self.nPublic      = None
-        self.domainBits   = None
-        self.domainSize   = None
-        self.A  = None
-        self.B1 = None 
-        self.B2 = None 
-        self.C  = None
-        self.vk_alfa_1  =  None
-        self.vk_beta_1  =  None
-        self.vk_delta_1 =  None
-        self.vk_beta_2  =  None
-        self.vk_delta_2 =  None
-        self.polsA      =  None
-        self.polsB      =  None
-        self.polsC      =  None
-        self.hExps      =  None 
-        self.IC         =  None
+        self.cir_header   = None
+
+        self.pk = getPK()
 
         self.ecbn128    = None 
         self.ec2bn128   = None 
 
         self.out_pk_f   = out_pk_f
+        self.out_vk_f   = out_vk_f
         self.out_k_binformat = out_k_binformat
         self.out_k_ecformat = out_k_ecformat
 
         self.test_f = test_f
         self.toxic = {}
+        self.snarkjs = snarkjs
  
         self.in_circuit_f = in_circuit_f
         self.out_circuit_f = out_circuit_f
         self.out_circuit_format = out_circuit_format
         self.in_circuit_format = FMT_EXT
+        self.alfabeta_f = '../../circuits/alfabeta.json'
 
         if self.in_circuit_f is not None:
            self.circuitRead()
         else:
-           print("Input circuit is required\n")
+           print ("Required input circuit\n")
+           sys.exit(0)
 
     def circuitRead(self):
         # cir Json to u256
         if self.in_circuit_f.endswith('.json'):
-           cir_u256 = self._cirjson_to_u256()
+           self.cir = cirjson_to_vars(self.in_circuit_f, self.in_circuit_format,
+                                      self.out_circuit_format)
 
            #u256 to bin
            if self.out_circuit_f is not None:
-              self._ciru256_to_bin(cir_u256)
+              cir_u256 = cirvars_to_bin(self.cir)
+              writeU256DataFile_h(cir_u256, self.out_circuit_f.encode("UTF-8"))
 
         elif self.in_circuit_f.endswith('.bin'):
-             cir_u256 = self._cirbin_to_u256()
+             cir_u256 = readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
+             self.cir = cirbin_to_vars(cir_u256)
 
-        self._ciru256_to_vars(cir_u256)
-
-    def launch_snarkjs(self):
-        # snarkjs setup is launched with circuit.json, format extended. Convert input file if necessary
-        if self.in_circuit_f.endswith('.json') and self.in_circuit_format == FMT_EXT
-           circuit_file = self.in_circuit_f
-        else :
-           print("To launch snarkjs, input circuit needs to be a json file and format cannot be Montgomery")
-           return
+    def launch_snarkjs(self, mode):
+        snarkjs = {}
+        if mode=="setup" or mode=="alfabeta_12":
+          # snarkjs setup is launched with circuit.json, format extended. Convert input file if necessary
+          if self.in_circuit_f.endswith('.json') and self.in_circuit_format == FMT_EXT :
+             circuit_file = self.in_circuit_f
+          elif mode == "alfabeta_12":
+             circuit_file = self.in_circuit_f
+          else:
+             print("To launch snarkjs, input circuit needs to be a json file and format cannot be Montgomery")
+             return
         
-        tmp_pk_f = self.out_pk_f
-        tmp_vk_f = self.out_vk_f   
-        call(["snarkjs", "setup", "-c", circuit_file, "--pk", tmp_pk_f, "--vk", tmp_vk_f, "--protocol", "groth"])
+          snarkjs['pk_f'] = '../../circuits/tmp_pk_f.json'
+          snarkjs['vk_f'] = '../../circuits/tmp_vk_f.json'
 
-        return tmp_pk_f, tmp_vk_f
+          if mode=="alfabeta_12":
+            alfabeta_command = "--fs"
+            alfabeta_file    = self.alfabeta_f
+          else:
+            alfabeta_command = ""
+            alfabeta_file    = ""
+
+          if mode=="setup" and self.test_f is not None:
+             toxic_command = "--d"
+             toxic_file = self.test_f
+          else:
+             toxic_command = ""
+             toxic_file = ""
+       
+          call([self.snarkjs, "setup", "-c", circuit_file, "--pk", snarkjs['pk_f'], "--vk", snarkjs['vk_f'], "--protocol", "groth", alfabeta_command, alfabeta_file, toxic_command, toxic_file])
+       
+        return snarkjs
    
     def setup(self):
         ZField.set_field(MOD_FIELD)
-        self.domainBits =  np.uint32(math.ceil(math.log(self.nConstraints+ 
-                                           self.nPubInputs + 
-                                           self.nOutputs,2)))
+        
+        #Init PK
+        self.pk['protocol'] = PROTOCOL_T_GROTH
+        self.pk['Rbitlen'] = self.cir['Rbitlen']
+        self.pk['k_binformat'] = self.out_k_binformat
+        self.pk['k_ecformat'] =  self.out_k_ecformat
+        self.pk['nVars'] = self.cir['nVars']
+        self.pk['nPublic']    = self.cir['nPubInputs'] + self.cir['nOutputs']
+        self.pk['domainBits'] =  np.uint32(math.ceil(math.log(self.cir['nConstraints']+ 
+                                           self.cir['nPubInputs'] + 
+                                           self.cir['nOutputs'],2)))
+        self.pk['domainSize'] = 1 << self.pk['domainBits']
+        self.pk['field_r'] = np.copy(self.cir['field_r'])
+        self.pk['group_q'] = np.copy(self.cir['group_q'])
 
-
-        self.nPublic    = self.nPubInputs + self.nOutputs
-        self.domainSize = 1 << self.domainBits
 
         prime = ZField.get_extended_p()
 
-        self.toxic['t'] = ZFieldElExt(randint(1,prime.as_long()-1))
+        self.toxic['t'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
 
         self._calculatePoly()
         self._calculateEncryptedValuesAtT()
 
         self.write_pk()
         self.write_vk()
+        snarkjs_resuts = self.test_results()
+
+        return
+   
+    def create_correct_pkjson(self): 
+          #Get pk json
+          test_pk_f = self.out_pk_f
+          test_vk_f = self.out_vk_f
+          if self.out_pk_f.endswith('.bin')  or  \
+              self.out_k_binformat != FMT_EXT or \
+              self.out_k_ecformat != EC_T_AFFINE:
+            if self.out_pk_f.endswith('.bin') :
+              test_pk_f = test_pk_f.replace('.bin','_cpy.json') 
+            else :
+              test_pk_f = test_pk_f.replace('.json','_cpy.json') 
+            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk)
+            pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
+            #if os.path.exists(test_pk_f):
+              #os.remove(test_pk_f)
+            f = open(test_pk_f, 'w')
+            print(pk_json, file=f)
+            f.close()
+
+          if self.out_vk_f.endswith('.bin') :
+          #Get vk json
+            test_vk_f = test_vk_f.replace('bin','json')
+            vk_dict = self._vars_to_vkdict()
+            vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
+            #if os.path.exists(test_vk_f):
+              #os.remove(test_vk_f)
+            f = open(test_vk_f, 'w')
+            print(vk_json, file=f)
+            f.close()
+
+          return test_pk_f, test_vk_f
+
+    def test_results(self):
 
         if self.test_f is not None:
-          self.write_toxic()
-          tmp_pk_f, tmp_vk_f = self.launch_snarkjs("setup")
-          self.compare_pk(tmp_pk_f)
-          self.compare_vk(tmp_vk_f)
+          # Write toxic json
+          toxic_dict={}
+          toxic_dict['t'] = str(self.toxic['t'].as_long())
+          toxic_dict['kalfa'] = str(self.toxic['kalfa'].as_long())   
+          toxic_dict['kbeta'] = str(self.toxic['kbeta'].as_long())
+          toxic_dict['kdelta'] = str(self.toxic['kdelta'].as_long())
+          toxic_dict['kgamma'] = str(self.toxic['kgamma'].as_long())
+          toxic_json = json.dumps(toxic_dict, indent=4, sort_keys=True)
+          #if os.path.exists(self.test_f):
+          #    os.remove(self.test_f)
+          f = open(self.test_f, 'w')
+          print(toxic_json, file=f)
+          f.close()
 
-        return 
+          test_pk_f, test_vk_f = self.create_correct_pkjson()
+
+       
+          # Launch snarkjs
+          snarkjs = self.launch_snarkjs("setup")
+
+
+          w1 = mp.Pool(processes=1)
+          w2 = mp.Pool(processes=1)
+
+          # Compare results
+          r1 = w1.apply_async(pysnarks_compare, args=(test_pk_f, snarkjs['pk_f'], ['A', 'B1', 'B2', 'C', 'hExps', 'polsA', 'polsB',
+                                                                   'polsC', 'vk_alfa_1', 'vk_beta_1', 'vk_beta_2',
+                                                                   'vk_delta_1', 'vk_delta_2'], self.pk['nPublic'] ))
+          r2 = w2.apply_async(pysnarks_compare, args=(test_vk_f, snarkjs['vk_f'], ['IC', 'vk_alfa_1', 'vk_alfabeta_12', 'vk_beta_2', 
+                                                                   'vk_delta_2', 'vk_gamma_2'],0))
+
+          pk_r = r1.get()
+          vk_r = r2.get()
+
+          w1.terminate()
+          w2.terminate()
+
+
+          return pk_r and vk_r
+        else:
+          return True
 
 
     def _calculatePoly(self):
         self._computeHeader()
 
-        """ 
-        r1 = mp.worker[0].apply_async(self._r1cs_to_mpoly, args=(self.R1CSA, self.header, 1))
+        w1 = mp.Pool(processes=1)
+        w2 = mp.Pool(processes=1)
+        w3 = mp.Pool(processes=1)
 
-        r2 = mp.worker[1].apply_async(self._r1cs_to_mpoly, args=(self.R1CSB, self.header, 0))
+        r1 = w1.apply_async(self._r1cs_to_mpoly, args=(self.cir['R1CSA'], 1))
 
-        r3 = mp.worker[2].apply_async(self._r1cs_to_mpoly, args=(self.R1CSC, self.header, 0))
+        r2 = w2.apply_async(self._r1cs_to_mpoly, args=(self.cir['R1CSB'], 0))
 
-        self.polsA = r1.get()
-        self.R1CSA = None
-        self.polsB = r2.get()
-        self.r1csb = none
-        self.polsC = r3.get()
-        self.R1CSC = None
+        r3 = w3.apply_async(self._r1cs_to_mpoly, args=(self.cir['R1CSC'], 0))
+
+        self.pk['polsA'] = r1.get()
+        self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
+        self.cir['R1CSA'] = None
+        self.pk['polsB'] = r2.get()
+        self.pk['polsB_nWords'] = self.pk['polsB'].shape[0]
+        self.cir['R1CSB'] = None
+        self.pk['polsC'] = r3.get()
+        self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
+        self.cir['R1CSC'] = None
+
+        w1.terminate()
+        w2.terminate()
+        w3.terminate()
+
         return
+
         """
-     
-        self.polsA = self._r1cs_to_mpoly(self.R1CSA, self.header,1)
-        self.R1CSA = None
-        self.polsB = self._r1cs_to_mpoly(self.R1CSB, self.header,0)
-        self.R1CSB = None
-        self.polsC = self._r1cs_to_mpoly(self.R1CSC, self.header,0)
-        self.R1CSC = None
+        self.pk['polsA']  = self._r1cs_to_mpoly(self.cir['R1CSA'], 1)
+        self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
+        self.cir['R1CSA'] = None
+        self.pk['polsB'] = self._r1cs_to_mpoly(self.cir['R1CSB'], 0)
+        self.pk['polsB_nWords'] = self.pk['polsB'].shape[0]
+        self.cir['R1CSB'] = None
+        self.pk['polsC'] = self._r1cs_to_mpoly(self.cir['R1CSC'], 0)
+        self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
+        self.cir['R1CSC'] = None
+        """
 
 
-    def _r1cs_to_mpoly(self, r1cs, header,extend):
+    def _r1cs_to_mpoly(self, r1cs, extend):
         to_mont = 0
         pidx = ZField.get_field()
-        if self.cirformat == ZUtils.FEXT:
+        if self.cir['cirformat'] == ZUtils.FEXT:
            to_mont = 1
 
-        poly_len = r1cs_to_mpoly_len_h(r1cs, header, extend)
-        pols = r1cs_to_mpoly_h(poly_len, r1cs, header, to_mont, pidx, extend)
+        poly_len = r1cs_to_mpoly_len_h(r1cs, self.cir_header, extend)
+        pols = r1cs_to_mpoly_h(poly_len, r1cs, self.cir_header, to_mont, pidx, extend)
         
         return pols
 
@@ -288,10 +378,10 @@ class GrothSetup(object):
       curve_params_g2 = self.curve_data['curve_params_g2']
 
       # Tocix k extended
-      self.toxic['kalfa'] = ZFieldElExt(randint(1,prime.as_long()-1))
-      self.toxic['kbeta'] = ZFieldElExt(randint(1,prime.as_long()-1))
-      self.toxic['kdelta'] = ZFieldElExt(randint(1,prime.as_long()-1))
-      self.toxic['kgamma'] = ZFieldElExt(randint(1,prime.as_long()-1))
+      self.toxic['kalfa'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
+      self.toxic['kbeta'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
+      self.toxic['kdelta'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
+      self.toxic['kgamma'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
 
       toxic_invDelta = self.toxic['kdelta'].inv()
       toxic_invGamma = self.toxic['kgamma'].inv()
@@ -306,70 +396,75 @@ class GrothSetup(object):
       G2 = ECCJacobian([G2x, G2y]).reduce()
 
       # vk coeff MONT
-      self.vk_alfa_1 = G1 * self.toxic['kalfa']
-      self.vk_beta_1 = G1 * self.toxic['kbeta']
-      self.vk_delta_1 = G1 * self.toxic['kdelta']
+      self.pk['alfa_1'] = G1 * self.toxic['kalfa']
+      self.pk['beta_1'] = G1 * self.toxic['kbeta']
+      self.pk['delta_1'] = G1 * self.toxic['kdelta']
 
-      self.vk_alfa_1 = ec_jac2aff_h(G1.as_uint256(self.vk_alfa_1).reshape(-1),ZField.get_field())
-      self.vk_beta_1 = ec_jac2aff_h(G1.as_uint256(self.vk_beta_1).reshape(-1),ZField.get_field())
-      self.vk_delta_1 = ec_jac2aff_h(G1.as_uint256(self.vk_delta_1).reshape(-1),ZField.get_field())
+      self.pk['alfa_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['alfa_1']).reshape(-1),ZField.get_field())
+      self.pk['beta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['beta_1']).reshape(-1),ZField.get_field())
+      self.pk['delta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['delta_1']).reshape(-1),ZField.get_field())
     
-      self.vk_beta_2 = G2 * self.toxic['kbeta']
-      self.vk_delta_2 = G2 * self.toxic['kdelta']
+      self.pk['beta_2'] = G2 * self.toxic['kbeta']
+      self.pk['delta_2'] = G2 * self.toxic['kdelta']
+      self.pk['gamma_2'] = G2 * self.toxic['kgamma']
     
-      self.vk_beta_2 = ec2_jac2aff_h(G2.as_uint256(self.vk_beta_2).reshape(-1),ZField.get_field())
-      self.vk_delta_2 = ec2_jac2aff_h(G2.as_uint256(self.vk_delta_2).reshape(-1),ZField.get_field())
+      self.pk['beta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['beta_2']).reshape(-1),ZField.get_field())
+      self.pk['delta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['delta_2']).reshape(-1),ZField.get_field())
+      self.pk['gamma_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['gamma_2']).reshape(-1),ZField.get_field())
 
-      self.ecbn128    =  ECBN128(self.domainSize+3,seed=1)
-      self.ec2bn128    = EC2BN128(self.nVars+1,seed=1)
+      self.ecbn128    =  ECBN128(self.pk['domainSize']+3,seed=self.seed)
+      self.ec2bn128    = EC2BN128(self.pk['nVars']+1,seed=self.seed)
    
       # a_t, b_t and c_t are in ext
       sorted_idx = sortu256_idx_h(a_t_u256)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       #ecbn128_samples = np.concatenate((a_t_u256,G1.as_uint256(G1)[:2]))
-      self.A,_ = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.A = ec_jac2aff_h(self.A.reshape(-1),ZField.get_field())
+      self.pk['A'],_ = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field())
       unsorted_idx = np.argsort(sorted_idx)
-      self.A = np.reshape(self.A,(-1,3,NWORDS_256BIT))[unsorted_idx]
-      #self.A = np.reshape(self.A,(-1,3,NWORDS_256BIT))
-      self.A = np.reshape(self.A,(-1,NWORDS_256BIT))
+      self.pk['A'] = np.reshape(self.pk['A'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
+      self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT*2/3)
 
       sorted_idx = sortu256_idx_h(b_t_u256)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
-      self.B1,t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.B1 = ec_jac2aff_h(self.B1.reshape(-1),ZField.get_field())
+      self.pk['B1'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field())
       unsorted_idx = np.argsort(sorted_idx)
-      self.B1 = np.reshape(self.B1,(-1,3,NWORDS_256BIT))[unsorted_idx]
-      self.B1=np.reshape(self.B1,(-1,NWORDS_256BIT))
+      self.pk['B1'] = np.reshape(self.pk['B1'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
+      self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT*2/3)
 
       ec2bn128_samples = np.concatenate((b_t_u256[sorted_idx],G2.as_uint256(G2)[:4]))
       #ec2bn128_samples = np.concatenate((b_t_u256,G2.as_uint256(G2)[:4]))
-      self.B2,t = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
-      self.B2 = ec2_jac2aff_h(self.B2.reshape(-1),ZField.get_field())
+      self.pk['B2'],t = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
+      self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field())
       unsorted_idx = np.argsort(sorted_idx)
-      self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))[unsorted_idx]
+      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,6,NWORDS_256BIT))[unsorted_idx]
       #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
-      self.B2 = np.reshape(self.B2,(-1,NWORDS_256BIT))
+      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
+      self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT*4/6)
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
       ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
                                       toxic_invDelta.reduce().as_uint256(),
-                                      a_t_u256, b_t_u256, c_t_u256, self.nPublic, pidx )
+                                      a_t_u256, b_t_u256, c_t_u256, self.pk['nPublic']+1, self.pk['nVars'], pidx )
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.C,t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.C = ec_jac2aff_h(self.C.reshape(-1),ZField.get_field())
+      self.pk['C'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field())
       unsorted_idx = np.argsort(sorted_idx)
-      self.C = np.reshape(self.C,(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['C'] = np.reshape(self.pk['C'],(-1,3,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
-      self.C=np.concatenate((np.zeros(((self.nPublic+1)*3,NWORDS_256BIT),dtype=np.uint32),np.reshape(self.C,(-1,NWORDS_256BIT))))
+      self.pk['C']=np.concatenate((np.zeros(((self.pk['nPublic']+1)*3,NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
+      self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT*2/3)
 
 
-      maxH = self.domainSize+1;
-      self.hExps = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
+      maxH = self.pk['domainSize']+1
+      self.pk['hExps'] = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
@@ -379,463 +474,156 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(eT_u256)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.hExps,t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.hExps = ec_jac2aff_h(self.hExps.reshape(-1),ZField.get_field())
+      self.pk['hExps'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field())
       unsorted_idx = np.argsort(sorted_idx)
-      self.hExps = np.reshape(self.hExps,(-1,3,NWORDS_256BIT))[unsorted_idx]
-      self.hExps=np.reshape(self.hExps,(-1,NWORDS_256BIT))
+      self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
+      self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_256BIT*2/3)
 
 
-      #TODO
-      """
-      for (let s=setup.vk_proof.nPublic+1; s<circuit.nVars; s++) {
-        let ps =
-            F.mul(
-                invDelta,
-                F.add(
-                    F.add(
-                        F.mul(v.a_t[s], setup.toxic.kbeta),
-                        F.mul(v.b_t[s], setup.toxic.kalfa)),
-                   v.c_t[s]));
-       const C = G1.affine(G1.mulScalar(G1.g, ps));
-       setup.vk_proof.C[s]=C;
-       """
+      ZField.set_field(MOD_FIELD)
+      pidx = ZField.get_field()
+      ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
+                                      toxic_invGamma.reduce().as_uint256(),
+                                      a_t_u256, b_t_u256, c_t_u256, 0, self.pk['nPublic']+1, pidx )
+      ZField.set_field(MOD_GROUP)
+      sorted_idx = sortu256_idx_h(ps_u256)
+      ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
+      self.pk['IC'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field())
+      unsorted_idx = np.argsort(sorted_idx)
+      self.pk['IC'] = np.reshape(self.pk['IC'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
 
     def _calculateValuesAtT(self):
-       # Required z_t, polsA/B/C are in Ext format
+       # Required z_t es Ext, polsA/B/C are in Mont format
        # u is Mont
-       z_t_u256, u = self._evalLagrangePoly(self.domainBits)
+       z_t_u256, u = self._evalLagrangePoly(self.pk['domainBits'])
 
        pidx = ZField.get_field()
 
-       a_t_u256 = mpoly_madd_h(self.polsA, u.reshape(-1), self.nVars, pidx)
-       b_t_u256 = mpoly_madd_h(self.polsB, u.reshape(-1), self.nVars, pidx)
-       c_t_u256 = mpoly_madd_h(self.polsC, u.reshape(-1), self.nVars, pidx)
+       w1 = mp.Pool(processes=1)
+       w2 = mp.Pool(processes=1)
+       w3 = mp.Pool(processes=1)
+       
+       r1 = w1.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
+       r2 = w2.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
+       r3 = w3.apply_async(mpoly_madd_h, args = (self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx))
+
+       a_t_u256 = r1.get()
+       b_t_u256 = r2.get()
+       c_t_u256 = r3.get()
+
+       w1.terminate()
+       w2.terminate()
+       w3.terminate()
+
+       #a_t_u256 = mpoly_madd_h(self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx)
+       #b_t_u256 = mpoly_madd_h(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx)
+       #c_t_u256 = mpoly_madd_h(self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx)
+       # a,b,c are Ext
 
        return a_t_u256, b_t_u256, c_t_u256, z_t_u256
 
-    def _cirbin_to_u256(self):
-        return readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
-
-    def _ciru256_to_bin(self, ciru256_data):
-        writeU256CircuitFile_h(ciru256_data, self.out_circuit_f.encode("UTF-8"))
-
-    def _vars_to_toxicdict(self):
-      toxic_dict = self.toxic
-      return toxic_dic
-
-    def _vars_to_pkdict(self):
-        pk_dict={}
-        pk_dict['protocol'] = "groth"
-        pk_dict['field_p'] = str(ZFieldElExt.from_uint256(self.field_p).as_long())
-        pk_dict['group_p'] = str(ZFieldElExt.from_uint256(self.group_p).as_long())
-        if self.out_k_binformat == FMT_EXT:
-           pk_dict['binFormat'] = "normal"
-           b_reduce = False
-        else:
-           pk_dict['binFormat'] = "montgomery"
-           b_reduce=True
-
-        pk_dict['Rbitlen'] = int(self.Rbitlen)
-
-        if self.out_k_ecformat == EC_T_AFFINE:
-           pk_dict['ecFormat'] = "affine"
-        elif self.out_k_ecformat == EC_T_JACOBIAN: 
-           pk_dict['ecFormat'] = "jacobian"
-        else :
-           pk_dict['ecFormat'] = "projective"
-
-           
-        pk_dict['nVars'] = int(self.nVars)
-        pk_dict['nPublic'] = int(self.nPublic)
-        pk_dict['domainBits'] = int(self.domainBits)
-        pk_dict['domainSize'] = int(self.domainSize)
-
-        ZField.set_field(MOD_FIELD)
-        if self.out_k_binformat == FMT_EXT:
-          spoly = mpoly_to_sparseu256_h(self.polsA)
-          pk_dict['polsA'] = [{k : str(ZFieldElRedc(BigInt.from_uint256(p[k])).extend().as_long()) for  k in p.keys()} for p in spoly]
-          spoly = mpoly_to_sparseu256_h(self.polsB)
-          pk_dict['polsB'] = [{k : str(ZFieldElRedc(BigInt.from_uint256(p[k])).extend().as_long()) for  k in p.keys()} for p in spoly]
-          spoly = mpoly_to_sparseu256_h(self.polsC)
-          pk_dict['polsC'] = [{k : str(ZFieldElRedc(BigInt.from_uint256(p[k])).extend().as_long()) for  k in p.keys()} for p in spoly]
-        else:
-          spoly = mpoly_to_sparseu256_h(self.polsA)
-          pk_dict['polsA'] = [{k : str(BigInt.from_uint256(p[k]).as_long()) for  k in p.keys()} for p in spoly]
-          spoly = mpoly_to_sparseu256_h(self.polsB)
-          pk_dict['polsB'] = [{k : str(BigInt.from_uint256(p[k]).as_long()) for  k in p.keys()} for p in spoly]
-          spoly = mpoly_to_sparseu256_h(self.polsC)
-          pk_dict['polsC'] = [{k : str(BigInt.from_uint256(p[k]).as_long()) for  k in p.keys()} for p in spoly]
 
 
-        ZField.set_field(MOD_GROUP)
-        P = ECC.from_uint256(self.A, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)
-        if not b_reduce:
-           pk_dict['A'] = [x.extend().as_str() for x in P]
-        else:
-           pk_dict['A'] = [x.as_str() for x in P]
-
-        P = ECC.from_uint256(self.B1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)
-        if not b_reduce:
-          pk_dict['B1'] = [x.extend().as_str() for x in P]
-        else:
-          pk_dict['B1'] = [x.as_str() for x in P]
-
-        P = ECC.from_uint256(self.B2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)
-        if not b_reduce:
-          pk_dict['B2'] = [x.extend().as_str() for x in P]
-        else:
-          pk_dict['B2'] = [x.as_str() for x in P]
-
-        P = ECC.from_uint256(self.C, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)
-        if not b_reduce:
-          pk_dict['C'] = [x.extend().as_str() for x in P]
-        else:
-          pk_dict['C'] = [x.as_str() for x in P]
-
-        if not b_reduce:
-          pk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].extend().as_str()
-          pk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].extend().as_str()
-          pk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].extend().as_str()
-          pk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].extend().as_str()
-          pk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].extend().as_str()
-
-        else:
-          pk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].as_str()
-          pk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].as_str()
-          pk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)[0].as_str()
-          pk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].as_str()
-          pk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True, ec2=True)[0].as_str()
-
-        P = ECC.from_uint256(self.hExps, in_ectype=EC_T_AFFINE, out_ectype=self.out_k_ecformat, reduced=True)
-        if not b_reduce:
-          pk_dict['hExps'] = [x.extend().as_str() for x in P]
-        else:
-          pk_dict['hExps'] = [x.as_str() for x in P]
-       
-        return pk_dict
- 
-           
-    def _vars_to_pkbin(self):
-        pk_bin = np.concatenate(
-                   self.protocol,
-                   self.Rbitlen,
-                   self.field_p,
-                   self.group_p,
-                   self.out_k_binformat,
-                   self.out_k_ecformat)
-
-        if self.out_k_binformat == FMT_MONT:
-           self.vk_alfa_1 = from_montgomeryN_h(self.vk_alfa_1, MOD_GROUP)
-           self.vk_beta_1 = from_montgomeryN_h(self.vk_beta_1, MOD_GROUP)
-           self.vk_delta_1 = from_montgomeryN_h(self.vk_delta_1, MOD_GROUP)
-           self.vk_beta_2 = from_montgomeryN_h(self.vk_beta_2, MOD_GROUP)
-           self.vk_delta_2 = from_montgomeryN_h(self.vk_delta_2, MOD_GROUP)
-           self.A = from_montgomeryN_h(self.A, MOD_GROUP)
-           self.B1 = from_montgomeryN_h(self.B1, MOD_GROUP)
-           self.B2 = from_montgomeryN_h(self.B2, MOD_GROUP)
-           self.C = from_montgomeryN_h(self.C, MOD_GROUP)
-           self.hExps = from_montgomeryN_h(self.hExps, MOD_GROUP)
-           self.polsA = mpoly_from_montgomery_h(self.polsA, MOD_FIELD)
-           self.polsB = mpoly_from_montgomery_h(self.polsB, MOD_FIELD
-           self.polsC = mpoly_from_montgomery_h(self.polsC, MOD_FIELD)
-        
-        pk_bin = np.concatenate(
-                  pk_bin,
-                  self.nVars,
-                  self,nPublic,
-                  self.domainSize,
-                  self.vk_alfa_1,    
-                  self.vk_beta_1,    
-                  self.vk_delta_1,   
-                  self.vk_beta_2,    
-                  self.vk_delta_2,   
-                  np.asarray(self.polsA.shape[0],dtype=np.uint32),
-                  self.polsA,
-                  np.asarray(self.polsB.shape[0],dtype=np.uint32),
-                  self.polsB,
-                  np.asarray(self.polsC.shape[0],dtype=np.uint32),
-                  self.polsC,
-                  np.asarray(self.A.shape[0],dtype=np.uint32),
-                  self.A,
-                  np.asarray(self.B1.shape[0],dtype=np.uint32),
-                  self.B1,
-                  np.asarray(self.B2.shape[0],dtype=np.uint32),
-                  self.B2,
-                  np.asarray(self.C.shape[0],dtype=np.uint32),
-                  self.C,
-                  np.asarray(self.hExps.shape[0],dtype=np.uint32),
-                  self.hExps)
-       
-        return pk_bin
-
-
-    def _ciru256_to_vars(self, ciru256_data):
-        R1CSA_offset = CIRBIN_H_N_OFFSET
-        R1CSB_offset = CIRBIN_H_N_OFFSET +  \
-                       np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
-        R1CSC_offset = CIRBIN_H_N_OFFSET + \
-                       np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]) + \
-                       np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
-
-        self.nWords        =  np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET])
-        self.nPubInputs    =  np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET])
-        self.nOutputs      =  np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET])
-        self.nVars         =  np.uint32(ciru256_data[CIRBIN_H_NVARS_OFFSET])
-        self.nConstraints  =  np.uint32(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET])
-        self.cirformat       =  np.uint32(ciru256_data[CIRBIN_H_FORMAT_OFFSET])
-        self.R1CSA_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
-        self.R1CSB_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
-        self.R1CSC_nWords =  np.uint32(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET])
-        self.R1CSA        =  ciru256_data[R1CSA_offset:R1CSB_offset] 
-        self.R1CSB        =  ciru256_data[R1CSB_offset:R1CSC_offset]
-        self.R1CSC        =  ciru256_data[R1CSC_offset:] 
-
-    def _cirvarsPack(self):
-        return  np.concatenate((
-                       [self.nWords,
-                        self.nPubInputs,
-                        self.nOutputs,
-                        self.nVars,
-                        self.nConstraints,
-                        self.cirformat,
-                        self.R1CSA_nWords,
-                        self.R1CSB_nWords,
-                        self.R1CSC_nWords],
-                        self.R1CSA,
-                        self.R1CSB,
-                        self.R1CSC))
-
-    
     def _computeHeader(self):
 
-        self.header = {'nWords' : self.nWords,
-                  'nPubInputs' : self.nPubInputs,
-                  'nOutputs' : self.nOutputs,
-                  'nVars' : self.nVars,
-                  'nConstraints' : self.nConstraints,
-                  'cirformat' : self.cirformat,
-                  'R1CSA_nWords' : self.R1CSA_nWords,
-                  'R1CSB_nWords' : self.R1CSB_nWords,
-                  'R1CSC_nWords' : self.R1CSC_nWords}
+        self.cir_header = {'nWords' : self.cir['nWords'],
+                  'nPubInputs' : self.cir['nPubInputs'],
+                  'nOutputs' : self.cir['nOutputs'],
+                  'nVars' : self.cir['nVars'],
+                  'nConstraints' : self.cir['nConstraints'],
+                  'cirformat' : self.cir['cirformat'],
+                  'R1CSA_nWords' : self.cir['R1CSA_nWords'],
+                  'R1CSB_nWords' : self.cir['R1CSB_nWords'],
+                  'R1CSC_nWords' : self.cir['R1CSC_nWords']}
 
-    def _cirjson_to_u256(self,circuit_f):
-        """
-          Converts from circom .json output file to binary format required to 
-            calculate snarks setup. Only the following entries are used:
-             - constraints -> R1CS a,b,c
-             - nPubInputs  -> k
-             - nVars       -> N
-             - nOutputs    ->
-             - cirformat      -> EXT[0]/MONT[1]
 
-          R1CS binary format:
-            N constraints  -------------------------------- 32 bits  
-            cumsum(  -> cumulative
-              N coeff constraints[0] ---------------------- 32 bits
-              N coeff constraints[1] ---------------------- 32 bits : N constraints[0] + N constraints[1]
-              ----
-              N coeff constraints[N-1] -------------------- 32 bits : N contraints[0] + N constraints[1] +
-                                                                      N constraints[2] +...+ Nconstraints[N-1]
-            )
-            Coeff[0,0] constraint 0, coeff 0 -------------- 32 bits
-            Coeff[0,1] constraint 0, coeff 1 -------------- 32 bits
-            ----
-            Coeff[0,C0-1] constraint 0, coeff C0-1 -------- 32 bits
-            Val[0,0] constraint 0, value 0 ---------------- 256 bits (8 words) : word 0 is LSW
-            Val[0,1] constraint 0, value 1 ---------------- 256 bits 
-            ----
-            Val[0,C0-1] constraint 0, value C0-1 - -------- 256 bits 
-            Coeff[1,0] constraint 1, coeff 0 -------------- 32 bits
-            Coeff[1,1] constraint 1, coeff 1 -------------- 32 bits
-            ----
-            Coeff[1,C1-1] constraint 1, coeff C1-1 -------- 32 bits
-            Val[1,0] constraint 1, value 0 ---------------- 256 bits 
-            Val[1,1] constraint 1, value 1 ---------------- 256 bits 
-            ----
-            Val[1,C1-1] constraint 1, value C1-1 -- ------- 256 bits 
-            ----
-            ----
-            Coeff[N-1,0] constraint N-1, coeff 0 ---------- 32 bits
-            Coeff[N-1,1] constraint N-1, coeff 1 ---------- 32 bits
-            ----
-            Coeff[N-1,CN_1-1] constraint N-1, coeff CN_1-1  32 bits
-            Val[N-1,0] constraint 1, value 0 -------------- 256 bits 
-            Val[N-1,1] constraint 1, value 1 -------------- 256 bits 
-            ----
-            Val[N-1,CN_1-1] constraint 1, value CN_1-1 ---- 256 bits 
-
-          Binary file format
-            nWords : File size in 32 bit workds --------------- 32 bits
-            nPubInputs : -------------------------------------- 32 bits
-            nOutputs   : -------------------------------------- 32 bits
-            nVars      : -------------------------------------- 32 bits
-            nConstraints : Number of constraints--------------- 32 bits
-            cirformat : Extended[0]/Montgomery[1]----------------- 32 bits
-            R1CSA_nWords : R1CSA size in 32 bit words --------- 32 bits
-            R1CSB_nWords : R1CSB size in 32 bit words --------- 32 bits
-            R1CSC_nWords : R1CSC size in 32 bit words --------- 32 bits
-            R1CSA        :  R1CS  format 
-            R1CSB        :  R1CS format
-            R1CSC        : R1Cs format
- 
-            
-        """
-        labels = ['constraints', 'nPubInputs','nOutputs','nVars']
-        f = open(circuit_f,'r')
-        cir_json_data = json.load(f)
-        cir_data = json_to_dict(cir_json_data, labels)
-        f.close()
-
-        if 'cirformat' in cir_data:
-            self.in_circuit_format = cir_data['cirformat']
-
-        if self.in_circuit_format == self.out_circuit_format:
-          R1CSA_u256 = [ZPolySparse(coeff[0]).as_uint256() for coeff in cir_data['constraints']]
-        elif self.in_circuit_format == ZUtils.FEXT:
-          R1CSA_u256 = [ZPolySparse(coeff[0]).reduce().as_uint256() for coeff in cir_data['constraints']]
-        else :
-          R1CSA_u256 = [ZPolySparse(coeff[0]).extend().as_uint256() for coeff in cir_data['constraints']]
-
-        R1CSA_l = []
-        R1CSA_p = []
-        for l,p in R1CSA_u256:
-            R1CSA_l.append(l)
-            R1CSA_p.append(p)
-        R1CSA_u256 = np.asarray(np.concatenate((np.asarray([len(R1CSA_l)]),
-                                              np.concatenate(
-                                                 (np.cumsum(R1CSA_l), 
-                                                  np.concatenate(R1CSA_p))))),
-                                                  dtype=np.uint32)
-        R1CSA_len = R1CSA_u256.shape[0]
-                
-
-        if self.in_circuit_format == self.out_circuit_format:
-          R1CSB_u256 = [ZPolySparse(coeff[1]).as_uint256() for coeff in cir_data['constraints']]
-        elif self.in_circuit_format == ZUtils.FEXT:
-          R1CSB_u256 = [ZPolySparse(coeff[1]).reduce().as_uint256() for coeff in cir_data['constraints']]
-        else :
-          R1CSB_u256 = [ZPolySparse(coeff[1]).extend().as_uint256() for coeff in cir_data['constraints']]
-
-        R1CSB_l = []
-        R1CSB_p = []
-        for l,p in R1CSB_u256:
-            R1CSB_l.append(l)
-            R1CSB_p.append(p)
-        R1CSB_u256 = np.asarray(np.concatenate((np.asarray([len(R1CSB_l)]),
-                                              np.concatenate(
-                                                 (np.cumsum(R1CSB_l), 
-                                                  np.concatenate(R1CSB_p))))),
-                                                  dtype=np.uint32)
-        R1CSB_len = R1CSB_u256.shape[0]
-
-        if self.in_circuit_format == self.out_circuit_format:
-          R1CSC_u256 = [ZPolySparse(coeff[2]).as_uint256() for coeff in cir_data['constraints']]
-        elif self.in_circuit_format == ZUtils.FEXT:
-          R1CSC_u256 = [ZPolySparse(coeff[2]).reduce().as_uint256() for coeff in cir_data['constraints']]
-        else :
-          R1CSC_u256 = [ZPolySparse(coeff[2]).extend().as_uint256() for coeff in cir_data['constraints']]
-    
-
-        R1CSC_l = []
-        R1CSC_p = []
-        for l,p in R1CSC_u256:
-            R1CSC_l.append(l)
-            R1CSC_p.append(p)
-        R1CSC_u256 = np.asarray(np.concatenate((np.asarray([len(R1CSC_l)]),
-                                              np.concatenate(
-                                                 (np.cumsum(R1CSC_l), 
-                                                  np.concatenate(R1CSC_p))))),
-                                                  dtype=np.uint32)
-        R1CSC_len = R1CSC_u256.shape[0]
-
-        fsize = CIRBIN_H_N_OFFSET + R1CSA_len + R1CSB_len + R1CSC_len
-
-        self.nWords       =  np.uint32(fsize)
-        self.nPubInputs   =  np.uint32(cir_data['nPubInputs'])
-        self.nOutputs     =  np.uint32(cir_data['nOutputs'])
-        self.nVars        =  np.uint32(cir_data['nVars'])
-        self.nConstraints =  np.uint32(len(cir_data['constraints']))
-        self.cirformat       =  np.uint32(self.out_circuit_format)
-        self.R1CSA_nWords =  np.uint32(R1CSA_len)
-        self.R1CSB_nWords =  np.uint32(R1CSB_len)
-        self.R1CSC_nWords =  np.uint32(R1CSC_len)
-        self.R1CSA        =  R1CSA_u256
-        self.R1CSB        =  R1CSB_u256
-        self.R1CSC        =  R1CSC_u256 
-
-        return  self._cirvarsPack()
 
     def write_pk(self):
-       out_pk_f = self.out_pk_f
-       if self.test_f is not None:
-         out_pk_f = './data/xxx.json'
 
-       if out_pk_f.endswith('.json') :
-         pk_dict = self._vars_to_pkdict()
+       if self.out_pk_f.endswith('.json') :
+         pk_dict = pkvars_to_json(self.out_k_binformat, self.out_k_ecformat,self.pk)
          pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
+         #if os.path.exists(self.out_pk_f):
+         #    os.remove(self.out_pk_f)
          f = open(self.out_pk_f, 'w')
          print(pk_json, file=f)
          f.close()
 
-       if self.out_pk_f.endswith('bin') :
-         pk_bin = self._vars_to_pkbin()
-         writeU256CircuitFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
+       elif self.out_pk_f.endswith('bin') :
+         pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk)
+         writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
 
+       else :
+         print ("No valid proving key file provided")
+         return
 
-    def write_toxic(self)
-       toxic_dict = self._vars_to_toxicdict()
-       toxic_json = json.dumps(toxic_dic, indent=4, sort_keys=True)
-       f = open(self.test_f, 'w')
-       print(toxic_json, file=f)
+        
+    def write_vk(self):
+       #Fill alfa and beta values and call snarkjs to compute vk value
+       vk_dict = self._vars_to_vkdict(alfabeta=True)
+       vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
+       #if os.path.exists(self.alfabeta_f):
+       #     os.remove(self.alfabeta_f)
+       f = open(self.alfabeta_f, 'w')
+       print(vk_json, file=f)
        f.close()
 
-    def write_vk(self):
-       self._gen_vk_alfabeta_12()
+       self.launch_snarkjs("alfabeta_12")
+
        if self.out_vk_f.endswith('.json') :
          vk_dict = self._vars_to_vkdict()
-         pk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
+         vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
+         #if os.path.exists(self.out_vk_f):
+         #   os.remove(self.out_vk_f)
          f = open(self.out_vk_f, 'w')
-         print(pk_json, file=f)
+         print(vk_json, file=f)
          f.close()
 
        elif self.out_vk_f.endswith('bin') :
          vk_bin = self._vars_to_vkbin()
 
          if vk_bin is not None:
-            writeU256CircuitFile_h(vk_bin, self.out_vk_f.encode("UTF-8"))
+            writeU256DataFile_h(vk_bin, self.out_vk_f.encode("UTF-8"))
 
-    def _vars_to_vkdict(self):
+    def _vars_to_vkdict(self, alfabeta=False):
       # TODO : only suported formats for vk are .json, affine and extended 
       vk_dict = {}
-      vk_dict['protocol'] = "groth"
-      vk_dict['field_p'] = str(ZFieldElExt.from_uint256(self.field_p).as_long())
-      vk_dict['group_p'] = str(ZFieldElExt.from_uint256(self.group_p).as_long())
-      vk_dict['binFormat'] = "normal"
-
-      vk_dict['Rbitlen'] = int(self.Rbitlen)
-      vk_dict['ecFormat'] = "affine"
-
-      vk_dict['nVars'] = int(self.nVars)
-      vk_dict['nPublic'] = int(self.nPublic)
-      vk_dict['domainBits'] = int(self.domainBits)
-      vk_dict['domainSize'] = int(self.domainSize)
-
-      ZField.set_field(MOD_FIELD)
-      vk_dict['vk_alfa_1'] = ECC.from_uint256(self.vk_alfa_1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
-      vk_dict['vk_beta_1'] = ECC.from_uint256(self.vk_beta_1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
-      vk_dict['vk_delta_1'] = ECC.from_uint256(self.vk_delta_1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
-      vk_dict['vk_beta_2'] = ECC.from_uint256(self.vk_beta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
-      vk_dict['vk_delta_2'] = ECC.from_uint256(self.vk_delta_2.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
-
       ZField.set_field(MOD_GROUP)
-      P = ECC.from_uint256(self.IC, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
-      vk_dict['IC'] = [x.extend().as_str() for x in P]
+      vk_dict['vk_alfa_1'] = ECC.from_uint256(self.pk['alfa_1'], in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
+      vk_dict['vk_beta_2'] = ECC.from_uint256(self.pk['beta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
 
+      if not alfabeta :
+        f = open(self.alfabeta_f,'r')
+        vk_dict['vk_alfabeta_12'] = json.load(f)
+        f.close()
+        vk_dict['protocol'] = "groth"
+        vk_dict['field_r'] = str(ZFieldElExt.from_uint256(self.pk['field_r']).as_long())
+        vk_dict['group_q'] = str(ZFieldElExt.from_uint256(self.pk['group_q']).as_long())
+        vk_dict['binFormat'] = "normal"
+
+        vk_dict['Rbitlen'] = int(self.pk['Rbitlen'])
+        vk_dict['ecFormat'] = "affine"
+
+        vk_dict['nVars'] = int(self.pk['nVars'])
+        vk_dict['nPublic'] = int(self.pk['nPublic'])
+        vk_dict['domainBits'] = int(self.pk['domainBits'])
+        vk_dict['domainSize'] = int(self.pk['domainSize'])
+  
+        vk_dict['vk_delta_2'] = ECC.from_uint256(self.pk['delta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
+        vk_dict['vk_gamma_2'] = ECC.from_uint256(self.pk['gamma_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
+
+        P = ECC.from_uint256(self.pk['IC'], in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+        vk_dict['IC'] = [x.extend().as_str() for x in P]
+  
       return vk_dict
 
     def _vars_to_vkbin(self):
-      print("Verifying Key can only be saved as .json\n");
+      print("Verifying Key can only be saved as .json\n")
+      sys.exit(0)
       vk_bin=None
       return vk_bin
 
@@ -855,11 +643,11 @@ if __name__ == "__main__":
     if os.path.isfile(out_circuit_f):
        GS = GrothSetup(in_circuit_f=out_circuit_f, 
                        out_pk_f=out_pk_f, out_k_binformat=FMT_MONT,
-                       out_k_ecformat=EC_T_AFFINE, test_f=toxic_vals)
+                       out_k_ecformat=EC_T_AFFINE, test_f=None)
     else:
        GS = GrothSetup(in_circuit_f=in_circuit_f, out_circuit_f=out_circuit_f, 
                        out_circuit_format=FMT_MONT, out_pk_f=out_pk_f, out_k_binformat=FMT_MONT,
-                       out_k_ecformat=EC_T_AFFINE, test_f=toxic_vals)
+                       out_k_ecformat=EC_T_AFFINE, test_f=None)
     """
 
     GS.setup()

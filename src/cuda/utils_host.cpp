@@ -548,15 +548,47 @@ void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwo
 
 }
 
+/*
+  Read header PK binary file
+
+  char * filename      : location of file to be read
+
+  circuit bin header file format:
+*/
+void readU256PKFileHeader_h(pkbin_hfile_t *hfile, const char *filename)
+{
+  FILE *ifp = fopen(filename,"rb");
+  fread(&hfile->nWords, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->ftype, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->protocol, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->Rbitlen, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->k_binformat, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->k_ecformat, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nVars, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nPublic, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->domainSize, sizeof(uint32_t), 1, ifp); 
+  fclose(ifp);
+
+}
+/*
+  Read PK binary file
+       
+*/
+void readU256PKFile_h(uint32_t *samples, const char *filename, uint32_t nwords=0)
+{
+  readU256CircuitFile_h(samples, filename, nwords);
+}
+
+
 
 /*
-  Write circuit binary file
+  Write binary file
 
   t_uint32_t * samples : input vector containing samples. Vector is of length nwords 
   char * filename      : location of file to be written
   uint32_t nwords      : Number of samples to write.
 */
-void writeU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords)
+void writeU256DataFile_h(uint32_t *samples, const char *filename, uint32_t nwords)
 {
   FILE *ifp = fopen(filename,"wb");
   fwrite(samples, sizeof(uint32_t), nwords, ifp); 
@@ -749,15 +781,51 @@ void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
 }
 
 
-void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
+void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last=0)
 {
   uint32_t i;
+  uint32_t skip_val=0;
 
-  for(i=0; i<n;i++){
-    from_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+  if (!strip_last){
+    for(i=0; i<n;i++){
+      from_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+    }
+  } else if (strip_last == 1) {
+    for(i=0; i<n;i++){
+      if (i%3 == 2){
+        skip_val++;
+      } else {
+         from_montgomery_h(&z[(i-skip_val)*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+      }
+      
+    }
+  } else if (strip_last == 2){
+    for(i=0; i<n;i++){
+      if (i%6 >= 4){
+         skip_val++;
+      } else {
+        from_montgomery_h(&z[(i-skip_val)*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+      }
+    }
   }
 }
 
+void ec_stripc_h(uint32_t *z, uint32_t *x, uint32_t n)
+{
+  uint32_t i;
+
+  for (i=0; i< n; i++){
+     memmove(&z[i*2*NWORDS_256BIT],&x[i*3*NWORDS_256BIT], 2 * NWORDS_256BIT * sizeof(uint32_t));
+  }
+}
+void ec2_stripc_h(uint32_t *z, uint32_t *x, uint32_t n)
+{
+  uint32_t i;
+
+  for (i=0; i< n; i++){
+     memmove(&z[i*4*NWORDS_256BIT],&x[i*6*NWORDS_256BIT], 4 * NWORDS_256BIT * sizeof(uint32_t));
+  }
+}
 /*
     Removes higher order coefficient equal to 0
 

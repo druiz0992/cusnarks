@@ -351,6 +351,47 @@ typedef enum{
 
 }cirbin_hfile_offset_t;
 
+typedef struct{
+  uint32_t nWords;
+  uint32_t ftype;
+  uint32_t protocol;
+  uint32_t Rbitlen;
+  uint32_t k_binformat;
+  uint32_t k_ecformat;
+  uint32_t nVars;
+  uint32_t nPublic;
+  uint32_t domainSize;
+  
+}pkbin_hfile_t;
+
+typedef enum{
+  SNARKSFILE_T_CIRCUIT = 0,
+  SNARKSFILE_T_PK, 
+  SNARKSFILE_T_VK,
+  SNARKSFILE_T_WITNESS,
+  SNARKSFILE_T_PROOF,
+  SNARKSFILE_T_PDATA,
+
+  SNARKSFILE_T_N
+
+}snarks_file_t;
+
+typedef enum {
+  PKBIN_H_NWORDS_OFFSET=0,
+  PKBIN_H_FTYPE_OFFSET,
+  PKBIN_H_PROTOCOL_OFFSET,
+  PKBIN_H_RBITLEN_OFFSET,
+  PKBIN_H_BINFORMAT_OFFSET,
+  PKBIN_H_ECFORMAT_OFFSET,
+  PKBIN_H_NVARS_OFFSET,
+  PKBIN_H_NPUBLIC_OFFSET,
+  PKBIN_H_DOMAINBITS_OFFSET,
+  PKBIN_H_DOMAINSIZE_OFFSET,
+
+  PKBIN_H_N_OFFSET
+  
+}pkbin_hfile_offset_t;
+
 typedef enum{
   PROTOCOL_T_NORMAL=0,
   PROTOCOL_T_GROTH,
