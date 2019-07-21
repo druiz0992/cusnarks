@@ -405,8 +405,8 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 
     return idx_flat
 
-def writeU256CircuitFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
-    uh.cwriteU256CircuitFile_h(&vin[0], <char *>fname, vin.shape[0])
+def writeU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
+    uh.cwriteU256DataFile_h(&vin[0], <char *>fname, vin.shape[0])
 
 def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(outsize * NWORDS_256BIT,dtype=np.uint32)
@@ -438,6 +438,30 @@ def readU256CircuitFile_h(bytes fname):
     uh.creadU256CircuitFile_h(&cir_data[0], <char *>fname, header_d['nWords'])
 
     return cir_data
+
+def readU256PKFile_h(bytes fname):
+    header_d = readU256PKFileHeader_h(<char *>fname)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pk_data = np.zeros(header_d['nWords'],dtype=np.uint32)
+   
+    uh.creadU256PKFile_h(&pk_data[0], <char *>fname, header_d['nWords'])
+
+    return pk_data
+
+def readU256PKFileHeader_h(bytes fname):
+    cdef ct.pkbin_hfile_t header
+    uh.creadU256PKFileHeader_h(&header, <char *>fname)
+   
+    header_d = {'nWords' : header.nWords,
+                'ftype' : header.ftype,
+                'protocol' : header.protocol,
+                'Rbitlen' : header.Rbitlen,
+                'k_binformat' : header.k_binformat,
+                'k_ecformat' : header.k_ecformat,
+                'nVars' : header.nVars,
+                'nPublic' : header.nPublic,
+                'domainSize' : header.domainSize }
+    
+    return header_d
 
 def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict header, ct.uint32_t extend):
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
@@ -536,13 +560,13 @@ def GrothSetupComputePS_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_kA,
                         np.ndarray[ndim=1, dtype=np.uint32_t]in_invD,
                         np.ndarray[ndim=2, dtype=np.uint32_t]in_veca,
                         np.ndarray[ndim=2, dtype=np.uint32_t]in_vecb,
-                        np.ndarray[ndim=2, dtype=np.uint32_t]in_vecc, ct.uint32_t nP, ct.uint32_t pidx):
+                        np.ndarray[ndim=2, dtype=np.uint32_t]in_vecc, ct.uint32_t start, ct.uint32_t end, ct.uint32_t pidx):
      cdef ct.uint32_t s,n=0
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t1 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] t2 = np.zeros(NWORDS_256BIT, dtype=np.uint32)
-     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((len(in_veca)-nP-1,NWORDS_256BIT), dtype=np.uint32)
+     cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((end-start,NWORDS_256BIT), dtype=np.uint32)
 
-     for s in xrange(nP+1,len(in_veca)):
+     for s in xrange(start,end):
         uh.cmontmult_h(&t1[0],&in_veca[s,0],&in_kB[0], pidx)
         uh.cmontmult_h(&t2[0],&in_vecb[s,0],&in_kA[0], pidx)
         uh.caddm_h(&t1[0],&t1[0], &t2[0], pidx)
@@ -625,11 +649,27 @@ def to_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
     
-def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx ):
+def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx, ct.uint32_t strip_last ):
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
      cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
 
-     uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
+     uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx, strip_last)
+
+     return out_v.reshape((-1,ct.NWORDS_256BIT))
+
+def ec_stripc_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v):
+     cdef ct.uint32_t n = <int>(in_v.shape[0]*2/3)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
+
+     uh.cec_stripc_h(&out_v[0], &in_v[0], <int>(n/(2*NWORDS_256BIT)))
+
+     return out_v.reshape((-1,ct.NWORDS_256BIT))
+
+def ec2_stripc_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v):
+     cdef ct.uint32_t n = <int>(in_v.shape[0]*4/6)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
+
+     uh.cec2_stripc_h(&out_v[0], &in_v[0], <int>(n/(4*NWORDS_256BIT)))
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
 

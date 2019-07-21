@@ -50,11 +50,13 @@ class CUSnarks {
         ~CUSnarks();
 
         void allocateCudaResources(uint32_t in_size, uint32_t out_size);
+        void allocateCudaCteResources(void);
         //void initRNG(uint32_t seed);
         double elapsedTime(void);
 
     public:
 
+        static uint32_t init_constants;
         void rand(uint32_t *samples, uint32_t n_samples);
         void randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod);
         void saveFile(uint32_t *samples, uint32_t n_samples, char *fname);

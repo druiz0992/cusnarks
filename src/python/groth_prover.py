@@ -52,7 +52,7 @@ import numpy as np
 import time
 
 from zutils import ZUtils
-from random import randint
+import random
 from zfield import *
 from ecc import *
 from zpoly import *
@@ -81,13 +81,30 @@ ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
 
 class GrothProver(object):
     
-    GroupIDX = 0
-    FieldIDX = 1
-
-    def __init__(self, proving_key_f, curve='BN128',  out_proof_f = DEFAULT_PROOF_LOC, out_public_f = DEFAULT_PUBLIC_LOC, in_point_fmt=ZUtils.FEXT, in_coor_fmt = ZUtils.JACOBIAN, accel = True, inrand=False):
+    def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',  out_proof_f = DEFAULT_PROOF_LOC, out_public_f = DEFAULT_PUBLIC_LOC,
+                 out_pk_f=None, out_pk_format=FMT_MONT,
+                 out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, benchmark_f=None, seed=None, snarkjs=None, accel = True):
 
         self.accel = accel
 
+        if seed is not None:
+          self.seed = seed
+          random.seed(seed) 
+        else:
+          self.seed = random.randint(0,1<<32)
+
+        if use_pycusnarks and self.accel:
+          self.roots1M_rdc_u256 = readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20)
+
+          batch_size = 1<<20
+          self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
+          self.ec2bn128 = EC2BN128(batch_size + 2, seed=self.seed)
+          self.cuzpoly = ZCUPoly(batch_size, seed=self.seed)
+    
+        self.out_proving_key_f = out_pk_f
+        self.out_proving_key_format = out_pk_format
+        self.proving_key_f = proving_key_f
+        self.verification_key_f = verification_key_f
         self.out_proof_f = out_proof_f
         self.out_public_f = out_public_f
         self.curve_data = ZUtils.CURVE_DATA[curve]
@@ -96,27 +113,44 @@ class GrothProver(object):
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data)
-        ZPoly.init(GrothProver.FieldIDX)
+        ZPoly.init(MOD_FIELD)
 
-        self.inrand = inrand
+        ZField.set_field(MOD_FIELD)
 
-        data_init = self.load_pkdata(proving_key_f)
-        if not data_init:
-          #init class variables
-          self.init_vars()
+        self.test_f= test_f
 
-          if use_pycusnarks and self.accel:
-             self.init_u256_vars(proving_key_f)
+        self.pk = getPK()
 
-        if use_pycusnarks and self.accel:
-          self.roots1M_rdc_u256 = readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20)
+        self.pi_a_eccf1 = None
+        self.pi_b_eccf2 = None
+        self.pi_c_eccf1 = None
+        self.public_signals = None
 
-          self.nVars = self.vk_proof['nVars']
-          self.batch_size = 1<<20
-          self.ecbn128 = ECBN128(self.batch_size + 2,   seed=1)
-          self.ec2bn128 = EC2BN128(self.batch_size + 2, seed=1)
-          self.cuzpoly = ZCUPoly(self.batch_size, seed=1)
-          
+        self.load_pkdata()
+
+        if self.out_proving_key_f is not None:
+             if self.out_proving_key_f.endswith('.json'):
+               pk_dict =pkvars_to_json(self.out_proving_key_format, EC_T_AFFINE, self.pk)
+               pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
+               f = open(self.out_proving_key_f, 'w')
+               print(pk_json, file=f)
+               f.close()
+               pk_dict = None
+               pk_json = None
+             elif self.out_proving_key_f.endswith('.bin'):
+               pk_bin = pkvars_to_bin(self.out_proving_key_format, EC_T_AFFINE, self.pk)
+               writeU256DataFile_h(pk_bin, self.out_proving_key_f.encode("UTF-8"))
+             elif self.out_proving_key_f.endswith('.npz'):
+                np.savez_compressed(proving_key_fnpz, alfa_1_u256 =  self.pk['alfa_1'],
+                             beta_1_u256 = self.pk['beta_1'], delta_1_u256 = self.pk['delta_1'],
+                             beta_2_u256 = self.pk['beta_2'], delta_2_u256 = self.pk['delta_2'],
+                             A_u256 = self.pk['A'], B1_u256=self.pk['B1'], B2_u256 = self.pk['B2'],
+                             C_u256 = self.pk['C'], hExps_u256 =self.pk['hExps'],
+                             polsA_u256 = self.pk['polsA'], polsB_u256 = self.pk['polsB'], polsC_u256 = self.pk['polsC'],
+                             nvars = self.pk['nVars'], npublic=self.pk['nPublic'], domain_bits=self.pk['domainBits'],
+                             domain_size = self.pk['domainSize'])
+            
+      
     def read_witness_data(self, witness_f):
        ## Open and parse witness data
        if os.path.isfile(witness_f):
@@ -127,161 +161,106 @@ class GrothProver(object):
           print("File doesn't exist")
           assert False
        
-    def load_pkdata(self, proving_key_f):
-       proving_key_fnpz = proving_key_f[:-4] + 'npz'
-       data_init = False
-       if use_pycusnarks and os.path.isfile(proving_key_fnpz) and self.accel:
-          npzfile = np.load(proving_key_fnpz)
-          self.vk_alfa_1_eccf1_u256 = npzfile['alfa_1_u256']
-          self.vk_beta_1_eccf1_u256 = npzfile['beta_1_u256']
-          self.vk_delta_1_eccf1_u256= npzfile['delta_1_u256']
-          self.vk_beta_2_eccf2_u256 = npzfile['beta_2_u256']
-          self.vk_delta_2_eccf2_u256 = npzfile['delta_2_u256']
+    def load_pkdata(self):
+       if use_pycusnarks and self.accel and self.proving_key_f.endswith('npz'):
+          npzfile = np.load(self.proving_key_f)
+          self.pk['protocol'] = np.uint32(PROTOCOL_T_GROTH)
+          self.pk['Rbitlen']  = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
+          self.pk['k_binformat'] = np.uint32(FMT_MONT)
+          self.pk['k_ecformat'] = np.uint32(EC_T_AFFINE)
+          self.pk['alfa_1'] = npzfile['alfa_1_u256']
+          self.pk['beta_1'] = npzfile['beta_1_u256']
+          self.pk['delta_1']= npzfile['delta_1_u256']
+          self.pk['beta_2'] = npzfile['beta_2_u256']
+          self.pk['delta_2'] = npzfile['delta_2_u256']
 
-          self.A_eccf1_u256 = npzfile['A_u256']
-          self.B1_eccf1_u256 = npzfile['B1_u256']
-          self.B2_eccf2_u256 = npzfile['B2_u256']
-          self.C_eccf1_u256  = npzfile['C_u256']
-          self.hExps_eccf1_u256 = npzfile['hExps_u256']
-          self.polsA_sps_u256 = npzfile['polsA_u256']
-          self.polsB_sps_u256 = npzfile['polsB_u256']
-          self.polsC_sps_u256 = npzfile['polsC_u256']
-          self.vk_proof={}
-          self.vk_proof['nVars'] = npzfile['nvars']
-          self.vk_proof['nPublic'] = npzfile['npublic']
-          self.vk_proof['domainSize'] = npzfile['domain_size']
-          self.vk_proof['domainBits'] = npzfile['domain_bits']
-          data_init = True
+          self.pk['A'] = npzfile['A_u256']
+          self.pk['B1'] = npzfile['B1_u256']
+          self.pk['B2'] = npzfile['B2_u256']
+          self.pk['C']  = npzfile['C_u256']
+          self.pk['hExps'] = npzfile['hExps_u256']
+          self.pk['polsA'] = npzfile['polsA_u256']
+          self.pk['polsB'] = npzfile['polsB_u256']
+          self.pk['polsC'] = npzfile['polsC_u256']
+          self.pk['nVars'] = npzfile['nvars']
+          self.pk['nPublic'] = npzfile['npublic']
+          self.pk['domainSize'] = npzfile['domain_size']
+
        ## Open and parse proving key data
-       elif os.path.isfile(proving_key_f):
-           f = open(proving_key_f,'r')
+       elif self.proving_key_f.endswith('.json'):
+           f = open(self.proving_key_f,'r')
            tmp_data = json.load(f)
-           self.vk_proof = json_to_dict(tmp_data)
+           vk_proof = json_to_dict(tmp_data)
            f.close()
-       else:
-          print("File doesn't exist")
-          assert False
+           if use_pycusnarks and self.accel:
+              self.pk = pkjson_to_vars(vk_proof, self.proving_key_f)  
+           else:
+              ZField.find_roots(ZUtils.NROOTS)
+              self.pk = pkjson_to_pyvars(vk_proof)  
+           vk_proof = None
+           tmp_data = None
+
+       elif self.proving_key_f.endswith('.bin'):
+          pk_bin = readU256PKFile_h(self.proving_key_f.encode("UTF-8"))
+          self.pk = pkbin_to_vars(pk_bin)
 
 
-       return data_init
+    def proof(self, witness_f):
+      t1, t2, t2 = self.gen_proof(witness_f)
+      self.write_pdata()
+      self.write_proof()
+      snarkjs_results = self.test_results()
 
-    def init_u256_vars(self, proving_key_f):
-       ZField.set_field(GrothProver.GroupIDX)
-       self.vk_alfa_1_eccf1_u256 = ECC.as_uint256(self.vk_alfa_1_eccf1,remove_last=True, as_reduced=True)
-       self.vk_beta_1_eccf1_u256 = ECC.as_uint256(self.vk_beta_1_eccf1,remove_last=True, as_reduced=True )
-       self.vk_delta_1_eccf1_u256= ECC.as_uint256(self.vk_delta_1_eccf1,remove_last= True, as_reduced=True)
-       self.vk_beta_2_eccf2_u256 = ECC.as_uint256(self.vk_beta_2_eccf2, remove_last = True, as_reduced=True)
-       self.vk_delta_2_eccf2_u256 = ECC.as_uint256(self.vk_delta_2_eccf2, remove_last = True, as_reduced=True)
+    def test_results(self):
+      proof_r = True
+      if self.test_f is not None:
+        # Write rand json
+        randout_dict={}
+        randout_dict['r'] = str(BigInt.from_uint256(self.r_scl).as_long())
+        randout_dict['s'] = str(BigInt.from_uint256(self.r_scl).as_long())
+        randout_json = json.dumps(randout_dict, indent=4, sort_keys=True)
+        f = open(self.test_f, 'w')
+        print(randout_json, file=f)
+        snarkjs = launch_snarkjs("proof")
+        p_r = pysnarks_compare(self.out_proof_f, snarks['p_f'], labels=['pi_a', 'pi_b', 'pi_c'])
+        pd_r = pysnarks_compare(self.out_public_f, snarks['pd_f'])
+        proof_r = p_r and pd_r
 
-       self.A_eccf1_u256 = ECC.as_uint256(self.A_eccf1, remove_last = True, as_reduced=True)
-       self.B1_eccf1_u256 = ECC.as_uint256(self.B1_eccf1, remove_last = True, as_reduced=True)
-       self.B2_eccf2_u256 = ECC.as_uint256(self.B2_eccf2, remove_last = True, as_reduced=True)
-       self.C_eccf1_u256  = ECC.as_uint256(self.C_eccf1, remove_last=True, as_reduced=True)
-       self.hExps_eccf1_u256 = ECC.as_uint256(self.hExps_eccf1, remove_last=True, as_reduced=True)
+      snarkjs = launch_snarkjs("verify")
 
+      return snarks['verify'], proof_r
 
+    def launch_snarkjs(self, mode):
+        snarkjs = {}
+        snarkjs['p_f'] = '../../circuits/tmp_p_f.json'
+        snarkjs['pd_f'] = '../../circuits/tmp_pd_f.json'
+        if mode=="proof" :
+          # snarkjs setup is launched with circuit.json, format extended. Convert input file if necessary
+          if self.witness_f.endswith('.json') and self.proving_key_f.endswith('.json') and self.pk['k_binformat']==FMT_EXT :
+             witness_file = self.witness_f
+             proving_key_file = self.proving_key_f
+          else :
+             print("To launch snarkjs, witness and proving key need to be json file, and proving key cannot be in Monggomery format") 
+             return
 
-       ZField.set_field(GrothProver.FieldIDX)
-       polsA_l = []
-       polsA_p = []
-       for pol in self.polsA_sps:
-         l,p = pol.reduce().as_uint256() 
-         polsA_l.append(l)
-         polsA_p.append(p)
-       self.polsA_sps_u256 = np.asarray(np.concatenate((np.asarray([len(polsA_l)]),
-                                    np.concatenate((np.cumsum(polsA_l),np.concatenate(polsA_p))))),dtype=np.uint32)
+          if self.test_f is not None:
+             debug_command = "--d"
+             debug_file = self.test_f
+          else:
+             debug_command = ""
+             debug_file = ""
 
-       polsB_l = []
-       polsB_p = []
-       for pol in self.polsB_sps:
-         l,p = pol.reduce().as_uint256() 
-         polsB_l.append(l)
-         polsB_p.append(p)
-       self.polsB_sps_u256 = np.asarray(np.concatenate((np.asarray([len(polsB_l)]),
-                                    np.concatenate((np.cumsum(polsB_l),np.concatenate(polsB_p))))),dtype=np.uint32)
+          call([self.snarkjs, "proof", "-w", witness_file, "--pk", self.proving_key_f, "-p", snarkjs['p_f'],"--pub",snarjs['pf_d'], debug_command, debug_file])
 
-       polsC_l = []
-       polsC_p = []
-       for pol in self.polsC_sps:
-         l,p = pol.reduce().as_uint256() 
-         polsC_l.append(l)
-         polsC_p.append(p)
-       self.polsC_sps_u256 = np.asarray(np.concatenate((np.asarray([len(polsC_l)]),
-                                    np.concatenate((np.cumsum(polsC_l),np.concatenate(polsC_p))))),dtype=np.uint32)
-
+        elif mode == "verify":
+          if self.verification_key_f is not None and self.verification_key_f.endswith('.json') :
+             verification_file = self.verification_f
+          else :
+             print("To launch snarkjs, verifiation filen needs to be json file")
+        
+          call([self.snarkjs, "verify", "--vk", verification_file, "-p", snarkjs['p_f'],"--pub",snarjs['pf_d']])
        
-       proving_key_fnpz = proving_key_f[:-4] + 'npz'
-
-       np.savez_compressed(proving_key_fnpz, alfa_1_u256 =  self.vk_alfa_1_eccf1_u256,
-                             beta_1_u256 = self.vk_beta_1_eccf1_u256, delta_1_u256 = self.vk_delta_1_eccf1_u256,
-                             beta_2_u256 = self.vk_beta_2_eccf2_u256, delta_2_u256 = self.vk_delta_2_eccf2_u256,
-                             A_u256 = self.A_eccf1_u256, B1_u256=self.B1_eccf1_u256, B2_u256 = self.B2_eccf2_u256,
-                             C_u256 = self.C_eccf1_u256, hExps_u256 =self.hExps_eccf1_u256,
-                             polsA_u256 = self.polsA_sps_u256, polsB_u256 = self.polsB_sps_u256, polsC_u256 = self.polsC_sps_u256,
-                             nvars = self.vk_proof['nVars'], npublic=self.vk_proof['nPublic'], domain_bits=self.vk_proof['domainBits'],
-                             domain_size = self.vk_proof['domainSize'])
-
-
-    def get_invpoly_u256(self, n):
-       fidx = ZField.get_field()
-
-       ZField.set_field(GrothProver.FieldIDX)
-       inv_fnpz = DATA_FOLDER + "inv_"+str(n)+".npz"
-       if not os.path.isfile(inv_fnpz):
-          poly = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(n-1)] + [ZFieldElExt(1)])
-          nd = (1<<  int(math.ceil(math.log(n+1, 2))) ) -1 - n
-          poly = poly.scale(nd)
-          inv_poly = poly.inv()
-          inv_poly_u256 = inv_poly.as_uint256()
-
-          np.savez_compressed(inv_fnpz, invpoly_data=inv_poly_u256)
-       else:  
-          npzfile = np.load(inv_fnpz)
-          inv_poly_u256 = npzfile['invpoly_data']
-
-       ZField.set_field(fidx)
-
-       return inv_poly_u256
- 
-    def init_vars(self):
-        # Init witness to Field El.
-        # TODO :  I am assuming that all field el are FielElExt (witness_scl, polsA_sps, polsB_sps, polsC_sps, alfa1...
-        # Witness is initialized a BitInt as it will operate on different fields
-        #self.witness_scl = [BigInt(el) for el in self.witness_scl]
-
-        # Init pi's
-        self.pi_a_eccf1 = ECC_F1()
-        self.pi_b_eccf2 = ECC_F2()
-        self.pi_c_eccf1 = ECC_F1()
-
-        self.vk_alfa_1_eccf1 = ECC_F1(p=self.vk_proof['vk_alfa_1'])
-        self.vk_beta_1_eccf1 = ECC_F1(p=self.vk_proof['vk_beta_1'])
-        self.vk_delta_1_eccf1 = ECC_F1(p=self.vk_proof['vk_delta_1'])
-
-        beta2 = [Z2FieldEl(el) for el in self.vk_proof['vk_beta_2']]
-        self.vk_beta_2_eccf2 = ECC_F2(beta2)
-        delta2 = [Z2FieldEl(el) for el in self.vk_proof['vk_delta_2']]
-        self.vk_delta_2_eccf2 = ECC_F2(delta2)
-
-
-        self.public_signals = None
-
-        self.A_eccf1     = [ECC_F1(p) for p in self.vk_proof['A']]
-        self.B1_eccf1    = [ECC_F1(p) for p in self.vk_proof['B1']]
-        self.B2_eccf2    = [ECC_F2(p) for p in self.vk_proof['B2']]
-        self.C_eccf1     = [ECC_F1(p) for p in self.vk_proof['C']]
-        self.hExps_eccf1 = [ECC_F1(p) for p in self.vk_proof['hExps']]
-
-
-        ZField.set_field(GrothProver.FieldIDX)
-
-        ZField.find_roots(ZUtils.NROOTS)
-        # TODO : This representation may not be optimum. I only have good representation of sparse polynomial,
-        #  but not of array of sparse poly (it is also sparse). I should encode it as a dictionary as wekk
-        self.polsA_sps = [ZPolySparse(el) if el is not {} else ZPolySparse({'0':0}) for el in self.vk_proof['polsA']]
-        self.polsB_sps = [ZPolySparse(el) if el is not {} else ZPolySparse({'0':0}) for el in self.vk_proof['polsB']]
-        self.polsC_sps = [ZPolySparse(el) if el is not {} else ZPolySparse({'0':0}) for el in self.vk_proof['polsC']]
-
+        return snarkjs
 
     def gen_proof(self, witness_f):
         """
@@ -294,24 +273,20 @@ class GrothProver(object):
         end = time.time()
         self.t_GP.append(end - start)
 
-        ZField.set_field(GrothProver.FieldIDX)
+        ZField.set_field(MOD_FIELD)
         # Init r and s scalars
-        if self.inrand:
-          self.r_scl = BigInt(16261132245285695825038220026199411981758970481965022651127483492661266665974)
-          self.s_scl = BigInt(54329550134654175536209911923112271011239733092116208039419485066137536819441)
-        else:
-          self.r_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
-          self.s_scl = BigInt(randint(1,ZField.get_extended_p().as_long()-1))
+        self.r_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1))
+        self.s_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1))
 
         if use_pycusnarks and self.accel:
-           self.r_scl_u256 = self.r_scl.as_uint256()
-           self.s_scl_u256 = self.s_scl.as_uint256()
-           self.witness_scl_u256 = \
+           self.r_scl = self.r_scl.as_uint256()
+           self.s_scl = self.s_scl.as_uint256()
+           self.witness_scl = \
              np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
-           nVars = self.nVars
-           nPublic = self.vk_proof['nPublic']
-           self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl_u256[:nVars])
-           self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl_u256[nPublic+1:nVars])
+           nVars = self.pk['nVars']
+           nPublic = self.pk['nPublic']
+           self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl[:nVars])
+           self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl[nPublic+1:nVars])
 
 
         # Accumulate multiplication of S EC points and S scalar. Parallelization
@@ -326,10 +301,10 @@ class GrothProver(object):
         
         if use_pycusnarks and self.accel:
           start = time.time()
-          ZField.set_field(GrothProver.FieldIDX)
+          ZField.set_field(MOD_FIELD)
           d4_u256  = ZFieldElExt(-self.r_scl * self.s_scl).as_uint256()
 
-          ZField.set_field(GrothProver.GroupIDX)
+          ZField.set_field(MOD_GROUP)
           self.pi_a_eccf1 = ec_jac2aff_h(self.pi_a_eccf1.reshape(-1),ZField.get_field())
           self.pi_b_eccf2 = ec2_jac2aff_h(self.pi_b_eccf2.reshape(-1),ZField.get_field())
           pib1_eccf1  = ec2_jac2aff_h(pib1_eccf1.reshape(-1), ZField.get_field())
@@ -338,74 +313,74 @@ class GrothProver(object):
           one = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
           sorted_H_idx = sortu256_idx_h(polH)
 
-          K = np.concatenate((polH[sorted_H_idx],[one],[self.s_scl_u256],[self.r_scl_u256],[d4_u256]))
-          sorted_hExps = np.reshape(self.hExps_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[sorted_H_idx]
-          P = np.concatenate((np.reshape(sorted_hExps,(-1,NWORDS_256BIT)),self.pi_c_eccf1[:2], self.pi_a_eccf1[:2], pib1_eccf1[:2], self.vk_delta_1_eccf1_u256))
+          K = np.concatenate((polH[sorted_H_idx],[one],[self.s_scl],[self.r_scl],[d4_u256]))
+          sorted_hExps = np.reshape(self.pk['hExps'][:2*nVars],(-1,2,NWORDS_256BIT))[sorted_H_idx]
+          P = np.concatenate((np.reshape(sorted_hExps,(-1,NWORDS_256BIT)),self.pi_c_eccf1[:2], self.pi_a_eccf1[:2], pib1_eccf1[:2], self.pk['delta_1']))
           ecbn128_samples = np.concatenate((K,P))
 
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
           self.pi_c_eccf1 = ec_jac2aff_h(self.pi_c_eccf1.reshape(-1),ZField.get_field())
-          self.public_signals = self.witness_scl_u256[1:self.vk_proof['nPublic']+1]
+          self.public_signals = self.witness_scl[1:self.pk['nPublic']+1]
           end = time.time()
           self.t_GP.append(end - start)
 
         else :
           d4  = ZFieldElExt(-(self.r_scl * self.s_scl))
-          ZField.set_field(GrothProver.GroupIDX)
-          d5  = d4 * self.vk_delta_1_eccf1
+          ZField.set_field(MOD_GROUP)
+          d5  = d4 * self.pk['delta_1']
 
           coeffH = polH.get_coeff()
 
           # Accumulate products of S ecc points and S scalars (same as at the beginning)
           n_coeff_h = len(coeffH)
-          self.pi_c_eccf1 += np.sum(np.multiply(self.hExps_eccf1[:n_coeff_h ], coeffH[:n_coeff_h]))
+          self.pi_c_eccf1 += np.sum(np.multiply(self.pk['hExps'][:n_coeff_h ], coeffH[:n_coeff_h]))
 
         
           self.pi_c_eccf1  += (self.pi_a_eccf1 * self.s_scl) + (pib1_eccf1 * self.r_scl) + d5
 
-          self.public_signals = self.witness_scl[1:self.vk_proof['nPublic']+1]
+          self.public_signals = self.witness_scl[1:self.pk['nPublic']+1]
 
         return self.t_EC, self.t_P, self.t_GP
  
 
     def findECPoints(self):
-        nVars = self.vk_proof['nVars']
-        nPublic = self.vk_proof['nPublic']
+        nVars = self.pk['nVars']
+        nPublic = self.pk['nPublic']
         self.t_EC = []
-        ZField.set_field(GrothProver.GroupIDX)
+        ZField.set_field(MOD_GROUP)
 
         if use_pycusnarks and self.accel:
           start_ec = time.time()
           #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P 
           one = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
-          sorted_scl = self.witness_scl_u256[:nVars][self.sorted_witness1_idx]
-          sorted_A_ecc = np.reshape(self.A_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
-          K = np.concatenate((sorted_scl,[one], [self.r_scl_u256]))
-          P = np.concatenate((np.reshape(sorted_A_ecc,(-1,NWORDS_256BIT)),self.vk_alfa_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
-          ecbn128_samples = np.concatenate((K,P))
+          sorted_scl = self.witness_scl[:nVars][self.sorted_witness1_idx]
+          sorted_A_ecc = np.reshape(self.pk['A'][:2*nVars*NWORDS_256BIT],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
+          K = np.concatenate((sorted_scl,[one], [self.r_scl]))
+          P = np.concatenate((np.reshape(sorted_A_ecc,-1),self.pk['alfa_1'], self.pk['delta_1']))
+          ecbn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
           self.pi_a_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
           # pi_b = pi_b + beta2 + delta2 * s
-          K[-1] = self.s_scl_u256
-          sorted_B2_ecc = np.reshape(self.B2_eccf2_u256[:4*nVars],(-1,4,NWORDS_256BIT))[self.sorted_witness1_idx]
-          P = np.concatenate((np.reshape(sorted_B2_ecc,(-1,NWORDS_256BIT)),self.vk_beta_2_eccf2_u256, self.vk_delta_2_eccf2_u256))
-          ec2bn128_samples = np.concatenate((K,P))
+          K[-1] = self.s_scl
+          sorted_B2_ecc = np.reshape(self.pk['B2'][:4*nVars*NWORDS_256BIT],(-1,4,NWORDS_256BIT))[self.sorted_witness1_idx]
+          P = np.concatenate((np.reshape(sorted_B2_ecc,-1),self.pk['beta_2'], self.pk['delta_2']))
+          ec2bn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
           self.pi_b_eccf2, t1 = ec_mad_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
           self.t_EC.append(t1)
           
 
           # pib1 = pib1 + beta1 + delta1 * s
-          sorted_B1_ecc = np.reshape(self.B1_eccf1_u256[:2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
-          P = np.concatenate((np.reshape(sorted_B1_ecc,(-1,NWORDS_256BIT)),self.vk_beta_1_eccf1_u256, self.vk_delta_1_eccf1_u256))
-          ecbn128_samples = np.concatenate((K,P))
+          sorted_B1_ecc = np.reshape(self.pk['B1'][:2*nVars*NWORDS_256BIT],(-1,2,NWORDS_256BIT))[self.sorted_witness1_idx]
+          P = np.concatenate((np.reshape(sorted_B1_ecc,-1),self.pk['beta_1'], self.pk['delta_1']))
+          ecbn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
           pib1_eccf1, t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
 
           # pi_c
-          sorted_scl = self.witness_scl_u256[nPublic+1:nVars][self.sorted_witness2_idx]
-          sorted_C_ecc = np.reshape(self.C_eccf1_u256[2*(nPublic+1):2*nVars],(-1,2,NWORDS_256BIT))[self.sorted_witness2_idx]
+          sorted_scl = self.witness_scl[nPublic+1:nVars][self.sorted_witness2_idx]
+          sorted_C_ecc = np.reshape(self.pk['C'][2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],(-1,2,NWORDS_256BIT))[self.sorted_witness2_idx]
           ecbn128_samples = np.concatenate((sorted_scl, np.reshape(sorted_C_ecc,(-1,NWORDS_256BIT))))
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
           self.t_EC.append(t1)
@@ -413,30 +388,30 @@ class GrothProver(object):
           self.t_EC.append(end_ec - start_ec)
 
         else :
-          self.pi_a_eccf1  = np.sum(np.multiply(self.A_eccf1[:nVars], self.witness_scl[:nVars]))
-          self.pi_b_eccf2  = np.sum(np.multiply(self.B2_eccf2[:nVars], self.witness_scl[:nVars]))
-          pib1_eccf1       = np.sum(np.multiply(self.B1_eccf1[:nVars], self.witness_scl[:nVars]))
-          self.pi_c_eccf1  = np.sum(np.multiply(self.C_eccf1[nPublic+1:nVars], self.witness_scl[nPublic+1:nVars]))
+          self.pi_a_eccf1  = np.sum(np.multiply(self.pk['A'][:nVars], self.witness_scl[:nVars]))
+          self.pi_b_eccf2  = np.sum(np.multiply(self.pk['B2'][:nVars], self.witness_scl[:nVars]))
+          pib1_eccf1       = np.sum(np.multiply(self.pk['B1'][:nVars], self.witness_scl[:nVars]))
+          self.pi_c_eccf1  = np.sum(np.multiply(self.pk['C'][nPublic+1:nVars], self.witness_scl[nPublic+1:nVars]))
 
           # pi_a = pi_a + alfa1 + delta1 * r
-          self.pi_a_eccf1  += self.vk_alfa_1_eccf1
-          self.pi_a_eccf1  += (self.vk_delta_1_eccf1 * self.r_scl)
+          self.pi_a_eccf1  += self.pk['alfa_1']
+          self.pi_a_eccf1  += (self.pk['delta_1'] * self.r_scl)
 
           # pi_b = pi_b + beta2 + delta2 * s
-          self.pi_b_eccf2  += self.vk_beta_2_eccf2
-          self.pi_b_eccf2  += (self.vk_delta_2_eccf2 * self.s_scl)
+          self.pi_b_eccf2  += self.pk['beta_2']
+          self.pi_b_eccf2  += (self.pk['delta_2'] * self.s_scl)
   
           # pib1 = pib1 + beta1 + delta1 * s
-          pib1_eccf1 += self.vk_beta_1_eccf1
-          pib1_eccf1 += (self.vk_delta_1_eccf1 * self.s_scl)
+          pib1_eccf1 += self.pk['beta_1']
+          pib1_eccf1 += (self.pk['delta_1'] * self.s_scl)
 
         return pib1_eccf1
 
 
-    def write_proof(self):
+    def write_pdata(self):
         if self.out_public_f.endswith('.json'):
            # Write public file
-           ZField.set_field(GrothProver.FieldIDX)
+           ZField.set_field(MOD_FIELD)
            ps = [str(BigInt.from_uint256(el).as_long()) for el in self.public_signals]
            j = json.dumps(ps, indent=4)
            f = open(self.out_public_f, 'w')
@@ -446,10 +421,11 @@ class GrothProver(object):
            public_bin = np.concatenate((
                    np.asarray([self.public_signals.shape[0]], dtype=np.uint32),
                    np.reshape(self.public_signals,(-1))))
-           writeU256CircuitFile_h(public_bin, self.out_public_f.encode("UTF-8"))
+           writeU256DataFile_h(public_bin, self.out_public_f.encode("UTF-8"))
 
+    def write_proof(self):
         if self.out_proof_f.endswith('.json'):
-           ZField.set_field(GrothProver.GroupIDX)
+           ZField.set_field(MOD_GROUP)
            # write proof file
            P = ECC.from_uint256(self.pi_a_eccf1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
            pi_a = [el.extend().as_str() for el in P]
@@ -465,20 +441,20 @@ class GrothProver(object):
            print(j, file=f)
            f.close()
         elif self.out_proof_f.endswith('.bin'):
-           self.pi_a_eccf1 = from_montgomeryN_h(np.reshape(self.pi_a_eccf1,(-1)), GrothProver.GroupIDX)
-           self.pi_b_eccf2 = from_montgomeryN_h(np.reshape(self.pi_b_eccf2,(-1)), GrothProver.GroupIDX)
-           self.pi_c_eccf1 = from_montgomeryN_h(np.reshape(self.pi_c_eccf1,(-1)), GrothProver.GroupIDX)
+           self.pi_a_eccf1 = from_montgomeryN_h(np.reshape(self.pi_a_eccf1,(-1)), MOD_GROUP)
+           self.pi_b_eccf2 = from_montgomeryN_h(np.reshape(self.pi_b_eccf2,(-1)), MOD_GROUP)
+           self.pi_c_eccf1 = from_montgomeryN_h(np.reshape(self.pi_c_eccf1,(-1)), MOD_GROUP)
            proof_bin = np.concatenate((
                     self.pi_a_eccf1, 
                     self.pi_b_eccf2,
                     self.pi_c_eccf1))
-           writeU256CircuitFile_h(proof_bin, self.out_public_f.encode("UTF-8"))
+           writeU256DataFile_h(proof_bin, self.out_public_f.encode("UTF-8"))
                
 
     def calculateH(self, d1, d2, d3):
-        ZField.set_field(GrothProver.FieldIDX)
-        m = np.int32(self.vk_proof['domainSize'])
-        nVars = self.nVars
+        ZField.set_field(MOD_FIELD)
+        m = np.int32(self.pk['domainSize'])
+        nVars = self.pk['nVars']
         self.t_P = []
 
         if use_pycusnarks and self.accel:
@@ -495,9 +471,9 @@ class GrothProver(object):
           # Convert witness to montgomery in zpoly_maddm_h
           #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
           reduce_coeff = 0
-          polA_T = mpoly_eval_h(self.witness_scl_u256,self.polsA_sps_u256, reduce_coeff, m, nVars-1, pidx)
-          polB_T = mpoly_eval_h(self.witness_scl_u256,self.polsB_sps_u256, reduce_coeff, m, nVars-1, pidx)
-          polC_T = mpoly_eval_h(self.witness_scl_u256,self.polsC_sps_u256, reduce_coeff, m, nVars-1, pidx)
+          polA_T = mpoly_eval_h(self.witness_scl,self.pk['polsA'], reduce_coeff, m, nVars-1, pidx)
+          polB_T = mpoly_eval_h(self.witness_scl,self.pk['polsB'], reduce_coeff, m, nVars-1, pidx)
+          polC_T = mpoly_eval_h(self.witness_scl,self.pk['polsC'], reduce_coeff, m, nVars-1, pidx)
           end = time.time()
           self.t_P.append(end-start)
           end_h = time.time()
@@ -567,9 +543,9 @@ class GrothProver(object):
           # polA_T[0] = polA_t[0] + (witness[2] * polsA[2]['0'])
   
   
-          polA_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polA_T] + self.polsA_sps[:nVars]))
-          polB_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polB_T] + self.polsB_sps[:nVars]))
-          polC_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polC_T] + self.polsC_sps[:nVars]))
+          polA_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polA_T] + self.pk['polsA'][:nVars]))
+          polB_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polB_T] + self.pk['polsB'][:nVars]))
+          polC_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polC_T] + self.pk['polsC'][:nVars]))
   
           polA_T = polA_T.expand_to_degree(nVars-1)
           polB_T = polB_T.expand_to_degree(nVars-1)
@@ -629,15 +605,13 @@ if __name__ == "__main__":
     witness_f=DEFAULT_WITNESS_LOC
     proving_key_f = DEFAULT_PROVING_KEY_LOC
 
-    G = GrothProver(proving_key_f, inrand=True)
+    G = GrothProver(proving_key_f)
     for i in range(1):
-      t1,t2,t3 = G.gen_proof(witness_f)
+      t1,t2,t3 = G.proof(witness_f)
       t.append(np.concatenate((t1,t2,t3)))
       print(t[-1])
     print(t)
      
-    G.write_proof()
-
 
 """  
    t:

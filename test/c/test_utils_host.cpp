@@ -9012,7 +9012,7 @@ void test_gen_roots(uint32_t nbits)
 
   field_roots_compute_h(roots,nbits);
 
-  writeU256CircuitFile_h(roots, roots_1M_filename, nsamples);
+  writeU256DataFile_h(roots, roots_1M_filename, nsamples);
 }
 
 

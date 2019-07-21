@@ -111,7 +111,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
 
      return result_snarks_complete, t
  
-def ec_sc1mul_cuda(pysnark, vector, fidx, ex2=False, premul=False ):
+def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False ):
     kernel_params={}
     kernel_config={}
    
@@ -558,10 +558,20 @@ def zpoly_mad_cuda(pysnark, vectors, fidx):
 def get_shfl_blockD(nsamples):
    minb = 32
    maxb = 256
-   blockD = [minb]
-   rsamples = math.ceil(nsamples/minb)
+   if nsamples > 128:
+     blockD = [256] 
+   elif nsamples > 64:
+     blockD = [128] 
+   elif nsamples > 32:
+     blockD = [64] 
+   else:
+     blockD = [32] 
+
+   rsamples = math.ceil(nsamples/blockD[0])
    while rsamples > maxb:
       blockD.append(maxb)
+      rsamples = rsamples/maxb
+
    lastb = max(math.ceil(math.log2(rsamples)),5)
    blockD.append(1<<lastb)
    blockD.sort()
