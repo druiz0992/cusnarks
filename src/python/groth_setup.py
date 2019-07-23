@@ -1,5 +1,3 @@
-#!/usr/bin/python
- 
 """
 /*
     Copyright 2018 0kims association.
@@ -78,7 +76,7 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None):
  
         if seed is not None:
           self.seed = seed
@@ -117,15 +115,23 @@ class GrothSetup(object):
         self.out_circuit_f = out_circuit_f
         self.out_circuit_format = out_circuit_format
         self.in_circuit_format = FMT_EXT
-        self.alfabeta_f = '../../circuits/alfabeta.json'
+        if keep_f is None:
+            print ("Repo directory needs to be provided\n", file=self.log_f)
+            sys.exit(1)
+
+        self.keep_f = gen_reponame(keep_f)
+        self.log_f = open(self.keep_f + 'log', 'w')
+        self.alfabeta_f = self.keep_f + 'alfabeta.json'
+        copy_input_files([in_circuit_f, test_f], self.keep_f)
         #self.worker = [mp.Pool(processes=1, maxtasksperchild=1) for p in range(5)]
         self.worker = mp.Pool(processes=mp.cpu_count()-1, maxtasksperchild=1) 
 
         if self.in_circuit_f is not None:
            self.circuitRead()
         else:
-           print ("Required input circuit\n")
-           sys.exit(0)
+           print ("Required input circuit\n", file=self.log_f)
+           self.log_f.flush()
+           sys.exit(1)
 
     def circuitRead(self):
         # cir Json to u256
@@ -151,11 +157,12 @@ class GrothSetup(object):
           elif mode == "alfabeta_12":
              circuit_file = self.in_circuit_f
           else:
-             print("To launch snarkjs, input circuit needs to be a json file and format cannot be Montgomery")
+             print("To launch snarkjs, input circuit needs to be a json file and format cannot be Montgomery", file=self.log_f)
+             self.log_f.flush()
              return
         
-          snarkjs['pk_f'] = '../../circuits/tmp_pk_f.json'
-          snarkjs['vk_f'] = '../../circuits/tmp_vk_f.json'
+          snarkjs['pk_f'] = self.keep_f + 'tmp_pk_f.json'
+          snarkjs['vk_f'] = self.keep_f + 'tmp_vk_f.json'
 
           if mode=="alfabeta_12":
             alfabeta_command = "--fs"
@@ -202,14 +209,15 @@ class GrothSetup(object):
 
         self.write_pk()
         self.write_vk()
+        copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
         snarkjs_resuts = self.test_results()
 
         return
    
     def create_correct_pkjson(self): 
           #Get pk json
-          test_pk_f = self.out_pk_f
-          test_vk_f = self.out_vk_f
+          test_pk_f = self.keep + self.out_pk_f
+          test_vk_f = self.keep + self.out_vk_f
           if self.out_pk_f.endswith('.bin')  or  \
               self.out_k_binformat != FMT_EXT or \
               self.out_k_ecformat != EC_T_AFFINE:
@@ -563,7 +571,8 @@ class GrothSetup(object):
          writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
 
        else :
-         print ("No valid proving key file provided")
+         print ("No valid proving key file provided", file=self.log_f)
+         self.log_f.flush()
          return
 
         
@@ -627,8 +636,9 @@ class GrothSetup(object):
       return vk_dict
 
     def _vars_to_vkbin(self):
-      print("Verifying Key can only be saved as .json\n")
-      sys.exit(0)
+      print("Verifying Key can only be saved as .json\n", file=self.log_f)
+      self.log_f.flush()
+      sys.exit(1)
       vk_bin=None
       return vk_bin
 

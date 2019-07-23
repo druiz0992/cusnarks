@@ -1,5 +1,3 @@
-#!/usr/bin/python
- 
 """
 /*
     Copyright 2018 0kims association.
@@ -84,7 +82,7 @@ class GrothProver(object):
     
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',  out_proof_f = DEFAULT_PROOF_LOC, out_public_f = DEFAULT_PUBLIC_LOC,
                  out_pk_f=None, out_pk_format=FMT_MONT,
-                 out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, benchmark_f=None, seed=None, snarkjs=None, accel = True):
+                 out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, benchmark_f=None, seed=None, snarkjs=None, accel = True, verify_en=0, keep_f=None):
 
         self.accel = accel
 
@@ -128,6 +126,13 @@ class GrothProver(object):
         self.public_signals = None
         self.witness_f = None
         self.snarkjs = snarkjs
+        self.verify_en = verify_en
+        if keep_f is None:
+            print ("Repo directory needs to be provided\n")
+            sys.exit(1)
+        self.keep_f = gen_reponame(keep_f)
+        self.log_f = open(self.keep_f + 'log', 'w')
+        copy_input_files([proving_key_f, verification_key_f], self.keep_f)
 
         #self.worker = [mp.Pool(processes=1) for p in range(5)]
         self.worker = mp.Pool(processes=mp.cpu_count()-1, maxtasksperchild=1) 
@@ -163,8 +168,9 @@ class GrothProver(object):
            self.witness_scl = [BigInt(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
            f.close()
        else:
-          print("File doesn't exist")
-          assert False
+          print("File doesn't exist", file=self.log_f)
+          self.log_f.flush()
+          os.exit(1)
        
     def load_pkdata(self):
        if use_pycusnarks and self.accel and self.proving_key_f.endswith('npz'):
@@ -211,14 +217,18 @@ class GrothProver(object):
 
 
     def proof(self, witness_f):
+      copy_input_files([witness_f], self.keep_f)
       self.witness_f = witness_f
       t1, t2, t3 = self.gen_proof()
       self.write_pdata()
       self.write_proof()
+      copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f],self.keep_f)
       snarkjs_results = self.test_results()
 
     def test_results(self):
       proof_r = True
+      snarkjs = {}
+      snarkjs['verify'] = 0
       if self.test_f is not None:
         # Write rand json
         randout_dict={}
@@ -233,15 +243,16 @@ class GrothProver(object):
         pd_r = pysnarks_compare(self.out_public_f, snarkjs['pd_f'], None, 0)
         proof_r = p_r and pd_r
 
-      snarkjs = self.launch_snarkjs("verify")
+      if self.verify_en:
+        snarkjs = self.launch_snarkjs("verify")
 
       return snarkjs['verify']==0, proof_r
 
     def launch_snarkjs(self, mode):
         snarkjs = {}
         if mode=="proof" :
-          snarkjs['p_f'] = '../../circuits/tmp_p_f.json'
-          snarkjs['pd_f'] = '../../circuits/tmp_pd_f.json'
+          snarkjs['p_f'] = self.keep_f + 'tmp_p_f.json'
+          snarkjs['pd_f'] = self.keep_f + 'tmp_pd_f.json'
           # snarkjs setup is launched with circuit.json, format extended. Convert input file if necessary
           if self.witness_f.endswith('.json') and self.proving_key_f.endswith('.json') and self.pk['k_binformat']==FMT_EXT :
              witness_file = self.witness_f
@@ -253,14 +264,16 @@ class GrothProver(object):
             else: 
                witness_file = self.witness_f
                proving_key_file = self.proving_key_f.replace('.json','_cpy.json')
+            proving_key_file = keep_f + proving_key_file
             pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk, self.worker)
             pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
             f = open(proving_key_file, 'w')
             print(pk_json, file=f)
             f.close()
           else:
-            printf("Witness file needs to be .json\n")
-            sys.exit(0)
+            print("Witness file needs to be .json\n", file=self.log_f)
+            self.log_f.flush()
+            sys.exit(1)
 
           if self.test_f is not None:
              debug_command = "--d"
@@ -277,7 +290,9 @@ class GrothProver(object):
           if self.verification_key_f is not None and self.verification_key_f.endswith('.json') :
              verification_key_file = self.verification_key_f
           else :
-             print("To launch snarkjs, verifiation filen needs to be json file")
+             print("To launch snarkjs, verification filen needs to be json file", file=self.log_f)
+              self.log_f.flush()
+              os.exit(1)
         
           snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
        
