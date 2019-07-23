@@ -355,8 +355,8 @@ void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_
   uint32_t n_zcoeff;
   uint32_t scl[NWORDS_256BIT];
   uint32_t i,j;
-  uint32_t *zcoeff_v_in, *zcoeff_v_out, zcoeff_d;
-  uint32_t prev_n_zcoeff = 0, accum_n_zcoeff;
+  uint32_t zcoeff_v_in[NWORDS_256BIT], *zcoeff_v_out, zcoeff_d;
+  uint32_t prev_n_zcoeff = 0, accum_n_zcoeff=0;
 
   /*
   printf("N zpoly: %d\n",n_zpoly);
@@ -370,10 +370,13 @@ void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_
     printf("Out Scalar : \n");
     printU256Number(scl);
     */
-    
-    accum_n_zcoeff = pin[1+i];
-    n_zcoeff = accum_n_zcoeff - prev_n_zcoeff;
-    prev_n_zcoeff = accum_n_zcoeff;
+    n_zcoeff = pin[1+i];
+    accum_n_zcoeff += n_zcoeff;   
+    //prev_n_zcoeff = n_zcoeff;
+ 
+    //accum_n_zcoeff = pin[1+i];
+    //n_zcoeff = accum_n_zcoeff - prev_n_zcoeff;
+    //prev_n_zcoeff = accum_n_zcoeff;
     zcoeff_v_offset = zcoeff_d_offset + n_zcoeff;
 
     /*
@@ -387,7 +390,7 @@ void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_
     
     for (j=0; j< n_zcoeff; j++){
        zcoeff_d = pin[zcoeff_d_offset+j];
-       zcoeff_v_in = &pin[zcoeff_v_offset+j*NWORDS_256BIT];
+       //memcpy(zcoeff_v_in , &pin[zcoeff_v_offset+j*NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
        zcoeff_v_out = &pout[zcoeff_d*NWORDS_256BIT];
        /*
        if ( ((i<5) || (i > last_idx-5)) && ((j<5) || (j>n_zcoeff-5))){
@@ -395,7 +398,8 @@ void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_
          printU256Number(zcoeff_v_in);
        }
        */
-       montmult_h(zcoeff_v_in, zcoeff_v_in, scl, pidx);
+       //printf("%u, %u, %u, %u, %u, %u\n",i,j,zcoeff_d, n_zcoeff, zcoeff_v_offset, zcoeff_d_offset);
+       montmult_h(zcoeff_v_in, &pin[zcoeff_v_offset+j*NWORDS_256BIT], scl, pidx);
        if(reduce_coeff){
          to_montgomery_h(zcoeff_v_in, zcoeff_v_in, pidx);
        }

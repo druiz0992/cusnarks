@@ -106,17 +106,23 @@ def json_to_list(data):
 def pysnarks_compare(f1_str, f2_str, labels, npublic):
      f1 = open(f1_str,'r')
      djson = json.load(f1)
-     d1 = json_to_dict(djson, labels)
+     if isinstance(djson,dict):
+       d1 = json_to_dict(djson, labels)
+     else:
+       d1 = json_to_list(djson)
      f1.close()
 
      f2 = open(f2_str,'r')
      djson = json.load(f2)
-     d2 = json_to_dict(djson, labels)
+     if isinstance(djson,dict):
+       d2 = json_to_dict(djson, labels)
+     else:
+       d2 = json_to_list(djson)
      f2.close()
      
      djson = None
 
-     if 'C' in labels:
+     if labels is not None and 'C' in labels:
         d1['C'] = d1['C'][npublic+1:]
         d2['C'] = d2['C'][npublic+1:]
 
@@ -154,7 +160,7 @@ def getCircuit():
     return cir
 
 
-def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
+def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format, worker):
         """
           Converts from circom .json output file to binary format required to 
             calculate snarks setup. Only the following entries are used:
@@ -226,21 +232,22 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
         if 'cirformat' in cir_data:
             tmp_in_circuit_format = cir_data['cirformat']
 
-        w1 = mp.Pool(processes=1)
-        w2 = mp.Pool(processes=1)
-        w3 = mp.Pool(processes=1)
+        #w1 = mp.Pool(processes=1)
+        #w2 = mp.Pool(processes=1)
+        #w3 = mp.Pool(processes=1)
 
-        r1 = w1.apply_async(cirjson_to_r1cs, args = (0,tmp_in_circuit_format, out_circuit_format, cir_data))
-        r2 = w2.apply_async(cirjson_to_r1cs, args=(1,tmp_in_circuit_format, out_circuit_format, cir_data))
-        r3 = w3.apply_async(cirjson_to_r1cs, args = (2,tmp_in_circuit_format, out_circuit_format, cir_data))
-
+        r1 = worker.apply_async(cirjson_to_r1cs, args = (0,tmp_in_circuit_format, out_circuit_format, cir_data))
+        r2 = worker.apply_async(cirjson_to_r1cs, args=(1,tmp_in_circuit_format, out_circuit_format, cir_data))
+        r3 = worker.apply_async(cirjson_to_r1cs, args = (2,tmp_in_circuit_format, out_circuit_format, cir_data))
+        #worker.close()
+        #worker.join()
         R1CSA_len, R1CSA_u256 = r1.get()
         R1CSB_len, R1CSB_u256 = r2.get()
         R1CSC_len, R1CSC_u256 = r3.get()
 
-        w1.terminate()
-        w2.terminate()
-        w3.terminate()
+        #w1.terminate()
+        #w2.terminate()
+        #w3.terminate()
 
         #R1CSA_len, R1CSA_u256 = cirjson_to_r1cs(0,tmp_in_circuit_format, out_circuit_format, cir_data)
         #R1CSB_len, R1CSB_u256 = cirjson_to_r1cs(1,tmp_in_circuit_format, out_circuit_format, cir_data)
@@ -339,6 +346,17 @@ def cirbin_to_vars(self, ciru256_data):
 
     
     
+def cirr1cs_to_mpoly(r1cs, cir_header, fmat, extend):
+        to_mont = 0
+        ZField.set_field(MOD_FIELD)
+        pidx = ZField.get_field()
+        if fmat == ZUtils.FEXT:
+           to_mont = 1
+
+        poly_len = r1cs_to_mpoly_len_h(r1cs,cir_header, extend)
+        pols = r1cs_to_mpoly_h(poly_len, r1cs, cir_header, to_mont, pidx, extend)
+        
+        return pols
 def getPK():
       pk = {}
 
@@ -380,6 +398,7 @@ def getPK():
       return pk
 
 def mpoly_to_json(mpoly, reduced):
+     ZField.set_field(MOD_FIELD)
      spoly = mpoly_to_sparseu256_h(mpoly)
      if reduced:
           P = [{k : str(BigInt.from_uint256(p[k]).as_long()) for  k in p.keys()} for p in spoly]
@@ -388,10 +407,11 @@ def mpoly_to_json(mpoly, reduced):
      return P
 
 def ecp_to_json(ecp, out_ec, b_reduce, ec2):
+        ZField.set_field(MOD_GROUP)
         if ec2:
-           P = ECC.from_uint256(ecp.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True)
+           P = ECC.from_uint256(ecp.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)
         else:
-           P = ECC.from_uint256(ecp, in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)
+           P = ECC.from_uint256(np.reshape(ecp,(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)
 
         if not b_reduce:
            p = [x.extend().as_str() for x in P]
@@ -399,7 +419,7 @@ def ecp_to_json(ecp, out_ec, b_reduce, ec2):
            p = [x.as_str() for x in P]
 
         return p
-def pkvars_to_json(out_bin, out_ec, pk):
+def pkvars_to_json(out_bin, out_ec, pk, worker):
         pk_dict= {}
         pk_dict['ftype'] = "PK_FILE"
         pk_dict['protocol'] = "groth"
@@ -429,67 +449,69 @@ def pkvars_to_json(out_bin, out_ec, pk):
 
         ZField.set_field(MOD_FIELD)
 
-        w1 = mp.Pool(processes=1)
-        w2 = mp.Pool(processes=1)
-        w3 = mp.Pool(processes=1)
+        #w1 = mp.Pool(processes=1)
+        #w2 = mp.Pool(processes=1)
+        #w3 = mp.Pool(processes=1)
 
         if out_bin == FMT_EXT:
-          r1 = w1.apply_async(mpoly_to_json, args=(pk['polsA'], False))
-          r2 = w2.apply_async(mpoly_to_json, args=(pk['polsB'], False))
-          r3 = w3.apply_async(mpoly_to_json, args=(pk['polsC'], False))
+          r1 = worker.apply_async(mpoly_to_json, args=(pk['polsA'], False))
+          r2 = worker.apply_async(mpoly_to_json, args=(pk['polsB'], False))
+          r3 = worker.apply_async(mpoly_to_json, args=(pk['polsC'], False))
         else:
-          r1 = w1.apply_async(mpoly_to_json, args=(pk['polsA'], True))
-          r2 = w2.apply_async(mpoly_to_json, args=(pk['polsB'], True))
-          r3 = w3.apply_async(mpoly_to_json, args=(pk['polsC'], True))
+          r1 = worker.apply_async(mpoly_to_json, args=(pk['polsA'], True))
+          r2 = worker.apply_async(mpoly_to_json, args=(pk['polsB'], True))
+          r3 = worker.apply_async(mpoly_to_json, args=(pk['polsC'], True))
        
+        #worker.close()
         pk_dict['polsA'] = r1.get()
         pk_dict['polsB'] = r2.get()
         pk_dict['polsC'] = r3.get()
 
-        w1.terminate()
-        w2.terminate()
-        w3.terminate()
+        #w1.terminate()
+        #w2.terminate()
+        #w3.terminate()
+
+
+        #w1 = mp.Pool(processes=1)
+        #w2 = mp.Pool(processes=1)
+        #w3 = mp.Pool(processes=1)
+        #w4 = mp.Pool(processes=1)
+        #w5 = mp.Pool(processes=1)
+
 
         ZField.set_field(MOD_GROUP)
+        r1 = worker.apply_async(ecp_to_json, args=(pk['A'], out_ec, b_reduce, False))
+        r2 = worker.apply_async(ecp_to_json, args=(pk['B1'], out_ec, b_reduce, False))
+        r3 = worker.apply_async(ecp_to_json, args=(pk['B2'], out_ec, b_reduce, True))
+        r4 = worker.apply_async(ecp_to_json, args=(pk['C'], out_ec, b_reduce, False))
+        r5 = worker.apply_async(ecp_to_json, args=(pk['hExps'], out_ec, b_reduce, False))
 
-        w1 = mp.Pool(processes=1)
-        w2 = mp.Pool(processes=1)
-        w3 = mp.Pool(processes=1)
-        w4 = mp.Pool(processes=1)
-        w5 = mp.Pool(processes=1)
-
-
-        r1 = w1.apply_async(ecp_to_json, args=(pk['A'], out_ec, b_reduce, False))
-        r2 = w2.apply_async(ecp_to_json, args=(pk['B1'], out_ec, b_reduce, False))
-        r3 = w3.apply_async(ecp_to_json, args=(pk['B2'], out_ec, b_reduce, True))
-        r4 = w4.apply_async(ecp_to_json, args=(pk['C'], out_ec, b_reduce, False))
-        r5 = w5.apply_async(ecp_to_json, args=(pk['hExps'], out_ec, b_reduce, False))
-
+        #worker.close()
         pk_dict['A'] = r1.get()
         pk_dict['B1'] = r2.get()
         pk_dict['B2'] = r3.get()
         pk_dict['C'] = r4.get()
         pk_dict['hExps'] = r5.get()
 
-        w1.terminate()
-        w2.terminate()
-        w3.terminate()
-        w4.terminate()
-        w5.terminate()
+        #w1.terminate()
+        #w2.terminate()
+        #w3.terminate()
+        #w4.terminate()
+        #w5.terminate()
 
         if not b_reduce:
-          pk_dict['vk_alfa_1'] = ECC.from_uint256(pk['alfa_1'], in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)[0].extend().as_str()
-          pk_dict['vk_beta_1'] = ECC.from_uint256(pk['beta_1'], in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)[0].extend().as_str()
-          pk_dict['vk_delta_1'] = ECC.from_uint256(pk['delta_1'], in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)[0].extend().as_str()
-          pk_dict['vk_beta_2'] = ECC.from_uint256(pk['beta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True)[0].extend().as_str()
-          pk_dict['vk_delta_2'] = ECC.from_uint256(pk['delta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True)[0].extend().as_str()
+          pk_dict['vk_alfa_1'] = ECC.from_uint256(np.reshape(pk['alfa_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].extend().as_str()
+          pk_dict['vk_beta_1'] = ECC.from_uint256(np.reshape(pk['beta_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].extend().as_str()
+          pk_dict['vk_delta_1'] = ECC.from_uint256(np.reshape(pk['delta_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].extend().as_str()
+          pk_dict['vk_beta_2'] = ECC.from_uint256(np.reshape(pk['beta_2'],(-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)[0].extend().as_str()
+          pk_dict['vk_delta_2'] = ECC.from_uint256(np.reshape(pk['delta_2'],(-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)[0].extend().as_str()
 
         else:
-          pk_dict['vk_alfa_1'] = ECC.from_uint256(pk['alfa_1'], in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)[0].as_str()
-          pk_dict['vk_beta_1'] = ECC.from_uint256(pk['beta_1'], in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)[0].as_str()
-          pk_dict['vk_delta_1'] = ECC.from_uint256(pk['delta_1'], in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True)[0].as_str()
-          pk_dict['vk_beta_2'] = ECC.from_uint256(pk['beta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True)[0].as_str()
-          pk_dict['vk_delta_2'] = ECC.from_uint256(pk['delta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True)[0].as_str()
+          pk_dict['vk_alfa_1'] = ECC.from_uint256(np.reshape(pk['alfa_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].as_str()
+          pk_dict['vk_beta_1'] = ECC.from_uint256(np.reshape(pk['beta_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].as_str()
+          pk_dict['vk_delta_1'] = ECC.from_uint256(np.reshape(pk['delta_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].as_str()
+          pk_dict['vk_beta_2'] = ECC.from_uint256(np.reshape(pk['beta_2'],(-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)[0].as_str()
+          pk_dict['vk_delta_2'] = ECC.from_uint256(np.reshape(pk['delta_2'],(-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)[0].as_str()
 
 
         return pk_dict
@@ -575,7 +597,7 @@ def pkjson_to_pyspol(inp):
 
    return P
 
-def pkjson_to_pyvars(pk_proof):
+def pkjson_to_pyvars(pk_proof, worker):
         # Init witness to Field El.
         # TODO :  I am assuming that all field el are FielElExt (witness_scl, polsA_sps, polsB_sps, polsC_sps, alfa1...
         # Witness is initialized a BitInt as it will operate on different fields
@@ -591,29 +613,30 @@ def pkjson_to_pyvars(pk_proof):
         delta2 = [Z2FieldEl(el) for el in pk_proof['vk_delta_2']]
         pk['delta_2'] = ECC_F2(delta2)
 
-        w1 = mp.Pool(processes=1)
-        w2 = mp.Pool(processes=1)
-        w3 = mp.Pool(processes=1)
-        w4 = mp.Pool(processes=1)
-        w5 = mp.Pool(processes=1)
+        #w1 = mp.Pool(processes=1)
+        #w2 = mp.Pool(processes=1)
+        #w3 = mp.Pool(processes=1)
+        #w4 = mp.Pool(processes=1)
+        #w5 = mp.Pool(processes=1)
 
-        r1     = w1.apply_async(pkjson_to_pyec, args=(pk_proof['A'], False))
-        r2     = w2.apply_async(pkjson_to_pyec, args=(pk_proof['B1'], False))
-        r3     = w3.apply_async(pkjson_to_pyec, args=(pk_proof['B2'], True))
-        r4     = w4.apply_async(pkjson_to_pyec, args=(pk_proof['C'], False))
-        r5     = w5.apply_async(pkjson_to_pyec, args=(pk_proof['hExps'], False))
+        r1     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['A'], False))
+        r2     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['B1'], False))
+        r3     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['B2'], True))
+        r4     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['C'], False))
+        r5     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['hExps'], False))
 
+        #worker.close()
         pk['A']     = r1.get()
         pk['B1']    = r2.get()
         pk['B2']    = r3.get()
         pk['C']     = r4.get()
         pk['hExps'] = r5.get()
 
-        w1.terminate()
-        w2.terminate()
-        w3.terminate()
-        w4.terminate()
-        w5.terminate()
+        #w1.terminate()
+        #w2.terminate()
+        #w3.terminate()
+        #w4.terminate()
+        #w5.terminate()
         
 
         ZField.set_field(MOD_FIELD)
@@ -629,11 +652,13 @@ def pkjson_to_pyvars(pk_proof):
 
 
 def pkpyec_to_vars(ecp, remove_last, as_reduced):
+     ZField.set_field(MOD_GROUP)
      P = ECC.as_uint256(ecp, remove_last, as_reduced)
 
      return P
 
 def pkpyspol_to_vars(spolp):
+       ZField.set_field(MOD_FIELD)
        pols_l = []
        pols_p = []
        for pol in spolp:
@@ -641,13 +666,14 @@ def pkpyspol_to_vars(spolp):
          pols_l.append(l)
          pols_p.append(p)
        P = np.asarray(np.concatenate((np.asarray([len(pols_l)]),
-                                    np.concatenate((np.cumsum(pols_l),np.concatenate(pols_p))))),dtype=np.uint32)
+                                    #np.concatenate((np.cumsum(pols_l),np.concatenate(pols_p))))),dtype=np.uint32)
+                                    np.concatenate((pols_l,np.concatenate(pols_p))))),dtype=np.uint32)
 
        return P
 
 
-def pkjson_to_vars(pk_proof, proving_key_f):
-       pk = pkjson_to_pyvars(pk_proof)
+def pkjson_to_vars(pk_proof, proving_key_f, worker):
+       pk = pkjson_to_pyvars(pk_proof, worker)
 
        ZField.set_field(MOD_GROUP)
        pk['alfa_1'] = np.reshape(pkpyec_to_vars(pk['alfa_1'],True, True),-1)
@@ -656,30 +682,31 @@ def pkjson_to_vars(pk_proof, proving_key_f):
        pk['beta_2'] = np.reshape(pkpyec_to_vars(pk['beta_2'],True, True),-1)
        pk['delta_2'] = np.reshape(pkpyec_to_vars(pk['delta_2'],True, True),-1)
 
-       w1 = mp.Pool(processes=1)
-       w2 = mp.Pool(processes=1)
-       w3 = mp.Pool(processes=1)
-       w4 = mp.Pool(processes=1)
-       w5 = mp.Pool(processes=1)
+       #w1 = mp.Pool(processes=1)
+       #w2 = mp.Pool(processes=1)
+       #w3 = mp.Pool(processes=1)
+       #w4 = mp.Pool(processes=1)
+       #w5 = mp.Pool(processes=1)
 
-       r1 = w1.apply_async(pkpyec_to_vars, args=(pk['A'],True, True))
-       r2 = w2.apply_async(pkpyec_to_vars, args=(pk['B1'],True, True))
-       r3 = w3.apply_async(pkpyec_to_vars, args=(pk['B2'],True, True))
-       r4 = w4.apply_async(pkpyec_to_vars, args=(pk['C'],True, True))
-       r5 = w5.apply_async(pkpyec_to_vars, args=(pk['hExps'],True, True))
+       r1 = worker.apply_async(pkpyec_to_vars, args=(pk['A'],True, True))
+       r2 = worker.apply_async(pkpyec_to_vars, args=(pk['B1'],True, True))
+       r3 = worker.apply_async(pkpyec_to_vars, args=(pk['B2'],True, True))
+       r4 = worker.apply_async(pkpyec_to_vars, args=(pk['C'],True, True))
+       r5 = worker.apply_async(pkpyec_to_vars, args=(pk['hExps'],True, True))
        
-       pk['A'] = r1.get()
-       pk['B1'] = r2.get()
-       pk['B2'] = r3.get()
-       pk['C']  = r4.get()
-       pk['hExps'] = r5.get()
+       #worker.close()
+       pk['A'] = np.reshape(r1.get(),-1)
+       pk['B1'] = np.reshape(r2.get(),-1)
+       pk['B2'] = np.reshape(r3.get(),-1)
+       pk['C']  = np.reshape(r4.get(),-1)
+       pk['hExps'] = np.reshape(r5.get(),-1)
 
 
-       w1.terminate()
-       w2.terminate()
-       w3.terminate()
-       w4.terminate()
-       w5.terminate() 
+       #w1.terminate()
+       #w2.terminate()
+       #w3.terminate()
+       #w4.terminate()
+       #w5.terminate() 
 
        ZField.set_field(MOD_FIELD)
        
@@ -714,11 +741,11 @@ def pkjson_to_vars(pk_proof, proving_key_f):
        pk['polsA_nWords'] = np.uint32(pk['polsA'].shape[0])
        pk['polsB_nWords'] = np.uint32(pk['polsB'].shape[0])
        pk['polsC_nWords'] = np.uint32(pk['polsC'].shape[0])
-       pk['A_nWords'] =  np.uint32(pk['A'].shape[0] * NWORDS_256BIT )
-       pk['B1_nWords'] =  np.uint32(pk['B1'].shape[0] * NWORDS_256BIT )
-       pk['B2_nWords'] =  np.uint32(pk['B2'].shape[0] * NWORDS_256BIT )
-       pk['C_nWords'] =  np.uint32(pk['C'].shape[0] * NWORDS_256BIT )
-       pk['hExps_nWords'] =  np.uint32(pk['hExps'].shape[0] * NWORDS_256BIT )
+       pk['A_nWords'] =  np.uint32(pk['A'].shape[0] )
+       pk['B1_nWords'] =  np.uint32(pk['B1'].shape[0] )
+       pk['B2_nWords'] =  np.uint32(pk['B2'].shape[0] )
+       pk['C_nWords'] =  np.uint32(pk['C'].shape[0] )
+       pk['hExps_nWords'] =  np.uint32(pk['hExps'].shape[0] )
        pk['nWords'] =  np.uint32(PKBIN_H_N_OFFSET + 2*NWORDS_256BIT + 8 + \
                        pk['polsA_nWords'] + pk['polsB_nWords'] + \
                        pk['polsC_nWords'] + pk['A_nWords'] + \
@@ -742,9 +769,9 @@ def pkbin_to_vars(pk_bin):
           pk['domainBits'] = pk_bin[PKBIN_H_DOMAINBITS_OFFSET]
           pk['domainSize'] = pk_bin[PKBIN_H_DOMAINSIZE_OFFSET]
           offset_data = PKBIN_H_N_OFFSET
-          pk['field_r'] = pk_bin[offset_data]
+          pk['field_r'] = pk_bin[offset_data:offset_data+NWORDS_256BIT]
           offset_data += NWORDS_256BIT
-          pk['group_q'] = pk_bin[offset_data]
+          pk['group_q'] = pk_bin[offset_data:offset_data+NWORDS_256BIT]
           offset_data += NWORDS_256BIT
 
           pk['polsA_nWords'] = pk_bin[offset_data]
