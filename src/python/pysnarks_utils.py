@@ -46,10 +46,12 @@
 """
 import json,ast
 import os.path
+import os
 import numpy as np
 import time
 import sys
 import multiprocessing as mp
+from datetime import datetime
 
 from random import randint
 
@@ -834,4 +836,16 @@ def pkbin_to_vars(pk_bin):
           offset_data +=  pk['hExps_nWords']
 
           return pk
+
+def gen_reponame(repo_f):
+    now = datetime.now()
+    reponame = repot_f + now.strftime("%Y%m%d__$H%M%S")
+    if not os.path.exists(reponame):
+        os.makedirs(reponame)
+    return reponame
+
+def copy_input_files(file_list, dest):
+    for f in file_list:
+        if f is not None:
+           os.system('cp -f f ' +dest)
 

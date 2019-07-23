@@ -53,11 +53,17 @@ CUMODE_SETUP_PROOF  = 2
 
 def run():
     opt = {}
-    opt['input_circuit_f'] = '../../circuits/circuit.bin'
+    opt['data_f'] = '../../circuits/'
+    opt['input_circuit_f'] = 'circuit.bin'
+    opt['verification_key_f'] = 'verification_key.json'
+    opt['debug_f'] = 'toxic.json'
+    opt['witness_f'] = 'witness.json'
+    opt['proof_f'] = 'proof.json'
+    opt['public_data_f']= 'public.json'
+
     opt['output_circuit_f'] = None
     opt['output_circuit_format'] = FMT_MONT
-    opt['proving_key_f'] = '../../circuits/proving_key.bin'
-    opt['verification_key_f'] = '../../circuits/verification_key.json'
+    opt['proving_key_f'] = opt['data_f'] + 'proving_key.bin'
     opt['keys_format'] = FMT_MONT
     opt['charmander_f'] = '../../../charmander-circuit'
     opt['benchmark_f'] = '../../../charmander-circuit/test/compiled_circuits'
@@ -67,15 +73,12 @@ def run():
     opt['seed'] = None
     opt['snarkjs'] = '../../../snarkjs/cli.js'
     opt['debug'] = 0
-    opt['debug_f'] = '../../circuits/toxic.json'
-    opt['witness_f'] = '../../circuits/witness.json'
     opt['witness_format'] = FMT_EXT
-    opt['proof_f'] = '../../proof.json'
-    opt['public_data_f']= '../../public.json'
     opt['proof_format'] = FMT_EXT
     opt['public_data_format'] = FMT_EXT
     opt['out_proving_key_format'] = FMT_MONT
     opt['out_proving_key_f'] = None
+    opt['verify'] = 0
 
 
     parser = argparse.ArgumentParser(
@@ -169,6 +172,13 @@ def run():
     parser.add_argument(
        '-out_kf', '--out_proving_key_format', type=int, help=help_str, required=False)  
 
+    help_str = 'Run snarks proof verification. Default : ' + str(opt['verify'])
+    parser.add_argument(
+       '-v', '--verify', type=int, help=help_str, required=False)  
+
+    help_str = 'Default location to retrieve and write files. Default ' + opt['data_f'])
+    parser.add_argument(
+       '-df', '--data_folder', type=str, help=help_str, required=False)  
 
     args = parser.parse_args()
  
@@ -184,6 +194,14 @@ def run():
     if args.benchmark is not None:
         opt['benchmark_f'] = args.benchmark
 
+    if args.data_folder is not None:
+        opt['data_f'] = args.data_f
+        if not opt['data_f'].endswith('\\'):
+           opt['data_f'] = opt['data_f'] + '\\'
+    if not os.path.exists(opt['data_f'][:-1]):
+        os.makedirs(opt['data_f'][:-1])
+    opt['keep_f'] = opt['data_f']
+        
     if args.mode != "s" and args.mode != 'setup' and \
         args.mode != 'p' and args.mode != 'proof' and \
         args.mode != 'sp' and args.mode != 'setup_proof' :
@@ -194,7 +212,10 @@ def run():
         opt['proving_key_f'] = args.proving_key
 
     if args.verification_key is not None:
-        opt['verification_key_f'] = args.verification_key
+        if '//' in args.verification_key:
+           opt['verification_key_f'] = args.verification_key
+        else:
+           opt['verification_key_f'] = opt['data_f'] + args.verification_key
 
     if args.seed is not None:
          opt['seed'] = args.seed
@@ -202,8 +223,10 @@ def run():
     if args.snarkjs is not None:
          opt['snarkjs'] = args.snarkjs
 
-    if args.debug is 0:
+    if args.debug is 0 or args.debug is None:
          opt['debug_f'] = None
+    else:
+         opt['debug_f'] = opt['data_f'] + opt['debug_f']
 
 
     if args.mode == 's' or args.mode == 'setup' or   \
@@ -212,9 +235,15 @@ def run():
       opt['mode'] = CUMODE_SETUP
 
       if args.input_circuit is not None :
-        opt['input_circuit_f'] = args.input_circuit
+        if '//' in args.input_circuit:
+           opt['input_circuit_f'] = args.input_circuit
+        else:
+           opt['input_circuit_f'] = opt['data_f'] + args.input_circuit
 
-      opt['output_circuit_f'] = args.output_circuit
+      if '//' in args.output_circuit:
+         opt['output_circuit_f'] = args.output_circuit
+      else:
+         opt['output_circuit_f'] = opt['data_f'] + args.output_circuit
 
       if args.output_circuit_format is not None:
         opt['output_circuit_format'] = args.output_circuit_format
@@ -236,7 +265,7 @@ def run():
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
-                    snarkjs=opt['snarkjs'])
+                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
       
       GS.setup()
 
@@ -246,16 +275,25 @@ def run():
       opt['mode'] = CUMODE_PROOF
   
       if args.witness is not None:
-          opt['witness_f'] = args.witness
+        if '//' in args.witness:
+           opt['witness_f'] = args.witness
+        else:
+           opt['witness_f'] = opt['data_f'] + args.witness
 
       if args.witness_format is not None:
           opt['witness_format'] = args.witness_format
 
       if args.proof is not None:
-          opt['proof_f'] = args.proof
+          if '//' in args.proof:
+            opt['proof_f'] = args.proof
+          else:
+            opt['proof_f'] = opt['data_f'] + args.proof
    
       if args.public_data is not None:
-          opt['public_data_f'] = args.public_data
+          if '//' in args.public_data:
+             opt['public_data_f'] = args.public_data
+          else :
+             opt['public_data_f'] = opt['data_f'] + args.public_data
 
       if args.proof_format is not None:
          opt['proof_format'] = args.proof_format
@@ -268,12 +306,15 @@ def run():
 
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
+
+      if args.verify is not None:
+         opt['verify'] = args.verify
     
       GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'],
                       out_proof_f=opt['proof_f'], out_public_f=opt['public_data_f'],
                       out_proof_format=opt['proof_format'], out_public_format=['out_public_format'], test_f=opt['debug_f'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], accel=True )
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], accel=True, verify_en=opt['verify'], keep_f=opt['keep_f'] )
       
       GP.proof(opt['witness_f'])
 

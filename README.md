@@ -1,26 +1,88 @@
 # CUSNARKS Overview
-Optimized CUDA implementation of SNARK Groth setup and prover based on [snarkjs][] designed with the objective of computing proofs for up
-to 2^27 number of constraints very fast. Cusnarks is expected to work with [circom][] for the generation and compilation
-of circuits, and with [snarkjs][] for the computation of the trusted setup, witnesses and verification of the proof.
+Optimized CUDA implementation of SNARK setup and prover based on [snarkjs][] implementation from *Groth16*, designed with the objective of computing proofs for up to 2^27 constraints very fast. CUsnarks is expected to work with [circom][] for the generation and compilation
+of circuits, and with [snarkjs][] for the computation of parts ofr the trusted setup, witnesses and verification of the proof.
 
-Host side has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and setup scripts are launched. Computation intensive functionality on the host side has been written in C/C++. Cython is used to build wrappers around C functions so that they can be
+Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and setup scripts are launched. Computation intensive functionality on the host side has been written in C/C++. Cython is used to build wrappers around C functions so that they can be
 called from Python.
 
-Elliptic curve scalar multiplication and reduction and polynomial multiplication, the heaviest functionality in terms of 
-computation requirements has been implemented on the device side.
+Elliptic curve scalar multiplicationm multi-exponentiation and polynomial multiplication, the heaviest functionality in terms of 
+computation requirements, have been implemented to run on the GPU side.
 
 Two libraries are generated :
-1. *libcusnarks.so* : is the standard cusnarks shared library
-2. *pycusnarks.so* includes a cython wrapper so that it can be used from Python
+1. *libcusnarks.so* : Cusnarks shared library
+2. *pycusnarks.so* : Cusnarks shared library wrapped with Cython wrapper so that it can be used from Python
 
 ## Outline
+* [Installation][]
+* [Launching Cusnarks](#Launching-Cusnarks)
 * [Architecture][]
 * [Modules][]
 * [Installation][]
 * [Using Cusnarks][]
-* [Other Info][]
+* [Other Info](#Other-Info)
   
+## Installation
+1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called $CUSNARKS_HOME
 
+2. Ensure that all [dependencies][] are installed. 
+    - Python2.x/Python3.x
+        - Cython (0.26.1)
+        - numpy (1.16.4)
+        - future (0.17.1)
+    - g++ compiler
+    - nvcc compiler (Optional)
+    - snarkjs : https://github.com/iden3/snarkjs
+
+
+3. Build Cusnarks to generate shared libraries in $CUSNARKS_HOME/lib.
+
+```sh
+make build
+```
+
+4. Add $CUSNARKS_HOME/lib to LD_LIBRARY_PATH
+
+```sh
+export LD_LIBRARY_PATH=$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH
+```
+
+5. Generate required metadata
+
+```sh
+make scripts
+```
+
+6. Launch units tests (optional) -> Currently, most not working, but don't worry. Bugs are in the test :-))
+
+```sh
+make test
+```
+
+## Launching Cusnarks
+Launch setup and proof generation by running pysnarks.py. 
+
+```sh
+cd src/python
+python pysnarks.py -h
+```
+
+For example, to generate a trusted setup from a .json/.bin compiled circuit:
+
+```sh
+python pysnarks.py -m s -in_c <INPUT_CIRCUIT file> -pk <OUT_PROVING_KEY file> -vk <OUT_VERIFICATION_KEY file> -snarkjs <SNARKJS location>
+```
+Running the trusted setup, requires snarkjs being installed to compute parts of the verification key. By default, Cusnarks assumes that snarkjs is installed in $CUSNARKS_HOME/../snarkjs/. If this the case, you don't need to provide snarjks location in the command line.
+
+
+To generate a proof:
+```sh
+python pysnarks.py -m -pk <INPUT_PROVING_KEY file> -w <INPUT_WITNESS file file> -p >OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file>
+```
+
+Furthermore, if you want to generate a proof and verify the proof using snarkjs:
+```sh
+python pysnarks.py -m -pk <INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p >OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -v 1 -snarkjs <SNARKJS location>
+```
 ## Architecture
 
 Modules are divided into 4 categories depending on functionality:
@@ -35,33 +97,6 @@ Modules are divided into 4 categories depending on functionality:
 
 ![Architecture](doc/architecture.png)
 
-## Installation
-1. Download repository www.github.com/iden3/cusnarks.git
-
-2. Ensure that all [dependencies][] are installed. 
-
-3. Build libraries
-
-```sh
-make build
-```
-Libraries are stored in $CUSNARKS_HOME/lib
-
-4. Launch units tests (optional)
-
-```sh
-make test
-```
-Launches all unit tests (python and C) 
-
-5. Launch Groth prover instance
-
-```sh
-cd src/python
-python groth_protocol.py
-```
-
-Launches the computation of a proof for a default circuit and witness
 
 ## Using-Cusnarks
 
@@ -70,7 +105,7 @@ Launches the computation of a proof for a default circuit and witness
 ### Python
 
 
-## Other
+## Other Info
 ### Directory Structure
 * *build\*    : Object files
 * data\     : Auxiliary files (test circuits, precomputed roots of unity,...)
@@ -106,3 +141,4 @@ Launches the computation of a proof for a default circuit and witness
 [Installation]: #Installation
 [Using Cusnarks]: #Using-Cusnarks
 [Other Info]: #Other
+
