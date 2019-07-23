@@ -32,13 +32,16 @@ LINKFLAGS2=-L $(LIB_PATH)
 LDFLAGS2=-lm -lcusnarks
 
 CSRC = test_utils_host.cpp
+CSRC2 = gen_roots.cpp 
 
 NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
 CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
 
 
 OBJ= $(CSRC:.cpp=.o)
+OBJ2= $(CSRC2:.cpp=.o)
 TEST= $(subst .cpp,,$(CSRC))
+SCRIPTS= $(subst .cpp,,$(CSRC2))
 
 clean:
 	rm -f *.o 
@@ -46,6 +49,12 @@ clean:
 ##################################################
 test: $(OBJ)
 	@for i in $(TEST); do \
+	  ./$$i; \
+	  echo ""; \
+	done
+
+scripts: $(OBJ)
+	@for i in $(SCRIPTS); do \
 	  ./$$i; \
 	  echo ""; \
 	done

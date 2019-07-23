@@ -72,6 +72,7 @@ AUX_INCLUDES = $(PCG_INCLUDE)
 
 SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
+SCRIPTS_SUBDIRS := $(CTEST_PATH)
 AUX_SUBDIRS := $(aux_dirs)
 AUX_REPOS := $(aux_repos)
 
@@ -132,6 +133,11 @@ test:
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
+scripts:   
+	@for i in $(SCRIPTS_SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) scripts); done
+
 clean:
 	@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
 	echo "clearing all in $$i..."; \
@@ -140,4 +146,4 @@ clean:
 cubin:
 	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
 
-.PHONY:	test build clean
+.PHONY:	scripts test build clean

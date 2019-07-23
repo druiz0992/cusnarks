@@ -116,15 +116,28 @@ class ECC(object):
             return
         elif type(p) is list:
             if len(p) == 2 and isinstance(p[ECC.X], ZFieldElRedc):
-               if isinstance(p[ECC.X], Z2FieldEl):
-                  p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]])]
+                  if p[ECC.X] == ECC.zero[ZUtils.FRDC] and p[ECC.Y] == ECC.one[ZUtils.FRDC] : 
+                      p = [p[ECC.X], p[ECC.Y], ECC.zero[ZUtils.FRDC]]
+                  else:
+                      p = [p[ECC.X], p[ECC.Y], ECC.one[ZUtils.FRDC]]
+            elif len(p) == 2 and isinstance(p[ECC.X], ZFieldElExt):
+                  if p[ECC.X] == ECC.zero[ZUtils.FEXT] and p[ECC.Y] == ECC.one[ZUtils.FEXT] : 
+                      p = [p[ECC.X], p[ECC.Y], ECC.zero[ZUtils.FEXT]]
+                  else:
+                      p = [p[ECC.X], p[ECC.Y], ECC.one[ZUtils.FEXT]]
+            elif len(p) == 2 and isinstance(p[ECC.X], Z2FieldEl):
+               if isinstance(p[ECC.X].P[0], ZFieldElRedc):
+                  if p[ECC.X] == Z2FieldEl([ECC.zero[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]]) and \
+                      p[ECC.Y] == Z2FieldEl([ECC.one[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]]):
+                    p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.zero[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]])]
+                  else:
+                    p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FRDC], ECC.zero[ZUtils.FRDC]])]
                else:
-                  p = [p[ECC.X], p[ECC.Y], ECC.one[Zutils.FRDC]]
-            elif len(p) == 2:
-               if isinstance(p[ECC.X], Z2FieldEl):
-                 p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]])]
-               else:
-                  p = [p[ECC.X], p[ECC.Y], ECC.one[ZUtils.FEXT]]
+                  if p[ECC.X] == Z2FieldEl([ECC.zero[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]]) and \
+                      p[ECC.Y] == Z2FieldEl([ECC.one[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]]):
+                    p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.zero[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]])]
+                  else:
+                    p = [p[ECC.X], p[ECC.Y], Z2FieldEl([ECC.one[ZUtils.FEXT], ECC.zero[ZUtils.FEXT]])]
             p_l = p
         elif isinstance(p,ECC):
             p_l = p.P
@@ -428,29 +441,37 @@ class ECC(object):
       return Pc
 
     @staticmethod
-    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False,ec2=False):
+    def from_uint256(x, in_ectype=0, out_ectype=0,reduced=False,ec2=False, remove_last = False):
         """
 
         :param x:
         :return:
         """
+        if remove_last:
+         last_idx=2
+        else:
+         last_idx = 3
+        
         if not ec2:
           if reduced:
-              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,last_idx))
           else:
-              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,last_idx))
         else:
           if reduced:
-              P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0])), ZFieldElRedc(BigInt.from_uint256(x_[1]))]) for x_ in x]),(-1,3))
+              P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0])), ZFieldElRedc(BigInt.from_uint256(x_[1]))]) for x_ in x]),(-1,last_idx))
           else:
-              P = np.reshape(np.asarray([Z2FieldEl([BigInt.from_uint256(x_[0]).as_long(), BigInt.from_uint256(x_[1]).as_long()]) for x_ in x]),(-1,3))
+              P = np.reshape(np.asarray([Z2FieldEl([BigInt.from_uint256(x_[0]).as_long(), BigInt.from_uint256(x_[1]).as_long()]) for x_ in x]),(-1,last_idx))
         
 
         Pinf = ECC._point_at_inf(out_ectype=out_ectype, reduced=reduced, ec2=ec2).get_P()
 
         for idx,p in enumerate(P):
           if all(p[:2] == Pinf[:2]):
-            P[idx] = list(Pinf)
+            if remove_last:
+              P[idx] = list(Pinf[:2])
+            else:
+              P[idx] = list(Pinf)
 
         if in_ectype == 0:
             P_ = [ECCProjective(x_.tolist()) for x_ in P]

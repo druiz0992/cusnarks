@@ -8142,7 +8142,7 @@ void test_ntt(uint32_t forward)
   } else {
      memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
      ntt_h(samples, roots, levels, pidx);
-     computeIRoots(roots, roots, nroots)
+     computeIRoots_h(roots, roots, nroots);
      intt_h(samples, roots, 1, levels, pidx);
   }
 
@@ -8266,7 +8266,7 @@ void test_ntt_parallel2D_65K(uint32_t forward)
        ntt_h(samples2, roots, levels, pidx);
      } else {
        readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
-       computeIRoots(roots, roots, nroots)
+       computeIRoots_h(roots, roots, nroots);
        intt_parallel2D_h(samples, roots, 1, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
        readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
        ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
@@ -8330,7 +8330,7 @@ void test_nttmul_parallel2D_65K(void)
        montmult_h(&Y2[j*NWORDS_256BIT], &Y2[j*NWORDS_256BIT], &X2[j*NWORDS_256BIT], pidx);
      }
 
-     computeIRoots(roots, roots, nroots)
+     computeIRoots_h(roots, roots, nroots);
 
      intt_parallel2D_h(Y1, roots, 1, Nrows, FFT_SIZEYX_65K, Ncols, FFT_SIZEXX_65K, pidx, 0);
      intt_h(Y2, roots, 1,levels, pidx);
@@ -8604,7 +8604,7 @@ void test_ntt_parallel2D_1M(uint32_t forward)
        ntt_h(samples2, roots, levels, pidx);
      } else {
        readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
-       computeIRoots(roots, roots, nroots)
+       computeIRoots_h(roots, roots, nroots);
        intt_parallel2D_h(samples, roots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
        readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,1<<NROOTS_1M);
        ntt_parallel2D_h(samples, roots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
@@ -8671,7 +8671,7 @@ void test_nttmul_parallel2D_1M(void)
        montmult_h(&Y2[j*NWORDS_256BIT], &Y2[j*NWORDS_256BIT], &X2[j*NWORDS_256BIT], pidx);
      }
 
-     computeIRoots(roots, roots, nroots)
+     computeIRoots_h(roots, roots, nroots);
 
      intt_parallel2D_h(Y1, roots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, pidx, 0);
      intt_h(Y2, roots,1,levels, pidx);
@@ -8759,7 +8759,7 @@ void test_nttmul_randomsize(void)
        montmult_h(&Y2[j*NWORDS_256BIT], &Y2[j*NWORDS_256BIT], &X2[j*NWORDS_256BIT], pidx);
      }
 
-     computeIRoots(roots, roots, nroots)
+     computeIRoots_h(roots, roots, npoints);
 
      if (fft_params.fft_type == FFT_T_2D){
        intt_parallel_h(Y1, roots,1, Ncols, Nrows, pidx, 0);
@@ -9005,17 +9005,6 @@ void test_mulu256()
   printf("N errors(Test_Mulu) : %d/%d\n",n_errors, N/2);
 }
 
-void test_gen_roots(uint32_t nbits)
-{
-  uint32_t nsamples = (1<<nbits) * NWORDS_256BIT;
-  uint32_t *roots = (uint32_t *)malloc( nsamples * sizeof(uint32_t));
-
-  field_roots_compute_h(roots,nbits);
-
-  writeU256DataFile_h(roots, roots_1M_filename, nsamples);
-}
-
-
 int main()
 {
   test_mul();  // test montgomery mul with predefined results
@@ -9060,7 +9049,6 @@ int main()
   test_mul_ext();
   test_inv_ext1();
   test_inv_ext2();
-  //test_gen_roots(20);
   test_mulu256();
 
   return 1;

@@ -86,7 +86,6 @@ class GrothSetup(object):
         else:
           self.seed = random.randint(0,1<<32)
 
-        #self.worker = [mp.Pool() for p in range(mp.cpu_count()-1)]
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group 
         ZField(self.curve_data['prime'])
@@ -119,6 +118,8 @@ class GrothSetup(object):
         self.out_circuit_format = out_circuit_format
         self.in_circuit_format = FMT_EXT
         self.alfabeta_f = '../../circuits/alfabeta.json'
+        #self.worker = [mp.Pool(processes=1, maxtasksperchild=1) for p in range(5)]
+        self.worker = mp.Pool(processes=mp.cpu_count()-1, maxtasksperchild=1) 
 
         if self.in_circuit_f is not None:
            self.circuitRead()
@@ -130,7 +131,7 @@ class GrothSetup(object):
         # cir Json to u256
         if self.in_circuit_f.endswith('.json'):
            self.cir = cirjson_to_vars(self.in_circuit_f, self.in_circuit_format,
-                                      self.out_circuit_format)
+                                      self.out_circuit_format, self.worker)
 
            #u256 to bin
            if self.out_circuit_f is not None:
@@ -216,7 +217,7 @@ class GrothSetup(object):
               test_pk_f = test_pk_f.replace('.bin','_cpy.json') 
             else :
               test_pk_f = test_pk_f.replace('.json','_cpy.json') 
-            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk)
+            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk, self.worker)
             pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
             #if os.path.exists(test_pk_f):
               #os.remove(test_pk_f)
@@ -261,21 +262,22 @@ class GrothSetup(object):
           snarkjs = self.launch_snarkjs("setup")
 
 
-          w1 = mp.Pool(processes=1)
-          w2 = mp.Pool(processes=1)
+          #w1 = mp.Pool(processes=1)
+          #w2 = mp.Pool(processes=1)
 
           # Compare results
-          r1 = w1.apply_async(pysnarks_compare, args=(test_pk_f, snarkjs['pk_f'], ['A', 'B1', 'B2', 'C', 'hExps', 'polsA', 'polsB',
+          r1 = self.worker.apply_async(pysnarks_compare, args=(test_pk_f, snarkjs['pk_f'], ['A', 'B1', 'B2', 'C', 'hExps', 'polsA', 'polsB',
                                                                    'polsC', 'vk_alfa_1', 'vk_beta_1', 'vk_beta_2',
                                                                    'vk_delta_1', 'vk_delta_2'], self.pk['nPublic'] ))
-          r2 = w2.apply_async(pysnarks_compare, args=(test_vk_f, snarkjs['vk_f'], ['IC', 'vk_alfa_1', 'vk_alfabeta_12', 'vk_beta_2', 
+          r2 = self.worker.apply_async(pysnarks_compare, args=(test_vk_f, snarkjs['vk_f'], ['IC', 'vk_alfa_1', 'vk_alfabeta_12', 'vk_beta_2', 
                                                                    'vk_delta_2', 'vk_gamma_2'],0))
 
+          #worker.close()
           pk_r = r1.get()
           vk_r = r2.get()
 
-          w1.terminate()
-          w2.terminate()
+          #w1.terminate()
+          #w2.terminate()
 
 
           return pk_r and vk_r
@@ -286,16 +288,17 @@ class GrothSetup(object):
     def _calculatePoly(self):
         self._computeHeader()
 
-        w1 = mp.Pool(processes=1)
-        w2 = mp.Pool(processes=1)
-        w3 = mp.Pool(processes=1)
+        #w1 = mp.Pool(processes=1)
+        #w2 = mp.Pool(processes=1)
+        #w3 = mp.Pool(processes=1)
 
-        r1 = w1.apply_async(self._r1cs_to_mpoly, args=(self.cir['R1CSA'], 1))
+        r1 = self.worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1))
 
-        r2 = w2.apply_async(self._r1cs_to_mpoly, args=(self.cir['R1CSB'], 0))
+        r2 = self.worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSB'], self.cir_header,self.cir['cirformat'], 0))
 
-        r3 = w3.apply_async(self._r1cs_to_mpoly, args=(self.cir['R1CSC'], 0))
+        r3 = self.worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'],0))
 
+        #worker.close()
         self.pk['polsA'] = r1.get()
         self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
         self.cir['R1CSA'] = None
@@ -306,9 +309,9 @@ class GrothSetup(object):
         self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
         self.cir['R1CSC'] = None
 
-        w1.terminate()
-        w2.terminate()
-        w3.terminate()
+        #w1.terminate()
+        #w2.terminate()
+        #w3.terminate()
 
         return
 
@@ -325,10 +328,11 @@ class GrothSetup(object):
         """
 
 
-    def _r1cs_to_mpoly(self, r1cs, extend):
+    def _r1cs_to_mpoly(self, r1cs, fmat, extend):
         to_mont = 0
+        ZField.set_field(MOD_FIELD)
         pidx = ZField.get_field()
-        if self.cir['cirformat'] == ZUtils.FEXT:
+        if fmat == ZUtils.FEXT:
            to_mont = 1
 
         poly_len = r1cs_to_mpoly_len_h(r1cs, self.cir_header, extend)
@@ -503,21 +507,22 @@ class GrothSetup(object):
 
        pidx = ZField.get_field()
 
-       w1 = mp.Pool(processes=1)
-       w2 = mp.Pool(processes=1)
-       w3 = mp.Pool(processes=1)
+       #w1 = mp.Pool(processes=1)
+       #w2 = mp.Pool(processes=1)
+       #w3 = mp.Pool(processes=1)
        
-       r1 = w1.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
-       r2 = w2.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
-       r3 = w3.apply_async(mpoly_madd_h, args = (self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx))
+       r1 = self.worker.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
+       r2 = self.worker.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
+       r3 = self.worker.apply_async(mpoly_madd_h, args = (self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx))
 
+       #worker.close()
        a_t_u256 = r1.get()
        b_t_u256 = r2.get()
        c_t_u256 = r3.get()
 
-       w1.terminate()
-       w2.terminate()
-       w3.terminate()
+       #w1.terminate()
+       #w2.terminate()
+       #w3.terminate()
 
        #a_t_u256 = mpoly_madd_h(self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx)
        #b_t_u256 = mpoly_madd_h(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx)
@@ -545,7 +550,7 @@ class GrothSetup(object):
     def write_pk(self):
 
        if self.out_pk_f.endswith('.json') :
-         pk_dict = pkvars_to_json(self.out_k_binformat, self.out_k_ecformat,self.pk)
+         pk_dict = pkvars_to_json(self.out_k_binformat, self.out_k_ecformat,self.pk, self.worker)
          pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
          #if os.path.exists(self.out_pk_f):
          #    os.remove(self.out_pk_f)

@@ -68,7 +68,7 @@ IF CUDA_DEF:
           out_v.length = params['out_length']
           in_v.length  = in_vec.shape[0]
   
-          #print in_v.length, self.in_dim, out_v.length, self.out_dim
+          #print (in_v.length, self.in_dim, out_v.length, self.out_dim)
           if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
               assert False, "Incorrect arguments"
               return 0.0
@@ -630,7 +630,7 @@ def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
            sumc=0
            for k in xrange(v_offset,v_offset+ct.NWORDS_256BIT):
               sumc += in_mpoly[k]
-           if sumc != 0:
+           if sumc != 0 or (ncoeff==1 and sumc == 0):
               sp_poly[str(in_mpoly[c_offset])] = in_mpoly[v_offset:v_offset+ct.NWORDS_256BIT]
               n_keys+=1
            c_offset +=1

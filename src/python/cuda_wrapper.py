@@ -269,7 +269,7 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
         else :
              zpoly_vector = expanded_vector
 
-        np.savez_compressed('../../test/python/aux_data/ifft_data.npz',ifft_data=vector)
+        #np.savez_compressed('../../test/python/aux_data/ifft_data.npz',ifft_data=vector)
         Nrows = ifft_params['fft_N'][(1<<FFT_T_3D)-1]
         Ncols = ifft_params['fft_N'][(1<<FFT_T_3D)-2]
         fft_yx = ifft_params['fft_N'][(1<<FFT_T_3D)-3]
@@ -556,23 +556,18 @@ def zpoly_mad_cuda(pysnark, vectors, fidx):
      """
 
 def get_shfl_blockD(nsamples):
-   minb = 32
-   maxb = 256
-   if nsamples > 128:
-     blockD = [256] 
-   elif nsamples > 64:
-     blockD = [128] 
-   elif nsamples > 32:
-     blockD = [64] 
-   else:
-     blockD = [32] 
 
-   rsamples = math.ceil(nsamples/blockD[0])
-   while rsamples > maxb:
-      blockD.append(maxb)
-      rsamples = rsamples/maxb
+   l = max(math.ceil(math.log2(nsamples)),5)
+   nb = math.ceil(l/8)
+   lpb = math.ceil(l/nb)
 
-   lastb = max(math.ceil(math.log2(rsamples)),5)
+   blockD = [1<<lpb] 
+   rsamples = l - lpb
+   while rsamples > lpb:
+      blockD.append(1<<lpb)
+      rsamples -= lpb
+
+   lastb = max(rsamples,5)
    blockD.append(1<<lastb)
    blockD.sort()
  
