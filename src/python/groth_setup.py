@@ -119,25 +119,38 @@ class GrothSetup(object):
             print ("Repo directory needs to be provided\n", file=self.log_f)
             sys.exit(1)
 
-        self.keep_f = gen_reponame(keep_f)
-        self.log_f = open(self.keep_f + 'log', 'w')
-        self.alfabeta_f = self.keep_f + 'alfabeta.json'
-        copy_input_files([in_circuit_f, test_f], self.keep_f)
-        #self.worker = [mp.Pool(processes=1, maxtasksperchild=1) for p in range(5)]
-        self.worker = mp.Pool(processes=mp.cpu_count()-1, maxtasksperchild=1) 
+        self.keep_f = gen_reponame(keep_f, sufix="_SETUP") 
+        self.alfabeta_f = self.keep_f + '/' + 'alfabeta.json'
+        self.test_f= self.keep_f + '/' +  test_f
+        copy_input_files([in_circuit_f], self.keep_f)
 
+        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+        logging.info('Staring Groth setupr with the follwing arguments :')
+        logging.info(' - curve : %s',curve)
+        logging.info(' - in_circuit_f : %s', in_circuit_f)
+        logging.info(' - out_circuit_f : %s', out_circuit_f)
+        logging.info(' - out_circuit_format : %s', out_circuit_format)
+        logging.info(' - out_pk_f : %s', out_pk_f)
+        logging.info(' - out_vk_f : %s', out_vk_f)
+        logging.info(' - out_k_binformat : %s', out_k_binformat)
+        logging.info(' - out_k_ecformat : %s', out_k_ecformat)
+        logging.info(' - test_f : %s', test_f)
+        logging.info(' - benchmark_f : %s', benchmark_f)
+        logging.info(' - seed : %s', seed)
+        logging.info(' - snarkjs : %s', snarkjs)
+        logging.info(' - keep_f : %s', keep_f)
+         
         if self.in_circuit_f is not None:
            self.circuitRead()
         else:
-           print ("Required input circuit\n", file=self.log_f)
-           self.log_f.flush()
+           logging.error ("Required input circuit %s", self.log_f)
            sys.exit(1)
 
     def circuitRead(self):
         # cir Json to u256
         if self.in_circuit_f.endswith('.json'):
            self.cir = cirjson_to_vars(self.in_circuit_f, self.in_circuit_format,
-                                      self.out_circuit_format, self.worker)
+                                      self.out_circuit_format)
 
            #u256 to bin
            if self.out_circuit_f is not None:
@@ -157,12 +170,11 @@ class GrothSetup(object):
           elif mode == "alfabeta_12":
              circuit_file = self.in_circuit_f
           else:
-             print("To launch snarkjs, input circuit needs to be a json file and format cannot be Montgomery", file=self.log_f)
-             self.log_f.flush()
+             logging.error("To launch snarkjs, input circuit %s needs to be a json file and format %s cannot be Montgomery", self.in_circuit_f, self.in_circuit_format)
              return
         
-          snarkjs['pk_f'] = self.keep_f + 'tmp_pk_f.json'
-          snarkjs['vk_f'] = self.keep_f + 'tmp_vk_f.json'
+          snarkjs['pk_f'] = self.keep_f + '/' + 'tmp_pk_f.json'
+          snarkjs['vk_f'] = self.keep_f + '/' + 'tmp_vk_f.json'
 
           if mode=="alfabeta_12":
             alfabeta_command = "--fs"
@@ -225,7 +237,7 @@ class GrothSetup(object):
               test_pk_f = test_pk_f.replace('.bin','_cpy.json') 
             else :
               test_pk_f = test_pk_f.replace('.json','_cpy.json') 
-            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk, self.worker)
+            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk)
             pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
             #if os.path.exists(test_pk_f):
               #os.remove(test_pk_f)
@@ -270,23 +282,19 @@ class GrothSetup(object):
           snarkjs = self.launch_snarkjs("setup")
 
 
-          #w1 = mp.Pool(processes=1)
-          #w2 = mp.Pool(processes=1)
+          worker = mp.Pool(processes=min(2,mp.cpu_count()-1))
 
           # Compare results
-          r1 = self.worker.apply_async(pysnarks_compare, args=(test_pk_f, snarkjs['pk_f'], ['A', 'B1', 'B2', 'C', 'hExps', 'polsA', 'polsB',
+          r1 = worker.apply_async(pysnarks_compare, args=(test_pk_f, snarkjs['pk_f'], ['A', 'B1', 'B2', 'C', 'hExps', 'polsA', 'polsB',
                                                                    'polsC', 'vk_alfa_1', 'vk_beta_1', 'vk_beta_2',
                                                                    'vk_delta_1', 'vk_delta_2'], self.pk['nPublic'] ))
-          r2 = self.worker.apply_async(pysnarks_compare, args=(test_vk_f, snarkjs['vk_f'], ['IC', 'vk_alfa_1', 'vk_alfabeta_12', 'vk_beta_2', 
+          r2 = worker.apply_async(pysnarks_compare, args=(test_vk_f, snarkjs['vk_f'], ['IC', 'vk_alfa_1', 'vk_alfabeta_12', 'vk_beta_2', 
                                                                    'vk_delta_2', 'vk_gamma_2'],0))
 
-          #worker.close()
           pk_r = r1.get()
           vk_r = r2.get()
 
-          #w1.terminate()
-          #w2.terminate()
-
+          worker.terminate()
 
           return pk_r and vk_r
         else:
@@ -296,17 +304,15 @@ class GrothSetup(object):
     def _calculatePoly(self):
         self._computeHeader()
 
-        #w1 = mp.Pool(processes=1)
-        #w2 = mp.Pool(processes=1)
-        #w3 = mp.Pool(processes=1)
 
-        r1 = self.worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1))
+        worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
 
-        r2 = self.worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSB'], self.cir_header,self.cir['cirformat'], 0))
+        r1 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1))
 
-        r3 = self.worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'],0))
+        r2 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSB'], self.cir_header,self.cir['cirformat'], 0))
 
-        #worker.close()
+        r3 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'],0))
+
         self.pk['polsA'] = r1.get()
         self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
         self.cir['R1CSA'] = None
@@ -317,9 +323,7 @@ class GrothSetup(object):
         self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
         self.cir['R1CSC'] = None
 
-        #w1.terminate()
-        #w2.terminate()
-        #w3.terminate()
+        woker.terminate()
 
         return
 
@@ -515,26 +519,18 @@ class GrothSetup(object):
 
        pidx = ZField.get_field()
 
-       #w1 = mp.Pool(processes=1)
-       #w2 = mp.Pool(processes=1)
-       #w3 = mp.Pool(processes=1)
-       
-       r1 = self.worker.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
-       r2 = self.worker.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
-       r3 = self.worker.apply_async(mpoly_madd_h, args = (self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx))
+       worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
 
-       #worker.close()
+       r1 = worker.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
+       r2 = worker.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
+       r3 = worker.apply_async(mpoly_madd_h, args = (self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx))
+
        a_t_u256 = r1.get()
        b_t_u256 = r2.get()
        c_t_u256 = r3.get()
 
-       #w1.terminate()
-       #w2.terminate()
-       #w3.terminate()
-
-       #a_t_u256 = mpoly_madd_h(self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx)
-       #b_t_u256 = mpoly_madd_h(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx)
-       #c_t_u256 = mpoly_madd_h(self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx)
+       worker.terminate()
+      
        # a,b,c are Ext
 
        return a_t_u256, b_t_u256, c_t_u256, z_t_u256
@@ -558,7 +554,7 @@ class GrothSetup(object):
     def write_pk(self):
 
        if self.out_pk_f.endswith('.json') :
-         pk_dict = pkvars_to_json(self.out_k_binformat, self.out_k_ecformat,self.pk, self.worker)
+         pk_dict = pkvars_to_json(self.out_k_binformat, self.out_k_ecformat,self.pk)
          pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
          #if os.path.exists(self.out_pk_f):
          #    os.remove(self.out_pk_f)
@@ -571,10 +567,8 @@ class GrothSetup(object):
          writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
 
        else :
-         print ("No valid proving key file provided", file=self.log_f)
-         self.log_f.flush()
-         return
-
+         logging.info ("No valid proving key file  %s provided", self.out_pk_f)
+         os.exit(1)
         
     def write_vk(self):
        #Fill alfa and beta values and call snarkjs to compute vk value
@@ -636,7 +630,7 @@ class GrothSetup(object):
       return vk_dict
 
     def _vars_to_vkbin(self):
-      print("Verifying Key can only be saved as .json\n", file=self.log_f)
+      logging.error("Verifying Key  file %s can only be saved as .json\n", self.out_vk_f)
       self.log_f.flush()
       sys.exit(1)
       vk_bin=None

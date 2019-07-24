@@ -252,6 +252,15 @@ def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1,
         return out_vec
 
 
+def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] zero = np.zeros(len(in_veca), dtype=np.uint32)
+
+        uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
+        uh.csubm_h(&out_vec[0], &zero[0] , &out_vec[0], pidx)
+
+        return out_vec
+
 def addm_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
