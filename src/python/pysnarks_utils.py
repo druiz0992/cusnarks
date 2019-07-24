@@ -106,7 +106,11 @@ def json_to_list(data):
      return
 
 def pysnarks_compare(f1_str, f2_str, labels, npublic):
-     f1 = open(f1_str,'r')
+     try:
+       f1 = open(f1_str,'r')
+     except Exception as e:
+       return False
+      
      djson = json.load(f1)
      if isinstance(djson,dict):
        d1 = json_to_dict(djson, labels)
@@ -114,7 +118,10 @@ def pysnarks_compare(f1_str, f2_str, labels, npublic):
        d1 = json_to_list(djson)
      f1.close()
 
-     f2 = open(f2_str,'r')
+     try:
+       f2 = open(f2_str,'r')
+     except Exception as e:
+       return False
      djson = json.load(f2)
      if isinstance(djson,dict):
        d2 = json_to_dict(djson, labels)
@@ -162,7 +169,7 @@ def getCircuit():
     return cir
 
 
-def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format, worker):
+def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
         """
           Converts from circom .json output file to binary format required to 
             calculate snarks setup. Only the following entries are used:
@@ -234,26 +241,17 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format, worker)
         if 'cirformat' in cir_data:
             tmp_in_circuit_format = cir_data['cirformat']
 
-        #w1 = mp.Pool(processes=1)
-        #w2 = mp.Pool(processes=1)
-        #w3 = mp.Pool(processes=1)
+        worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
 
         r1 = worker.apply_async(cirjson_to_r1cs, args = (0,tmp_in_circuit_format, out_circuit_format, cir_data))
         r2 = worker.apply_async(cirjson_to_r1cs, args=(1,tmp_in_circuit_format, out_circuit_format, cir_data))
         r3 = worker.apply_async(cirjson_to_r1cs, args = (2,tmp_in_circuit_format, out_circuit_format, cir_data))
-        #worker.close()
-        #worker.join()
+
         R1CSA_len, R1CSA_u256 = r1.get()
         R1CSB_len, R1CSB_u256 = r2.get()
         R1CSC_len, R1CSC_u256 = r3.get()
 
-        #w1.terminate()
-        #w2.terminate()
-        #w3.terminate()
-
-        #R1CSA_len, R1CSA_u256 = cirjson_to_r1cs(0,tmp_in_circuit_format, out_circuit_format, cir_data)
-        #R1CSB_len, R1CSB_u256 = cirjson_to_r1cs(1,tmp_in_circuit_format, out_circuit_format, cir_data)
-        #R1CSC_len, R1CSC_u256 = cirjson_to_r1cs(2,tmp_in_circuit_format, out_circuit_format, cir_data)
+        w.terminate()
 
         fsize = CIRBIN_H_N_OFFSET + R1CSA_len + R1CSB_len + R1CSC_len
 
@@ -421,7 +419,9 @@ def ecp_to_json(ecp, out_ec, b_reduce, ec2):
            p = [x.as_str() for x in P]
 
         return p
-def pkvars_to_json(out_bin, out_ec, pk, worker):
+
+
+def pkvars_to_json(out_bin, out_ec, pk):
         pk_dict= {}
         pk_dict['ftype'] = "PK_FILE"
         pk_dict['protocol'] = "groth"
@@ -451,9 +451,7 @@ def pkvars_to_json(out_bin, out_ec, pk, worker):
 
         ZField.set_field(MOD_FIELD)
 
-        #w1 = mp.Pool(processes=1)
-        #w2 = mp.Pool(processes=1)
-        #w3 = mp.Pool(processes=1)
+        worker = mp.Pool(processes=min(5,mp.cpu_count()-1))
 
         if out_bin == FMT_EXT:
           r1 = worker.apply_async(mpoly_to_json, args=(pk['polsA'], False))
@@ -464,42 +462,25 @@ def pkvars_to_json(out_bin, out_ec, pk, worker):
           r2 = worker.apply_async(mpoly_to_json, args=(pk['polsB'], True))
           r3 = worker.apply_async(mpoly_to_json, args=(pk['polsC'], True))
        
-        #worker.close()
         pk_dict['polsA'] = r1.get()
         pk_dict['polsB'] = r2.get()
         pk_dict['polsC'] = r3.get()
 
-        #w1.terminate()
-        #w2.terminate()
-        #w3.terminate()
-
-
-        #w1 = mp.Pool(processes=1)
-        #w2 = mp.Pool(processes=1)
-        #w3 = mp.Pool(processes=1)
-        #w4 = mp.Pool(processes=1)
-        #w5 = mp.Pool(processes=1)
-
-
         ZField.set_field(MOD_GROUP)
+
         r1 = worker.apply_async(ecp_to_json, args=(pk['A'], out_ec, b_reduce, False))
         r2 = worker.apply_async(ecp_to_json, args=(pk['B1'], out_ec, b_reduce, False))
         r3 = worker.apply_async(ecp_to_json, args=(pk['B2'], out_ec, b_reduce, True))
         r4 = worker.apply_async(ecp_to_json, args=(pk['C'], out_ec, b_reduce, False))
         r5 = worker.apply_async(ecp_to_json, args=(pk['hExps'], out_ec, b_reduce, False))
 
-        #worker.close()
         pk_dict['A'] = r1.get()
         pk_dict['B1'] = r2.get()
         pk_dict['B2'] = r3.get()
         pk_dict['C'] = r4.get()
         pk_dict['hExps'] = r5.get()
 
-        #w1.terminate()
-        #w2.terminate()
-        #w3.terminate()
-        #w4.terminate()
-        #w5.terminate()
+        worker.terminate()
 
         if not b_reduce:
           pk_dict['vk_alfa_1'] = ECC.from_uint256(np.reshape(pk['alfa_1'],(-1,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, remove_last=True)[0].extend().as_str()
@@ -599,7 +580,7 @@ def pkjson_to_pyspol(inp):
 
    return P
 
-def pkjson_to_pyvars(pk_proof, worker):
+def pkjson_to_pyvars(pk_proof):
         # Init witness to Field El.
         # TODO :  I am assuming that all field el are FielElExt (witness_scl, polsA_sps, polsB_sps, polsC_sps, alfa1...
         # Witness is initialized a BitInt as it will operate on different fields
@@ -615,11 +596,7 @@ def pkjson_to_pyvars(pk_proof, worker):
         delta2 = [Z2FieldEl(el) for el in pk_proof['vk_delta_2']]
         pk['delta_2'] = ECC_F2(delta2)
 
-        #w1 = mp.Pool(processes=1)
-        #w2 = mp.Pool(processes=1)
-        #w3 = mp.Pool(processes=1)
-        #w4 = mp.Pool(processes=1)
-        #w5 = mp.Pool(processes=1)
+        worker = mp.Pool(processes=min(5,mp.cpu_count()-1))
 
         r1     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['A'], False))
         r2     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['B1'], False))
@@ -627,19 +604,13 @@ def pkjson_to_pyvars(pk_proof, worker):
         r4     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['C'], False))
         r5     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['hExps'], False))
 
-        #worker.close()
         pk['A']     = r1.get()
         pk['B1']    = r2.get()
         pk['B2']    = r3.get()
         pk['C']     = r4.get()
         pk['hExps'] = r5.get()
 
-        #w1.terminate()
-        #w2.terminate()
-        #w3.terminate()
-        #w4.terminate()
-        #w5.terminate()
-        
+        worker.terminate()
 
         ZField.set_field(MOD_FIELD)
 
@@ -674,8 +645,8 @@ def pkpyspol_to_vars(spolp):
        return P
 
 
-def pkjson_to_vars(pk_proof, proving_key_f, worker):
-       pk = pkjson_to_pyvars(pk_proof, worker)
+def pkjson_to_vars(pk_proof, proving_key_f):
+       pk = pkjson_to_pyvars(pk_proof)
 
        ZField.set_field(MOD_GROUP)
        pk['alfa_1'] = np.reshape(pkpyec_to_vars(pk['alfa_1'],True, True),-1)
@@ -684,11 +655,7 @@ def pkjson_to_vars(pk_proof, proving_key_f, worker):
        pk['beta_2'] = np.reshape(pkpyec_to_vars(pk['beta_2'],True, True),-1)
        pk['delta_2'] = np.reshape(pkpyec_to_vars(pk['delta_2'],True, True),-1)
 
-       #w1 = mp.Pool(processes=1)
-       #w2 = mp.Pool(processes=1)
-       #w3 = mp.Pool(processes=1)
-       #w4 = mp.Pool(processes=1)
-       #w5 = mp.Pool(processes=1)
+       worker = mp.Pool(processes=min(5,mp.cpu_count()-1))
 
        r1 = worker.apply_async(pkpyec_to_vars, args=(pk['A'],True, True))
        r2 = worker.apply_async(pkpyec_to_vars, args=(pk['B1'],True, True))
@@ -696,19 +663,13 @@ def pkjson_to_vars(pk_proof, proving_key_f, worker):
        r4 = worker.apply_async(pkpyec_to_vars, args=(pk['C'],True, True))
        r5 = worker.apply_async(pkpyec_to_vars, args=(pk['hExps'],True, True))
        
-       #worker.close()
        pk['A'] = np.reshape(r1.get(),-1)
        pk['B1'] = np.reshape(r2.get(),-1)
        pk['B2'] = np.reshape(r3.get(),-1)
        pk['C']  = np.reshape(r4.get(),-1)
        pk['hExps'] = np.reshape(r5.get(),-1)
 
-
-       #w1.terminate()
-       #w2.terminate()
-       #w3.terminate()
-       #w4.terminate()
-       #w5.terminate() 
+       worker.terminate()
 
        ZField.set_field(MOD_FIELD)
        
@@ -837,9 +798,12 @@ def pkbin_to_vars(pk_bin):
 
           return pk
 
-def gen_reponame(repo_f):
+def gen_reponame(repo_f,sufix=None):
     now = datetime.now()
-    reponame = repot_f + now.strftime("%Y%m%d__$H%M%S")
+    reponame = repo_f + now.strftime("%Y%m%d__%H%M%S")
+    if sufix is not None:
+       reponame = reponame + sufix
+
     if not os.path.exists(reponame):
         os.makedirs(reponame)
     return reponame
@@ -847,5 +811,5 @@ def gen_reponame(repo_f):
 def copy_input_files(file_list, dest):
     for f in file_list:
         if f is not None:
-           os.system('cp -f f ' +dest)
+           os.system('cp -f ' + f + ' '  +dest)
 

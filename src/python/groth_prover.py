@@ -49,6 +49,7 @@ import os.path
 import numpy as np
 import time
 from subprocess import call
+import logging
 
 from zutils import ZUtils
 import random
@@ -66,23 +67,14 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-#Input files
-DEFAULT_WITNESS_LOC = "../../data/witness_pedersen.json"
-DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_pedersen.json"
-#DEFAULT_WITNESS_LOC = "../../data/witness_multiplier.json"
-#DEFAULT_PROVING_KEY_LOC = "../../data/proving_key_multiplier.json"
-#Output files
-DEFAULT_PROOF_LOC =  "../../data/proof.bin"
-DEFAULT_PUBLIC_LOC =  "../../data/public.bin"
-DATA_FOLDER = "../../data/"
-
 ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
 
 class GrothProver(object):
     
-    def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',  out_proof_f = DEFAULT_PROOF_LOC, out_public_f = DEFAULT_PUBLIC_LOC,
-                 out_pk_f=None, out_pk_format=FMT_MONT,
-                 out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, benchmark_f=None, seed=None, snarkjs=None, accel = True, verify_en=0, keep_f=None):
+    def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',  out_proof_f = None,
+                 out_public_f = None, out_pk_f=None, out_pk_format=FMT_MONT,
+                 out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, 
+                 benchmark_f=None, seed=None, snarkjs=None, accel = True, verify_en=0, keep_f=None):
 
         self.accel = accel
 
@@ -116,8 +108,6 @@ class GrothProver(object):
 
         ZField.set_field(MOD_FIELD)
 
-        self.test_f= test_f
-
         self.pk = getPK()
 
         self.pi_a_eccf1 = None
@@ -130,17 +120,33 @@ class GrothProver(object):
         if keep_f is None:
             print ("Repo directory needs to be provided\n")
             sys.exit(1)
-        self.keep_f = gen_reponame(keep_f)
-        self.log_f = open(self.keep_f + 'log', 'w')
+        self.keep_f = gen_reponame(keep_f, sufix="_PROVER")
         copy_input_files([proving_key_f, verification_key_f], self.keep_f)
+        self.test_f= self.keep_f + '/' + test_f
 
-        #self.worker = [mp.Pool(processes=1) for p in range(5)]
-        self.worker = mp.Pool(processes=mp.cpu_count()-1, maxtasksperchild=1) 
+        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+        logging.info('Staring Groth prover with the follwing parameters :')
+        logging.info(' - proving_key_f : %s', proving_key_f)
+        logging.info(' - verification_key_f : %s',verification_key_f)
+        logging.info(' - curve : %s',curve)
+        logging.info(' - out_proof_f : %s',out_proof_f)
+        logging.info(' - out_pk_f : %s',out_pk_f)
+        logging.info(' - out_pk_format : %s',out_pk_format) 
+        logging.info(' - out_proof_format : %s',out_proof_format)
+        logging.info(' - out_public_format :  %s',out_public_format)
+        logging.info(' - test_f : %s',self.test_f)
+        logging.info(' - benchmark_f : %s', benchmark_f)
+        logging.info(' - seed : %s', seed)
+        logging.info(' - snarkjs : %s', snarkjs)
+        logging.info(' - accel :  %s',accel)
+        logging.info(' - verify_en : %s', verify_en)
+        logging.info(' - keep_f : %s', keep_f)
+  
         self.load_pkdata()
 
         if self.out_proving_key_f is not None:
              if self.out_proving_key_f.endswith('.json'):
-               pk_dict =pkvars_to_json(self.out_proving_key_format, EC_T_AFFINE, self.pk, self.worker)
+               pk_dict =pkvars_to_json(self.out_proving_key_format, EC_T_AFFINE, self.pk)
                pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
                f = open(self.out_proving_key_f, 'w')
                print(pk_json, file=f)
@@ -168,8 +174,7 @@ class GrothProver(object):
            self.witness_scl = [BigInt(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
            f.close()
        else:
-          print("File doesn't exist", file=self.log_f)
-          self.log_f.flush()
+          logging.error('Witness file %s doesn\'t exist', self.witness_f)
           os.exit(1)
        
     def load_pkdata(self):
@@ -204,10 +209,10 @@ class GrothProver(object):
            vk_proof = json_to_dict(tmp_data)
            f.close()
            if use_pycusnarks and self.accel:
-              self.pk = pkjson_to_vars(vk_proof, self.proving_key_f, self.worker)  
+              self.pk = pkjson_to_vars(vk_proof, self.proving_key_f)  
            else:
               ZField.find_roots(ZUtils.NROOTS)
-              self.pk = pkjson_to_pyvars(vk_proof, self.worker)  
+              self.pk = pkjson_to_pyvars(vk_proof)  
            vk_proof = None
            tmp_data = None
 
@@ -217,19 +222,28 @@ class GrothProver(object):
 
 
     def proof(self, witness_f):
-      copy_input_files([witness_f], self.keep_f)
       self.witness_f = witness_f
+      logging.info("Starting proof...")
+
       t1, t2, t3 = self.gen_proof()
+       
+      logging.info("Proof completed. Times" )
+      logging.info('- Time 1 : %s', t1)
+      logging.info('- Time 2 : %s', t2)
+      logging.info('- Time 3 : %s', t3)
+
       self.write_pdata()
       self.write_proof()
-      copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f],self.keep_f)
-      snarkjs_results = self.test_results()
+      snarkjs_verify, snarkjs_proof_result = self.test_results()
+
+      copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
 
     def test_results(self):
       proof_r = True
       snarkjs = {}
       snarkjs['verify'] = 0
       if self.test_f is not None:
+        logging.info("Calling snarkjs proof to compare computed proving and verification keys")
         # Write rand json
         randout_dict={}
         randout_dict['r'] = str(BigInt.from_uint256(self.r_scl).as_long())
@@ -242,17 +256,30 @@ class GrothProver(object):
         p_r = pysnarks_compare(self.out_proof_f, snarkjs['p_f'], ['pi_a', 'pi_b', 'pi_c'],0)
         pd_r = pysnarks_compare(self.out_public_f, snarkjs['pd_f'], None, 0)
         proof_r = p_r and pd_r
+        if proof_r:
+          logging.info("Compared keys are equal")
+        elif p_r:
+          logging.info("Verification keys are different")
+        elif pd_r:
+          logging.info("Proving keys are different")
+        else:
+          logging.info("Verification and Proving keys are different")
 
       if self.verify_en:
+        logging.info("Calling snarkjs verify to verify proof")
         snarkjs = self.launch_snarkjs("verify")
+        if snarkjs['verify'] == 0:
+          logging.info("Verification succeded")
+        else:
+          logging.info("Verification failed")
 
       return snarkjs['verify']==0, proof_r
 
     def launch_snarkjs(self, mode):
         snarkjs = {}
         if mode=="proof" :
-          snarkjs['p_f'] = self.keep_f + 'tmp_p_f.json'
-          snarkjs['pd_f'] = self.keep_f + 'tmp_pd_f.json'
+          snarkjs['p_f'] = self.keep_f + '/' +  'tmp_p_f.json'
+          snarkjs['pd_f'] = self.keep_f + '/' + 'tmp_pd_f.json'
           # snarkjs setup is launched with circuit.json, format extended. Convert input file if necessary
           if self.witness_f.endswith('.json') and self.proving_key_f.endswith('.json') and self.pk['k_binformat']==FMT_EXT :
              witness_file = self.witness_f
@@ -264,15 +291,15 @@ class GrothProver(object):
             else: 
                witness_file = self.witness_f
                proving_key_file = self.proving_key_f.replace('.json','_cpy.json')
-            proving_key_file = keep_f + proving_key_file
-            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk, self.worker)
+            proving_key_file = self.keep_f + '/' + proving_key_file.rsplit('/', 1)[1]
+            #proving_key_file = self.keep_f + proving_key_file
+            pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk)
             pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
             f = open(proving_key_file, 'w')
             print(pk_json, file=f)
             f.close()
           else:
-            print("Witness file needs to be .json\n", file=self.log_f)
-            self.log_f.flush()
+            logging.error(' Witness file %s needs to be .json', self.witness_f)
             sys.exit(1)
 
           if self.test_f is not None:
@@ -290,9 +317,8 @@ class GrothProver(object):
           if self.verification_key_f is not None and self.verification_key_f.endswith('.json') :
              verification_key_file = self.verification_key_f
           else :
-             print("To launch snarkjs, verification filen needs to be json file", file=self.log_f)
-              self.log_f.flush()
-              os.exit(1)
+             logging.error(' To launch snarkjs, verification file %s needs to be a json file', self.verification_key_f)
+             os.exit(1)
         
           snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
        
@@ -305,9 +331,10 @@ class GrothProver(object):
         # Read witness
         self.t_GP = []
         start = time.time()
+        start_p = time.time()
         self.read_witness_data()
         end = time.time()
-        self.t_GP.append(end - start)
+        self.t_GP.append({'read w' :end - start})
 
         ZField.set_field(MOD_FIELD)
         # Init r and s scalars
@@ -317,12 +344,19 @@ class GrothProver(object):
         if use_pycusnarks and self.accel:
            self.r_scl = self.r_scl.as_uint256()
            self.s_scl = self.s_scl.as_uint256()
+           start = time.time()
            self.witness_scl = \
-             np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
+              np.reshape(np.asarray([el.as_uint256() for el in self.witness_scl], dtype=np.uint32),(-1,NWORDS_256BIT))
+           end = time.time()
+           self.t_GP.append({'convert w' :end - start})
            nVars = self.pk['nVars']
            nPublic = self.pk['nPublic']
+
            self.sorted_witness1_idx = sortu256_idx_h(self.witness_scl[:nVars])
            self.sorted_witness2_idx = sortu256_idx_h(self.witness_scl[nPublic+1:nVars])
+
+        end = time.time()
+        self.t_GP.append({'sort' :end - start})
 
 
         # Accumulate multiplication of S EC points and S scalar. Parallelization
@@ -338,9 +372,11 @@ class GrothProver(object):
         if use_pycusnarks and self.accel:
           start = time.time()
           ZField.set_field(MOD_FIELD)
-          r = ZFieldElExt.from_uint256(self.r_scl)
-          s = ZFieldElExt.from_uint256(self.s_scl)
-          d4_u256  = ZFieldElExt(-r * s).as_uint256()
+          r_mont = to_montgomeryN_h(np.reshape(self.r_scl,-1),MOD_FIELD)
+          d4_u256 = montmult_neg_h(np.reshape(r_mont,-1),np.reshape(self.s_scl,-1), MOD_FIELD)
+          #r = ZFieldElExt.from_uint256(self.r_scl)
+          #s = ZFieldElExt.from_uint256(self.s_scl)
+          #d4_u256  = ZFieldElExt(-r * s).as_uint256()
 
           ZField.set_field(MOD_GROUP)
           self.pi_a_eccf1 = ec_jac2aff_h(self.pi_a_eccf1.reshape(-1),ZField.get_field())
@@ -361,11 +397,11 @@ class GrothProver(object):
           ecbn128_samples = np.concatenate((K,P))
 
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-          self.t_EC.append(t1)
+          self.t_EC.append({'pi_c final' : t1})
           self.pi_c_eccf1 = ec_jac2aff_h(self.pi_c_eccf1.reshape(-1),ZField.get_field())
           self.public_signals = self.witness_scl[1:self.pk['nPublic']+1]
           end = time.time()
-          self.t_GP.append(end - start)
+          self.t_GP.append({'total proof':end - start_p})
 
         else :
           d4  = ZFieldElExt(-(self.r_scl * self.s_scl))
@@ -402,7 +438,7 @@ class GrothProver(object):
           P = np.concatenate((np.reshape(sorted_A_ecc,-1),self.pk['alfa_1'], self.pk['delta_1']))
           ecbn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
           self.pi_a_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-          self.t_EC.append(t1)
+          self.t_EC.append({'pi_a':t1})
 
           # pi_b = pi_b + beta2 + delta2 * s
           K[-1] = self.s_scl
@@ -410,7 +446,7 @@ class GrothProver(object):
           P = np.concatenate((np.reshape(sorted_B2_ecc,-1),self.pk['beta_2'], self.pk['delta_2']))
           ec2bn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
           self.pi_b_eccf2, t1 = ec_mad_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
-          self.t_EC.append(t1)
+          self.t_EC.append({'pi_b':t1})
           
 
           # pib1 = pib1 + beta1 + delta1 * s
@@ -418,16 +454,16 @@ class GrothProver(object):
           P = np.concatenate((np.reshape(sorted_B1_ecc,-1),self.pk['beta_1'], self.pk['delta_1']))
           ecbn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
           pib1_eccf1, t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-          self.t_EC.append(t1)
+          self.t_EC.append({'pib1':t1})
 
           # pi_c
           sorted_scl = self.witness_scl[nPublic+1:nVars][self.sorted_witness2_idx]
           sorted_C_ecc = np.reshape(self.pk['C'][2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],(-1,2,NWORDS_256BIT))[self.sorted_witness2_idx]
           ecbn128_samples = np.concatenate((sorted_scl, np.reshape(sorted_C_ecc,(-1,NWORDS_256BIT))))
           self.pi_c_eccf1,t1 = ec_mad_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-          self.t_EC.append(t1)
+          self.t_EC.append({'pi_c' :t1} )
           end_ec = time.time()
-          self.t_EC.append(end_ec - start_ec)
+          self.t_EC.append({'total' :end_ec - start_ec})
 
         else :
           self.pi_a_eccf1  = np.sum(np.multiply(self.pk['A'][:nVars], self.witness_scl[:nVars]))
@@ -501,12 +537,12 @@ class GrothProver(object):
 
         if use_pycusnarks and self.accel:
           start_h = time.time()
-          start = time.time()
-          d2_u256 = ZFieldElExt(d2).reduce().as_uint256()
-          d1d2 = ZFieldElExt(d1 * d2)
-          _d3_d1d2 = ZFieldElExt(-d3 - d1d2.as_long())
-          end = time.time()
-          self.t_P.append(end-start)
+          #start = time.time()
+          #d2_u256 = ZFieldElExt(d2).reduce().as_uint256()
+          #d1d2 = ZFieldElExt(d1 * d2)
+          #_d3_d1d2 = ZFieldElExt(-d3 - d1d2.as_long())
+          #end = time.time()
+          #self.t_P.append({'scalar mult' : end-start})
 
           start = time.time()
           pidx = ZField.get_field()
@@ -517,7 +553,7 @@ class GrothProver(object):
           polB_T = mpoly_eval_h(self.witness_scl,self.pk['polsB'], reduce_coeff, m, nVars, pidx)
           polC_T = mpoly_eval_h(self.witness_scl,self.pk['polsC'], reduce_coeff, m, nVars, pidx)
           end = time.time()
-          self.t_P.append(end-start)
+          self.t_P.append({'mpols eval' : end-start})
           end_h = time.time()
           t_h = end_h - start_h
 
@@ -526,40 +562,37 @@ class GrothProver(object):
           ifft_params = ntt_build_h(polA_T.shape[0]);
           # polC_S  is extended -> use extended scaler
           polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polC_T, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
-          self.t_P.append(t1)
+          self.t_P.append({'polsC ifft' : t1})
           # polA_S montgomery -> use montgomery scaler
           polA_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polA_T,ifft_params, ZField.get_field(), as_mont=1)
-          self.t_P.append(t1)
+          self.t_P.append({'polsA ifft' : t1})
           # polB_S montgomery  -> use montgomery scaler
           # TODO : return_val = 0, out_extra_len= out_len
           polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, polB_T, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
-          self.t_P.append(t1)
+          self.t_P.append({'polsB ifft' : t1})
 
           mul_params = ntt_build_h(polA_S.shape[0]*2)
           #polAB_S is extended -> use extended scaler
           # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
           polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, polA_S,polB_S,mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
-          self.t_P.append(t1)
+          self.t_P.append({'polsAB mul' : t1})
           polAB_S = polAB_S[:zpoly_norm_h(polAB_S)]
 
           # polABC_S is extended
           # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
           # TODO : perform several sub operations per thread to improve efficiency
           polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, polAB_S, polC_S, ZField.get_field(), vectorA_len = 0, return_val=1)
-          self.t_P.append(t1)
+          self.t_P.append({'polsAB - polsC' : t1})
           polABC_S = polABC_S[:zpoly_norm_h(polABC_S)]
 
           # polABC_S, polH_S are extended
           polH_S = polABC_S[m:]
 
           #TODO : d1, d2 and d3 assumed to be zero
-          start = time.time()
           polH_S_idx = zpoly_norm_h(polH_S)
           polH_S = polH_S[:zpoly_norm_h(polH_S)]
-          end = time.time()
-          self.t_P.append(end-start)
           end_h = time.time()
-          self.t_P.append(end_h - start_h + t_h)
+          self.t_P.append({'total':end_h - start_h + t_h})
   
         else:
           # Init dense poly of degree m-1 (all zero)
@@ -584,7 +617,6 @@ class GrothProver(object):
           # polA_T[1] = polA_t[1] + (witness[0] * polsA[0]['1'])
           # polA_T[2] = polA_t[2] + (witness[1] * polsA[1]['2'])
           # polA_T[0] = polA_t[0] + (witness[2] * polsA[2]['0'])
-  
   
           polA_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polA_T] + self.pk['polsA'][:nVars]))
           polB_T = np.sum( np.multiply([1] + self.witness_scl[:nVars], [polB_T] + self.pk['polsB'][:nVars]))
@@ -642,19 +674,6 @@ class GrothProver(object):
           polH_S = polH_S.norm()
   
         return polH_S
-
-if __name__ == "__main__":
-    t = []
-    witness_f=DEFAULT_WITNESS_LOC
-    proving_key_f = DEFAULT_PROVING_KEY_LOC
-
-    G = GrothProver(proving_key_f)
-    for i in range(1):
-      t1,t2,t3 = G.proof(witness_f)
-      t.append(np.concatenate((t1,t2,t3)))
-      print(t[-1])
-    print(t)
-     
 
 """  
    t:

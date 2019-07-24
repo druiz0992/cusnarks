@@ -172,11 +172,11 @@ def run():
     parser.add_argument(
        '-out_kf', '--out_proving_key_format', type=int, help=help_str, required=False)  
 
-    help_str = 'Run snarks proof verification. Default : ' + str(opt['verify'])
+    help_str = 'Run snarkjs proof verification. Default : ' + str(opt['verify'])
     parser.add_argument(
        '-v', '--verify', type=int, help=help_str, required=False)  
 
-    help_str = 'Default location to retrieve and write files. Default ' + opt['data_f'])
+    help_str = 'Default location to retrieve and write files. Default ' + opt['data_f']
     parser.add_argument(
        '-df', '--data_folder', type=str, help=help_str, required=False)  
 
@@ -209,7 +209,10 @@ def run():
       return
     
     if args.proving_key is not None:
-        opt['proving_key_f'] = args.proving_key
+        if '//' in args.proving_key :
+            opt['proving_key_f'] = args.proving_key
+        else:
+            opt['proving_key_f'] = opt['data_f']  + args.proving_key
 
     if args.verification_key is not None:
         if '//' in args.verification_key:
@@ -226,7 +229,7 @@ def run():
     if args.debug is 0 or args.debug is None:
          opt['debug_f'] = None
     else:
-         opt['debug_f'] = opt['data_f'] + opt['debug_f']
+         opt['debug_f'] = opt['debug_f']
 
 
     if args.mode == 's' or args.mode == 'setup' or   \
@@ -313,7 +316,7 @@ def run():
       GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'],
                       out_proof_f=opt['proof_f'], out_public_f=opt['public_data_f'],
-                      out_proof_format=opt['proof_format'], out_public_format=['out_public_format'], test_f=opt['debug_f'],
+                      out_proof_format=opt['proof_format'], out_public_format=opt['public_data_format'], test_f=opt['debug_f'],
                       benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], accel=True, verify_en=opt['verify'], keep_f=opt['keep_f'] )
       
       GP.proof(opt['witness_f'])

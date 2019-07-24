@@ -48,6 +48,10 @@ import os.path
 import numpy as np
 import time
 import math
+from subprocess import call
+import multiprocessing as mp
+import nvgpu
+
 
 from zutils import ZUtils
 from random import randint
@@ -573,6 +577,14 @@ def get_shfl_blockD(nsamples):
  
    return blockD[::-1]
     
-   
-   
+def get_gpu_affinity_cuda():
+   available_gpus = nvgpu.available_gpus()
+   n_cores = mp.cpu_count()
+   gpu_affinity = {}
+   for gpu in available_gpus:
+     gpu_affinity[gpu] = []
+   for core in xrange(n_cores):
+      r = call(['nvidia-smi' , 'topo', '-c' , str(core)])
+      gpu_affinity[str(r)].append(core)
 
+   return gpu_affinity
