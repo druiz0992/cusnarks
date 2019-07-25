@@ -317,7 +317,7 @@ def run():
                       out_pk_format = opt['out_proving_key_format'],
                       out_proof_f=opt['proof_f'], out_public_f=opt['public_data_f'],
                       out_proof_format=opt['proof_format'], out_public_format=opt['public_data_format'], test_f=opt['debug_f'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], accel=True, verify_en=opt['verify'], keep_f=opt['keep_f'] )
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], verify_en=opt['verify'], keep_f=opt['keep_f'] )
       
       GP.proof(opt['witness_f'])
 

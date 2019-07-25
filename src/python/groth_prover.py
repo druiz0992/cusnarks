@@ -76,9 +76,21 @@ class GrothProver(object):
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',  out_proof_f = None,
                  out_public_f = None, out_pk_f=None, out_pk_format=FMT_MONT,
                  out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, 
-                 benchmark_f=None, seed=None, snarkjs=None, accel = True, verify_en=0, keep_f=None):
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None):
 
-        self.accel = accel
+        # Check valid folder exists
+        if keep_f is None:
+            print ("Repo directory needs to be provided\n")
+            sys.exit(1)
+
+        self.keep_f = gen_reponame(keep_f, sufix="_PROVER")
+
+        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+
+        if not use_pycusnarks :
+          logging.error('PyCUSnarks shared library not found. Exiting...')
+          sys.exit(1)
+
 
         if seed is not None:
           self.seed = seed
@@ -86,16 +98,14 @@ class GrothProver(object):
         else:
           self.seed = random.randint(0,1<<32)
 
-        if use_pycusnarks and self.accel:
-          self.roots1M_rdc_u256_sh = RawArray(c_uint32,  (1 << 20) * NWORDS_256BIT)
-          self.roots1M_rdc_u256 = np.frombuffer(self.roots1M_rdc_u256_sh, dtype=np.uint32).reshape((1<<20, NWORDS_256BIT))
-          np.copyto(self.roots1M_rdc_u256, readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20) )
-          #self.roots1M_rdc_u256 = readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20)
+        self.roots1M_rdc_u256_sh = RawArray(c_uint32,  (1 << 20) * NWORDS_256BIT)
+        self.roots1M_rdc_u256 = np.frombuffer(self.roots1M_rdc_u256_sh, dtype=np.uint32).reshape((1<<20, NWORDS_256BIT))
+        np.copyto(self.roots1M_rdc_u256, readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20) )
 
-          batch_size = 1<<20
-          self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
-          self.ec2bn128 = EC2BN128(batch_size + 2, seed=self.seed)
-          self.cuzpoly = ZCUPoly(batch_size, seed=self.seed)
+        batch_size = 1<<20
+        self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
+        self.ec2bn128 = EC2BN128(batch_size + 2, seed=self.seed)
+        self.cuzpoly = ZCUPoly(batch_size, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
         self.out_proving_key_format = out_pk_format
@@ -128,17 +138,13 @@ class GrothProver(object):
         self.sorted_scl_array = None
         self.sorted_scl_array_idx = None
 
-        if keep_f is None:
-            print ("Repo directory needs to be provided\n")
-            sys.exit(1)
-        self.keep_f = gen_reponame(keep_f, sufix="_PROVER")
+
         copy_input_files([proving_key_f, verification_key_f], self.keep_f)
         if test_f is None:
            self.test_f = test_f
         else:
            self.test_f= self.keep_f + '/' + test_f
 
-        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
         logging.info('#################################### ')
         logging.info('Staring Groth prover with the follwing parameters :')
         logging.info(' - proving_key_f : %s', proving_key_f)
@@ -153,7 +159,6 @@ class GrothProver(object):
         logging.info(' - benchmark_f : %s', benchmark_f)
         logging.info(' - seed : %s', seed)
         logging.info(' - snarkjs : %s', snarkjs)
-        logging.info(' - accel :  %s',accel)
         logging.info(' - verify_en : %s', verify_en)
         logging.info(' - keep_f : %s', keep_f)
         logging.info('#################################### ')
@@ -182,17 +187,18 @@ class GrothProver(object):
                              polsA_u256 = self.pk['polsA'], polsB_u256 = self.pk['polsB'], polsC_u256 = self.pk['polsC'],
                              nvars = self.pk['nVars'], npublic=self.pk['nPublic'], domain_bits=self.pk['domainBits'],
                              domain_size = self.pk['domainSize'])
-        # convert data to array of bytes so that it can be easily transfered to shared mem
-        if use_pycusnarks and self.accel:
-             #self.pk = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
-             if self.test_f :
-               self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
 
-             pk_bin = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
-             self.pk_sh = RawArray(c_uint32, int(pk_bin[0]))
-             self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
-             np.copyto(self.pk, pk_bin)
-             del pk_bin
+        # convert data to array of bytes so that it can be easily transfered to shared mem
+        if self.test_f :
+           # if snarkjs is to be launched to compare results, I am assuming circuit is small, so i keep 
+           # a version to be able to generate json. Else, results will overwrite input data
+           self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
+
+        pk_bin = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
+        self.pk_sh = RawArray(c_uint32, int(pk_bin[0]))
+        self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
+        np.copyto(self.pk, pk_bin)
+        del pk_bin
              
 
 
@@ -200,31 +206,35 @@ class GrothProver(object):
        ## Open and parse witness data
        if os.path.isfile(self.witness_f):
            f = open(self.witness_f,'r')
-           if use_pycusnarks and self.accel:
-              pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
-              nVars = int(pkbin_vars[0][0])
-              domainSize = int(pkbin_vars[1][0])
-              self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
-              self.scl_array = np.frombuffer(self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
-              np.copyto(self.scl_array[:nVars], np.reshape(np.asarray([BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
-                                                        dtype=np.uint32),(-1, NWORDS_256BIT)) )
 
-              self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize)
-              self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
+           pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
+           nVars = int(pkbin_vars[0][0])
+           domainSize = int(pkbin_vars[1][0])
+
+           self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
+           self.scl_array = np.frombuffer(
+                     self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
+           np.copyto(
+               self.scl_array[:nVars],
+               np.reshape(
+                   np.asarray(
+                       [BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
+                                                                     dtype=np.uint32),(-1, NWORDS_256BIT))
+                    )
+
+           self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize)
+           self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
           
-              self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
-              self.sorted_scl_array = np.frombuffer(self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
-              #self.scl_array = np.reshape(np.asarray([BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
-              #                                          dtype=np.uint32),(-1, NWORDS_256BIT))
-           else:
-              self.scl_array = [BigInt(c) for c in ast.literal_eval(json.dumps(json.load(f)))]
-           f.close()
+           self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
+           self.sorted_scl_array = np.frombuffer(
+                             self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT)
+                                                )
        else:
           logging.error('Witness file %s doesn\'t exist', self.witness_f)
           os.exit(1)
        
     def load_pkdata(self):
-       if use_pycusnarks and self.accel and self.proving_key_f.endswith('npz'):
+       if self.proving_key_f.endswith('npz'):
           npzfile = np.load(self.proving_key_f)
           self.pk['protocol'] = np.uint32(PROTOCOL_T_GROTH)
           self.pk['Rbitlen']  = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
@@ -254,11 +264,7 @@ class GrothProver(object):
            tmp_data = json.load(f)
            vk_proof = json_to_dict(tmp_data)
            f.close()
-           if use_pycusnarks and self.accel:
-              self.pk = pkjson_to_vars(vk_proof, self.proving_key_f)  
-           else:
-              ZField.find_roots(ZUtils.NROOTS)
-              self.pk = pkjson_to_pyvars(vk_proof)  
+           self.pk = pkjson_to_vars(vk_proof, self.proving_key_f)  
            del vk_proof
            del tmp_data
 
@@ -277,11 +283,11 @@ class GrothProver(object):
        logging.info('')
        logging.info('')
 
-    def proof(self, witness_f):
+    def proof(self, witness_f, mproc = False):
       self.witness_f = witness_f
       logging.info("Starting proof...")
 
-      t1, t2, t3 = self.gen_proof()
+      t1, t2, t3 = self.gen_proof(mproc)
        
       logging.info("Proof completed" )
       logging.info('')
@@ -304,7 +310,7 @@ class GrothProver(object):
       logging.info('')
 
       # convert data to pkvars if necessary (only if test_f is set)
-      if use_pycusnarks and self.accel and self.test_f is not None:
+      if self.test_f is not None:
         self.pk =  pkbin_to_vars(self.pk_short)
         del self.pk_short
 
@@ -403,100 +409,138 @@ class GrothProver(object):
        
         return snarkjs
 
-    def gen_proof(self):
+    def gen_proof(self, mproc=False):
         """
           public_signals, pi_a_eccf1, pi_b_eccf2, pi_c_eccf1 
+
+            inputs  : Witness from file 
+            Outputs : Bin witnes (2)
+
+          1 - Read all witness data -> CPU. When batch samples available,
+                  start process 3
+
+          ------------------------
+            inputs  : Witness (1)
+            Outputs : pi's (final result),  pi_c (4).
+
+          2.1 - get witness batch  
+          2.2 - sort witness1 batch [0-nVars] -> CPU
+          2.3 - EC multi expo with batch A/B1/B2 and witnesss1 -> pi_a, pi_b, pib -> GPU
+          2.4 - sort witness2 batch [nPublic+1,nVars]
+          2.5 - EC multi expo with batch C and witnesss2 -> pi_c
+          ------------------------
+       
+            inputs  : pols from file
+                      witness (1). But reqiures all witness read
+            Outputs : pX_T (I can't start 4 until all poool is availlable)
+
+          3.1  Evaluate pols pA, pB and pC. Complete poly needs to be evaluated
+                 before starting FFTs. CPU cores can work in this. Ideally,
+                 multiple cores help evaluate pA. When it is done, repeat for pB,...
+                 polsA   ----> polA_T  ----> delete polsA. I need mutexes. Modify 
+                 C routine to do this
+          ------------------------
+
+            inputs  : pX_T (3)A
+            output  : pH at the end of process (5). 
+
+          4.1   Get polA_T, polB_T and polB_T batch
+          4.2   perform 3xIFFT, 1 poly MUL and 1 poly SUB. Dedicate GPUs to do partial IFFT
+                and CPU to combine results to do 3-step fft. Complete  IFFT-A, IFFT-B, IFFT-C,
+                 FFT-A, FFT-B, FFT-AxFFT-B, IFFTAxB, SUB and finaly get pH
+          -----------------------
+            
+            Input : pH (4), hExps (file), pi_c (2)
+            Output : pi_c
+
+          5.1 - EC multi expo with batch hExps and pH -
+ 
+         
+         ------
+          
+            1 1 1 1 1 1 1 1 1 
+                  2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 
+                            3 3 3 3 3 3 pA done 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
+                                               StartIFFT PA 4 4 4 4 4 4 4 4 4 4 4 4 PH Done
+                                                                                     5 5 5 5 5 5 5 5 5 5 5 5 5 5 
+
+
+
         """
-        # Read witness
+
         self.t_GP = {}
         start = time.time()
         start_p = time.time()
+
+        # Read witness info
         self.read_witness_data()
+
         end = time.time()
         self.t_GP['read w'] = round(end - start,2)
 
         ZField.set_field(MOD_FIELD)
+
         # Init r and s scalars
-        self.r_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1))
-        self.s_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1))
+        self.r_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
+        self.s_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
 
-        if use_pycusnarks and self.accel:
-           self.r_scl = self.r_scl.as_uint256()
-           self.s_scl = self.s_scl.as_uint256()
-           pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize','hExps', 'delta_1','polsA'])
-           #large input : hExps. I can overwrite it provided that i don't require comparing to snarkjs
-           nVars = pk_bin[0][0]
-           nPublic = pk_bin[1][0]
-           domainSize = pk_bin[2][0]
-           hExps = np.reshape(pk_bin[3],(-1,NWORDS_256BIT))
-           delta_1 = pk_bin[4]
-           polH = np.reshape(pk_bin[5][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
+        pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize','hExps', 'delta_1','polsA'])
 
-           np.copyto(self.sorted_scl_array_idx[:nVars], sortu256_idx_h(self.scl_array[:nVars]))
-           np.copyto(self.sorted_scl_array[:nVars], self.scl_array[:nVars][self.sorted_scl_array_idx[:nVars]])
+        #large input : hExps. I can overwrite it provided that i don't require comparing to snarkjs
+        nVars = pk_bin[0][0]
+        nPublic = pk_bin[1][0]
+        domainSize = pk_bin[2][0]
+        hExps = np.reshape(pk_bin[3],(-1,NWORDS_256BIT))
+        delta_1 = pk_bin[4]
+        polH = np.reshape(pk_bin[5][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
+
+        # sorted scl array is in shared memory. It keeps a working window for data
+        np.copyto(
+            self.sorted_scl_array_idx[:nVars],
+            sortu256_idx_h(self.scl_array[:nVars])
+                 )
+
+        np.copyto(
+          self.sorted_scl_array[:nVars],
+          self.scl_array[:nVars][self.sorted_scl_array_idx[:nVars]]
+                 )
 
         end = time.time()
         self.t_GP['sort'] = round(end - start,2)
 
-
-        # Accumulate multiplication of S EC points and S scalar. Parallelization
-        # can be accomplised by each thread performing a multiplication and storing
-        # values in same input EC point
-        # Second step is to add all ECC points
         pib1_eccf1 = self.findECPoints()
 
-        d1 = d2 = d3 = 0
-        # polH must be in extended format
-        
-        if use_pycusnarks and self.accel:
-          self.calculateH(d1, d2, d3)
+        self.calculateH()
 
-          ds_1 = domainSize - 1
-          start = time.time()
-          ZField.set_field(MOD_FIELD)
-          r_mont = to_montgomeryN_h(np.reshape(self.r_scl,-1),MOD_FIELD)
-          self.sorted_scl_array[ds_1+3:ds_1+4] = montmult_neg_h(np.reshape(r_mont,-1),np.reshape(self.s_scl,-1), MOD_FIELD)
+        ds_1 = domainSize - 1
+        start = time.time()
+        ZField.set_field(MOD_FIELD)
+        r_mont = to_montgomeryN_h(np.reshape(self.r_scl,-1),MOD_FIELD)
+        self.sorted_scl_array[ds_1+3:ds_1+4] = montmult_neg_h(np.reshape(r_mont,-1),np.reshape(self.s_scl,-1), MOD_FIELD)
 
-          ZField.set_field(MOD_GROUP)
+        ZField.set_field(MOD_GROUP)
 
-          np.copyto(self.sorted_scl_array_idx[:ds_1], sortu256_idx_h(polH[:ds_1]))
-          np.copyto(self.sorted_scl_array[:ds_1], polH[:ds_1][self.sorted_scl_array_idx[:ds_1]])
-          self.sorted_scl_array[ds_1:ds_1+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-          self.sorted_scl_array[ds_1+1:ds_1+2] = self.s_scl
-          self.sorted_scl_array[ds_1+2:ds_1+3] = self.r_scl
+        np.copyto(self.sorted_scl_array_idx[:ds_1], sortu256_idx_h(polH[:ds_1]))
+        np.copyto(self.sorted_scl_array[:ds_1], polH[:ds_1][self.sorted_scl_array_idx[:ds_1]])
+        self.sorted_scl_array[ds_1:ds_1+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
+        self.sorted_scl_array[ds_1+1:ds_1+2] = self.s_scl
+        self.sorted_scl_array[ds_1+2:ds_1+3] = self.r_scl
 
-          np.copyto(hExps[:2*ds_1], np.reshape(np.reshape(hExps[:2*ds_1], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:ds_1]],(-1,NWORDS_256BIT)))
-          hExps[2*ds_1:2*ds_1+2] = self.pi_c_eccf1[:2]
-          hExps[2*ds_1+2:2*ds_1+4] = self.pi_a_eccf1[:2]
-          hExps[2*ds_1+4:2*ds_1+6] = pib1_eccf1[:2]
-          hExps[2*ds_1+6:2*ds_1+8] = np.reshape(delta_1,(-1,NWORDS_256BIT))
-          self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-              self.sorted_scl_array[:ds_1+4],
-              hExps[:2*ds_1+8],
-              False)
+        np.copyto(hExps[:2*ds_1], np.reshape(np.reshape(hExps[:2*ds_1], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:ds_1]],(-1,NWORDS_256BIT)))
+        hExps[2*ds_1:2*ds_1+2] = self.pi_c_eccf1[:2]
+        hExps[2*ds_1+2:2*ds_1+4] = self.pi_a_eccf1[:2]
+        hExps[2*ds_1+4:2*ds_1+6] = pib1_eccf1[:2]
+        hExps[2*ds_1+6:2*ds_1+8] = np.reshape(delta_1,(-1,NWORDS_256BIT))
+        self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
+            self.sorted_scl_array[:ds_1+4],
+            hExps[:2*ds_1+8],
+            False)
 
-          self.t_EC['pi_c final'] = round(t1,2)
+        self.t_EC['pi_c final'] = round(t1,2)
 
-          self.public_signals = np.copy(self.scl_array[1:nPublic+1])
-          end = time.time()
-          self.t_GP['total'] = round(end - start_p,2)
-
-        else :
-          polH = self.calculateH(d1, d2, d3)
-          d4  = ZFieldElExt(-(self.r_scl * self.s_scl))
-          ZField.set_field(MOD_GROUP)
-          d5  = d4 * self.pk['delta_1']
-
-          coeffH = polH.get_coeff()
-
-          # Accumulate products of S ecc points and S scalars (same as at the beginning)
-          n_coeff_h = len(coeffH)
-          self.pi_c_eccf1 += np.sum(np.multiply(self.pk['hExps'][:n_coeff_h ], coeffH[:n_coeff_h]))
-
-        
-          self.pi_c_eccf1  += (self.pi_a_eccf1 * self.s_scl) + (pib1_eccf1 * self.r_scl) + d5
-
-          self.public_signals = self.scl_array[1:self.pk['nPublic']+1]
+        self.public_signals = np.copy(self.scl_array[1:nPublic+1])
+        end = time.time()
+        self.t_GP['total'] = round(end - start_p,2)
 
         return self.t_EC, self.t_P, self.t_GP
  
@@ -517,77 +561,56 @@ class GrothProver(object):
         self.t_EC = {}
         ZField.set_field(MOD_GROUP)
 
-        if use_pycusnarks and self.accel:
-          pk_bin = pkbin_get(self.pk,['nVars', 'nPublic','A', 'B1', 'B2', 'C'])
-          nVars = pk_bin[0][0]
-          nPublic = pk_bin[1][0]
-          A = pk_bin[2]
-          B1 = pk_bin[3]
-          B2 = pk_bin[4]
-          C  = pk_bin[5]
-          start_ec = time.time()
+        pk_bin = pkbin_get(self.pk,['nVars', 'nPublic','A', 'B1', 'B2', 'C'])
+        nVars = pk_bin[0][0]
+        nPublic = pk_bin[1][0]
+        A = pk_bin[2]
+        B1 = pk_bin[3]
+        B2 = pk_bin[4]
+        C  = pk_bin[5]
+        start_ec = time.time()
 
-          #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P
-          
-          self.sorted_scl_array[nVars:nVars+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-          self.sorted_scl_array[nVars+1:nVars+2] = self.r_scl
+        #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P
+        
+        self.sorted_scl_array[nVars:nVars+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
+        self.sorted_scl_array[nVars+1:nVars+2] = self.r_scl
 
-          np.copyto(A[:2*nVars*NWORDS_256BIT], np.reshape(np.reshape(A[:2*nVars*NWORDS_256BIT], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
-          self.pi_a_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-              self.sorted_scl_array[:2+nVars],
-              A,
-              False)
-          self.t_EC['pi_a'] = round(t1,2)
+        np.copyto(A[:2*nVars*NWORDS_256BIT], np.reshape(np.reshape(A[:2*nVars*NWORDS_256BIT], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
+        self.pi_a_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
+            self.sorted_scl_array[:2+nVars],
+            A,
+            False)
+        self.t_EC['pi_a'] = round(t1,2)
 
-          self.sorted_scl_array[nVars+1:nVars+2] = self.s_scl
-          np.copyto(B2[:4*nVars*NWORDS_256BIT], np.reshape(np.reshape(B2[:4*nVars*NWORDS_256BIT], (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
-          self.pi_b_eccf2,t1 = self.compute_proof_ecp(self.ec2bn128, 
-               self.sorted_scl_array[:2+nVars],
-               B2,
-               True)
-          self.t_EC['pi_b']= round(t1,2)
+        self.sorted_scl_array[nVars+1:nVars+2] = self.s_scl
+        np.copyto(B2[:4*nVars*NWORDS_256BIT], np.reshape(np.reshape(B2[:4*nVars*NWORDS_256BIT], (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
+        self.pi_b_eccf2,t1 = self.compute_proof_ecp(self.ec2bn128, 
+             self.sorted_scl_array[:2+nVars],
+             B2,
+             True)
+        self.t_EC['pi_b']= round(t1,2)
 
-          np.copyto(B1[:2*nVars*NWORDS_256BIT], np.reshape(np.reshape(B1[:2*nVars*NWORDS_256BIT], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
-          pib1_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-              self.sorted_scl_array[:2+nVars], 
-              B1,
-              False)
-          self.t_EC['pib1'] = round(t1,2)
+        np.copyto(B1[:2*nVars*NWORDS_256BIT], np.reshape(np.reshape(B1[:2*nVars*NWORDS_256BIT], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
+        pib1_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
+            self.sorted_scl_array[:2+nVars], 
+            B1,
+            False)
+        self.t_EC['pib1'] = round(t1,2)
 
-          np.copyto(self.sorted_scl_array_idx[nPublic+1:nVars], sortu256_idx_h(self.scl_array[nPublic+1:nVars]))
-          np.copyto(self.sorted_scl_array[nPublic+1:nVars], self.scl_array[nPublic+1:nVars][self.sorted_scl_array_idx[nPublic+1:nVars]])
+        np.copyto(self.sorted_scl_array_idx[nPublic+1:nVars], sortu256_idx_h(self.scl_array[nPublic+1:nVars]))
+        np.copyto(self.sorted_scl_array[nPublic+1:nVars], self.scl_array[nPublic+1:nVars][self.sorted_scl_array_idx[nPublic+1:nVars]])
 
-          np.copyto(C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT], 
-                 np.reshape(np.reshape(C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],
-                                (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[nPublic+1:nVars]],-1))
-          self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-              self.sorted_scl_array[nPublic+1:nVars],
-              C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],
-              False)
-          self.t_EC['pi_c'] = round(t1,2)
+        np.copyto(C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT], 
+               np.reshape(np.reshape(C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],
+                              (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[nPublic+1:nVars]],-1))
+        self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
+            self.sorted_scl_array[nPublic+1:nVars],
+            C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],
+            False)
+        self.t_EC['pi_c'] = round(t1,2)
 
-          end_ec = time.time()
-          self.t_EC['total']  = round(end_ec - start_ec,2)
-
-        else :
-          nVars = self.pk['nVars']
-          nPublic = self.pk['nPublic']
-          self.pi_a_eccf1  = np.sum(np.multiply(self.pk['A'][:nVars], self.scl_array[:nVars]))
-          self.pi_b_eccf2  = np.sum(np.multiply(self.pk['B2'][:nVars], self.scl_array[:nVars]))
-          pib1_eccf1       = np.sum(np.multiply(self.pk['B1'][:nVars], self.scl_array[:nVars]))
-          self.pi_c_eccf1  = np.sum(np.multiply(self.pk['C'][nPublic+1:nVars], self.scl_array[nPublic+1:nVars]))
-
-          # pi_a = pi_a + alfa1 + delta1 * r
-          self.pi_a_eccf1  += self.pk['alfa_1']
-          self.pi_a_eccf1  += (self.pk['delta_1'] * self.r_scl)
-
-          # pi_b = pi_b + beta2 + delta2 * s
-          self.pi_b_eccf2  += self.pk['beta_2']
-          self.pi_b_eccf2  += (self.pk['delta_2'] * self.s_scl)
-  
-          # pib1 = pib1 + beta1 + delta1 * s
-          pib1_eccf1 += self.pk['beta_1']
-          pib1_eccf1 += (self.pk['delta_1'] * self.s_scl)
+        end_ec = time.time()
+        self.t_EC['total']  = round(end_ec - start_ec,2)
 
         return pib1_eccf1
 
@@ -635,174 +658,80 @@ class GrothProver(object):
            writeU256DataFile_h(proof_bin, self.out_public_f.encode("UTF-8"))
                
 
-    def calculateH(self, d1, d2, d3):
+    def calculateH(self):
         ZField.set_field(MOD_FIELD)
         self.t_P = {}
 
-        if use_pycusnarks and self.accel:
-          pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB', 'polsC', 'polsH'])
-          nVars = pk_bin[0][0]
-          m = pk_bin[1][0]
-          pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-          pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-          pC = np.reshape(pk_bin[4][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-          pH = np.reshape(pk_bin[5][:(2*m-1)*NWORDS_256BIT],((2*m-1),NWORDS_256BIT))
-          start_h = time.time()
-          #start = time.time()
+        pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB', 'polsC', 'polsH'])
+        nVars = pk_bin[0][0]
+        m = pk_bin[1][0]
+        pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
+        pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
+        pC = np.reshape(pk_bin[4][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
+        pH = np.reshape(pk_bin[5][:(2*m-1)*NWORDS_256BIT],((2*m-1),NWORDS_256BIT))
 
-          start = time.time()
-          pidx = ZField.get_field()
-          # Convert witness to montgomery in zpoly_maddm_h
-          #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-          reduce_coeff = 0
-          polA_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pA,-1), reduce_coeff, m, nVars, pidx)
-          np.copyto(pA, polA_T)
-          del polA_T
-          polB_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pB,-1), reduce_coeff, m, nVars, pidx)
-          np.copyto(pB, polB_T)
-          del polB_T
-          polC_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pC,-1), reduce_coeff, m, nVars, pidx)
-          np.copyto(pC, polC_T)
-          del polC_T
-          end = time.time()
-          self.t_P['eval'] = round(end-start,2)
-          end_h = time.time()
-          t_h = end_h - start_h
+        start_h = time.time()
+        start = time.time()
+
+        # Convert witness to montgomery in zpoly_maddm_h
+        #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
+        pidx = ZField.get_field()
+        reduce_coeff = 0  
+        polA_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pA,-1), reduce_coeff, m, nVars, pidx)
+        np.copyto(pA, polA_T)
+        del polA_T
+        polB_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pB,-1), reduce_coeff, m, nVars, pidx)
+        np.copyto(pB, polB_T)
+        del polB_T
+        polC_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pC,-1), reduce_coeff, m, nVars, pidx)
+        np.copyto(pC, polC_T)
+        del polC_T
+        end = time.time()
+        self.t_P['eval'] = round(end-start,2)
+        end_h = time.time()
+        t_h = end_h - start_h
 
 
-          start_h = time.time()
-          ifft_params = ntt_build_h(pA.shape[0])
+        start_h = time.time()
+        ifft_params = ntt_build_h(pA.shape[0])
 
-          # polC_S  is extended -> use extended scaler
-          polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
-          np.copyto(pC,polC_S)
-          del polC_S
-          self.t_P['ifft-C'] = round(t1,2)
+        # polC_S  is extended -> use extended scaler
+        polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
+        np.copyto(pC,polC_S)
+        del polC_S
+        self.t_P['ifft-C'] = round(t1,2)
 
-          # polA_S montgomery -> use montgomery scaler
-          polA_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pA,ifft_params, ZField.get_field(), as_mont=1)
-          np.copyto(pA,polA_S)
-          del polA_S
-          self.t_P['ifft-A'] =  round(t1,2)
+        # polA_S montgomery -> use montgomery scaler
+        polA_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pA,ifft_params, ZField.get_field(), as_mont=1)
+        np.copyto(pA,polA_S)
+        del polA_S
+        self.t_P['ifft-A'] =  round(t1,2)
 
-          # polB_S montgomery  -> use montgomery scaler
-          # TODO : return_val = 0, out_extra_len= out_len
-          polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pB, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
-          np.copyto(pB,polB_S)
-          del polB_S
-          self.t_P['ifft-B'] = round(t1,2)
+        # polB_S montgomery  -> use montgomery scaler
+        # TODO : return_val = 0, out_extra_len= out_len
+        polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pB, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
+        np.copyto(pB,polB_S)
+        del polB_S
+        self.t_P['ifft-B'] = round(t1,2)
 
-          mul_params = ntt_build_h(pH.shape[0])
-          #polAB_S is extended -> use extended scaler
-          # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
-          polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
-          nsamplesH = zpoly_norm_h(polAB_S)
-          np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
-          del polAB_S
-          self.t_P['mul'] = round(t1,2)
+        mul_params = ntt_build_h(pH.shape[0])
+        #polAB_S is extended -> use extended scaler
+        # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
+        polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
+        nsamplesH = zpoly_norm_h(polAB_S)
+        np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
+        del polAB_S
+        self.t_P['mul'] = round(t1,2)
 
-          # polABC_S is extended
-          # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
-          # TODO : perform several sub operations per thread to improve efficiency
-          polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, pH[:nsamplesH], pC, ZField.get_field(), vectorA_len = 0, return_val=1)
-          np.copyto(pH[:m-1],polABC_S[m:])
-          del polABC_S
-          self.t_P['sub'] =  round(t1,2)
+        # polABC_S is extended
+        # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
+        # TODO : perform several sub operations per thread to improve efficiency
+        polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, pH[:nsamplesH], pC, ZField.get_field(), vectorA_len = 0, return_val=1)
+        np.copyto(pH[:m-1],polABC_S[m:])
+        del polABC_S
+        self.t_P['sub'] =  round(t1,2)
 
-          # polABC_S, polH_S are extended
-          #polH_S = polABC_S[m:]
+        end_h = time.time()
+        self.t_P['total'] = round( end_h - start_h + t_h,2)
 
-          #TODO : d1, d2 and d3 assumed to be zero
-          end_h = time.time()
-          self.t_P['total'] = round( end_h - start_h + t_h,2)
-  
-        else:
-          nVars = self.pk['nVars']
-          m = np.int32(self.pk['domainSize'])
-          # Init dense poly of degree m-1 (all zero)
-          polA_T = ZPoly([ZFieldElExt(0) for i in xrange(m)])
-          polB_T = ZPoly([ZFieldElExt(0) for i in xrange(m)])
-          polC_T = ZPoly([ZFieldElExt(0) for i in xrange(m)])
-
-          # interpretation of polsA is that there are up to S sparse polynomials, and each sparse poly
-          # has C sparse coeffs
-          # polA_T = polA_T + witness[s] * polsA[s]
-          #
-          #  for (let s=0; s<vk_proof.nVars; s++) {
-          #     for (let c in vk_proof.polsA[s]) {
-          #           polA_T[c] = F.add(polA_T[c], F.mul(witness[s], vk_proof.polsA[s][c]));
-          #     }
-          #
-          # Ex:
-          # s iterates from 0 to 4
-          # polsA = [{'1': 1}, {'2' : 1}, {'0': 3924283749832748327}, {}]
-          # polsA[0] = {'1' : 1}, polsA[1] = {'2':1}, polsA[2] = {'0',3243243284}, polsA[3]={}
-          # c in polsA[0] : '1', c in polsA[1] : '2', c in polsA[2] : '0', c in polsA[3] : {}
-          # polA_T[1] = polA_t[1] + (witness[0] * polsA[0]['1'])
-          # polA_T[2] = polA_t[2] + (witness[1] * polsA[1]['2'])
-          # polA_T[0] = polA_t[0] + (witness[2] * polsA[2]['0'])
-  
-          polA_T = np.sum( np.multiply([1] + self.scl_array[:nVars], [polA_T] + self.pk['polsA'][:nVars]))
-          polB_T = np.sum( np.multiply([1] + self.scl_array[:nVars], [polB_T] + self.pk['polsB'][:nVars]))
-          polC_T = np.sum( np.multiply([1] + self.scl_array[:nVars], [polC_T] + self.pk['polsC'][:nVars]))
-  
-          polA_T = polA_T.expand_to_degree(nVars-1)
-          polB_T = polB_T.expand_to_degree(nVars-1)
-          polC_T = polC_T.expand_to_degree(nVars-1)
-  
-          # in : poly deg nVars-1.  out : poly deg nVars - 1
-          polA_S = ZPoly(polA_T)
-          polA_S.intt()
-          # in : poly deg nVars-1.  out : poly deg nVars - 1
-          polB_S = ZPoly(polB_T)
-          polB_S.intt()
- 
-          polC_S = ZPoly(polC_T)
-          polC_S.intt()
-
-          # in : 2xpoly deg nVars-1.  out : poly deg nVars - 1
-          polAB_S = ZPoly(polA_S)
-          polAB_S.poly_mul(ZPoly(polB_S))
-
-          polABC_S = polAB_S - polC_S
-    
-          inv_pol = None
-    
-          polZ_S = ZPoly([ZFieldElExt(-1)] + [ZFieldElExt(0) for i in range(m-1)] + [ZFieldElExt(1)])
-
-          #return polABC_S
-          polH_S = polABC_S.poly_div_snarks(polZ_S.get_degree())
-
-          """
-          H_S_copy = ZPoly(polH_S)
-          H_S_copy.poly_mul(polZ_S)
-
-          if H_S_copy == polABC_S:
-            print "OK"
-          else:
-            print "KO"
-          """
-
-          # add coefficients of the polynomial (d2*A + d1*B - d3) + d1*d2*Z 
-
-          polH_S = polH_S + d2 * polA_S + d2 * polB_S
-          polH_S = polH_S.expand_to_degree(m)
-
-          polH_S.zcoeff[0] -= d3
-  
-          # Z = x^m -1
-          d1d2 = d1 * d2
-          polH_S.zcoeff[m] += d1d2
-          polH_S.zcoeff[0] -= d1d2
-    
-          polH_S = polH_S.norm()
-  
-          return polH_S
-
-"""  
-   t:
-     ECPoints-EC_MAD_CUDA, ECPoints-EC2_MAD_CUDA, ECPoints-EC_MAD_CUDA, ECPoints-EC_MAD_CUDA, ECPoints-All
-     H-d, H-ZPOLY_MADDM_H, H-IFFT_C, H-IFFT_A, H-IFFT_B, H-MUL, H-AB_C, H-DIV, 0,0,0, H-NORM, H-All
-     END- MAD_CUDA, END-all
-         
-"""
+        return

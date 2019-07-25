@@ -106,11 +106,20 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
                     kernel_cb *kcb,uint32_t seed) : 
                        kernel_callbacks(kcb)
 {
+  int deviceCount = 0;
+  uint32_t id;
+  CCHECK(cudaGetDeviceCount(&deviceCount));
+
   if (CUSnarks::init_constants==0){
     CUSnarks::init_constants = 1;
-    CCHECK(cudaDeviceReset());
-    CUSnarks::allocateCudaCteResources();
+    for (id=0; id< deviceCount; id++){
+       CCHECK(cudaSetDevice(id));
+       CCHECK(cudaDeviceReset());
+       CUSnarks::allocateCudaCteResources();
+    }
+    CCHECK(cudaSetDevice(0));
   }
+
   in_vector_device.data = NULL;
   in_vector_device.length = in_len;
   in_vector_device.size = in_size;
