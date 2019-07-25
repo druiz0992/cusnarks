@@ -397,7 +397,7 @@ typedef enum{
   PROTOCOL_T_GROTH,
   PROTOCOL_T_N,
 
-}t_protocol;
+}protocol_t;
 
 typedef enum{
   EC_T_PROJECTIVE = 0,
@@ -405,5 +405,14 @@ typedef enum{
   EC_T_AFFINE,
   EC_T_N
 
-}t_ec_format;
+}ec_format_t;
+
+typedef enum{
+  GPU_ID0 = 0,
+  GPU_ID1,
+  GPU_ID2,
+  GPU_ID3
+
+}gpu_id_t;
+
 #endif

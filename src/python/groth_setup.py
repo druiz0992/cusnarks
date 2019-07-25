@@ -78,6 +78,17 @@ class GrothSetup(object):
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
                  benchmark_f=None, seed=None, snarkjs=None, keep_f=None):
  
+        if keep_f is None:
+            print ("Repo directory needs to be provided\n", file=self.log_f)
+            sys.exit(1)
+
+        self.keep_f = gen_reponame(keep_f, sufix="_SETUP") 
+
+        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+
+        if not use_pycusnarks :
+          logging.error('PyCUSnarks shared library not found. Exiting...')
+          sys.exit(1)
         if seed is not None:
           self.seed = seed
           random.seed(seed) 
@@ -115,17 +126,13 @@ class GrothSetup(object):
         self.out_circuit_f = out_circuit_f
         self.out_circuit_format = out_circuit_format
         self.in_circuit_format = FMT_EXT
-        if keep_f is None:
-            print ("Repo directory needs to be provided\n", file=self.log_f)
-            sys.exit(1)
 
-        self.keep_f = gen_reponame(keep_f, sufix="_SETUP") 
+
         self.alfabeta_f = self.keep_f + '/' + 'alfabeta.json'
         self.test_f= self.keep_f + '/' +  test_f
         copy_input_files([in_circuit_f], self.keep_f)
 
-        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
-        logging.info('#################################### ', keep_f)
+        logging.info('#################################### ')
         logging.info('Staring Groth setupr with the follwing arguments :')
         logging.info(' - curve : %s',curve)
         logging.info(' - in_circuit_f : %s', in_circuit_f)
@@ -140,7 +147,7 @@ class GrothSetup(object):
         logging.info(' - seed : %s', seed)
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
-        logging.info('#################################### ', keep_f)
+        logging.info('#################################### ')
          
         if self.in_circuit_f is not None:
            self.circuitRead()
