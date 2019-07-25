@@ -125,6 +125,7 @@ class GrothSetup(object):
         copy_input_files([in_circuit_f], self.keep_f)
 
         logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+        logging.info('#################################### ', keep_f)
         logging.info('Staring Groth setupr with the follwing arguments :')
         logging.info(' - curve : %s',curve)
         logging.info(' - in_circuit_f : %s', in_circuit_f)
@@ -139,6 +140,7 @@ class GrothSetup(object):
         logging.info(' - seed : %s', seed)
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
+        logging.info('#################################### ', keep_f)
          
         if self.in_circuit_f is not None:
            self.circuitRead()
