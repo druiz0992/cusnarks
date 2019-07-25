@@ -571,8 +571,10 @@ def get_shfl_blockD(nsamples):
       blockD.append(1<<lpb)
       rsamples -= lpb
 
-   lastb = max(rsamples,5)
-   blockD.append(1<<lastb)
+   if rsamples :
+      lastb = max(rsamples,5)
+      blockD.append(1<<lastb)
+
    blockD.sort()
  
    return blockD[::-1]

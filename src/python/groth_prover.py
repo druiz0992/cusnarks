@@ -128,10 +128,15 @@ class GrothProver(object):
         self.pi_a_eccf1 = None
         self.pi_b_eccf2 = None
         self.pi_c_eccf1 = None
+        self.pib1_eccf1 = None
         self.public_signals = None
         self.witness_f = None
         self.snarkjs = snarkjs
         self.verify_en = verify_en
+
+        self.t_GP = {}
+        self.t_EC = {}
+        self.t_P = {}
         
         #scalar array : extended witness / polH
         self.scl_array = None
@@ -285,26 +290,27 @@ class GrothProver(object):
 
     def proof(self, witness_f, mproc = False):
       self.witness_f = witness_f
+      logging.info('#################################### ')
       logging.info("Starting proof...")
 
-      t1, t2, t3 = self.gen_proof(mproc)
+      self.gen_proof(mproc)
        
       logging.info("Proof completed" )
+      logging.info('#################################### ')
+
       logging.info('')
       logging.info('')
       logging.info('#################################### ')
+      logging.info('Total Time to generate proof : %s seconds', self.t_GP['total'])
       logging.info('')
-      logging.info('Total Time to generate proof : %s seconds', t3['total'])
+      logging.info('------ Time EC [sec] : %s ', self.t_EC['total.0'] + self.t_EC['total.1'] + self.t_EC['EC Mexp2'])
+      logging.info('%s', self.t_EC)
       logging.info('')
-      logging.info('------ Time EC [sec] : %s ', t1['total'] + t1['pi_c final'])
-      logging.info('%s', t1)
+      logging.info('----- Time FFT [sec] : %s ', self.t_P['total'])
+      logging.info('%s', self.t_P)
       logging.info('')
-      logging.info('----- Time FFT [sec] : %s ', t2['total'])
-      logging.info('%s', t2)
-      logging.info('')
-      logging.info('----- Time Main [sec] : %s ', t3['total'])
-      logging.info('%s', t3)
-      logging.info('')
+      logging.info('----- Time Main [sec] : %s ', self.t_GP['total'])
+      logging.info('%s', self.t_GP)
       logging.info('#################################### ')
       logging.info('')
       logging.info('')
@@ -348,6 +354,7 @@ class GrothProver(object):
           logging.info("Verification and Proving keys are different")
 
       if self.verify_en:
+        logging.info('#################################### ')
         logging.info("Calling snarkjs verify to verify proof ....")
         logging.info("")
         snarkjs = self.launch_snarkjs("verify")
@@ -355,7 +362,6 @@ class GrothProver(object):
           logging.info("Verification SUCCEDED")
         else:
           logging.info("Verification FAILED")
-        logging.info("")
         logging.info('#################################### ')
 
       return
@@ -467,8 +473,9 @@ class GrothProver(object):
 
 
         """
-
-        self.t_GP = {}
+        ######################
+        # Beginning of P1 - Read Witness
+        ######################
         start = time.time()
         start_p = time.time()
 
@@ -478,8 +485,13 @@ class GrothProver(object):
         end = time.time()
         self.t_GP['read w'] = round(end - start,2)
 
+        
+        ######################
+        # Beginning of P2 
+        #   - Get witness batch, sort and EC Multiexp
+        ######################
+        start = time.time()
         ZField.set_field(MOD_FIELD)
-
         # Init r and s scalars
         self.r_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
         self.s_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
@@ -490,29 +502,70 @@ class GrothProver(object):
         nVars = pk_bin[0][0]
         nPublic = pk_bin[1][0]
         domainSize = pk_bin[2][0]
+        ds_1 = domainSize - 1
         hExps = np.reshape(pk_bin[3],(-1,NWORDS_256BIT))
         delta_1 = pk_bin[4]
         polH = np.reshape(pk_bin[5][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
 
+        
         # sorted scl array is in shared memory. It keeps a working window for data
         np.copyto(
-            self.sorted_scl_array_idx[:nVars],
-            sortu256_idx_h(self.scl_array[:nVars])
+            self.sorted_scl_array_idx[:nPublic+1],
+            sortu256_idx_h(self.scl_array[:nPublic+1])
                  )
 
         np.copyto(
-          self.sorted_scl_array[:nVars],
-          self.scl_array[:nVars][self.sorted_scl_array_idx[:nVars]]
+          self.sorted_scl_array[:nPublic+1],
+          self.scl_array[:nPublic+1][self.sorted_scl_array_idx[:nPublic+1]]
                  )
 
         end = time.time()
-        self.t_GP['sort'] = round(end - start,2)
+        self.t_GP['sort1.0'] = round(end - start,2)
 
-        pib1_eccf1 = self.findECPoints()
+        start = time.time()
 
+        self.findECPoints(0)
+
+        end = time.time()
+        self.t_GP['EC Mexp1.0'] = round(end - start,2)
+
+        np.copyto(
+            self.sorted_scl_array_idx[nPublic+1:nVars],
+            sortu256_idx_h(self.scl_array[nPublic+1:nVars])
+                 )
+
+        np.copyto(
+          self.sorted_scl_array[nPublic+1:nVars],
+          self.scl_array[nPublic+1:nVars][self.sorted_scl_array_idx[nPublic+1:nVars]]
+                 )
+
+        self.sorted_scl_array[nPublic:nPublic+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
+        self.sorted_scl_array[nVars:nVars+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
+        self.sorted_scl_array[nVars+1:nVars+2] = self.r_scl
+
+        end = time.time()
+        self.t_GP['sort1.1'] = round(end - start,2)
+
+        start = time.time()
+
+        self.findECPoints(1)
+
+        end = time.time()
+        self.t_GP['EC Mexp1.1'] = round(end - start,2)
+        ######################
+        # Beginning of P3 and P4
+        #  P3 - Poly Eval
+        #  P4 - Poly Operations
+        ######################
+        start = time.time()
         self.calculateH()
+        end = time.time()
+        self.t_GP['pH'] = round(end - start,2)
 
-        ds_1 = domainSize - 1
+        ######################
+        # Beginning of P5
+        #   - Final EC MultiExp
+        ######################
         start = time.time()
         ZField.set_field(MOD_FIELD)
         r_mont = to_montgomeryN_h(np.reshape(self.r_scl,-1),MOD_FIELD)
@@ -529,20 +582,21 @@ class GrothProver(object):
         np.copyto(hExps[:2*ds_1], np.reshape(np.reshape(hExps[:2*ds_1], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:ds_1]],(-1,NWORDS_256BIT)))
         hExps[2*ds_1:2*ds_1+2] = self.pi_c_eccf1[:2]
         hExps[2*ds_1+2:2*ds_1+4] = self.pi_a_eccf1[:2]
-        hExps[2*ds_1+4:2*ds_1+6] = pib1_eccf1[:2]
+        hExps[2*ds_1+4:2*ds_1+6] = self.pib1_eccf1[:2]
         hExps[2*ds_1+6:2*ds_1+8] = np.reshape(delta_1,(-1,NWORDS_256BIT))
         self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
             self.sorted_scl_array[:ds_1+4],
             hExps[:2*ds_1+8],
             False)
 
-        self.t_EC['pi_c final'] = round(t1,2)
+        end = time.time()
+        self.t_EC['EC Mexp2'] = round(end - start,2)
 
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
-        end = time.time()
+
         self.t_GP['total'] = round(end - start_p,2)
 
-        return self.t_EC, self.t_P, self.t_GP
+        return 
  
 
     def compute_proof_ecp(self, pyCuOjb, K, P, ec2):
@@ -556,9 +610,10 @@ class GrothProver(object):
 
             return ecp, t
 
-    def findECPoints(self):
+    def findECPoints(self, phase):
     
-        self.t_EC = {}
+        start_ec = time.time()
+
         ZField.set_field(MOD_GROUP)
 
         pk_bin = pkbin_get(self.pk,['nVars', 'nPublic','A', 'B1', 'B2', 'C'])
@@ -568,51 +623,100 @@ class GrothProver(object):
         B1 = pk_bin[3]
         B2 = pk_bin[4]
         C  = pk_bin[5]
-        start_ec = time.time()
+
+        if phase == 0:
+          start_idx = 0
+          start_idx2 = start_idx
+          end_idx = nPublic+1
+          end_idx2 = end_idx
+        
+        else:
+          start_idx = nPublic+1
+          start_idx2 = nPublic
+          end_idx = nVars
+          end_idx2 = nVars+2
+       
 
         #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P
         
-        self.sorted_scl_array[nVars:nVars+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-        self.sorted_scl_array[nVars+1:nVars+2] = self.r_scl
+        np.copyto(
+            A[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
+            np.reshape(
+                 np.reshape(A[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
+                           (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
+                 )
 
-        np.copyto(A[:2*nVars*NWORDS_256BIT], np.reshape(np.reshape(A[:2*nVars*NWORDS_256BIT], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
-        self.pi_a_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-            self.sorted_scl_array[:2+nVars],
-            A,
-            False)
-        self.t_EC['pi_a'] = round(t1,2)
+        self.pi_a_eccf1,t1 = self.compute_proof_ecp(
+                                        self.ecbn128,
+                                        self.sorted_scl_array[start_idx2:end_idx2],
+                                        A[2*start_idx2*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
+                                        False)
+        # Copy result for carrying sum
+        np.copyto(
+             A[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
+             np.reshape(self.pi_a_eccf1[:2],-1)
+         )
+        self.t_EC['pi_a.'+str(phase)] = round(t1,2)
 
         self.sorted_scl_array[nVars+1:nVars+2] = self.s_scl
-        np.copyto(B2[:4*nVars*NWORDS_256BIT], np.reshape(np.reshape(B2[:4*nVars*NWORDS_256BIT], (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
-        self.pi_b_eccf2,t1 = self.compute_proof_ecp(self.ec2bn128, 
-             self.sorted_scl_array[:2+nVars],
-             B2,
-             True)
-        self.t_EC['pi_b']= round(t1,2)
 
-        np.copyto(B1[:2*nVars*NWORDS_256BIT], np.reshape(np.reshape(B1[:2*nVars*NWORDS_256BIT], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:nVars]],-1))
-        pib1_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-            self.sorted_scl_array[:2+nVars], 
-            B1,
-            False)
-        self.t_EC['pib1'] = round(t1,2)
+        np.copyto(
+            B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT],
+            np.reshape(
+                  np.reshape(B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
+                               (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
+           )
 
-        np.copyto(self.sorted_scl_array_idx[nPublic+1:nVars], sortu256_idx_h(self.scl_array[nPublic+1:nVars]))
-        np.copyto(self.sorted_scl_array[nPublic+1:nVars], self.scl_array[nPublic+1:nVars][self.sorted_scl_array_idx[nPublic+1:nVars]])
+        self.pi_b_eccf2,t1 = self.compute_proof_ecp(
+                                         self.ec2bn128, 
+                                         self.sorted_scl_array[start_idx2:end_idx2],
+                                         B2[4*start_idx2*NWORDS_256BIT:4*end_idx2*NWORDS_256BIT],
+                                         True)
+        # Copy result for carrying sum
+        np.copyto(
+             B2[4*(end_idx-1)*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
+             np.reshape(self.pi_b_eccf2[:4],-1)
+         )
+        self.t_EC['pi_b.'+str(phase)]= round(t1,2)
 
-        np.copyto(C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT], 
-               np.reshape(np.reshape(C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],
-                              (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[nPublic+1:nVars]],-1))
-        self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
-            self.sorted_scl_array[nPublic+1:nVars],
-            C[2*(nPublic+1)*NWORDS_256BIT:2*nVars*NWORDS_256BIT],
-            False)
-        self.t_EC['pi_c'] = round(t1,2)
+        np.copyto(
+             B1[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
+             np.reshape(
+                  np.reshape(B1[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
+                                          (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
+            )
+
+        self.pib1_eccf1,t1 = self.compute_proof_ecp(
+                                          self.ecbn128,
+                                          self.sorted_scl_array[start_idx2:end_idx2], 
+                                          B1[2*start_idx2*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
+                                          False)
+        # Copy result for carrying sum
+        np.copyto(
+             B1[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
+             np.reshape(self.pib1_eccf1[:2],-1)
+         )
+        self.t_EC['pib1.'+str(phase)] = round(t1,2)
+
+        if phase == 1:
+           np.copyto(
+               C[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
+               np.reshape(
+                  np.reshape(C[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
+                                           (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
+             )
+
+           self.pi_c_eccf1,t1 = self.compute_proof_ecp(
+                                               self.ecbn128,
+                                               self.sorted_scl_array[start_idx:end_idx],
+                                               C[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
+                                               False)
+           self.t_EC['pi_c.'+str(phase)] = round(t1,2)
 
         end_ec = time.time()
-        self.t_EC['total']  = round(end_ec - start_ec,2)
+        self.t_EC['total.'+str(phase)]  = round(end_ec - start_ec,2)
 
-        return pib1_eccf1
+        return 
 
 
     def write_pdata(self):
@@ -660,7 +764,6 @@ class GrothProver(object):
 
     def calculateH(self):
         ZField.set_field(MOD_FIELD)
-        self.t_P = {}
 
         pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB', 'polsC', 'polsH'])
         nVars = pk_bin[0][0]

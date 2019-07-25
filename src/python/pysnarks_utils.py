@@ -607,6 +607,7 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
           polsA_extnWords = max(pk['polsA_nWords'], pk['domainSize']*NWORDS_256BIT)
           polsB_extnWords = max(pk['polsB_nWords'], pk['domainSize']*NWORDS_256BIT)
           polsC_extnWords = max(pk['polsC_nWords'], pk['domainSize']*NWORDS_256BIT)
+
           A_extnWords = pk['A_nWords'] + 4 * NWORDS_256BIT  # A + alfa_1 + delta_1
           B1_extnWords = pk['B1_nWords'] + 4 * NWORDS_256BIT  # B1 + beta_1 + delta_1
           B2_extnWords = pk['B2_nWords'] + 8 * NWORDS_256BIT  # B2 + beta_2 + delta_2
