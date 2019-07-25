@@ -499,8 +499,80 @@ def pkvars_to_json(out_bin, out_ec, pk):
 
         return pk_dict
 
+def pkbin_get(pk_bin, labels):
+    #Header + field p + group g + X_nWords
+    offset_data = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 8
+    polsA_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT]
+    polsB_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 1]
+    polsC_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 2]
+    polsH_nWords = (pk_bin[PKBIN_H_DOMAINSIZE_OFFSET]*2-1)*NWORDS_256BIT 
+    A_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 3]
+    B1_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 4]
+    B2_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 5]
+    C_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 6]
+    hExps_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 7]
 
-def pkvars_to_bin(out_bin, out_ec, pk): 
+    offset_ec_data = offset_data + polsA_nWords + polsB_nWords + polsC_nWords
+    
+    ret_val = []
+    for label in labels:
+       if label=='nVars':
+         ret_val.append(pk_bin[PKBIN_H_NVARS_OFFSET:PKBIN_H_NVARS_OFFSET+1])
+       elif label== 'nPublic':
+         ret_val.append(pk_bin[PKBIN_H_NPUBLIC_OFFSET:PKBIN_H_NPUBLIC_OFFSET+1])
+       elif label== 'domainSize':
+         ret_val.append(pk_bin[PKBIN_H_DOMAINSIZE_OFFSET:PKBIN_H_DOMAINSIZE_OFFSET+1])
+       elif label== 'polsA':
+         polsA_offset = offset_data
+         ret_val.append(pk_bin[polsA_offset:polsA_offset+polsA_nWords])
+       elif label== 'polsH':
+         polsH_offset = offset_data
+         ret_val.append(pk_bin[polsH_offset:polsH_offset+polsH_nWords])
+       elif label== 'polsB':
+         polsB_offset = offset_data + polsA_nWords
+         ret_val.append(pk_bin[polsB_offset:polsB_offset+polsB_nWords])
+       elif label== 'polsC':
+         polsC_offset = offset_data + polsA_nWords + polsB_nWords
+         ret_val.append(pk_bin[polsC_offset:polsC_offset+polsC_nWords])
+       elif label== 'alfa_1':
+         alfa_1_offset = offset_ec_data
+         ret_val.append(pk_bin[alfa_1_offset:alfa_1_offset+2*NWORDS_256BIT])
+       elif label== 'beta_1':
+         beta_1_offset = offset_ec_data + 2*NWORDS_256BIT
+         ret_val.append(pk_bin[beta_1_offset:beta_1_offset+2*NWORDS_256BIT])
+       elif label== 'delta_1':
+         delta_1_offset = offset_ec_data + 4*NWORDS_256BIT
+         ret_val.append(pk_bin[delta_1_offset:delta_1_offset+2*NWORDS_256BIT])
+       elif label== 'beta_2':
+         beta_2_offset = offset_ec_data + 6*NWORDS_256BIT
+         ret_val.append(pk_bin[beta_2_offset:beta_2_offset+4*NWORDS_256BIT])
+       elif label== 'delta_2':
+         delta_2_offset = offset_ec_data + 10*NWORDS_256BIT
+         ret_val.append(pk_bin[delta_2_offset:delta_2_offset+4*NWORDS_256BIT])
+       elif label == 'A':
+         A_offset = offset_ec_data + 14*NWORDS_256BIT
+         ret_val.append(pk_bin[A_offset:A_offset+A_nWords])
+       elif label == 'B1':
+         B1_offset = offset_ec_data + 14*NWORDS_256BIT + A_nWords
+         ret_val.append(pk_bin[B1_offset:B1_offset+B1_nWords])
+       elif label == 'B2':
+         B2_offset = offset_ec_data + 14*NWORDS_256BIT + A_nWords + \
+                     B1_nWords
+         ret_val.append(pk_bin[B2_offset:B2_offset+B2_nWords])
+       elif label == 'C':
+         C_offset = offset_ec_data + 14*NWORDS_256BIT + A_nWords + \
+                     B1_nWords + B2_nWords
+         ret_val.append(pk_bin[C_offset:C_offset+C_nWords])
+       elif label == 'hExps':
+         hExps_offset = offset_ec_data + 14*NWORDS_256BIT + A_nWords + \
+                     B1_nWords + B2_nWords + C_nWords
+         ret_val.append(pk_bin[hExps_offset:hExps_offset+hExps_nWords])
+       else: 
+         sys.exit(1)
+
+    return ret_val
+    
+def pkvars_to_bin(out_bin, out_ec, pk, ext=False): 
         pk_bin = np.concatenate( (
                    np.asarray([pk['nWords']], dtype=np.uint32),
                    np.asarray([SNARKSFILE_T_PK], dtype=np.uint32),
@@ -515,16 +587,73 @@ def pkvars_to_bin(out_bin, out_ec, pk):
                    np.asarray(pk['field_r'], dtype=np.uint32),
                    np.asarray(pk['group_q'], dtype=np.uint32)) )
 
+        polsA_extnWords = pk['polsA_nWords']
+        polsB_extnWords = pk['polsB_nWords']
+        polsC_extnWords = pk['polsC_nWords']
+
+        A_extnWords = pk['A_nWords']
+        B1_extnWords = pk['B1_nWords']
+        B2_extnWords = pk['B2_nWords']
+        C_extnWords = pk['C_nWords']
+        hExps_extnWords = pk['hExps_nWords']
+
+        A_ext = np.zeros(0,dtype=np.uint32)
+        B1_ext = np.zeros(0,dtype=np.uint32)
+        B2_ext = np.zeros(0,dtype=np.uint32)
+        C_ext = np.zeros(0,dtype=np.uint32)
+        hExps_ext = np.zeros(0,dtype=np.uint32)
+
+        if ext:
+          polsA_extnWords = max(pk['polsA_nWords'], pk['domainSize']*NWORDS_256BIT)
+          polsB_extnWords = max(pk['polsB_nWords'], pk['domainSize']*NWORDS_256BIT)
+          polsC_extnWords = max(pk['polsC_nWords'], pk['domainSize']*NWORDS_256BIT)
+          A_extnWords = pk['A_nWords'] + 4 * NWORDS_256BIT  # A + alfa_1 + delta_1
+          B1_extnWords = pk['B1_nWords'] + 4 * NWORDS_256BIT  # B1 + beta_1 + delta_1
+          B2_extnWords = pk['B2_nWords'] + 8 * NWORDS_256BIT  # B2 + beta_2 + delta_2
+          C_extnWords = pk['C_nWords'] 
+          hExps_extnWords = pk['hExps_nWords']  + 12 * NWORDS_256BIT # hExps + pi_c + pi_a + pib1 + delta_1 + pi_b
+         
+          if out_bin == FMT_EXT:
+            A_ext = np.concatenate(
+                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                                  )
+            B1_ext = np.concatenate(
+                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                                  )
+            B2_ext = np.concatenate(
+                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1)
+                                   )
+            C_ext = np.zeros(0,dtype=np.uint32)
+            hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
+            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+
+          else:
+            A_ext = np.concatenate( (pk['alfa_1'], pk['delta_1']) )
+            B1_ext = np.concatenate( (pk['beta_1'], pk['delta_1']) )
+            B2_ext = np.concatenate( (pk['beta_2'], pk['delta_2']) )
+            C_ext = np.zeros(0,dtype=np.uint32)
+            hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
+            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = pk['delta_1']
+
+
+        polsA_ext = np.zeros(polsA_extnWords - pk['polsA_nWords'],dtype=np.uint32)
+        polsB_ext = np.zeros(polsB_extnWords - pk['polsB_nWords'],dtype=np.uint32)
+        polsC_ext = np.zeros(polsC_extnWords - pk['polsC_nWords'],dtype=np.uint32)
+
+
         pk_bin = np.concatenate( (
                       pk_bin,
-                      np.asarray([pk['polsA_nWords']],dtype=np.uint32),
-                      np.asarray([pk['polsB_nWords']],dtype=np.uint32),
-                      np.asarray([pk['polsC_nWords']],dtype=np.uint32),
-                      np.asarray([pk['A_nWords']],dtype=np.uint32),
-                      np.asarray([pk['B1_nWords']],dtype=np.uint32),
-                      np.asarray([pk['B2_nWords']],dtype=np.uint32),
-                      np.asarray([pk['C_nWords']],dtype=np.uint32),
-                      np.asarray([pk['hExps_nWords']],dtype=np.uint32)) )
+                      np.asarray([polsA_extnWords],dtype=np.uint32),
+                      np.asarray([polsB_extnWords],dtype=np.uint32),
+                      np.asarray([polsC_extnWords],dtype=np.uint32),
+                      np.asarray([A_extnWords],dtype=np.uint32),
+                      np.asarray([B1_extnWords],dtype=np.uint32),
+                      np.asarray([B2_extnWords],dtype=np.uint32),
+                      np.asarray([C_extnWords],dtype=np.uint32),
+                      np.asarray([hExps_extnWords],dtype=np.uint32)) )
 
         if out_bin == FMT_EXT:
            mpoly_from_montgomery_h(pk['polsA'], MOD_FIELD)
@@ -533,18 +662,26 @@ def pkvars_to_bin(out_bin, out_ec, pk):
            pk_bin = np.concatenate( (
                       pk_bin,
                       pk['polsA'],
+                      polsA_ext,
                       pk['polsB'],
+                      polsB_ext,
                       pk['polsC'], 
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_GROUP,1),-1),
+                      polsC_ext,
+                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['A'], MOD_GROUP,1),-1),
+                      A_ext,
                       np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_GROUP,1),-1),
+                      B1_ext,
                       np.reshape(from_montgomeryN_h(np.reshape(pk['B2'],-1), MOD_GROUP,2),-1),
+                      B2_ext,
                       np.reshape(from_montgomeryN_h(np.reshape(pk['C'],-1), MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_GROUP,1),-1)))
+                      C_ext,
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_GROUP,1),-1),
+                      hExps_ext))
            mpoly_to_montgomery_h(pk['polsA'], MOD_FIELD)
            mpoly_to_montgomery_h(pk['polsB'], MOD_FIELD)
            mpoly_to_montgomery_h(pk['polsC'], MOD_FIELD)
@@ -552,19 +689,28 @@ def pkvars_to_bin(out_bin, out_ec, pk):
            pk_bin = np.concatenate((
                   pk_bin,
                   pk['polsA'],
+                  polsA_ext,
                   pk['polsB'],
+                  polsB_ext,
                   pk['polsC'],
-                  np.reshape(pk['alfa_1'],-1),    
-                  np.reshape(pk['beta_1'],-1),
-                  np.reshape(pk['delta_1'],-1),
-                  np.reshape(pk['beta_2'],-1),
-                  np.reshape(pk['delta_2'],-1),
+                  polsC_ext,
+                  pk['alfa_1'],    
+                  pk['beta_1'],
+                  pk['delta_1'],
+                  pk['beta_2'],
+                  pk['delta_2'],
                   np.reshape(pk['A'],-1),
+                  A_ext,
                   np.reshape(pk['B1'],-1),
+                  B1_ext,
                   np.reshape(pk['B2'],-1),
+                  B2_ext,
                   np.reshape(pk['C'],-1),
-                  np.reshape(pk['hExps'],-1)) )
+                  C_ext,
+                  np.reshape(pk['hExps'],-1), 
+                  hExps_ext) )
        
+        pk_bin[0] = pk_bin.shape[0]
         return pk_bin
 
 def pkjson_to_pyec(inv, ec2):
@@ -800,7 +946,8 @@ def pkbin_to_vars(pk_bin):
 
 def gen_reponame(repo_f,sufix=None):
     now = datetime.now()
-    reponame = repo_f + now.strftime("%Y%m%d__%H%M%S")
+    #reponame = repo_f + now.strftime("%Y%m%d__%H%M%S")
+    reponame = repo_f 
     if sufix is not None:
        reponame = reponame + sufix
 
