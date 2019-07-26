@@ -17,6 +17,7 @@ int main()
    uint32_t m = 1<<16;
    uint32_t nVars = 41050;
    uint32_t pidx=1;
+   mpoly_eval_t *args = (mpoly_eval_t *) malloc(sizeof(mpoly_eval_t));
 
    uint32_t *scl = (uint32_t *)calloc(nVars , NWORDS_256BIT * sizeof(uint32_t));
    uint32_t *mpoly_out = (uint32_t *) calloc(m , NWORDS_256BIT * sizeof(uint32_t));
@@ -26,12 +27,21 @@ int main()
      if (i%NWORDS_256BIT == 7){
         scl[i] = 0;
      }
-   }             
+   }     
+   args->pout = mpoly_out; 
+   args->scalar = scl;
+   args->pin = polsA;
+   args->reduce_coeff = reduce_coeff;
+   args->start_idx = 0;
+   args->last_idx = nVars; 
+   args->max_threads= 0;
+   args->pidx = pidx;        
 
-   mpoly_eval_h(mpoly_out , scl, polsA, reduce_coeff, nVars-1, pidx);
+   mpoly_eval_h(args);
 
    free(mpoly);
    free(mpoly_out);
    free(scl);
+   free(args);
 
 }

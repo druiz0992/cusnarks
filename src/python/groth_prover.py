@@ -137,6 +137,8 @@ class GrothProver(object):
         self.t_GP = {}
         self.t_EC = {}
         self.t_P = {}
+
+        init_h()
         
         #scalar array : extended witness / polH
         self.scl_array = None
@@ -206,6 +208,8 @@ class GrothProver(object):
         del pk_bin
              
 
+    def __del__(self):
+       release_h()
 
     def read_witness_data(self):
        ## Open and parse witness data
@@ -288,6 +292,36 @@ class GrothProver(object):
        logging.info('')
        logging.info('')
 
+    def timeStats(self, t):
+      for s in t:
+        for k, v in s.items():
+           if k is not 'total':
+             s[k] = str(round(v,2)) + '(' + str(round(100*v/s['total'],2)) + '%)'
+   
+    def logTimeResults(self):
+     
+      self.t_EC['total'] = round(self.t_EC['total.0'] + self.t_EC['total.1'] + self.t_EC['EC Mexp2'],2)
+      self.timeStats([self.t_EC, self.t_GP, self.t_P])
+      self.t_P['total'] = round(self.t_P['total'],2)
+      self.t_GP['total'] = round(self.t_GP['total'],2)
+
+      logging.info('')
+      logging.info('')
+      logging.info('#################################### ')
+      logging.info('Total Time to generate proof : %s seconds', self.t_GP['total'])
+      logging.info('')
+      logging.info('------ Time EC [sec] : %s ', str(round(self.t_EC['total'],2)) + '(' + str(round(100*self.t_EC['total']/self.t_GP['total'],2)) + '%)')
+      logging.info('%s', self.t_EC)
+      logging.info('')
+      logging.info('----- Time Poly [sec] : %s ', str(round(self.t_P['total'],2)) + '(' + str(round(100*self.t_P['total']/self.t_GP['total'],2)) + '%)')
+      logging.info('%s', self.t_P)
+      logging.info('')
+      logging.info('----- Time GP [sec] : %s ', self.t_GP['total'])
+      logging.info('%s', self.t_GP)
+      logging.info('#################################### ')
+      logging.info('')
+      logging.info('')
+
     def proof(self, witness_f, mproc = False):
       self.witness_f = witness_f
       logging.info('#################################### ')
@@ -298,22 +332,7 @@ class GrothProver(object):
       logging.info("Proof completed" )
       logging.info('#################################### ')
 
-      logging.info('')
-      logging.info('')
-      logging.info('#################################### ')
-      logging.info('Total Time to generate proof : %s seconds', self.t_GP['total'])
-      logging.info('')
-      logging.info('------ Time EC [sec] : %s ', self.t_EC['total.0'] + self.t_EC['total.1'] + self.t_EC['EC Mexp2'])
-      logging.info('%s', self.t_EC)
-      logging.info('')
-      logging.info('----- Time FFT [sec] : %s ', self.t_P['total'])
-      logging.info('%s', self.t_P)
-      logging.info('')
-      logging.info('----- Time Main [sec] : %s ', self.t_GP['total'])
-      logging.info('%s', self.t_GP)
-      logging.info('#################################### ')
-      logging.info('')
-      logging.info('')
+      self.logTimeResults()
 
       # convert data to pkvars if necessary (only if test_f is set)
       if self.test_f is not None:
@@ -483,7 +502,7 @@ class GrothProver(object):
         self.read_witness_data()
 
         end = time.time()
-        self.t_GP['read w'] = round(end - start,2)
+        self.t_GP['read w'] = end - start
 
         
         ######################
@@ -520,14 +539,14 @@ class GrothProver(object):
                  )
 
         end = time.time()
-        self.t_GP['sort1.0'] = round(end - start,2)
+        self.t_GP['sort1.0'] = end - start
 
         start = time.time()
 
         self.findECPoints(0)
 
         end = time.time()
-        self.t_GP['EC Mexp1.0'] = round(end - start,2)
+        self.t_GP['EC Mexp1.0'] = end - start
 
         np.copyto(
             self.sorted_scl_array_idx[nPublic+1:nVars],
@@ -544,23 +563,25 @@ class GrothProver(object):
         self.sorted_scl_array[nVars+1:nVars+2] = self.r_scl
 
         end = time.time()
-        self.t_GP['sort1.1'] = round(end - start,2)
+        self.t_GP['sort1.1'] = end - start
 
         start = time.time()
 
         self.findECPoints(1)
 
         end = time.time()
-        self.t_GP['EC Mexp1.1'] = round(end - start,2)
+        self.t_GP['EC Mexp1.1'] = end - start
         ######################
         # Beginning of P3 and P4
         #  P3 - Poly Eval
         #  P4 - Poly Operations
         ######################
         start = time.time()
+
         self.calculateH()
+
         end = time.time()
-        self.t_GP['pH'] = round(end - start,2)
+        self.t_GP['pH'] = end - start
 
         ######################
         # Beginning of P5
@@ -569,32 +590,51 @@ class GrothProver(object):
         start = time.time()
         ZField.set_field(MOD_FIELD)
         r_mont = to_montgomeryN_h(np.reshape(self.r_scl,-1),MOD_FIELD)
-        self.sorted_scl_array[ds_1+3:ds_1+4] = montmult_neg_h(np.reshape(r_mont,-1),np.reshape(self.s_scl,-1), MOD_FIELD)
+        self.sorted_scl_array[ds_1+3:ds_1+4] = montmult_neg_h(
+                                           np.reshape(r_mont,-1),
+                                           np.reshape(self.s_scl,-1), MOD_FIELD
+                                                             )
 
         ZField.set_field(MOD_GROUP)
 
-        np.copyto(self.sorted_scl_array_idx[:ds_1], sortu256_idx_h(polH[:ds_1]))
-        np.copyto(self.sorted_scl_array[:ds_1], polH[:ds_1][self.sorted_scl_array_idx[:ds_1]])
+        np.copyto(
+               self.sorted_scl_array_idx[:ds_1],
+               sortu256_idx_h(polH[:ds_1])
+                 )
+
+        np.copyto(
+               self.sorted_scl_array[:ds_1],
+               polH[:ds_1][self.sorted_scl_array_idx[:ds_1]]
+                 )
         self.sorted_scl_array[ds_1:ds_1+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
         self.sorted_scl_array[ds_1+1:ds_1+2] = self.s_scl
         self.sorted_scl_array[ds_1+2:ds_1+3] = self.r_scl
 
-        np.copyto(hExps[:2*ds_1], np.reshape(np.reshape(hExps[:2*ds_1], (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:ds_1]],(-1,NWORDS_256BIT)))
+        np.copyto(
+            hExps[:2*ds_1],
+            np.reshape(
+                np.reshape(hExps[:2*ds_1], 
+                  (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[:ds_1]],(-1,NWORDS_256BIT))
+                     )
+
         hExps[2*ds_1:2*ds_1+2] = self.pi_c_eccf1[:2]
         hExps[2*ds_1+2:2*ds_1+4] = self.pi_a_eccf1[:2]
         hExps[2*ds_1+4:2*ds_1+6] = self.pib1_eccf1[:2]
         hExps[2*ds_1+6:2*ds_1+8] = np.reshape(delta_1,(-1,NWORDS_256BIT))
-        self.pi_c_eccf1,t1 = self.compute_proof_ecp(self.ecbn128,
+
+        self.pi_c_eccf1,t1 = self.compute_proof_ecp(
+            self.ecbn128,
             self.sorted_scl_array[:ds_1+4],
             hExps[:2*ds_1+8],
             False)
 
         end = time.time()
-        self.t_EC['EC Mexp2'] = round(end - start,2)
+        self.t_EC['EC Mexp2'] = end - start
+        self.t_GP['EC Mexp2'] = end - start
 
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
 
-        self.t_GP['total'] = round(end - start_p,2)
+        self.t_GP['total'] = end - start_p
 
         return 
  
@@ -656,7 +696,7 @@ class GrothProver(object):
              A[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
              np.reshape(self.pi_a_eccf1[:2],-1)
          )
-        self.t_EC['pi_a.'+str(phase)] = round(t1,2)
+        self.t_EC['pi_a.'+str(phase)] = t1
 
         self.sorted_scl_array[nVars+1:nVars+2] = self.s_scl
 
@@ -677,7 +717,7 @@ class GrothProver(object):
              B2[4*(end_idx-1)*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
              np.reshape(self.pi_b_eccf2[:4],-1)
          )
-        self.t_EC['pi_b.'+str(phase)]= round(t1,2)
+        self.t_EC['pi_b.'+str(phase)]= t1
 
         np.copyto(
              B1[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
@@ -696,7 +736,7 @@ class GrothProver(object):
              B1[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
              np.reshape(self.pib1_eccf1[:2],-1)
          )
-        self.t_EC['pib1.'+str(phase)] = round(t1,2)
+        self.t_EC['pib1.'+str(phase)] = t1
 
         if phase == 1:
            np.copyto(
@@ -711,10 +751,10 @@ class GrothProver(object):
                                                self.sorted_scl_array[start_idx:end_idx],
                                                C[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
                                                False)
-           self.t_EC['pi_c.'+str(phase)] = round(t1,2)
+           self.t_EC['pi_c.'+str(phase)] = t1
 
         end_ec = time.time()
-        self.t_EC['total.'+str(phase)]  = round(end_ec - start_ec,2)
+        self.t_EC['total.'+str(phase)]  = end_ec - start_ec
 
         return 
 
@@ -762,9 +802,20 @@ class GrothProver(object):
            writeU256DataFile_h(proof_bin, self.out_public_f.encode("UTF-8"))
                
 
-    def calculateH(self):
-        ZField.set_field(MOD_FIELD)
+    def evalPoly(self, pX, nVars, m):
+        # Convert witness to montgomery in zpoly_maddm_h
+        #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
+        pidx = ZField.get_field()
+        reduce_coeff = 0  
+        polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, 10, pidx)
+        np.copyto(pX, polX_T)
 
+
+    def calculateH(self):
+
+        start_h = time.time()
+
+        ZField.set_field(MOD_FIELD)
         pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB', 'polsC', 'polsH'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
@@ -773,49 +824,37 @@ class GrothProver(object):
         pC = np.reshape(pk_bin[4][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pH = np.reshape(pk_bin[5][:(2*m-1)*NWORDS_256BIT],((2*m-1),NWORDS_256BIT))
 
-        start_h = time.time()
-        start = time.time()
-
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-        pidx = ZField.get_field()
-        reduce_coeff = 0  
-        polA_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pA,-1), reduce_coeff, m, nVars, pidx)
-        np.copyto(pA, polA_T)
-        del polA_T
-        polB_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pB,-1), reduce_coeff, m, nVars, pidx)
-        np.copyto(pB, polB_T)
-        del polB_T
-        polC_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pC,-1), reduce_coeff, m, nVars, pidx)
-        np.copyto(pC, polC_T)
-        del polC_T
+        start = time.time()
+
+        self.evalPoly(pA, nVars, m)
+        self.evalPoly(pB, nVars, m)
+        self.evalPoly(pC, nVars, m)
+
         end = time.time()
-        self.t_P['eval'] = round(end-start,2)
-        end_h = time.time()
-        t_h = end_h - start_h
+        self.t_P['eval'] = end-start
 
-
-        start_h = time.time()
         ifft_params = ntt_build_h(pA.shape[0])
 
         # polC_S  is extended -> use extended scaler
         polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
         np.copyto(pC,polC_S)
         del polC_S
-        self.t_P['ifft-C'] = round(t1,2)
+        self.t_P['ifft-C'] = t1
 
         # polA_S montgomery -> use montgomery scaler
         polA_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pA,ifft_params, ZField.get_field(), as_mont=1)
         np.copyto(pA,polA_S)
         del polA_S
-        self.t_P['ifft-A'] =  round(t1,2)
+        self.t_P['ifft-A'] =  t1
 
         # polB_S montgomery  -> use montgomery scaler
         # TODO : return_val = 0, out_extra_len= out_len
         polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pB, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
         np.copyto(pB,polB_S)
         del polB_S
-        self.t_P['ifft-B'] = round(t1,2)
+        self.t_P['ifft-B'] = t1
 
         mul_params = ntt_build_h(pH.shape[0])
         #polAB_S is extended -> use extended scaler
@@ -824,7 +863,7 @@ class GrothProver(object):
         nsamplesH = zpoly_norm_h(polAB_S)
         np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
         del polAB_S
-        self.t_P['mul'] = round(t1,2)
+        self.t_P['mul'] = t1
 
         # polABC_S is extended
         # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
@@ -832,9 +871,9 @@ class GrothProver(object):
         polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, pH[:nsamplesH], pC, ZField.get_field(), vectorA_len = 0, return_val=1)
         np.copyto(pH[:m-1],polABC_S[m:])
         del polABC_S
-        self.t_P['sub'] =  round(t1,2)
+        self.t_P['sub'] =  t1
 
         end_h = time.time()
-        self.t_P['total'] = round( end_h - start_h + t_h,2)
+        self.t_P['total'] = end_h - start_h
 
         return

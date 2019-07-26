@@ -19,24 +19,25 @@ LD_FLAGS=$(LD_PATH)
 CUSNARKS_LIB=$(CUSNARKS_LIB)
 CUBIN_NAME=$(CUBIN_NAME)
 AUX_INCLUDES=$(AUX_INCLUDES)
+DEFINES=$(DEFINES)
 
 LOG_LEVEL=$(LOG_LEVEL)
 
 NVCC = nvcc
 CC  = g++
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
-#CFLAGS=-c -g -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
-CFLAGS=-c -O2 -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH) -w
+#CFLAGS=-c -g -DLINUXINTEL64  -$(DEFINES) -std=c++11 -I $(INCLUDE_PATH) -w
+CFLAGS=-c -O2 -DLINUXINTEL64  $(DEFINES) -std=c++11 -I $(INCLUDE_PATH) -w
 #CFLAGS=-c -DLINUXINTEL64 -g -G -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-EXTRA_CFLAGS2=-I $(AUX_INCLUDES) -shared -fPIC
+EXTRA_CFLAGS2=-fopenmp -I $(AUX_INCLUDES) -shared -fPIC
 #CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -maxrregcount=64 -lineinfo -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -lineinfo -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_61 --shared -o 
 LINKFLAGS2=--shared -o 
-LDFLAGS=-lm -lcudart
-LDFLAGS2=-lm
+LDFLAGS=-lm -lcudart -lgomp
+LDFLAGS2=-lm -lgomp
 NVDISASM = nvdisasm
 NVDISASM_FLAGS = --no-dataflow --print-code --print-line-info --separate-functions
 CUOBJDUMP = cuobjdump
@@ -97,7 +98,7 @@ endif
 ##################################################
 %.o : %.cu
 ifneq ($(CUDA_INSTALLED),)
-	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS) $*.cu -o $*.o	
+	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS)  $*.cu -o $*.o	
 endif
 
 ##################################################

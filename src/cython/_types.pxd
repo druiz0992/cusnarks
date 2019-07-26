@@ -138,6 +138,18 @@ cdef extern from "types.h":
      uint32_t nVars
      uint32_t nPublic
      uint32_t domainSize
+
+  ctypedef struct mpoly_eval_t:
+    uint32_t *pout
+    const uint32_t *scalar
+    uint32_t *pin
+    uint32_t reduce_coeff
+    uint32_t start_idx
+    uint32_t last_idx
+    uint32_t max_threads
+    uint32_t thread_id
+    uint32_t pidx
+  
   
 
   ctypedef enum snarks_file_t:

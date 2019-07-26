@@ -415,4 +415,17 @@ typedef enum{
 
 }gpu_id_t;
 
+typedef struct{
+  uint32_t *pout;
+  const uint32_t *scalar;
+  uint32_t *pin;
+  uint32_t reduce_coeff;
+  uint32_t start_idx;
+  uint32_t last_idx;
+  uint32_t max_threads;
+  uint32_t thread_id;
+  uint32_t pidx;
+  
+}mpoly_eval_t;
+
 #endif

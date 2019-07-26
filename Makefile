@@ -94,6 +94,8 @@ AUX_REPOS := $(aux_repos)
 #             0 -> Debug
 # 
 
+DEFINES = -DPARALLEL_EN
+
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
               'OBJECT_PATH=$(OBJECT_PATH)'     \
@@ -105,7 +107,9 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CTEST_PATH=$(CTEST_PATH)'       \
               'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
-              'AUX_INCLUDES=$(AUX_INCLUDES)' 
+              'AUX_INCLUDES=$(AUX_INCLUDES)'  \
+              'DEFINES=$(DEFINES)'  
+  
 
 
 #all:    

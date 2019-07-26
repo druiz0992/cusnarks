@@ -32,7 +32,7 @@
 """
 cimport _types as ct
 
-cdef extern from "../cuda/utils_host.h":
+cdef extern from "../cuda/utils_host.h" nogil: 
     void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void caddm_h "addm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void caddu256_h "addu256_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B)
@@ -52,7 +52,9 @@ cdef extern from "../cuda/utils_host.h":
     void creadU256CircuitFileHeader_h "readU256CircuitFileHeader_h"( ct.cirbin_hfile_t *hfile, const char *filename)
     void creadU256PKFile_h "readU256PKFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256PKFileHeader_h "readU256PKFileHeader_h"( ct.pkbin_hfile_t *hfile, const char *filename)
-    void cmpoly_eval_h "mpoly_eval_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t reduce_coeff, ct.uint32_t last_idx, ct.uint32_t pidx)
+    #void cmpoly_eval_h "mpoly_eval_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t reduce_coeff, ct.uint32_t last_idx, ct.uint32_t pidx)
+    void *cmpoly_eval_h "mpoly_eval_h" (ct.mpoly_eval_t *args)
+    void cmpoly_eval_server_h "mpoly_eval_server_h" (ct.mpoly_eval_t *args)
     void cr1cs_to_mpoly_h "r1cs_to_mpoly_h" (ct.uint32_t *pout, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t to_mont, ct.uint32_t pidx, ct.uint32_t extend)
     void cr1cs_to_mpoly_len_h "r1cs_to_mpoly_len_h" (ct.uint32_t *plen_out, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t extend)
     void cmontinv_h "montinv_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t pidx)
@@ -65,4 +67,6 @@ cdef extern from "../cuda/utils_host.h":
     void cfield_roots_compute_h "field_roots_compute_h" (ct.uint32_t *roots, ct.uint32_t nbits)
     void cmpoly_from_montgomery_h "mpoly_from_montgomery_h" (ct.uint32_t *x, ct.uint32_t pidx)
     void cmpoly_to_montgomery_h "mpoly_to_montgomery_h" (ct.uint32_t *x, ct.uint32_t pidx)
+    void cinit_h "init_h"()
+    void crelease_h "release_h"()
   
