@@ -127,6 +127,7 @@ class GrothSetup(object):
         self.out_circuit_format = out_circuit_format
         self.in_circuit_format = FMT_EXT
 
+        init_h()
 
         self.alfabeta_f = self.keep_f + '/' + 'alfabeta.json'
         self.test_f= self.keep_f + '/' +  test_f
@@ -154,6 +155,9 @@ class GrothSetup(object):
         else:
            logging.error ("Required input circuit %s", self.log_f)
            sys.exit(1)
+
+    def __del__(self):
+       release_h()
 
     def circuitRead(self):
         # cir Json to u256

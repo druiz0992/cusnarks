@@ -69,7 +69,9 @@ void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename);
 void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
 void readU256PKFileHeader_h(pkbin_hfile_t *hfile, const char *filename);
 void readU256PKFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
-void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t reduce_coeff, uint32_t last_idx, uint32_t pidx);
+void mpoly_eval_server_h(mpoly_eval_t *mpoly_args);
+void *mpoly_eval_h(void *args);
+//void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t reduce_coeff, uint32_t last_idx, uint32_t pidx);
 void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t to_mont, uint32_t pidx, uint32_t extend);
 void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
 void shlru256_h(uint32_t *y, uint32_t *x, uint32_t count);
@@ -90,4 +92,6 @@ void mpoly_from_montgomery_h(uint32_t *x, uint32_t pidx);
 void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx);
 void swapu256_h(uint32_t *a, uint32_t *b);
 void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots);
+void init_h(void);
+void release_h(void);
 #endif

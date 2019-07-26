@@ -386,13 +386,29 @@ def rangeu256_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] star
      return out_samples.reshape((-1,ct.NWORDS_256BIT))
 
 def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
-              ct.uint32_t reduce_coeff, ct.uint32_t ncoeff, ct.uint32_t last_idx, ct.uint32_t pidx):
+              ct.uint32_t reduce_coeff, ct.uint32_t ncoeff, ct.uint32_t start_idx, ct.uint32_t last_idx, ct.uint32_t max_threads, ct.uint32_t pidx):
 
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(ncoeff*8,dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] sclflat = np.zeros(scldata.shape[0] * scldata.shape[1],dtype=np.uint32)
      sclflat = np.reshape(scldata,-1)
+     cdef ct.mpoly_eval_t *args_c = <ct.mpoly_eval_t *> malloc(sizeof(ct.mpoly_eval_t))
          
-     uh.cmpoly_eval_h(&outd[0],&sclflat[0], &pdata[0], reduce_coeff, last_idx, pidx)
+     args_c.pout = &outd[0]
+     args_c.scalar = &sclflat[0]
+     args_c.pin = &pdata[0]
+     args_c.reduce_coeff = reduce_coeff
+     args_c.start_idx = start_idx
+     args_c.last_idx = last_idx
+     args_c.max_threads = max_threads
+     args_c.pidx = pidx
+
+     if args_c.max_threads == 0:
+       uh.cmpoly_eval_h(args_c)
+     else:
+       with nogil:
+         uh.cmpoly_eval_server_h(args_c)
+
+     free(args_c)
 
      return np.reshape(outd,(-1,8))
 
@@ -696,4 +712,10 @@ def mpoly_to_montgomery_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_vec, ct.uint3
 def mpoly_from_montgomery_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_vec, ct.uint32_t pidx):
      uh.cmpoly_from_montgomery_h(&in_vec[0], pidx)
      return
+
+def init_h():
+     uh.cinit_h()
+
+def release_h():
+    uh.crelease_h()
 
