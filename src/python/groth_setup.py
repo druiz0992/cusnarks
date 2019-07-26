@@ -50,6 +50,9 @@ import numpy as np
 import time
 import random
 from subprocess import call
+import logging
+from multiprocessing import RawArray
+from ctypes import c_uint32
 
 from zutils import ZUtils
 from zfield import *
@@ -169,10 +172,12 @@ class GrothSetup(object):
            if self.out_circuit_f is not None:
               cir_u256 = cirvars_to_bin(self.cir)
               writeU256DataFile_h(cir_u256, self.out_circuit_f.encode("UTF-8"))
+              del cir_u256
 
         elif self.in_circuit_f.endswith('.bin'):
              cir_u256 = readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
              self.cir = cirbin_to_vars(cir_u256)
+             del cir_u256
 
     def launch_snarkjs(self, mode):
         snarkjs = {}
@@ -211,26 +216,16 @@ class GrothSetup(object):
         ZField.set_field(MOD_FIELD)
         
         #Init PK
-        self.pk['protocol'] = PROTOCOL_T_GROTH
-        self.pk['Rbitlen'] = self.cir['Rbitlen']
+        cirvars_to_pkvars(self.pk, self.cir)
         self.pk['k_binformat'] = self.out_k_binformat
         self.pk['k_ecformat'] =  self.out_k_ecformat
-        self.pk['nVars'] = self.cir['nVars']
-        self.pk['nPublic']    = self.cir['nPubInputs'] + self.cir['nOutputs']
-        self.pk['domainBits'] =  np.uint32(math.ceil(math.log(self.cir['nConstraints']+ 
-                                           self.cir['nPubInputs'] + 
-                                           self.cir['nOutputs'],2)))
-        self.pk['domainSize'] = 1 << self.pk['domainBits']
-        self.pk['field_r'] = np.copy(self.cir['field_r'])
-        self.pk['group_q'] = np.copy(self.cir['group_q'])
-
 
         prime = ZField.get_extended_p()
 
         self.toxic['t'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
 
-        self._calculatePoly()
-        self._calculateEncryptedValuesAtT()
+        self.calculatePoly()
+        self.calculateEncryptedValuesAtT()
 
         self.write_pk()
         self.write_vk()
@@ -261,7 +256,7 @@ class GrothSetup(object):
           if self.out_vk_f.endswith('.bin') :
           #Get vk json
             test_vk_f = test_vk_f.replace('bin','json')
-            vk_dict = self._vars_to_vkdict()
+            vk_dict = self.vars_to_vkdict()
             vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
             #if os.path.exists(test_vk_f):
               #os.remove(test_vk_f)
@@ -314,8 +309,8 @@ class GrothSetup(object):
           return True
 
 
-    def _calculatePoly(self):
-        self._computeHeader()
+    def calculatePoly(self):
+        self.computeHeader()
 
 
         worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
@@ -341,19 +336,19 @@ class GrothSetup(object):
         return
 
         """
-        self.pk['polsA']  = self._r1cs_to_mpoly(self.cir['R1CSA'], 1)
+        self.pk['polsA']  = self.r1cs_to_mpoly(self.cir['R1CSA'], 1)
         self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
         self.cir['R1CSA'] = None
-        self.pk['polsB'] = self._r1cs_to_mpoly(self.cir['R1CSB'], 0)
+        self.pk['polsB'] = self.r1cs_to_mpoly(self.cir['R1CSB'], 0)
         self.pk['polsB_nWords'] = self.pk['polsB'].shape[0]
         self.cir['R1CSB'] = None
-        self.pk['polsC'] = self._r1cs_to_mpoly(self.cir['R1CSC'], 0)
+        self.pk['polsC'] = self.r1cs_to_mpoly(self.cir['R1CSC'], 0)
         self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
         self.cir['R1CSC'] = None
         """
 
 
-    def _r1cs_to_mpoly(self, r1cs, fmat, extend):
+    def r1cs_to_mpoly(self, r1cs, fmat, extend):
         to_mont = 0
         ZField.set_field(MOD_FIELD)
         pidx = ZField.get_field()
@@ -365,7 +360,7 @@ class GrothSetup(object):
         
         return pols
 
-    def _evalLagrangePoly(self, bits):
+    def evalLagrangePoly(self, bits):
        """
         m : int
         t : ZFieldElRedc
@@ -399,8 +394,8 @@ class GrothSetup(object):
 
        return z.as_uint256(), u_u256
    
-    def _calculateEncryptedValuesAtT(self):
-      a_t_u256, b_t_u256, c_t_u256, z_t_u256 = self._calculateValuesAtT()
+    def calculateEncryptedValuesAtT(self):
+      a_t_u256, b_t_u256, c_t_u256, z_t_u256 = self.calculateValuesAtT()
 
       prime = ZField.get_extended_p()
       curve_params = self.curve_data['curve_params']
@@ -525,10 +520,10 @@ class GrothSetup(object):
       self.pk['IC'] = np.reshape(self.pk['IC'],(-1,3,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
 
-    def _calculateValuesAtT(self):
+    def calculateValuesAtT(self):
        # Required z_t es Ext, polsA/B/C are in Mont format
        # u is Mont
-       z_t_u256, u = self._evalLagrangePoly(self.pk['domainBits'])
+       z_t_u256, u = self.evalLagrangePoly(self.pk['domainBits'])
 
        pidx = ZField.get_field()
 
@@ -550,7 +545,7 @@ class GrothSetup(object):
 
 
 
-    def _computeHeader(self):
+    def computeHeader(self):
 
         self.cir_header = {'nWords' : self.cir['nWords'],
                   'nPubInputs' : self.cir['nPubInputs'],
@@ -585,7 +580,7 @@ class GrothSetup(object):
         
     def write_vk(self):
        #Fill alfa and beta values and call snarkjs to compute vk value
-       vk_dict = self._vars_to_vkdict(alfabeta=True)
+       vk_dict = self.vars_to_vkdict(alfabeta=True)
        vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
        #if os.path.exists(self.alfabeta_f):
        #     os.remove(self.alfabeta_f)
@@ -596,7 +591,7 @@ class GrothSetup(object):
        self.launch_snarkjs("alfabeta_12")
 
        if self.out_vk_f.endswith('.json') :
-         vk_dict = self._vars_to_vkdict()
+         vk_dict = self.vars_to_vkdict()
          vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
          #if os.path.exists(self.out_vk_f):
          #   os.remove(self.out_vk_f)
@@ -605,12 +600,12 @@ class GrothSetup(object):
          f.close()
 
        elif self.out_vk_f.endswith('bin') :
-         vk_bin = self._vars_to_vkbin()
+         vk_bin = self.vars_to_vkbin()
 
          if vk_bin is not None:
             writeU256DataFile_h(vk_bin, self.out_vk_f.encode("UTF-8"))
 
-    def _vars_to_vkdict(self, alfabeta=False):
+    def vars_to_vkdict(self, alfabeta=False):
       # TODO : only suported formats for vk are .json, affine and extended 
       vk_dict = {}
       ZField.set_field(MOD_GROUP)
@@ -642,7 +637,7 @@ class GrothSetup(object):
   
       return vk_dict
 
-    def _vars_to_vkbin(self):
+    def vars_to_vkbin(self):
       logging.error("Verifying Key  file %s can only be saved as .json\n", self.out_vk_f)
       self.log_f.flush()
       sys.exit(1)

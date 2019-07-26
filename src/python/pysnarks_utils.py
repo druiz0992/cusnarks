@@ -251,7 +251,7 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
         R1CSB_len, R1CSB_u256 = r2.get()
         R1CSC_len, R1CSC_u256 = r3.get()
 
-        w.terminate()
+        worker.terminate()
 
         fsize = CIRBIN_H_N_OFFSET + R1CSA_len + R1CSB_len + R1CSC_len
 
@@ -357,6 +357,21 @@ def cirr1cs_to_mpoly(r1cs, cir_header, fmat, extend):
         pols = r1cs_to_mpoly_h(poly_len, r1cs, cir_header, to_mont, pidx, extend)
         
         return pols
+
+def cirvars_to_pkvars(pk, cir):
+
+        pk['protocol'] = cir['protocol']
+        pk['Rbitlen'] = cir['Rbitlen']
+
+        pk['nVars'] = cir['nVars']
+        pk['nPublic']    = cir['nPubInputs'] + cir['nOutputs']
+        pk['domainBits'] =  np.uint32(math.ceil(math.log(cir['nConstraints']+ 
+                                           cir['nPubInputs'] + 
+                                           cir['nOutputs'],2)))
+        pk['domainSize'] = 1 << pk['domainBits']
+        pk['field_r'] = np.copy(cir['field_r'])
+        pk['group_q'] = np.copy(cir['group_q'])
+
 def getPK():
       pk = {}
 
