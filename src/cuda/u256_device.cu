@@ -519,6 +519,7 @@ __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
       return;
     }
 
+    //memset causes blocking operations on current device
     x = (uint32_t *) &in_vector[tid * U256K_OFFSET + U256_XOFFSET];
     z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     memset(z, 0, NWORDS_256BIT*sizeof(uint32_t));
@@ -547,6 +548,7 @@ __global__ void shl1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
       return;
     }
 
+    //memset causes blocking operations on current device
     x = (uint32_t *) &in_vector[tid * U256K_OFFSET + U256_XOFFSET];
     z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     memset(z, 0, NWORDS_256BIT*sizeof(uint32_t));
@@ -614,7 +616,8 @@ __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
   uint32_t tmp[NWORDS_256BIT+1];  //288 bits. I can multiply by up to 32
 
 	   //TODO change be movu256
-  memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
+  //memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
+  movu256(tmp, x);
 
   assert(k < U256_MAX_SMALLK);
 

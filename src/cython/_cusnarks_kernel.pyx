@@ -44,7 +44,7 @@ from libc.stdlib cimport malloc, free
 from libc.math cimport log2, ceil
 
 IF CUDA_DEF:
-  from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
+  from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly, C_AsyncBuf
 
 
   # CUSnarks class cython wrapper
@@ -61,7 +61,13 @@ IF CUDA_DEF:
           if out_size == 0:
              self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
   
-      def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel=1):
+      def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
+                       ct.uint32_t stream_id=N_STREAMS_PER_GPU, ct.uint32_t n_kernels=1):
+         
+          self.kernelLaunchAsync(in_vec, config, params,  gpu_id=0, stream_id=N_STREAMS_PER_GPU, n_kernels=n_kernesl)
+
+      def kernelLaunchAsync(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
+                       ct.uint32_t stream_id=N_STREAMS_PER_GPU, ct.uint32_t n_kernels=1):
           cdef ct.vector_t out_v
           cdef ct.vector_t in_v
          
@@ -72,14 +78,11 @@ IF CUDA_DEF:
           if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
               assert False, "Incorrect arguments"
               return 0.0
-  
-          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
-          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
-  
+   
           # create kernel config data
-          cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernel * sizeof(ct.kernel_config_t))
+          cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernels * sizeof(ct.kernel_config_t))
   
-          for i in range(n_kernel):
+          for i in range(n_kernels):
              kconfig[i].blockD = config['blockD'][i]
              kconfig[i].kernel_idx = config['kernel_idx'][i]
              # gridD and smemS and return_val do not need to exist
@@ -100,19 +103,32 @@ IF CUDA_DEF:
              else:
                  kconfig[i].in_offset = 0
   
+          """
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
+  
           in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
           in_vec_flat = np.concatenate(in_vec)
           in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
   
           out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
           out_v.data = <ct.uint32_t *>&out_vec_flat[0]
+          """
+          cdef AsyncBuf [ct.uint32_t] *in_vec_flat = new AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
+          in_vec_flat.set(&in_vec.data[0,0], in_v.length*in_vec.shape[1])
+          in_v.data  = <ct.uint32_t *>in_vec_flat.get()
+  
+          cdef AsyncBuf [ct.uint32_t] *out_vec_flat = AsyncBuf[ct.uint32_t](out_v.length  * in_vec.shape[1])
+          out_v.data = <ct.uint32_t *>out_vec_flat.get()
   
           # TODO :I am trying to represent input data as ndarray. I don't
           # know how other way to do this but to overwrite ndarray with input data
   
           # create kernel params data
-          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernel * sizeof(ct.kernel_params_t))
-          for i in range(n_kernel):
+          #cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+          cdef AsyncBuf [ct.kernel_params_t] *kparams_buffer = AsyncBuf[ct.kernel_params_t](n_kernels)
+          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.get()
+          for i in range(n_kernels):
             kparams[i].midx = params['midx'][i]
             kparams[i].in_length = params['in_length'][i]
             kparams[i].out_length = params['out_length']
@@ -142,14 +158,17 @@ IF CUDA_DEF:
             else:
               kparams[i].as_mont = 1
   
-          exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
+          exec_time = self._cusnarks_ptr.kernelLaunchAsync(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
          
           kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
   
           free(kconfig)
-          free(kparams)
+          #free(kparams)
   
           return kdata, exec_time
+
+      def streamSync(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
+          return
    
       def rand(self, ct.uint32_t n_samples):
           cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
@@ -243,13 +262,25 @@ IF CUDA_DEF:
       def __dealloc__(self):
           del self._zpoly_ptr
   
+  # C_AsyncBuf class cython wrapper
+  cdef class AsyncBuf:
+      cdef C_AsyncBuf* _async_buffer_ptr
   
-def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
-        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+      def __cinit__(self, ct.uint32_t nelems):
+          self._async_buffer_ptr = new C_AsyncBuf(nelems)
+  
+      def __dealloc__(self):
+          if self._async_buffer_ptr != NULL:
+            del self._async_buffer_ptr
 
-        uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
+      def  get(self):
+        return self.get()
+
+      def  getNelems(self):
+        return self.getNelems()
   
-        return out_vec
+      def  set(self, T *in_data, ct.uint32_t nelems):
+        return self.set(in_data, nelems)
 
 
 def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):

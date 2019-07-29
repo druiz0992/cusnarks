@@ -227,7 +227,7 @@ class CUU256Test(unittest.TestCase):
               result = np.concatenate((result,zeros))
               kernel_params['in_length'][1] = min_length
 
-            result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,2 )
+            result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,n_kernels=2 )
 
             kernel_params['midx'] = [MOD_FIELD]
             kernel_params['premod'] = [1]
@@ -238,7 +238,7 @@ class CUU256Test(unittest.TestCase):
             kernel_config['smemS'] = [kernel_config['blockD'][0] * NWORDS_256BIT * 4]
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
 
-            result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,1 )
+            result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,n_kernels=1 )
 
 
             kernel_params['midx'] = [MOD_FIELD]
@@ -250,7 +250,7 @@ class CUU256Test(unittest.TestCase):
             kernel_config['smemS'] = [kernel_config['blockD'][0] * NWORDS_256BIT * 4]
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE]
 
-            result,_ = u256.kernelLaunch(result, kernel_config, kernel_params,1 )
+            result,_ = u256.kernelLaunch(result, kernel_config, kernel_params,n_kernels=1 )
            
             #debugReduceAddm(u256_vector,result)
       
@@ -275,7 +275,7 @@ class CUU256Test(unittest.TestCase):
             kernel_config['gridD'] = [0,  1]
             kernel_config['kernel_idx'] = [CB_U256_ADDM_REDUCE_SHFL, CB_U256_ADDM_REDUCE_SHFL]
 
-            result2,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,2 )
+            result2,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,n_kernels=2 )
             self.assertTrue(all(np.concatenate(result2 == r_addm_reduce)))
 
 def debugReduceAddm(u256_vector, result):

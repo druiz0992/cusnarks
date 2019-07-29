@@ -45,6 +45,7 @@ cdef extern from "types.h":
   cdef uint32_t NWORDS_256BIT
   cdef uint32_t MAX_R1CSPOLY_NWORDS
   cdef uint32_t MAX_R1CSPOLYTMP_NWORDS
+  cdef uint32_t N_STREAMS_PER_GPU
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -165,6 +166,10 @@ cdef extern from "types.h":
   ctypedef enum gpu_id_t:
     GPU_ID0 = 0, GPU_ID1, GPU_ID2, GPU_ID3
 
+  ctypedef enum kernel_t:
+     KERNEL_T_ZPOLY = 0, KERNEL_T_ECBN128_T, KERNEL_T_EC2BN128_T, KERNEL_T_N
+
 _NWORDS_256BIT = NWORDS_256BIT
 _MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
 _MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS
+_NSTREAMS_PER_GPU = N_STREAMS_PER_GPU
