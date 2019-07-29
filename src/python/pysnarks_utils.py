@@ -490,6 +490,8 @@ def pkvars_to_json(out_bin, out_ec, pk):
 
         ZField.set_field(MOD_GROUP)
 
+        a = ecp_to_json(pk['hExps'], out_ec, b_reduce, False)
+
         r1 = worker.apply_async(ecp_to_json, args=(pk['A'], out_ec, b_reduce, False))
         r2 = worker.apply_async(ecp_to_json, args=(pk['B1'], out_ec, b_reduce, False))
         r3 = worker.apply_async(ecp_to_json, args=(pk['B2'], out_ec, b_reduce, True))
@@ -930,7 +932,13 @@ def pkbin_to_vars(pk_bin):
                            pk['polsC_nWords'] 
                           
           if pk['k_binformat'] == FMT_EXT:
-             to_montgomeryN_h(pk_bin[offset_data:offset_ec_data], MOD_FIELD)
+              mpoly_to_montgomery_h(pk_bin[offset_data:offset_data+pk['polsA_nWords']],MOD_FIELD)
+              tmp_offset_data = offset_data + pk['polsA_nWords']
+              mpoly_to_montgomery_h(pk_bin[tmp_offset_data:tmp_offset_data+pk['polsB_nWords']],MOD_FIELD)
+              tmp_offset_data += pk['polsB_nWords']
+              mpoly_to_montgomery_h(pk_bin[tmp_offset_data:tmp_offset_data+pk['polsC_nWords']],MOD_FIELD)
+              tmp_offset_data += pk['polsC_nWords']
+             #to_montgomeryN_h(pk_bin[offset_data:offset_ec_data], MOD_FIELD)
 
           pk['polsA'] = pk_bin[offset_data:offset_data+pk['polsA_nWords']]
           offset_data += pk['polsA_nWords']
