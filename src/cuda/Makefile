@@ -44,7 +44,6 @@ CUOBJDUMP = cuobjdump
 CUOBJDUMP_FLAGS = -ptx -sass 
 
 CUSRC = cusnarks_kernel.cu \
-        async_buffer.cu \
         u256.cu \
         u256_device.cu \
         ecbn128.cu \

@@ -617,7 +617,7 @@ __device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
 
 	   //TODO change be movu256
   //memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
-  movu256(tmp, x);
+  movu256(tmp, (uint32_t *)x);
 
   assert(k < U256_MAX_SMALLK);
 

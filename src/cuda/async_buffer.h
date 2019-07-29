@@ -42,11 +42,46 @@ class AsyncBuf {
 
     public:
  
-        T * get(void);
+        T * getBuf(void);
         uint32_t  getNelems(void);
-        uint32_t set(T *in_data, uint32_t nelems);   
-        AsyncBuf(uint32_t nelems)
+        uint32_t setBuf(T *in_data, uint32_t nelems);   
+        AsyncBuf(uint32_t nelems);
         ~AsyncBuf();
 };
+
+template<class T>
+AsyncBuf<T>::AsyncBuf(uint32_t nelems) : 
+   max_nelems(nelems)
+{
+   CCHECK(CudaMallocHost((void **)data, nelems*sizeof(T)));
+}  
+
+template <class T>
+AsyncBuf<T>::~AsyncBuf(void)
+{
+   CCHECK(CudaFreeHost(data));
+}
+
+template <class T>
+T * AsyncBuf::getBuf(void)
+{
+  return data;
+}  
+
+template <class T>
+uint32_t AsyncBuf::getNelems(void)
+{
+  return max_nelems;
+}  
+
+template <class T>
+uint32_t AsyncBuf::setBuf(T *in_data, uint32_t nelems)
+{
+   if (nelems > max_nelems){
+     return 1;
+   }
+   memcpy(data, in_data, sizeof(T) * nelems);
+   return 0;
+}
 
 #endif

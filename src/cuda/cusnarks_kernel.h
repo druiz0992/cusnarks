@@ -59,10 +59,10 @@ class CUSnarks {
 
         void resetDevices(void);
         void allocateCudaResources(uint32_t in_size, uint32_t out_size, 
+                                    uint32_t in_len, uint32_t out_len); 
         void allocateCudaCommonResources(void);
         void allocateCudaCteResources(void);
         void releaseCudaResources(void);
-        void releaseCudaCteResources(void);
         void releaseCudaCommonResources(void);
         double elapsedTime(void);
 
