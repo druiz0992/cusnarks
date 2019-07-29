@@ -37,6 +37,10 @@ cimport _cusnarks_kernel
 cdef extern from "rng_cython.h":
      pass
 
+
+cdef extern from "cusnarks_kernel_cython.h":
+     pass
+
 cdef extern from "../cuda/cusnarks_kernel.h":
     cdef cppclass C_CUSnarks "CUSnarks":
         C_CUSnarks(ct.uint32_t in_len, ct.uint32_t in_size, ct.uint32_t out_len, ct.uint32_t out_size, 
@@ -46,10 +50,10 @@ cdef extern from "../cuda/cusnarks_kernel.h":
         void randu256(ct.uint32_t *samples, ct.uint32_t n_samples, ct.uint32_t *mod)
         void saveFile(ct.uint32_t *samples, ct.uint32_t n_samples, char * fname)
         double kernelLaunch( ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
-                          ct.kernel_config_t *config, ct.kernel_params_t *params, uint32_t did, ct.uint32_t stream_id,
+                          ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t did, ct.uint32_t stream_id,
                           ct.uint32_t n_kernel)
         double kernelLaunchAsync( ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
-                          ct.kernel_config_t *config, ct.kernel_params_t *params, uint32_t did, ct.uint32_t stream_id,
+                          ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t did, ct.uint32_t stream_id,
                           ct.uint32_t n_kernel)
         double streamSync(ct.uint32_t gpu_id, ct.uint32_t stream_id)
         void getDeviceInfo()
@@ -74,10 +78,11 @@ cdef extern from "../cuda/zpoly.h":
         C_ZCUPoly(ct.uint32_t len, ct.uint32_t seed) except +
         C_ZCUPoly(ct.uint32_t len) except +
 
-cdef extern from "../cuda/async_buffer.h":
+#cdef extern from "async_buffer_cython.h":
+cdef extern from "./async_buffer_cython.h":
     cdef cppclass C_AsyncBuf "AsyncBuf"[T] :
         C_AsyncBuf(ct.uint32_t nelems) except +
-        T *get()
+        T *getBuf()
         ct.uint32_t getNelems()
-        ct.uint32_t set(T *in_data, ct.uint32_t nelems)
+        ct.uint32_t setBuf(T *in_data, ct.uint32_t nelems)
    
