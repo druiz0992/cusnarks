@@ -150,7 +150,7 @@ def getCircuit():
     cir = {}
     cir['nWords']   = None
     cir['ftype'] = np.uint32(SNARKSFILE_T_PK)
-    cir['protocol'] = None
+    cir['protocol'] = np.uint32(PROTOCOL_T_GROTH)
     cir['nPubInputs'] = None
     cir['Rbitlen'] = None
     cir['cirformat']    = None
@@ -259,7 +259,7 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
         cir = getCircuit()
 
         cir['nWords']       =  np.uint32(fsize)
-        cir['protocol']     = PROTOCOL_T_GROTH  # Groth
+        cir['protocol']     = np.uint32(PROTOCOL_T_GROTH)  # Groth
         cir['nPubInputs']   =  np.uint32(cir_data['nPubInputs'])
         cir['Rbitlen']        = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
         cir['cirformat']       =  np.uint32(out_circuit_format)
@@ -320,7 +320,7 @@ def cirvars_to_bin(cir):
                         cir['R1CSC']))
 
 
-def cirbin_to_vars(self, ciru256_data):
+def cirbin_to_vars(ciru256_data):
         R1CSA_offset = CIRBIN_H_N_OFFSET
         R1CSB_offset = CIRBIN_H_N_OFFSET +  \
                        np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
@@ -359,6 +359,13 @@ def cirr1cs_to_mpoly(r1cs, cir_header, fmat, extend):
         return pols
 
 def cirvars_to_pkvars(pk, cir):
+        cir['Rbitlen']        = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
+        pidx = ZField.get_field()
+        ZField.set_field(MOD_FIELD)
+        cir['field_r']        = ZField.get_extended_p().as_uint256()
+        ZField.set_field(MOD_GROUP)
+        cir['group_q']       = ZField.get_extended_p().as_uint256()
+        ZField.set_field(pidx)
 
         pk['protocol'] = cir['protocol']
         pk['Rbitlen'] = cir['Rbitlen']
@@ -591,7 +598,7 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
         pk_bin = np.concatenate( (
                    np.asarray([pk['nWords']], dtype=np.uint32),
                    np.asarray([SNARKSFILE_T_PK], dtype=np.uint32),
-                   np.asarray([pk['protocol']], dtype=np.uint32),
+                   np.asarray([PROTOCOL_T_GROTH], dtype=np.uint32),
                    np.asarray([pk['Rbitlen']], dtype=np.uint32),
                    np.asarray([out_bin], dtype=np.uint32),
                    np.asarray([pk['k_ecformat']], dtype=np.uint32),
@@ -683,12 +690,12 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
                       polsB_ext,
                       pk['polsC'], 
                       polsC_ext,
-                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['A'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_GROUP,1),-1),
                       A_ext,
                       np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_GROUP,1),-1),
                       B1_ext,

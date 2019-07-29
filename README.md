@@ -31,6 +31,7 @@ Two libraries are generated :
         - future (0.17.1)
     - g++ compiler
     - nvcc compiler (Optional)
+    - openmp
     - snarkjs : https://github.com/iden3/snarkjs
 
 
