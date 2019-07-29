@@ -722,8 +722,6 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
 
     size1 = 16;
     size2 = blockDim.x >> 6;
-    // ECP_JAC_INOFFSET = 3 * NWORDS_256BIT
-    // ECP_JAC_INXOFFSET = 1 * NWORDS_256BIT
     // scalar multipliation
     if (params->premul){
         sumX.setu256(0,xo,0,1);

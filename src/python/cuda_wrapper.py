@@ -67,7 +67,7 @@ try:
 except ImportError:
   sys.exit()
 
-def zpoly_div_cuda(pysnark, poly ,n, fidx):
+def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = N_STREAMS_PER_GPU):
      nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
      ne = n + nd
      nsamples = len(poly) + nd
@@ -93,7 +93,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
                    #kernel_params['in_length'][0]-2*ne+nd - 1)/ kernel_config['blockD'][0])]
      kernel_config['kernel_idx']= [CB_ZPOLY_DIVSNARKS]
 
-     result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+     result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=1)
 
      result_snarks_complete = np.zeros((nsamples-ne,NWORDS_256BIT),dtype=np.uint32)
      result_snarks_complete[:nsamples-2*ne+nd] = result_snarks
@@ -115,7 +115,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
 
      return result_snarks_complete, t
  
-def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False ):
+def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, gpu_id=0, stream_id=N_STREAMS_PER_GPU ):
     kernel_params={}
     kernel_config={}
    
@@ -151,11 +151,11 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False ):
                                 kernel_config['blockD'][0])]
     kernel_config['return_val']=[1]
 
-    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
+    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
 
     return result,t
 
-def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
+def ec_mad_cuda(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = N_STREAMS_PER_GPU):
    kernel_params={}
    kernel_config={}
    
@@ -214,8 +214,8 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
            kernel_params['padding_idx'][i] = int(kernel_params['in_length'][i]/outdims)
            kernel_params['in_length'][i] = min_length[i]
     
-   result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,nkernels )
-   #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,1 )
+   result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,gpu_id, stream_id,n_kernels=nkernels )
+   #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,n_kernels=1 )
 
    #new_vector = new_vector.reshape((-1,8))
    #Kp = [ZFieldElExt(BigInt.from_uint256(k)) for k in new_vector[:new_nsamples]]
@@ -229,7 +229,7 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    
    return result, t
 
-def zpoly_fft_cuda(pysnark, vector, roots, fidx ):
+def zpoly_fft_cuda(pysnark, vector, roots, fidx, gpu_id=0, stream_id=N_STREAMS_PER_GPU ):
         nsamples = len(vector)
 
         n_cols = 10
@@ -256,12 +256,12 @@ def zpoly_fft_cuda(pysnark, vector, roots, fidx ):
                                      (kernel_config['blockD'][2] + nsamples-1)/kernel_config['blockD'][2]]
         kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
         zpoly_vector = np.concatenate((vector, roots))
-        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=4)
 
         return result, t
 
 
-def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0 ):
+def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0, gpu_id=0, stream_id?N_STREAMS_PER_GPU ):
         nsamples = 1<<ifft_params['levels']
         expanded_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
         expanded_vector[:len(vector)] = vector
@@ -306,7 +306,7 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
 
         kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
 
-        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id,n_kernels=4)
         if return_val == 0:
            result = nsamples
 
@@ -324,7 +324,7 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
 
         return result,t
 
-def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, return_val=0, as_mont=1):
+def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, return_val=0, as_mont=1, gpu_id=0, stream_id=N_STREAMS_PER_GPU):
     nsamples = 1<<mul_params['levels']
     expanded_vectorA = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
     expanded_vectorB = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
@@ -375,13 +375,13 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
 
     kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
 
-    X1S,t1 = pysnark.kernelLaunch(zpoly_vectorA, kernel_config, kernel_params,n_kernels1)
+    X1S,t1 = pysnark.kernelLaunch(zpoly_vectorA, kernel_config, kernel_params,gpu_id, stream_id, n_kernels = n_kernels1)
 
     kernel_params['in_length'][0] = nsamples
     kernel_params['stride'][0] = 1
     kernel_config['return_val'][0] = 1
 
-    Y1S,t2 = pysnark.kernelLaunch(zpoly_vectorB, kernel_config, kernel_params,n_kernels1)
+    Y1S,t2 = pysnark.kernelLaunch(zpoly_vectorB, kernel_config, kernel_params,gpu_id, stream_id, n_kernels = n_kernels1)
 
     kernel_params['padding_idx'] = [2*nsamples+2] * n_kernels2
     kernel_params['in_length'] = [nsamples] * n_kernels2
@@ -403,7 +403,7 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
     kernel_config['kernel_idx']= [CB_ZPOLY_MULCPREV,
                                   CB_ZPOLY_FFT3DXXPREV, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY ]
 
-    fftmul_result,t3 = pysnark.kernelLaunch(X1S, kernel_config, kernel_params,n_kernels2)
+    fftmul_result,t3 = pysnark.kernelLaunch(X1S, kernel_config, kernel_params,gpu_id, stream_id, n_kernels = n_kernels2)
     if return_val == 0:
       fftmul_result = nsamples
 
@@ -421,7 +421,7 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
   
     return fftmul_result, t1+t2+t3
 
-def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0):  
+def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0, gpu_id=0, stream_id=N_STREAMS_PER_GPU):  
 
      kernel_config={}
      kernel_params={}
@@ -469,7 +469,7 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
      #kernel_config['kernel_idx'] = [CB_ZPOLY_SUBPREV]
      kernel_config['kernel_idx'] = [CB_ZPOLY_SUB]
      kernel_config['return_val'] = [return_val] 
-     result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params )
+     result,t = pysnark.kernelLaunch(vector, kernel_config, gpu_id, stream_id, kernel_params )
 
      if return_val == 0:
         result = kernel_params['out_length']
@@ -478,7 +478,7 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
 
      return result,t
 
-def u256_mul_cuda(pysnark, vectorA, vectorB, fidx):
+def u256_mul_cuda(pysnark, vectorA, vectorB, fidx, gpu_id=0, stream_id=N_STREAMS_PER_GPU):
      vector = np.zeros((int(2*len(vectorA)), NWORDS_256BIT),dtype=np.uint32)
      vector[::2] = vectorA
      vector[1::2] = vectorB
@@ -494,12 +494,12 @@ def u256_mul_cuda(pysnark, vectorA, vectorB, fidx):
      kernel_config['blockD'] = [U256_BLOCK_DIM]
      kernel_config['kernel_idx'] = [CB_U256_MULM]
 
-     result, t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,2 )
+     result, t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=2 )
 
      return result, t
 
 
-def zpoly_mulK_cuda(pysnark, vectorA, K, fidx):  
+def zpoly_mulK_cuda(pysnark, vectorA, K, fidx, gpu_id=0, stream_id=N_STREAMS_PER_GPU):  
      #TODO revie
      vector =np.concatenate((K, vector))
      nsamples = len(vectorA)
@@ -514,11 +514,11 @@ def zpoly_mulK_cuda(pysnark, vectorA, K, fidx):
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [U256_BLOCK_DIM]
      kernel_config['kernel_idx'] = [CB_ZPOLY_MULK]
-     result,t= pysnark.kernelLaunch(vector, kernel_config, kernel_params )
+     result,t= pysnark.kernelLaunch(vector, kernel_config, gpu_id, stream_id,  kernel_params )
 
      return result,t
 
-def zpoly_mad_cuda(pysnark, vectors, fidx):  
+def zpoly_mad_cuda(pysnark, vectors, fidx, gpu_id=0, stream_id=N_STREAMS_PER_GPU):  
 
      kernel_config={}
      kernel_params={}

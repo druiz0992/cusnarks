@@ -102,6 +102,8 @@
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
 
+#define N_STREAMS_PER_GPU (3)
+
 typedef unsigned int uint32_t;
 typedef int int32_t;
 
@@ -428,4 +430,11 @@ typedef struct{
   
 }mpoly_eval_t;
 
+typedef enum{
+  KERNEL_T_ZPOLY = 0,
+  KERNEL_T_ECBN128_T,
+  KERNEL_T_EC2BN128_T,
+
+  KERNEL_T_N
+}kernel_t;
 #endif

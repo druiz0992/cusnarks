@@ -478,16 +478,16 @@ class GrothProver(object):
             Input : pH (4), hExps (file), pi_c (2)
             Output : pi_c
 
-          5.1 - EC multi expo with batch hExps and pH -
+          5.1 - EC multi expo with batch hExps and shorted pH -
  
          
          ------
           
-            1 1 1 1 1 1 1 1 1 
-                  2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 
-                            3 3 3 3 3 3 pA done 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
-                                               StartIFFT PA 4 4 4 4 4 4 4 4 4 4 4 4 PH Done
-                                                                                     5 5 5 5 5 5 5 5 5 5 5 5 5 5 
+            1 1 1 1 1 1 1 1 1  (CPU)
+                  2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 (CPU/GPU ecbn/ec2bn)
+                            3 3 3 3 3 3 pA done 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 (CPU)
+                                               StartIFFT PA 4 4 4 4 4 4 4 4 4 4 4 4 PH Done (GPU Zpoly)
+                                                                                     5 5 5 5 5 5 5 5 5 5 5 5 5 5 (CPU/GPU ecbn/ec2bn) 
 
 
 
