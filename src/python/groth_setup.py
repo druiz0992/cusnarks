@@ -99,9 +99,9 @@ class GrothSetup(object):
           self.seed = random.randint(0,1<<32)
 
         self.curve_data = ZUtils.CURVE_DATA[curve]
-        # Initialize Group 
+        # Initialize Group
         ZField(self.curve_data['prime'])
-        # Initialize Field 
+        # Initialize Field
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data)
         ZPoly.init(MOD_FIELD)
@@ -220,6 +220,7 @@ class GrothSetup(object):
         self.pk['k_binformat'] = self.out_k_binformat
         self.pk['k_ecformat'] =  self.out_k_ecformat
 
+
         prime = ZField.get_extended_p()
 
         self.toxic['t'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
@@ -230,14 +231,14 @@ class GrothSetup(object):
         self.write_pk()
         self.write_vk()
         copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
-        snarkjs_resuts = self.test_results()
+        self.test_results()
 
         return
    
     def create_correct_pkjson(self): 
           #Get pk json
-          test_pk_f = self.keep + self.out_pk_f
-          test_vk_f = self.keep + self.out_vk_f
+          test_pk_f = self.keep_f + self.out_pk_f
+          test_vk_f = self.keep_f + self.out_vk_f
           if self.out_pk_f.endswith('.bin')  or  \
               self.out_k_binformat != FMT_EXT or \
               self.out_k_ecformat != EC_T_AFFINE:
@@ -331,7 +332,7 @@ class GrothSetup(object):
         self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
         self.cir['R1CSC'] = None
 
-        woker.terminate()
+        worker.terminate()
 
         return
 

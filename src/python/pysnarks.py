@@ -243,10 +243,11 @@ def run():
         else:
            opt['input_circuit_f'] = opt['data_f'] + args.input_circuit
 
-      if '//' in args.output_circuit:
-         opt['output_circuit_f'] = args.output_circuit
-      else:
-         opt['output_circuit_f'] = opt['data_f'] + args.output_circuit
+      if args.output_circuit is not None:
+        if '//' in args.output_circuit:
+           opt['output_circuit_f'] = args.output_circuit
+        else:
+           opt['output_circuit_f'] = opt['data_f'] + args.output_circuit
 
       if args.output_circuit_format is not None:
         opt['output_circuit_format'] = args.output_circuit_format

@@ -1,4 +1,8 @@
 #cython: language_level=3
+#cython.wraparound(False)
+#cython.boundscheck(False)
+#cython.nonecheck(False):w
+
 """
     Copyright 2018 0kims association.
 
@@ -426,7 +430,8 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 
     vin_flat = np.reshape(vin,-1)
 
-    uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
+    with nogil:
+      uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
 
     return idx_flat
 
@@ -619,18 +624,20 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
      return out_vec
 
 def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/24)
+     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
     
-     uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+     with nogil:
+       uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
 
 def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/48)
+     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
-    
-     uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+   
+     with nogil: 
+       uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
 
@@ -670,7 +677,8 @@ def to_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
      cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
 
-     uh.cto_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
+     with nogil:
+       uh.cto_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
     
@@ -678,7 +686,8 @@ def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pi
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
      cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
 
-     uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx, strip_last)
+     with nogil:
+       uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx, strip_last)
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
 
