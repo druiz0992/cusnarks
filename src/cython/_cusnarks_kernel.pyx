@@ -114,20 +114,20 @@ IF CUDA_DEF:
           out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
           out_v.data = <ct.uint32_t *>&out_vec_flat[0]
           """
-          cdef AsyncBuf [ct.uint32_t] *in_vec_flat = new AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
-          in_vec_flat.set(&in_vec.data[0,0], in_v.length*in_vec.shape[1])
-          in_v.data  = <ct.uint32_t *>in_vec_flat.get()
+          cdef C_AsyncBuf [ct.uint32_t] *in_vec_flat = new C_AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
+          in_vec_flat.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+          in_v.data  = <ct.uint32_t *>in_vec_flat.getBuf()
   
-          cdef AsyncBuf [ct.uint32_t] *out_vec_flat = AsyncBuf[ct.uint32_t](out_v.length  * in_vec.shape[1])
-          out_v.data = <ct.uint32_t *>out_vec_flat.get()
+          cdef C_AsyncBuf [ct.uint32_t] *out_vec_flat = new C_AsyncBuf[ct.uint32_t](out_v.length  * in_vec.shape[1])
+          out_v.data = <ct.uint32_t *>out_vec_flat.getBuf()
   
           # TODO :I am trying to represent input data as ndarray. I don't
           # know how other way to do this but to overwrite ndarray with input data
   
           # create kernel params data
           #cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
-          cdef AsyncBuf [ct.kernel_params_t] *kparams_buffer = AsyncBuf[ct.kernel_params_t](n_kernels)
-          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.get()
+          cdef C_AsyncBuf [ct.kernel_params_t] *kparams_buffer = new C_AsyncBuf[ct.kernel_params_t](n_kernels)
+          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
           for i in range(n_kernels):
             kparams[i].midx = params['midx'][i]
             kparams[i].in_length = params['in_length'][i]
@@ -160,7 +160,7 @@ IF CUDA_DEF:
   
           exec_time = self._cusnarks_ptr.kernelLaunchAsync(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
          
-          kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
+          #kdata =  np.reshape(out_v,(-1,in_vec.shape[1]))
   
           free(kconfig)
           #free(kparams)
@@ -263,6 +263,7 @@ IF CUDA_DEF:
           del self._zpoly_ptr
   
   # C_AsyncBuf class cython wrapper
+  """
   cdef class AsyncBuf:
       cdef C_AsyncBuf* _async_buffer_ptr
   
@@ -273,14 +274,15 @@ IF CUDA_DEF:
           if self._async_buffer_ptr != NULL:
             del self._async_buffer_ptr
 
-      def  get(self):
+      def  getBuf(self):
         return self.get()
 
       def  getNelems(self):
         return self.getNelems()
   
-      def  set(self, T *in_data, ct.uint32_t nelems):
-        return self.set(in_data, nelems)
+      def  setBuf(self, T *in_data, ct.uint32_t nelems):
+        return self.setBuf(in_data, nelems)
+      """
 
 
 def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
