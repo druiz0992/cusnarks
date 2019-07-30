@@ -81,6 +81,7 @@ class GrothSetup(object):
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
                  benchmark_f=None, seed=None, snarkjs=None, keep_f=None):
  
+        # Check valid folder exists
         if keep_f is None:
             print ("Repo directory needs to be provided\n", file=self.log_f)
             sys.exit(1)
@@ -92,6 +93,7 @@ class GrothSetup(object):
         if not use_pycusnarks :
           logging.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
+
         if seed is not None:
           self.seed = seed
           random.seed(seed) 
@@ -156,6 +158,13 @@ class GrothSetup(object):
          
         if self.in_circuit_f is not None:
            self.circuitRead()
+           self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.pk['domainBits']) * NWORDS_256BIT)
+           self.roots_rdc_u256 = np.frombuffer(
+                    self.roots_rdc_u256_sh,
+                    dtype=np.uint32).reshape((self.pk['domainBits'], NWORDS_256BIT))
+           np.copyto(self.roots1M_rdc_u256, readU256DataFile_h(ROOTS_1M_filename_bin.encode("UTF-8"), 1<<20, 1<<self.pk['domainBits']) )
+
+           #roots_rdc_u256 = field_roots_compute_h(bits)
         else:
            logging.error ("Required input circuit %s", self.log_f)
            sys.exit(1)
@@ -373,18 +382,12 @@ class GrothSetup(object):
        u_u256 = np.zeros((m,NWORDS_256BIT),dtype=np.uint32)
        trdc_u256 = t_rdc.as_uint256()
       
-       #load roots
-       if os.path.exists(ROOTS_1M_filename_bin):
-           roots_rdc_u256 = readU256DataFile_h(ROOTS_1M_filename_bin.encode("UTF-8"), 1<<20, 1<<bits)
-       else :
-           roots_rdc_u256 = field_roots_compute_h(nbits)
-
        z = tm.extend() - 1
        z_rdc = z.reduce()
        if tm == ZFieldElExt(1).reduce():
          for i in xrange(m): 
            #TODO : roots[0] is always 1. Does this make any sense? check javascript version
-           if roots_rdc_u256[0] == trdc_u256:
+           if self.roots_rdc_u256[0] == trdc_u256:
              u_u256[i] = ZFieldElExt(1).reduce().as_uint256()
              return z.as_uint256(), u_u256
 
@@ -392,7 +395,7 @@ class GrothSetup(object):
        lrdc_u256 = l_rdc.as_uint256()
 
        pidx = ZField.get_field()
-       u_u256 = evalLagrangePoly_h(trdc_u256,lrdc_u256, roots_rdc_u256, pidx)
+       u_u256 = evalLagrangePoly_h(trdc_u256,lrdc_u256, self.roots_rdc_u256, pidx)
 
        return z.as_uint256(), u_u256
    

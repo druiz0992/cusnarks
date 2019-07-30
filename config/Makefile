@@ -29,21 +29,26 @@ EXTRA_CFLAGS2=-I $(AUX_INCLUDES)
 LINKFLAGS2=-L $(LIB_PATH)
 LDFLAGS2=-lm -lcusnarks
 
-CSRC = test_utils_host.cpp
+CSRC = gen_roots.cpp 
 
-NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
-CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
+AUX_DIRS=../data \
+         ../circuits
 
 OBJ= $(CSRC:.cpp=.o)
-TEST= $(subst .cpp,,$(CSRC))
-SCRIPTS= $(subst .cpp,,$(CSRC2))
+SCRIPTS= $(subst .cpp,,$(CSRC))
 
 clean:
 	rm -f *.o 
 
 ##################################################
-test: $(OBJ)
-	@for i in $(TEST); do \
+config: $(OBJ)
+	@echo "Generating auxiliary directories...";
+	@for i in $(AUX_DIRS); do \
+	  if [ ! -d "$$i" ]; then \
+	     mkdir $$i;  \
+	  fi \
+	done
+	@for i in $(SCRIPTS); do \
 	  ./$$i; \
 	  echo ""; \
 	done

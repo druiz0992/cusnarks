@@ -69,7 +69,7 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
+ROOTS_1M_filename_bin = '../../data/zpoly_roots_1M.bin'
 
 class GrothProver(object):
     
@@ -91,16 +91,15 @@ class GrothProver(object):
           logging.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
 
-
         if seed is not None:
           self.seed = seed
           random.seed(seed) 
         else:
           self.seed = random.randint(0,1<<32)
 
-        self.roots1M_rdc_u256_sh = RawArray(c_uint32,  (1 << 20) * NWORDS_256BIT)
-        self.roots1M_rdc_u256 = np.frombuffer(self.roots1M_rdc_u256_sh, dtype=np.uint32).reshape((1<<20, NWORDS_256BIT))
-        np.copyto(self.roots1M_rdc_u256, readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20) )
+        self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << 20) * NWORDS_256BIT)
+        self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<20, NWORDS_256BIT))
+        np.copyto(self.roots_rdc_u256, readU256DataFile_h(ROOTS_1M_filename_bin.encode("UTF-8"), 1<<20, 1<<20) )
 
         batch_size = 1<<20
         self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
@@ -154,9 +153,9 @@ class GrothProver(object):
 
         logging.info('#################################### ')
         logging.info('Staring Groth prover with the follwing parameters :')
+        logging.info(' - curve : %s',curve)
         logging.info(' - proving_key_f : %s', proving_key_f)
         logging.info(' - verification_key_f : %s',verification_key_f)
-        logging.info(' - curve : %s',curve)
         logging.info(' - out_proof_f : %s',out_proof_f)
         logging.info(' - out_pk_f : %s',out_pk_f)
         logging.info(' - out_pk_format : %s',out_pk_format) 
@@ -848,7 +847,7 @@ class GrothProver(object):
         ifft_params = ntt_build_h(pA.shape[0])
 
         # polC_S  is extended -> use extended scaler
-        polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
+        polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots_rdc_u256)
         np.copyto(pC,polC_S)
         del polC_S
         self.t_P['ifft-C'] = t1
@@ -869,7 +868,7 @@ class GrothProver(object):
         mul_params = ntt_build_h(pH.shape[0])
         #polAB_S is extended -> use extended scaler
         # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
-        polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
+        polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots_rdc_u256, return_val=1, as_mont=0)
         nsamplesH = zpoly_norm_h(polAB_S)
         np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
         del polAB_S
