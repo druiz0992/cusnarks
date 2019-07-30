@@ -179,7 +179,7 @@ class GrothProver(object):
                f = open(self.out_proving_key_f, 'w')
                print(pk_json, file=f)
                f.close()
-               del pk_dic
+               del pk_dict
                del pk_json
              elif self.out_proving_key_f.endswith('.bin'):
                pk_bin = pkvars_to_bin(self.out_proving_key_format, EC_T_AFFINE, self.pk, ext=False)

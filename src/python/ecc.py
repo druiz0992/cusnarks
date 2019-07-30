@@ -454,9 +454,9 @@ class ECC(object):
         
         if not ec2:
           if reduced:
-              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,last_idx))
           else:
-              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,3))
+              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,last_idx))
         else:
           if reduced:
               P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0])), ZFieldElRedc(BigInt.from_uint256(x_[1]))]) for x_ in x]),(-1,last_idx))

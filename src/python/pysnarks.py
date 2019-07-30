@@ -306,7 +306,10 @@ def run():
          opt['public_data_format'] = args.public_data_format
 
       if args.out_proving_key is not None:
-         opt['out_proving_key_f'] = args.out_proving_key
+         if '//' in args.out_proving_key:
+            opt['out_proving_key_f'] = args.out_proving_key
+         else:
+            opt['out_proving_key_f'] = opt['data_f'] + args.out_proving_key
 
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
