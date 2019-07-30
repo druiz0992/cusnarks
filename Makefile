@@ -47,6 +47,7 @@ PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
 CTEST_PATH = $(CUSNARKS_PATH)/test/c
+CONFIG_PATH= $(CUSNARKS_PATH)/config
 
 AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
 PCG_PATH = $(AUX_PATH)/pcg-cpp/test-high
@@ -68,11 +69,13 @@ test_dirs = $(CTEST_PATH) \
 
 aux_repos = $(PCG_REPO)
 
+config_dirs = $(CONFIG_PATH)
+
 AUX_INCLUDES = $(PCG_INCLUDE)
 
 SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
-SCRIPTS_SUBDIRS := $(CTEST_PATH)
+CONFIG_SUBDIRS := $(config_dirs)
 AUX_SUBDIRS := $(aux_dirs)
 AUX_REPOS := $(aux_repos)
 
@@ -137,17 +140,17 @@ test:
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
-scripts:   
-	@for i in $(SCRIPTS_SUBDIRS); do \
+config:   
+	@for i in $(SCRIPTS_CONFIG); do \
 	echo "make test in $$i..."; \
-	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) scripts); done
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
 
 clean:
-	@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
+	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(SCRIPTS_SUBDIRS); do \
 	echo "clearing all in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
 cubin:
 	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
 
-.PHONY:	scripts test build clean
+.PHONY:	config test build clean
