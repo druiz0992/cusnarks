@@ -214,7 +214,6 @@ class GrothProver(object):
     def read_witness_data(self):
        ## Open and parse witness data
        if os.path.isfile(self.witness_f):
-           f = open(self.witness_f,'r')
 
            pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
            nVars = int(pkbin_vars[0][0])
@@ -223,13 +222,24 @@ class GrothProver(object):
            self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
            self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
-           np.copyto(
-               self.scl_array[:nVars],
-               np.reshape(
-                   np.asarray(
-                       [BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
-                                                                     dtype=np.uint32),(-1, NWORDS_256BIT))
-                    )
+           if self.witness_f.endswith('.json'):
+             f = open(self.witness_f,'r')
+             np.copyto(
+                 self.scl_array[:nVars],
+                 np.reshape(
+                     np.asarray(
+                         [BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
+                                                                       dtype=np.uint32),(-1, NWORDS_256BIT))
+                      )
+             f.close()
+           elif self.witness_f.endswith('.txt'):
+             with open(self.witness_f, 'r') as f:
+               np.copyto(
+                 self.scl_array[:nVars],
+                 np.reshape(
+                     np.asarray(
+                          [BigInt(c).as_uint256() for c in f]),(-1,NWORDS_256BIT))
+                     )
 
            self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize)
            self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)

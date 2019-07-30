@@ -53,7 +53,7 @@ test: $(OBJ)
 	  echo ""; \
 	done
 
-scripts: $(OBJ)
+scripts: $(OBJ2)
 	@for i in $(SCRIPTS); do \
 	  ./$$i; \
 	  echo ""; \
