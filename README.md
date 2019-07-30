@@ -29,10 +29,12 @@ Two libraries are generated :
         - Cython (0.26.1)
         - numpy (1.16.4)
         - future (0.17.1)
+        - nvgpu (0.8.0)
     - g++ compiler
     - nvcc compiler (Optional)
     - openmp
     - snarkjs : https://github.com/iden3/snarkjs
+    - nodejs
 
 
 3. Build Cusnarks to generate shared libraries in $CUSNARKS_HOME/lib.

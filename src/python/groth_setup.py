@@ -133,7 +133,8 @@ class GrothSetup(object):
         init_h()
 
         self.alfabeta_f = self.keep_f + '/' + 'alfabeta.json'
-        self.test_f= self.keep_f + '/' +  test_f
+        #self.test_f= self.keep_f + '/' +  test_f
+        self.test_f= self.keep_f
         copy_input_files([in_circuit_f], self.keep_f)
 
         logging.info('#################################### ')
