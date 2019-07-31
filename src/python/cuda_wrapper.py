@@ -229,7 +229,7 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    
    return result, t
 
-def zpoly_fft_cuda(pysnark, vector, roots, fidx ):
+def zpoly_fft_cuda2(pysnark, vector, roots, fidx ):
         nsamples = len(vector)
 
         n_cols = 10
@@ -261,7 +261,7 @@ def zpoly_fft_cuda(pysnark, vector, roots, fidx ):
         return result, t
 
 
-def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0 ):
+def zpoly_fft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0, fft=1 ):
         nsamples = 1<<ifft_params['levels']
         expanded_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
         expanded_vector[:len(vector)] = vector
@@ -297,7 +297,7 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
         kernel_params['N_ffty'] = [Nrows] * n_kernels1
         kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
         kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
-        kernel_params['forward'] = [0] * n_kernels1
+        kernel_params['forward'] = [fft] * n_kernels1
         kernel_params['as_mont'] = [as_mont] * n_kernels1
   
         kernel_config['smemS'] = [0] * n_kernels1

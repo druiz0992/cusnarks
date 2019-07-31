@@ -34,6 +34,7 @@
 #define _UTILS_HOST_H_
 
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
+void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void montmult_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);

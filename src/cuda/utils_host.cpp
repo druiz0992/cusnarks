@@ -900,6 +900,16 @@ void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
   }
 }
 
+void montmultN_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t n, uint32_t pidx)
+{
+  uint32_t i;
+
+  #pragma omp parallel for if(parallelism_enabled)
+  for (i=0; i<n; i++){
+     montmult_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], &y[i*NWORDS_256BIT], pidx);
+  }
+}
+
 /* 
    Convert 256 bit number from montgomery representation of one of the two prime 
       p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
