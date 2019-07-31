@@ -34,6 +34,7 @@ cimport _types as ct
 
 cdef extern from "../cuda/utils_host.h" nogil: 
     void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
+    #void cmontmultN_h "montmultN_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t n, ct.uint32_t pidx)
     void caddm_h "addm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void caddu256_h "addu256_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B)
     void csubm_h "subm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
@@ -52,7 +53,6 @@ cdef extern from "../cuda/utils_host.h" nogil:
     void creadU256CircuitFileHeader_h "readU256CircuitFileHeader_h"( ct.cirbin_hfile_t *hfile, const char *filename)
     void creadU256PKFile_h "readU256PKFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256PKFileHeader_h "readU256PKFileHeader_h"( ct.pkbin_hfile_t *hfile, const char *filename)
-    #void cmpoly_eval_h "mpoly_eval_h" (ct.uint32_t *pout, ct.uint32_t *scalar, ct.uint32_t *p,ct.uint32_t reduce_coeff, ct.uint32_t last_idx, ct.uint32_t pidx)
     void *cmpoly_eval_h "mpoly_eval_h" (ct.mpoly_eval_t *args)
     void cmpoly_eval_server_h "mpoly_eval_server_h" (ct.mpoly_eval_t *args)
     void cr1cs_to_mpoly_h "r1cs_to_mpoly_h" (ct.uint32_t *pout, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t to_mont, ct.uint32_t pidx, ct.uint32_t extend)
