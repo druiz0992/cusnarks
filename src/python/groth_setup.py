@@ -116,6 +116,8 @@ class GrothSetup(object):
 
         self.pk = getPK()
 
+        self.t_S = {}
+
         self.ecbn128    = None 
         self.ec2bn128   = None 
 
@@ -160,6 +162,8 @@ class GrothSetup(object):
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
         logging.info('#################################### ')
+        logging.info('')
+        logging.info('')
          
         if self.in_circuit_f is not None:
            self.circuitRead()
@@ -204,6 +208,11 @@ class GrothSetup(object):
              cir_u256 = readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
              self.cir = cirbin_to_vars(cir_u256)
              del cir_u256
+        logging.info('############################################## ')
+        logging.info(' - NVars        : %s',int(self.cir['nVars']))
+        logging.info(' - nOutputs     : %s',int(self.cir['nOutputs']))
+        logging.info(' - nConstraints : %s',int(self.cir['nConstraints']))
+        logging.info('############################################## ')
 
     def launch_snarkjs(self, mode):
         snarkjs = {}
@@ -245,6 +254,7 @@ class GrothSetup(object):
         logging.info('Starting setup....')
 
         ZField.set_field(MOD_FIELD)
+        start_s = time.time()
         
         #Init PK
         cirvars_to_pkvars(self.pk, self.cir)
@@ -257,13 +267,24 @@ class GrothSetup(object):
         self.toxic['t'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
 
         self.calculatePoly()
+        end = time.time()
+        self.t_S['cal Poly'] = end - start_s
+
+        start = time.time()
         self.calculateEncryptedValuesAtT()
+
+        end_s = time.time()
+        self.t_S['total'] = end_s - start_s
+        self.t_S['cal Crypto'] = end_s - start
+
         logging.info('')
-        logging.info('Setup finised')
+        logging.info('Setup completed')
         logging.info('')
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
+
+        self.logTimeResults()
 
         self.write_pk()
         self.write_vk()
@@ -362,6 +383,7 @@ class GrothSetup(object):
 
           return pk_r and vk_r
         else:
+          logging.info('Results not verified')
           return True
 
 
@@ -390,19 +412,6 @@ class GrothSetup(object):
         worker.terminate()
 
         return
-
-        """
-        self.pk['polsA']  = self.r1cs_to_mpoly(self.cir['R1CSA'], 1)
-        self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
-        self.cir['R1CSA'] = None
-        self.pk['polsB'] = self.r1cs_to_mpoly(self.cir['R1CSB'], 0)
-        self.pk['polsB_nWords'] = self.pk['polsB'].shape[0]
-        self.cir['R1CSB'] = None
-        self.pk['polsC'] = self.r1cs_to_mpoly(self.cir['R1CSC'], 0)
-        self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
-        self.cir['R1CSC'] = None
-        """
-
 
     def r1cs_to_mpoly(self, r1cs, fmat, extend):
         to_mont = 0
@@ -445,8 +454,12 @@ class GrothSetup(object):
        return z.as_uint256(), u_u256
    
     def calculateEncryptedValuesAtT(self):
+      start = time.time()
       a_t_u256, b_t_u256, c_t_u256, z_t_u256 = self.calculateValuesAtT()
+      end = time.time()
+      self.t_S['cal Val'] = end - start
 
+      start = time.time()
       prime = ZField.get_extended_p()
       curve_params = self.curve_data['curve_params']
       curve_params_g2 = self.curve_data['curve_params_g2']
@@ -488,30 +501,46 @@ class GrothSetup(object):
 
       self.ecbn128    =  ECBN128(self.pk['domainSize']+3,seed=self.seed)
       self.ec2bn128    = EC2BN128(self.pk['nVars']+1,seed=self.seed)
+
+      end = time.time()
+      self.t_S['init k'] = end - start
    
+      start = time.time()
       # a_t, b_t and c_t are in ext
       sorted_idx = sortu256_idx_h(a_t_u256)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       #ecbn128_samples = np.concatenate((a_t_u256,G1.as_uint256(G1)[:2]))
-      self.pk['A'],_ = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
       self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
 
+      end = time.time()
+      self.t_S['A'] = end - start
+
+      self.t_S['A gpu'] = t1
+      start = time.time()
+
+    
       sorted_idx = sortu256_idx_h(b_t_u256)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
-      self.pk['B1'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
 
+      end= time.time()
+      self.t_S['B1 gpu'] = t1
+      self.t_S['B1'] = end-start
+
+      start= time.time()
       ec2bn128_samples = np.concatenate((b_t_u256[sorted_idx],G2.as_uint256(G2)[:4]))
       #ec2bn128_samples = np.concatenate((b_t_u256,G2.as_uint256(G2)[:4]))
-      self.pk['B2'],t = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
+      self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
@@ -519,6 +548,12 @@ class GrothSetup(object):
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
       self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
+
+      self.t_S['B2 gpu'] = t1
+      end= time.time()
+      self.t_S['B2'] = end - start
+
+      start = time.time()
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
@@ -528,7 +563,7 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['C'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
@@ -536,6 +571,11 @@ class GrothSetup(object):
       self.pk['C']=np.concatenate((np.zeros(((self.pk['nPublic']+1)*2,NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
 
+      self.t_S['C gpu'] = t1
+      end = time.time()
+      self.t_S['C'] =end - start 
+
+      start = time.time()
 
       maxH = self.pk['domainSize']+1
       self.pk['hExps'] = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
@@ -548,13 +588,18 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(eT_u256)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['hExps'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
       self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_256BIT)
 
+      end = time.time()
+      self.t_S['hExps'] =end - start 
+      self.t_S['hExps gpu'] = t1
+
+      start = time.time()
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
@@ -564,11 +609,15 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['IC'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
+
+      end = time.time()
+      self.t_S['IC'] =end - start 
+      self.t_S['IC gpu'] = t1
 
     def calculateValuesAtT(self):
        # Required z_t es Ext, polsA/B/C are in Mont format
@@ -736,7 +785,23 @@ class GrothSetup(object):
       vk_bin=None
       return vk_bin
 
+    def timeStats(self, t):
+      for s in t:
+        for k, v in s.items():
+           if k is not 'total':
+             s[k] = str(round(v,2)) + '(' + str(round(100*v/s['total'],2)) + '%)'
 
+    def logTimeResults(self):
+      self.timeStats([self.t_S])
+
+      logging.info('')
+      logging.info('')
+      logging.info('#################################### ')
+      logging.info('Total Time to generate setup : %s seconds', round(self.t_S['total']))
+      logging.info('')
+      logging.info('- %s', self.t_S)
+      logging.info('')
+      logging.info('#################################### ')
 if __name__ == "__main__":
     in_circuit_f = '../../data/prove-kyc.json'
     out_circuit_f = '../../data/prove-kyc.bin'
