@@ -141,7 +141,7 @@ test:
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
 config:   
-	@for i in $(SCRIPTS_CONFIG); do \
+	@for i in $(CONFIG_SUBDIRS); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
 

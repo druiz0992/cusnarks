@@ -266,7 +266,8 @@ def zpoly_ifft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, r
         expanded_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
         expanded_vector[:len(vector)] = vector
         if roots is not None:
-             expanded_roots = roots[::1<<(20-ifft_params['levels'])]
+             n_bits = int(math.log(roots.shape[0],2))
+             expanded_roots = roots[::1<<(n_bits-ifft_params['levels'])]
              scalerMont = ZFieldElExt(len(expanded_roots)).inv().reduce().as_uint256()
              scalerExt = ZFieldElExt(len(expanded_roots)).inv().as_uint256()
              zpoly_vector = np.concatenate((expanded_vector, expanded_roots, [scalerExt],[scalerMont]))
@@ -335,7 +336,8 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
     kernel_params={}
 
     if roots is not None:
-          expanded_roots = roots[::1<<(20-mul_params['levels'])]
+          n_bits = int(math.log(roots.shape[0],2))
+          expanded_roots = roots[::1<<(n_bits-mul_params['levels'])]
           scalerMont = ZFieldElExt(len(expanded_roots)).inv().reduce().as_uint256()
           scalerExt = ZFieldElExt(len(expanded_roots)).inv().as_uint256()
           zpoly_vectorA = np.concatenate((expanded_vectorA, expanded_roots,[scalerExt], [scalerMont]))

@@ -241,7 +241,7 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
         if 'cirformat' in cir_data:
             tmp_in_circuit_format = cir_data['cirformat']
 
-        worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
+        worker = mp.Pool(processes=min(3,mp.cpu_count()))
 
         r1 = worker.apply_async(cirjson_to_r1cs, args = (0,tmp_in_circuit_format, out_circuit_format, cir_data))
         r2 = worker.apply_async(cirjson_to_r1cs, args=(1,tmp_in_circuit_format, out_circuit_format, cir_data))
@@ -473,7 +473,7 @@ def pkvars_to_json(out_bin, out_ec, pk):
 
         ZField.set_field(MOD_FIELD)
 
-        worker = mp.Pool(processes=min(5,mp.cpu_count()-1))
+        worker = mp.Pool(processes=min(5,mp.cpu_count()))
 
         if out_bin == FMT_EXT:
           r1 = worker.apply_async(mpoly_to_json, args=(pk['polsA'], False))
@@ -798,7 +798,7 @@ def pkjson_to_pyvars(pk_proof):
             k = [Z2FieldEl(el) for el in pk_proof['vk_delta_2']]
             pk['delta_2'] = ECC_F2(k)
 
-        worker = mp.Pool(processes=min(5,mp.cpu_count()-1))
+        worker = mp.Pool(processes=min(5,mp.cpu_count()))
 
         r1     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['A'],b_reduce, False))
         r2     = worker.apply_async(pkjson_to_pyec, args=(pk_proof['B1'], b_reduce,False))
@@ -857,7 +857,7 @@ def pkjson_to_vars(pk_proof, proving_key_f):
        pk['beta_2'] = np.reshape(pkpyec_to_vars(pk['beta_2'],True, True),-1)
        pk['delta_2'] = np.reshape(pkpyec_to_vars(pk['delta_2'],True, True),-1)
 
-       worker = mp.Pool(processes=min(5,mp.cpu_count()-1))
+       worker = mp.Pool(processes=min(5,mp.cpu_count()))
 
        r1 = worker.apply_async(pkpyec_to_vars, args=(pk['A'],True, True))
        r2 = worker.apply_async(pkpyec_to_vars, args=(pk['B1'],True, True))

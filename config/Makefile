@@ -31,9 +31,6 @@ LDFLAGS2=-lm -lcusnarks
 
 CSRC = gen_roots.cpp 
 
-AUX_DIRS=../data \
-         ../circuits
-
 OBJ= $(CSRC:.cpp=.o)
 SCRIPTS= $(subst .cpp,,$(CSRC))
 
@@ -41,17 +38,8 @@ clean:
 	rm -f *.o 
 
 ##################################################
-config: $(OBJ)
-	@echo "Generating auxiliary directories...";
-	@for i in $(AUX_DIRS); do \
-	  if [ ! -d "$$i" ]; then \
-	     mkdir $$i;  \
-	  fi \
-	done
-	@for i in $(SCRIPTS); do \
-	  ./$$i; \
-	  echo ""; \
-	done
+config: 
+	python3 cusnarks_config.py
 
 ##################################################
 %.o : %.cpp
