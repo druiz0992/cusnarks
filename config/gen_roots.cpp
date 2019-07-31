@@ -54,9 +54,10 @@ void test_gen_roots(uint32_t nbits, char *filename)
 }
 
 
-int main()
+int main(int argc, char **argv )
 {
-  test_gen_roots(20,roots_1M_filename);
+  char *n;
+  test_gen_roots(strtol(argv[1], &n,10),argv[2]);
   return 1;
 }
 

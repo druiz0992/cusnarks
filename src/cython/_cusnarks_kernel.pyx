@@ -623,21 +623,32 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
 
      return out_vec
 
-def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
+def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
      cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
+     cdef ct.uint32_t out_len
+     if strip_last == 0:
+         out_len = <int>len(in_v)
+     else:
+         out_len = <int> (lenv * 2 * NWORDS_256BIT)
+
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
     
      with nogil:
-       uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+       uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx, strip_last)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
 
-def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
+def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
      cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
+     cdef ct.uint32_t out_len
+     if strip_last == 0:
+         out_len = <int>len(in_v)
+     else:
+         out_len = <int> (lenv * 4 * NWORDS_256BIT)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
    
      with nogil: 
-       uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+       uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx, strip_last)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
 

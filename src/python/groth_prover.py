@@ -60,6 +60,7 @@ from ecc import *
 from zpoly import *
 from constants import *
 from pysnarks_utils import *
+import multiprocessing as mp
 from cuda_wrapper import *
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
@@ -69,7 +70,9 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-ROOTS_1M_filename_bin = '../../data/zpoly_roots_1M.bin'
+sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
+
+import cusnarks_config as cfg
 
 class GrothProver(object):
     
@@ -93,13 +96,17 @@ class GrothProver(object):
 
         if seed is not None:
           self.seed = seed
-          random.seed(seed) 
         else:
-          self.seed = random.randint(0,1<<32)
+          x = os.urandom(4)
+          self.seed = int(x.hex(),16)
 
-        self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << 20) * NWORDS_256BIT)
-        self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<20, NWORDS_256BIT))
-        np.copyto(self.roots_rdc_u256, readU256DataFile_h(ROOTS_1M_filename_bin.encode("UTF-8"), 1<<20, 1<<20) )
+        random.seed(self.seed) 
+
+        self.roots_f = cfg.get_roots_file()
+        self.n_bits_roots = cfg.get_n_roots()
+        self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
+        self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
+        np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
         batch_size = 1<<20
         self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
@@ -163,7 +170,7 @@ class GrothProver(object):
         logging.info(' - out_public_format :  %s',out_public_format)
         logging.info(' - test_f : %s',self.test_f)
         logging.info(' - benchmark_f : %s', benchmark_f)
-        logging.info(' - seed : %s', seed)
+        logging.info(' - seed : %s', self.seed)
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - verify_en : %s', verify_en)
         logging.info(' - keep_f : %s', keep_f)
@@ -816,7 +823,7 @@ class GrothProver(object):
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
         pidx = ZField.get_field()
         reduce_coeff = 0  
-        polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, 10, pidx)
+        polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
         np.copyto(pX, polX_T)
 
 
@@ -845,6 +852,11 @@ class GrothProver(object):
         self.t_P['eval'] = end-start
 
         ifft_params = ntt_build_h(pA.shape[0])
+
+        if self.n_bits_roots < ifft_params['levels']:
+          logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
+          sys.exit(1)
+     
 
         # polC_S  is extended -> use extended scaler
         polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots_rdc_u256)

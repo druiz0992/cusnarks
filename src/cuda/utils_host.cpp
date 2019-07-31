@@ -2087,65 +2087,86 @@ void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
   subm_h(&y[NWORDS_256BIT],Zero,&y[NWORDS_256BIT],pidx);
 }
 
-void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
+void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last=0)
 {
   uint32_t i, zinv[NWORDS_256BIT*utils_nprocs], zinv_sq[NWORDS_256BIT*utils_nprocs];
   const uint32_t *One = CusnarksOneMontGet(pidx);
   const uint32_t *ECOne = CusnarksMiscKGet();
+  uint32_t ndims = ECP_JAC_OUTDIMS;
+  if (strip_last == 1){
+     ndims = ECP_JAC_INDIMS;
+  }
 
   #pragma omp parallel for if(parallelism_enabled)
   for (i=0; i< n; i++){
      if (!memcmp(
                &x[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
                &ECOne[(pidx*MISC_K_N+MISC_K_INF)*NWORDS_256BIT],
-               sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT)
+               sizeof(uint32_t) * ndims * NWORDS_256BIT)
         ) {
            memmove(
-             &y[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+             &y[i*ndims*NWORDS_256BIT],
              &x[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-            sizeof(uint32_t)*ECP_JAC_OUTDIMS*NWORDS_256BIT
+            sizeof(uint32_t)*ndims*NWORDS_256BIT
                  );
             continue;
      }
      int tid = omp_get_thread_num();
      //zinv = x[Z].inv()
-     montinv_h(&zinv[tid*NWORDS_256BIT], &x[2*NWORDS_256BIT+i*3*NWORDS_256BIT],pidx);
+     montinv_h(&zinv[tid*NWORDS_256BIT], &x[2*NWORDS_256BIT+i*ECP_JAC_OUTDIMS*NWORDS_256BIT],pidx);
      //zinv_sq = zinv * zinv
      montsquare_h(&zinv_sq[tid*NWORDS_256BIT], &zinv[tid*NWORDS_256BIT], pidx);
      // zinv = zinv_sq * zinv
      montmult_h(&zinv[tid*NWORDS_256BIT], &zinv_sq[tid*NWORDS_256BIT], &zinv[tid*NWORDS_256BIT], pidx);
      // y[X] = x[X] * zinv_sq
-     montmult_h(&y[i*3*NWORDS_256BIT], &x[i*3*NWORDS_256BIT], &zinv_sq[tid*NWORDS_256BIT], pidx);
+     montmult_h(&y[i*ndims*NWORDS_256BIT], &x[i*ECP_JAC_OUTDIMS*NWORDS_256BIT], &zinv_sq[tid*NWORDS_256BIT], pidx);
      // y[Y] = x[Y] * zinv
-     montmult_h(&y[NWORDS_256BIT + i*3*NWORDS_256BIT], &x[NWORDS_256BIT + i*3*NWORDS_256BIT], &zinv[tid*NWORDS_256BIT], pidx);
+     montmult_h(&y[NWORDS_256BIT + i*ndims*NWORDS_256BIT], &x[NWORDS_256BIT + i*ECP_JAC_OUTDIMS*NWORDS_256BIT], &zinv[tid*NWORDS_256BIT], pidx);
+  }   
+
+  if (!strip_last){
+    #pragma omp parallel for if(parallelism_enabled)
+    for (i=0; i< n; i++){
      // y[Z] = 1
-     memcpy(&y[2*NWORDS_256BIT+i*3*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+        memcpy(&y[2*NWORDS_256BIT+i*ECP_JAC_OUTDIMS*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+     }
   }
 }
 
-void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx)
+void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last=0)
 {
   uint32_t i, zinv[2*NWORDS_256BIT*utils_nprocs], zinv_sq[2*NWORDS_256BIT*utils_nprocs];
   const uint32_t *One = CusnarksOneMontGet(pidx);
   const uint32_t *ECOne = CusnarksMiscKGet();
+  uint32_t ndims = ECP2_JAC_OUTDIMS;
+  if (strip_last == 1){
+     ndims = ECP2_JAC_INDIMS;
+  }
 
 
   #pragma omp parallel for if(parallelism_enabled)
   for (i=0; i< n; i++){
-     if (!memcmp(&x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],&ECOne[(pidx*MISC_K_N+MISC_K_INF2)*NWORDS_256BIT],sizeof(uint32_t) * 6 * NWORDS_256BIT)) {
-        memmove(&y[i*6*NWORDS_256BIT], &x[i*6*NWORDS_256BIT],sizeof(uint32_t)*6*NWORDS_256BIT);
+     if (!memcmp(&x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],&ECOne[(pidx*MISC_K_N+MISC_K_INF2)*NWORDS_256BIT],sizeof(uint32_t) * ECP2_JAC_OUTDIMS * NWORDS_256BIT)) {
+        memmove(&y[i*ndims*NWORDS_256BIT], &x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],sizeof(uint32_t)*ECP2_JAC_OUTDIMS*NWORDS_256BIT);
         continue;
      }
      int tid = omp_get_thread_num();
-     montinv_ext_h(&zinv[2*tid*NWORDS_256BIT], &x[4*NWORDS_256BIT+i*6*NWORDS_256BIT],pidx);
+     montinv_ext_h(&zinv[2*tid*NWORDS_256BIT], &x[4*NWORDS_256BIT+i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],pidx);
 
      montmult_ext_h(&zinv_sq[2*tid*NWORDS_256BIT], &zinv[2*tid*NWORDS_256BIT], &zinv[2*tid*NWORDS_256BIT], pidx);
      montmult_ext_h(&zinv[2*tid*NWORDS_256BIT], &zinv_sq[2*tid*NWORDS_256BIT], &zinv[2*tid*NWORDS_256BIT], pidx);
 
-     montmult_ext_h(&y[i*6*NWORDS_256BIT], &x[i*6*NWORDS_256BIT], &zinv_sq[2*tid*NWORDS_256BIT], pidx);
-     montmult_ext_h(&y[2*NWORDS_256BIT + i*6*NWORDS_256BIT], &x[2*NWORDS_256BIT + i*6*NWORDS_256BIT], &zinv[2*tid*NWORDS_256BIT], pidx);
-     memcpy(&y[4*NWORDS_256BIT+i*6*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
-     memset(&y[5*NWORDS_256BIT+i*6*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+     montmult_ext_h(&y[i*ndims*NWORDS_256BIT], &x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT], &zinv_sq[2*tid*NWORDS_256BIT], pidx);
+     montmult_ext_h(&y[2*NWORDS_256BIT + i*ndims*NWORDS_256BIT], &x[2*NWORDS_256BIT + i*ECP2_JAC_OUTDIMS*NWORDS_256BIT], &zinv[2*tid*NWORDS_256BIT], pidx);
+  }
+
+  if (!strip_last){
+    #pragma omp parallel for if(parallelism_enabled)
+    for (i=0; i< n; i++){
+     // y[Z] = 1
+     memcpy(&y[4*NWORDS_256BIT+i*ECP2_JAC_OUTDIMS*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+     memset(&y[5*NWORDS_256BIT+i*ECP2_JAC_OUTDIMS*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+   }
   }
 }
 
