@@ -155,6 +155,8 @@ class ZField(object):
                                                (factor[1] ** exponent[1]) *
                                                (factor[N-1] ** exponent[N-1])
         """
+        if ZField.init_prime:
+             return
         ZField.init_prime = True
         ZField.ext_prime = [BigInt(q)]
         ZField.redc_prime = []
@@ -179,6 +181,9 @@ class ZField(object):
 
     @classmethod
     def add_field(cls,p, factor_data=None):
+        for zp in ZField.ext_prime:
+           if zp == p :
+              return
         ZField.ext_prime.append(BigInt(p))
         idx = len(ZField.ext_prime)-1
         old_idx = ZField.active_prime_idx

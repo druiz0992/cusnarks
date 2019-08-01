@@ -60,6 +60,7 @@ from ecc import *
 from zpoly import *
 from constants import *
 from pysnarks_utils import *
+import multiprocessing as mp
 from cuda_wrapper import *
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
@@ -69,7 +70,9 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-ROOTS_1M_filename = '../../data/zpoly_roots_1M.bin'
+sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
+
+import cusnarks_config as cfg
 
 class GrothProver(object):
     
@@ -91,16 +94,19 @@ class GrothProver(object):
           logging.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
 
-
         if seed is not None:
           self.seed = seed
-          random.seed(seed) 
         else:
-          self.seed = random.randint(0,1<<32)
+          x = os.urandom(4)
+          self.seed = int(x.hex(),16)
 
-        self.roots1M_rdc_u256_sh = RawArray(c_uint32,  (1 << 20) * NWORDS_256BIT)
-        self.roots1M_rdc_u256 = np.frombuffer(self.roots1M_rdc_u256_sh, dtype=np.uint32).reshape((1<<20, NWORDS_256BIT))
-        np.copyto(self.roots1M_rdc_u256, readU256DataFile_h(ROOTS_1M_filename.encode("UTF-8"), 1<<20, 1<<20) )
+        random.seed(self.seed) 
+
+        self.roots_f = cfg.get_roots_file()
+        self.n_bits_roots = cfg.get_n_roots()
+        self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
+        self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
+        np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
         batch_size = 1<<20
         self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
@@ -154,9 +160,9 @@ class GrothProver(object):
 
         logging.info('#################################### ')
         logging.info('Staring Groth prover with the follwing parameters :')
+        logging.info(' - curve : %s',curve)
         logging.info(' - proving_key_f : %s', proving_key_f)
         logging.info(' - verification_key_f : %s',verification_key_f)
-        logging.info(' - curve : %s',curve)
         logging.info(' - out_proof_f : %s',out_proof_f)
         logging.info(' - out_pk_f : %s',out_pk_f)
         logging.info(' - out_pk_format : %s',out_pk_format) 
@@ -164,7 +170,7 @@ class GrothProver(object):
         logging.info(' - out_public_format :  %s',out_public_format)
         logging.info(' - test_f : %s',self.test_f)
         logging.info(' - benchmark_f : %s', benchmark_f)
-        logging.info(' - seed : %s', seed)
+        logging.info(' - seed : %s', self.seed)
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - verify_en : %s', verify_en)
         logging.info(' - keep_f : %s', keep_f)
@@ -179,7 +185,7 @@ class GrothProver(object):
                f = open(self.out_proving_key_f, 'w')
                print(pk_json, file=f)
                f.close()
-               del pk_dic
+               del pk_dict
                del pk_json
              elif self.out_proving_key_f.endswith('.bin'):
                pk_bin = pkvars_to_bin(self.out_proving_key_format, EC_T_AFFINE, self.pk, ext=False)
@@ -214,7 +220,6 @@ class GrothProver(object):
     def read_witness_data(self):
        ## Open and parse witness data
        if os.path.isfile(self.witness_f):
-           f = open(self.witness_f,'r')
 
            pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
            nVars = int(pkbin_vars[0][0])
@@ -223,13 +228,24 @@ class GrothProver(object):
            self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
            self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
-           np.copyto(
-               self.scl_array[:nVars],
-               np.reshape(
-                   np.asarray(
-                       [BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
-                                                                     dtype=np.uint32),(-1, NWORDS_256BIT))
-                    )
+           if self.witness_f.endswith('.json'):
+             f = open(self.witness_f,'r')
+             np.copyto(
+                 self.scl_array[:nVars],
+                 np.reshape(
+                     np.asarray(
+                         [BigInt(c).as_uint256() for c in ast.literal_eval(json.dumps(json.load(f)))],
+                                                                       dtype=np.uint32),(-1, NWORDS_256BIT))
+                      )
+             f.close()
+           elif self.witness_f.endswith('.txt'):
+             with open(self.witness_f, 'r') as f:
+               np.copyto(
+                 self.scl_array[:nVars],
+                 np.reshape(
+                     np.asarray(
+                          [BigInt(c).as_uint256() for c in f]),(-1,NWORDS_256BIT))
+                     )
 
            self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize)
            self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
@@ -543,7 +559,7 @@ class GrothProver(object):
 
         start = time.time()
 
-        self.findECPoints(0)
+        self.findECPoints(0, stream_id=[1,2,3,4])
 
         end = time.time()
         self.t_GP['EC Mexp1.0'] = end - start
@@ -567,7 +583,7 @@ class GrothProver(object):
 
         start = time.time()
 
-        self.findECPoints(1)
+        self.findECPoints(1, stream_id=[1,2,3,4])
 
         end = time.time()
         self.t_GP['EC Mexp1.1'] = end - start
@@ -639,10 +655,10 @@ class GrothProver(object):
         return 
  
 
-    def compute_proof_ecp(self, pyCuOjb, K, P, ec2):
+    def compute_proof_ecp(self, pyCuOjb, K, P, ec2, gpu_id=0, stream_id=0):
             ZField.set_field(MOD_GROUP)
             ecbn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
-            ecp,t = ec_mad_cuda(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2)
+            ecp,t = ec_mad_cuda(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, gpu_id, stream_id)
             if ec2:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
             else:
@@ -650,7 +666,7 @@ class GrothProver(object):
 
             return ecp, t
 
-    def findECPoints(self, phase):
+    def findECPoints(self, phase, stream_id=[0,0,0,0]):
     
         start_ec = time.time()
 
@@ -678,7 +694,7 @@ class GrothProver(object):
        
 
         #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P
-        
+        #A
         np.copyto(
             A[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
             np.reshape(
@@ -690,35 +706,25 @@ class GrothProver(object):
                                         self.ecbn128,
                                         self.sorted_scl_array[start_idx2:end_idx2],
                                         A[2*start_idx2*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
-                                        False)
-        # Copy result for carrying sum
-        np.copyto(
-             A[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
-             np.reshape(self.pi_a_eccf1[:2],-1)
-         )
-        self.t_EC['pi_a.'+str(phase)] = t1
-
+                                        False, gpu_id=0, stream_id=stream_id[0])
+        #B2
         self.sorted_scl_array[nVars+1:nVars+2] = self.s_scl
 
         np.copyto(
             B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT],
             np.reshape(
-                  np.reshape(B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
-                               (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
-           )
+                np.reshape(B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT],
+                           (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
+        )
 
-        self.pi_b_eccf2,t1 = self.compute_proof_ecp(
-                                         self.ec2bn128, 
-                                         self.sorted_scl_array[start_idx2:end_idx2],
-                                         B2[4*start_idx2*NWORDS_256BIT:4*end_idx2*NWORDS_256BIT],
-                                         True)
-        # Copy result for carrying sum
-        np.copyto(
-             B2[4*(end_idx-1)*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
-             np.reshape(self.pi_b_eccf2[:4],-1)
-         )
-        self.t_EC['pi_b.'+str(phase)]= t1
+        self.pi_b_eccf2,t2 = self.compute_proof_ecp(
+            self.ec2bn128,
+            self.sorted_scl_array[start_idx2:end_idx2],
+            B2[4*start_idx2*NWORDS_256BIT:4*end_idx2*NWORDS_256BIT],
+            True, gpu_id=0, stream_id=stream_id[1])
 
+
+        #B1
         np.copyto(
              B1[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
              np.reshape(
@@ -726,19 +732,14 @@ class GrothProver(object):
                                           (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
             )
 
-        self.pib1_eccf1,t1 = self.compute_proof_ecp(
+        self.pib1_eccf1,t3 = self.compute_proof_ecp(
                                           self.ecbn128,
                                           self.sorted_scl_array[start_idx2:end_idx2], 
                                           B1[2*start_idx2*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
-                                          False)
-        # Copy result for carrying sum
-        np.copyto(
-             B1[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
-             np.reshape(self.pib1_eccf1[:2],-1)
-         )
-        self.t_EC['pib1.'+str(phase)] = t1
+                                          False, gpu_id=0, stream_id=stream_id[2])
 
         if phase == 1:
+           #C
            np.copyto(
                C[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
                np.reshape(
@@ -746,17 +747,43 @@ class GrothProver(object):
                                            (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
              )
 
-           self.pi_c_eccf1,t1 = self.compute_proof_ecp(
+           self.pi_c_eccf1,t4 = self.compute_proof_ecp(
                                                self.ecbn128,
                                                self.sorted_scl_array[start_idx:end_idx],
                                                C[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
-                                               False)
-           self.t_EC['pi_c.'+str(phase)] = t1
+                                               False, gpu_id=0, stream_id=stream_id[3])
+
+
+        if phase == 1:
+          self.t_EC['pi_c.'+str(phase)] = t4 if stream_id[3] == 0 else self.ecbn128.streamSync(0,stream_id[3]) 
+
+        self.t_EC['pi_a.'+str(phase)] = t1 if stream_id[0] == 0 else self.ecbn128.streamSync(0,stream_id[0])
+        self.t_EC['pi_b.'+str(phase)] = t2 if stream_id[1] == 0 else self.ec2bn128.streamSync(0,stream_id[1]) 
+        self.t_EC['pib1.'+str(phase)] = t3 if stream_id[2] == 0 else self.ecbn128.streamSync(0,stream_id[2]) 
+
+        # Copy result for carrying sum
+        np.copyto(
+             A[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
+             np.reshape(self.pi_a_eccf1[:2],-1)
+         )
+
+        np.copyto(
+             B2[4*(end_idx-1)*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
+             np.reshape(self.pi_b_eccf2[:4],-1)
+         )
+        np.copyto(
+             B1[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
+             np.reshape(self.pib1_eccf1[:2],-1)
+         )
+        if phase == 1:
+           np.copyto(
+               C[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT], 
+               np.reshape(self.pi_c_eccf1[:2],-1)
+           )
 
         end_ec = time.time()
         self.t_EC['total.'+str(phase)]  = end_ec - start_ec
-
-        return 
+        return
 
 
     def write_pdata(self):
@@ -807,7 +834,7 @@ class GrothProver(object):
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
         pidx = ZField.get_field()
         reduce_coeff = 0  
-        polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, 10, pidx)
+        polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
         np.copyto(pX, polX_T)
 
 
@@ -821,7 +848,7 @@ class GrothProver(object):
         m = pk_bin[1][0]
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-        pC = np.reshape(pk_bin[4][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
+        #pC = np.reshape(pk_bin[4][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pH = np.reshape(pk_bin[5][:(2*m-1)*NWORDS_256BIT],((2*m-1),NWORDS_256BIT))
 
         # Convert witness to montgomery in zpoly_maddm_h
@@ -830,28 +857,46 @@ class GrothProver(object):
 
         self.evalPoly(pA, nVars, m)
         self.evalPoly(pB, nVars, m)
-        self.evalPoly(pC, nVars, m)
+        #self.evalPoly(pC, nVars, m)
 
         end = time.time()
         self.t_P['eval'] = end-start
 
         ifft_params = ntt_build_h(pA.shape[0])
 
+        if self.n_bits_roots < ifft_params['levels']:
+          logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
+          sys.exit(1)
+     
+
         # polC_S  is extended -> use extended scaler
-        polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots1M_rdc_u256)
-        np.copyto(pC,polC_S)
-        del polC_S
-        self.t_P['ifft-C'] = t1
+        #polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots_rdc_u256)
+        #np.copyto(pC,polC_S)
+        #del polC_S
+        #self.t_P['ifft-C'] = t1
 
         # polA_S montgomery -> use montgomery scaler
-        polA_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pA,ifft_params, ZField.get_field(), as_mont=1)
+        polA_S,t1 = zpoly_fft_cuda(self.cuzpoly, pA,ifft_params, ZField.get_field(), as_mont=1, roots=self.roots_rdc_u256, fft=0)
         np.copyto(pA,polA_S)
         del polA_S
         self.t_P['ifft-A'] =  t1
+    
+        #TODO : interpolation. Do single N/2 FFT for odd samples and copy original pA samples in even places. Integrate later, ideally
+        # with premultiplication of roots
+        #polB_S = fft(polA_S,N) : polB_S even samples = pA
+        #ifft_params = ntt_build_h(pA.shape[0]*2)
+        #polB_S,t1 = zpoly_fft_cuda(self.cuzpoly, polA_S,ifft_params, ZField.get_field(), as_mont=1, roots=self.roots_rdc_u256, fft=1)
+
+        #polC_S = fft(polA_S,N/2) . polB_S odd samples = polC_S
+        #ifft_params = ntt_build_h(pA.shape[0])
+        #r = montmultN_h(polA_S.reshape(-1),self.roots_rdc_u256[::1<<3][0:1<<16].reshape(-1),MOD_FIELD)
+        #polC_S,t1 = zpoly_fft_cuda(self.cuzpoly, r.reshape((-1,NWORDS_256BIT)),ifft_params, ZField.get_field(), as_mont=1, roots=self.roots_rdc_u256, fft=1)
+
+
 
         # polB_S montgomery  -> use montgomery scaler
         # TODO : return_val = 0, out_extra_len= out_len
-        polB_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pB, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0)
+        polB_S,t1 = zpoly_fft_cuda(self.cuzpoly, pB, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0, fft=0)
         np.copyto(pB,polB_S)
         del polB_S
         self.t_P['ifft-B'] = t1
@@ -859,19 +904,20 @@ class GrothProver(object):
         mul_params = ntt_build_h(pH.shape[0])
         #polAB_S is extended -> use extended scaler
         # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
-        polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots1M_rdc_u256, return_val=1, as_mont=0)
-        nsamplesH = zpoly_norm_h(polAB_S)
-        np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
+        polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots_rdc_u256, return_val=1, as_mont=0)
+        #nsamplesH = zpoly_norm_h(polAB_S)
+        #np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
+        np.copyto(pH[:m-1],polAB_S[m:-1])
         del polAB_S
         self.t_P['mul'] = t1
 
         # polABC_S is extended
         # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
         # TODO : perform several sub operations per thread to improve efficiency
-        polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, pH[:nsamplesH], pC, ZField.get_field(), vectorA_len = 0, return_val=1)
-        np.copyto(pH[:m-1],polABC_S[m:])
-        del polABC_S
-        self.t_P['sub'] =  t1
+        #polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, pH[:nsamplesH], pC, ZField.get_field(), vectorA_len = 0, return_val=1)
+        #np.copyto(pH[:m-1],polABC_S[m:])
+        #del polABC_S
+        #self.t_P['sub'] =  t1
 
         end_h = time.time()
         self.t_P['total'] = end_h - start_h

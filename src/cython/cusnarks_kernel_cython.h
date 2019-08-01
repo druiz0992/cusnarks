@@ -1,2 +1,2 @@
-typedef int cudaStream_t;
-typedef int cudaEvent_t;
+typedef void cudaStream_t;
+typedef void cudaEvent_t;

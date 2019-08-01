@@ -151,6 +151,8 @@ cdef extern from "types.h":
     uint32_t thread_id
     uint32_t pidx
   
+  ctypedef enum misc_const_len_t:
+    MISC_K_1 = 0, MISC_K_INF = 2, MISC_K_INF2 = 5, MISC_K_N = 11 
   
 
   ctypedef enum snarks_file_t:

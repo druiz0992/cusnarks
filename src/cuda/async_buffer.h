@@ -34,54 +34,73 @@
 #ifndef _ASYNC_BUFFER_H_
 #define _ASYNC_BUFFER_H_
 
+// Templates is the correct way to implement this function. However, I can't make it work 
+// (functionalitiy implemented in h file using cuda functions) with cython, as there are lots of dependencies. 
+// For now, I will use void *
+
+/*
 template <class T> 
 class AsyncBuf {
     private:
-        T *data;
+        T *buffer;
         uint32_t max_nelems;
 
     public:
  
-        T * getBuf(void);
-        uint32_t  getNelems(void);
-        uint32_t setBuf(T *in_data, uint32_t nelems);   
-        AsyncBuf(uint32_t nelems);
-        ~AsyncBuf();
+        AsyncBuf(uint32_t nelems):max_nelems(nelems)
+        {
+          printf("size of T : %d\n", sizeof(T));
+          CCHECK(cudaMallocHost((void **)&buffer, nelems*sizeof(T)));
+          return;
+        }
+
+        ~AsyncBuf()
+        {
+          CCHECK(cudaFreeHost(buffer));
+          return;
+        }
+
+        T * getBuf(void)
+        {
+           return buffer;
+        }
+
+        uint32_t  getNelems(void)
+        {
+           return max_nelems;
+        }
+
+        uint32_t setBuf(T *in_data, uint32_t nelems) 
+        {  
+          printf("setBuf. data : %d, nelems : %d, max_nelems %d \n",in_data, nelems, max_nelems);
+          if (nelems > max_nelems){
+            return 1;
+          }
+          printf("memcpy beore : \n");
+          memcpy(buffer, in_data, sizeof(T) * nelems);
+          printf("memcpy after\n");
+          return 0;   
+       }
 };
 
-template<class T>
-AsyncBuf<T>::AsyncBuf(uint32_t nelems) : 
-   max_nelems(nelems)
-{
-   CCHECK(CudaMallocHost((void **)data, nelems*sizeof(T)));
-}  
+*/
 
-template <class T>
-AsyncBuf<T>::~AsyncBuf(void)
-{
-   CCHECK(CudaFreeHost(data));
-}
 
-template <class T>
-T * AsyncBuf::getBuf(void)
-{
-  return data;
-}  
+class AsyncBuf {
+    private:
+        void *buffer;
+        uint32_t max_nelems;
+        uint32_t el_size;
 
-template <class T>
-uint32_t AsyncBuf::getNelems(void)
-{
-  return max_nelems;
-}  
+    public:
+ 
+        AsyncBuf(uint32_t nelems, uint32_t el_size);
+        ~AsyncBuf();
 
-template <class T>
-uint32_t AsyncBuf::setBuf(T *in_data, uint32_t nelems)
-{
-   if (nelems > max_nelems){
-     return 1;
-   }
-   memcpy(data, in_data, sizeof(T) * nelems);
-   return 0;
-}
+        void * getBuf(void);
+        uint32_t  getNelems(void);
+        uint32_t setBuf(void *in_data, uint32_t nelems); 
+};
+
 
 #endif

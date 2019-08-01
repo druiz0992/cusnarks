@@ -37,9 +37,17 @@ cimport _cusnarks_kernel
 cdef extern from "rng_cython.h":
      pass
 
+"""
+#cdef extern from "./cuda.h":
+cdef extern from "/usr/local/cuda/include/cuda_runtime_api.h":
+   #void CCHECK(ct.uint32_t )
+   #ct.uint32_t CudaMallocHost(void **, ct.uint32_t)
+   int cudaMallocHost(void **ptr, size_t size);
+   int cudaFreeHost(void *ptr);
+""" 
 
-cdef extern from "cusnarks_kernel_cython.h":
-     pass
+cdef extern from "./cusnarks_kernel_cython.h":
+    pass
 
 cdef extern from "../cuda/cusnarks_kernel.h":
     cdef cppclass C_CUSnarks "CUSnarks":
@@ -52,9 +60,9 @@ cdef extern from "../cuda/cusnarks_kernel.h":
         double kernelLaunch( ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
                           ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t did, ct.uint32_t stream_id,
                           ct.uint32_t n_kernel)
-        double kernelLaunchAsync( ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
-                          ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t did, ct.uint32_t stream_id,
-                          ct.uint32_t n_kernel)
+        #double kernelLaunchAsync( ct.vector_t *out_vector_host, ct.vector_t *in_vector_host,
+                          #ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t did, ct.uint32_t stream_id,
+                          #ct.uint32_t n_kernel)
         double streamSync(ct.uint32_t gpu_id, ct.uint32_t stream_id)
         void getDeviceInfo()
 
@@ -78,11 +86,14 @@ cdef extern from "../cuda/zpoly.h":
         C_ZCUPoly(ct.uint32_t len, ct.uint32_t seed) except +
         C_ZCUPoly(ct.uint32_t len) except +
 
-#cdef extern from "async_buffer_cython.h":
-cdef extern from "./async_buffer_cython.h":
-    cdef cppclass C_AsyncBuf "AsyncBuf"[T] :
-        C_AsyncBuf(ct.uint32_t nelems) except +
-        T *getBuf()
+   
+cdef extern from "../cuda/async_buffer.h":
+#cdef extern from "./async_buffer_cython.h":
+    #cdef cppclass C_AsyncBuf "AsyncBuf"[T] :
+    cdef cppclass C_AsyncBuf "AsyncBuf" :
+        C_AsyncBuf(ct.uint32_t nelems, ct.uint32_t el_size) except +
+        void *getBuf()
         ct.uint32_t getNelems()
-        ct.uint32_t setBuf(T *in_data, ct.uint32_t nelems)
+        ct.uint32_t setBuf(void *in_data, ct.uint32_t nelems)
+
    

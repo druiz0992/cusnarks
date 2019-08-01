@@ -61,7 +61,6 @@ from zpoly import *
 from constants import *
 from cuda_wrapper import *
 from pysnarks_utils import *
-from multiproc  import *
 import multiprocessing as mp
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
@@ -71,8 +70,8 @@ try:
 except ImportError:
     use_pycusnarks = False
 
-ROOTS_1M_filename_npz = '../../data/zpoly_data_1M.npz'
-ROOTS_1M_filename_bin = '../../data/zpoly_roots_1M.bin'
+sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
+import cusnarks_config as cfg
 
 class GrothSetup(object):
     
@@ -81,6 +80,7 @@ class GrothSetup(object):
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
                  benchmark_f=None, seed=None, snarkjs=None, keep_f=None):
  
+        # Check valid folder exists
         if keep_f is None:
             print ("Repo directory needs to be provided\n", file=self.log_f)
             sys.exit(1)
@@ -92,16 +92,19 @@ class GrothSetup(object):
         if not use_pycusnarks :
           logging.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
+
         if seed is not None:
           self.seed = seed
-          random.seed(seed) 
         else:
-          self.seed = random.randint(0,1<<32)
+          x = os.urandom(4)
+          self.seed = int(x.hex(),16)
+
+        random.seed(self.seed) 
 
         self.curve_data = ZUtils.CURVE_DATA[curve]
-        # Initialize Group 
+        # Initialize Group
         ZField(self.curve_data['prime'])
-        # Initialize Field 
+        # Initialize Field
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data)
         ZPoly.init(MOD_FIELD)
@@ -112,6 +115,8 @@ class GrothSetup(object):
         self.cir_header   = None
 
         self.pk = getPK()
+
+        self.t_S = {}
 
         self.ecbn128    = None 
         self.ec2bn128   = None 
@@ -132,8 +137,13 @@ class GrothSetup(object):
 
         init_h()
 
+        if test_f is None:
+           self.test_f = test_f
+        else:
+           self.test_f= self.keep_f + '/' + test_f
+
         self.alfabeta_f = self.keep_f + '/' + 'alfabeta.json'
-        self.test_f= self.keep_f + '/' +  test_f
+
         copy_input_files([in_circuit_f], self.keep_f)
 
         logging.info('#################################### ')
@@ -152,9 +162,29 @@ class GrothSetup(object):
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
         logging.info('#################################### ')
+        logging.info('')
+        logging.info('')
          
         if self.in_circuit_f is not None:
            self.circuitRead()
+           self.nbits = np.uint32(math.ceil(math.log(self.cir['nConstraints'] + \
+                         self.cir['nPubInputs'] + \
+                         self.cir['nOutputs'], 2)))
+
+           self.roots_f = cfg.get_roots_file()
+           self.n_bits_roots = cfg.get_n_roots()
+
+           if self.n_bits_roots < self.nbits:
+             logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< self.nbits))
+             sys.exit(1)
+           
+           self.roots_rdc_u256_sh = RawArray(c_uint32,  int((1 << self.nbits) * NWORDS_256BIT))
+           self.roots_rdc_u256 = np.frombuffer(
+                    self.roots_rdc_u256_sh,
+                    dtype=np.uint32).reshape((1 << self.nbits, NWORDS_256BIT))
+           np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.nbits) )
+
+           #roots_rdc_u256 = field_roots_compute_h(bits)
         else:
            logging.error ("Required input circuit %s", self.log_f)
            sys.exit(1)
@@ -178,6 +208,11 @@ class GrothSetup(object):
              cir_u256 = readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
              self.cir = cirbin_to_vars(cir_u256)
              del cir_u256
+        logging.info('############################################## ')
+        logging.info(' - NVars        : %s',int(self.cir['nVars']))
+        logging.info(' - nOutputs     : %s',int(self.cir['nOutputs']))
+        logging.info(' - nConstraints : %s',int(self.cir['nConstraints']))
+        logging.info('############################################## ')
 
     def launch_snarkjs(self, mode):
         snarkjs = {}
@@ -213,31 +248,55 @@ class GrothSetup(object):
         return snarkjs
    
     def setup(self):
+        logging.info('#################################### ')
+        logging.info('')
+        logging.info('')
+        logging.info('Starting setup....')
+
         ZField.set_field(MOD_FIELD)
+        start_s = time.time()
         
         #Init PK
         cirvars_to_pkvars(self.pk, self.cir)
         self.pk['k_binformat'] = self.out_k_binformat
         self.pk['k_ecformat'] =  self.out_k_ecformat
 
+
         prime = ZField.get_extended_p()
 
         self.toxic['t'] = ZFieldElExt(random.randint(1,prime.as_long()-1))
 
         self.calculatePoly()
+        end = time.time()
+        self.t_S['cal Poly'] = end - start_s
+
+        start = time.time()
         self.calculateEncryptedValuesAtT()
+
+        end_s = time.time()
+        self.t_S['total'] = end_s - start_s
+        self.t_S['cal Crypto'] = end_s - start
+
+        logging.info('')
+        logging.info('Setup completed')
+        logging.info('')
+        logging.info('#################################### ')
+        logging.info('')
+        logging.info('')
+
+        self.logTimeResults()
 
         self.write_pk()
         self.write_vk()
         copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
-        snarkjs_resuts = self.test_results()
+        self.test_results()
 
         return
    
     def create_correct_pkjson(self): 
           #Get pk json
-          test_pk_f = self.keep + self.out_pk_f
-          test_vk_f = self.keep + self.out_vk_f
+          test_pk_f = self.keep_f + self.out_pk_f
+          test_vk_f = self.keep_f + self.out_vk_f
           if self.out_pk_f.endswith('.bin')  or  \
               self.out_k_binformat != FMT_EXT or \
               self.out_k_ecformat != EC_T_AFFINE:
@@ -267,6 +326,10 @@ class GrothSetup(object):
           return test_pk_f, test_vk_f
 
     def test_results(self):
+        logging.info('#################################### ')
+        logging.info('')
+        logging.info('')
+        logging.info('Checking results...')
 
         if self.test_f is not None:
           # Write toxic json
@@ -287,10 +350,11 @@ class GrothSetup(object):
 
        
           # Launch snarkjs
+          logging.info('Launching snarkjs setup to compare result...')
           snarkjs = self.launch_snarkjs("setup")
 
 
-          worker = mp.Pool(processes=min(2,mp.cpu_count()-1))
+          worker = mp.Pool(processes=min(2,mp.cpu_count()))
 
           # Compare results
           r1 = worker.apply_async(pysnarks_compare, args=(test_pk_f, snarkjs['pk_f'], ['A', 'B1', 'B2', 'C', 'hExps', 'polsA', 'polsB',
@@ -303,9 +367,23 @@ class GrothSetup(object):
           vk_r = r2.get()
 
           worker.terminate()
+          if pk_r:
+            logging.info('Proving Key matches')
+          else:
+            logging.info('Proving Key failed')
+          if vk_r:
+            logging.info('Verification Key matches')
+          else:
+            logging.info('Verification Key failed')
+
+          if pk_t and vk_r:
+            logging.info('Setup passed')
+          else:
+            logging.info('Setup failed')
 
           return pk_r and vk_r
         else:
+          logging.info('Results not verified')
           return True
 
 
@@ -313,7 +391,7 @@ class GrothSetup(object):
         self.computeHeader()
 
 
-        worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
+        worker = mp.Pool(processes=min(3,mp.cpu_count()))
 
         r1 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1))
 
@@ -331,22 +409,9 @@ class GrothSetup(object):
         self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
         self.cir['R1CSC'] = None
 
-        woker.terminate()
+        worker.terminate()
 
         return
-
-        """
-        self.pk['polsA']  = self.r1cs_to_mpoly(self.cir['R1CSA'], 1)
-        self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
-        self.cir['R1CSA'] = None
-        self.pk['polsB'] = self.r1cs_to_mpoly(self.cir['R1CSB'], 0)
-        self.pk['polsB_nWords'] = self.pk['polsB'].shape[0]
-        self.cir['R1CSB'] = None
-        self.pk['polsC'] = self.r1cs_to_mpoly(self.cir['R1CSC'], 0)
-        self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
-        self.cir['R1CSC'] = None
-        """
-
 
     def r1cs_to_mpoly(self, r1cs, fmat, extend):
         to_mont = 0
@@ -371,18 +436,12 @@ class GrothSetup(object):
        u_u256 = np.zeros((m,NWORDS_256BIT),dtype=np.uint32)
        trdc_u256 = t_rdc.as_uint256()
       
-       #load roots
-       if os.path.exists(ROOTS_1M_filename_bin):
-           roots_rdc_u256 = readU256DataFile_h(ROOTS_1M_filename_bin.encode("UTF-8"), 1<<20, 1<<bits)
-       else :
-           roots_rdc_u256 = field_roots_compute_h(nbits)
-
        z = tm.extend() - 1
        z_rdc = z.reduce()
        if tm == ZFieldElExt(1).reduce():
          for i in xrange(m): 
            #TODO : roots[0] is always 1. Does this make any sense? check javascript version
-           if roots_rdc_u256[0] == trdc_u256:
+           if self.roots_rdc_u256[0] == trdc_u256:
              u_u256[i] = ZFieldElExt(1).reduce().as_uint256()
              return z.as_uint256(), u_u256
 
@@ -390,13 +449,17 @@ class GrothSetup(object):
        lrdc_u256 = l_rdc.as_uint256()
 
        pidx = ZField.get_field()
-       u_u256 = evalLagrangePoly_h(trdc_u256,lrdc_u256, roots_rdc_u256, pidx)
+       u_u256 = evalLagrangePoly_h(trdc_u256,lrdc_u256, self.roots_rdc_u256, pidx)
 
        return z.as_uint256(), u_u256
    
     def calculateEncryptedValuesAtT(self):
+      start = time.time()
       a_t_u256, b_t_u256, c_t_u256, z_t_u256 = self.calculateValuesAtT()
+      end = time.time()
+      self.t_S['cal Val'] = end - start
 
+      start = time.time()
       prime = ZField.get_extended_p()
       curve_params = self.curve_data['curve_params']
       curve_params_g2 = self.curve_data['curve_params_g2']
@@ -424,51 +487,73 @@ class GrothSetup(object):
       self.pk['beta_1'] = G1 * self.toxic['kbeta']
       self.pk['delta_1'] = G1 * self.toxic['kdelta']
 
-      self.pk['alfa_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['alfa_1']).reshape(-1),ZField.get_field())
-      self.pk['beta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['beta_1']).reshape(-1),ZField.get_field())
-      self.pk['delta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['delta_1']).reshape(-1),ZField.get_field())
+      self.pk['alfa_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['alfa_1']).reshape(-1),ZField.get_field(),1)
+      self.pk['beta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['beta_1']).reshape(-1),ZField.get_field(),1)
+      self.pk['delta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['delta_1']).reshape(-1),ZField.get_field(),1)
     
       self.pk['beta_2'] = G2 * self.toxic['kbeta']
       self.pk['delta_2'] = G2 * self.toxic['kdelta']
       self.pk['gamma_2'] = G2 * self.toxic['kgamma']
     
-      self.pk['beta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['beta_2']).reshape(-1),ZField.get_field())
-      self.pk['delta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['delta_2']).reshape(-1),ZField.get_field())
-      self.pk['gamma_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['gamma_2']).reshape(-1),ZField.get_field())
+      self.pk['beta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['beta_2']).reshape(-1),ZField.get_field(),1)
+      self.pk['delta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['delta_2']).reshape(-1),ZField.get_field(),1)
+      self.pk['gamma_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['gamma_2']).reshape(-1),ZField.get_field(),1)
 
       self.ecbn128    =  ECBN128(self.pk['domainSize']+3,seed=self.seed)
       self.ec2bn128    = EC2BN128(self.pk['nVars']+1,seed=self.seed)
+
+      end = time.time()
+      self.t_S['init k'] = end - start
    
+      start = time.time()
       # a_t, b_t and c_t are in ext
       sorted_idx = sortu256_idx_h(a_t_u256)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       #ecbn128_samples = np.concatenate((a_t_u256,G1.as_uint256(G1)[:2]))
-      self.pk['A'],_ = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field())
+      self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['A'] = np.reshape(self.pk['A'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
-      self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT*2/3)
+      self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
 
+      end = time.time()
+      self.t_S['A'] = end - start
+
+      self.t_S['A gpu'] = t1
+      start = time.time()
+
+    
       sorted_idx = sortu256_idx_h(b_t_u256)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
-      self.pk['B1'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field())
+      self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['B1'] = np.reshape(self.pk['B1'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
-      self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT*2/3)
+      self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
 
+      end= time.time()
+      self.t_S['B1 gpu'] = t1
+      self.t_S['B1'] = end-start
+
+      start= time.time()
       ec2bn128_samples = np.concatenate((b_t_u256[sorted_idx],G2.as_uint256(G2)[:4]))
       #ec2bn128_samples = np.concatenate((b_t_u256,G2.as_uint256(G2)[:4]))
-      self.pk['B2'],t = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
-      self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field())
+      self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
+      self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,6,NWORDS_256BIT))[unsorted_idx]
+      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
       #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
-      self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT*4/6)
+      self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
+
+      self.t_S['B2 gpu'] = t1
+      end= time.time()
+      self.t_S['B2'] = end - start
+
+      start = time.time()
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
@@ -478,14 +563,19 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['C'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field())
+      self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['C'] = np.reshape(self.pk['C'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
-      self.pk['C']=np.concatenate((np.zeros(((self.pk['nPublic']+1)*3,NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
-      self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT*2/3)
+      self.pk['C']=np.concatenate((np.zeros(((self.pk['nPublic']+1)*2,NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
+      self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
 
+      self.t_S['C gpu'] = t1
+      end = time.time()
+      self.t_S['C'] =end - start 
+
+      start = time.time()
 
       maxH = self.pk['domainSize']+1
       self.pk['hExps'] = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
@@ -498,13 +588,18 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(eT_u256)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['hExps'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field())
+      self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
-      self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_256BIT*2/3)
+      self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_256BIT)
 
+      end = time.time()
+      self.t_S['hExps'] =end - start 
+      self.t_S['hExps gpu'] = t1
+
+      start = time.time()
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
@@ -514,11 +609,15 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['IC'],t = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
-      self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field())
+      self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['IC'] = np.reshape(self.pk['IC'],(-1,3,NWORDS_256BIT))[unsorted_idx]
+      self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
+
+      end = time.time()
+      self.t_S['IC'] =end - start 
+      self.t_S['IC gpu'] = t1
 
     def calculateValuesAtT(self):
        # Required z_t es Ext, polsA/B/C are in Mont format
@@ -527,7 +626,7 @@ class GrothSetup(object):
 
        pidx = ZField.get_field()
 
-       worker = mp.Pool(processes=min(3,mp.cpu_count()-1))
+       worker = mp.Pool(processes=min(3,mp.cpu_count()))
 
        r1 = worker.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
        r2 = worker.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
@@ -561,6 +660,9 @@ class GrothSetup(object):
 
     def write_pk(self):
 
+       logging.info('#################################### ')
+       logging.info('')
+       logging.info('Writing Proving Key')
        if self.out_pk_f.endswith('.json') :
          pk_dict = pkvars_to_json(self.out_k_binformat, self.out_k_ecformat,self.pk)
          pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
@@ -577,8 +679,15 @@ class GrothSetup(object):
        else :
          logging.info ("No valid proving key file  %s provided", self.out_pk_f)
          os.exit(1)
+       logging.info('')
+       logging.info('#################################### ')
+       logging.info('')
         
     def write_vk(self):
+       logging.info('#################################### ')
+       logging.info('')
+       logging.info('')
+       logging.info('Writing Verification Key')
        #Fill alfa and beta values and call snarkjs to compute vk value
        vk_dict = self.vars_to_vkdict(alfabeta=True)
        vk_json = json.dumps(vk_dict, indent=4, sort_keys=True)
@@ -588,6 +697,7 @@ class GrothSetup(object):
        print(vk_json, file=f)
        f.close()
 
+       logging.info('Calling snarkjs to compute binding')
        self.launch_snarkjs("alfabeta_12")
 
        if self.out_vk_f.endswith('.json') :
@@ -604,13 +714,27 @@ class GrothSetup(object):
 
          if vk_bin is not None:
             writeU256DataFile_h(vk_bin, self.out_vk_f.encode("UTF-8"))
+       logging.info('')
+       logging.info('')
+       logging.info('#################################### ')
 
     def vars_to_vkdict(self, alfabeta=False):
       # TODO : only suported formats for vk are .json, affine and extended 
       vk_dict = {}
       ZField.set_field(MOD_GROUP)
-      vk_dict['vk_alfa_1'] = ECC.from_uint256(self.pk['alfa_1'], in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)[0].extend().as_str()
-      vk_dict['vk_beta_2'] = ECC.from_uint256(self.pk['beta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
+      vk_dict['vk_alfa_1'] = ECC.from_uint256(
+                 self.pk['alfa_1'],
+                 in_ectype=EC_T_AFFINE,
+                 out_ectype=EC_T_AFFINE,
+                 reduced=True,
+                 remove_last=True)[0].extend().as_str()
+      vk_dict['vk_beta_2'] = ECC.from_uint256(
+                 self.pk['beta_2'].reshape((-1,2,NWORDS_256BIT)),
+                 in_ectype=EC_T_AFFINE,
+                 out_ectype=EC_T_AFFINE,
+                 reduced=True,
+                 ec2=True,
+                 remove_last=True)[0].extend().as_str()
 
       if not alfabeta :
         f = open(self.alfabeta_f,'r')
@@ -629,10 +753,27 @@ class GrothSetup(object):
         vk_dict['domainBits'] = int(self.pk['domainBits'])
         vk_dict['domainSize'] = int(self.pk['domainSize'])
   
-        vk_dict['vk_delta_2'] = ECC.from_uint256(self.pk['delta_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
-        vk_dict['vk_gamma_2'] = ECC.from_uint256(self.pk['gamma_2'].reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)[0].extend().as_str()
+        vk_dict['vk_delta_2'] = ECC.from_uint256(
+                   self.pk['delta_2'].reshape((-1,2,NWORDS_256BIT)),
+                   in_ectype=EC_T_AFFINE,
+                   out_ectype=EC_T_AFFINE,
+                   reduced=True,
+                   ec2=True,
+                   remove_last=True)[0].extend().as_str()
+        vk_dict['vk_gamma_2'] = ECC.from_uint256(
+                   self.pk['gamma_2'].reshape((-1,2,NWORDS_256BIT)),
+                   in_ectype=EC_T_AFFINE,
+                   out_ectype=EC_T_AFFINE,
+                   reduced=True,
+                   ec2=True,
+                   remove_last=True)[0].extend().as_str()
 
-        P = ECC.from_uint256(self.pk['IC'], in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+        P = ECC.from_uint256(
+                   self.pk['IC'],
+                   in_ectype=EC_T_AFFINE,
+                   out_ectype=EC_T_AFFINE,
+                   reduced=True,
+                   remove_last=True)
         vk_dict['IC'] = [x.extend().as_str() for x in P]
   
       return vk_dict
@@ -644,7 +785,23 @@ class GrothSetup(object):
       vk_bin=None
       return vk_bin
 
+    def timeStats(self, t):
+      for s in t:
+        for k, v in s.items():
+           if k is not 'total':
+             s[k] = str(round(v,2)) + '(' + str(round(100*v/s['total'],2)) + '%)'
 
+    def logTimeResults(self):
+      self.timeStats([self.t_S])
+
+      logging.info('')
+      logging.info('')
+      logging.info('#################################### ')
+      logging.info('Total Time to generate setup : %s seconds', round(self.t_S['total']))
+      logging.info('')
+      logging.info('- %s', self.t_S)
+      logging.info('')
+      logging.info('#################################### ')
 if __name__ == "__main__":
     in_circuit_f = '../../data/prove-kyc.json'
     out_circuit_f = '../../data/prove-kyc.bin'

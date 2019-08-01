@@ -1,4 +1,8 @@
 #cython: language_level=3
+#cython.wraparound(False)
+#cython.boundscheck(False)
+#cython.nonecheck(False)
+
 """
     Copyright 2018 0kims association.
 
@@ -60,17 +64,18 @@ IF CUDA_DEF:
              self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
           if out_size == 0:
              self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
-  
+ 
       def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
-                       ct.uint32_t stream_id=N_STREAMS_PER_GPU, ct.uint32_t n_kernels=1):
-         
-          self.kernelLaunchAsync(in_vec, config, params,  gpu_id=0, stream_id=N_STREAMS_PER_GPU, n_kernels=n_kernesl)
-
-      def kernelLaunchAsync(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
-                       ct.uint32_t stream_id=N_STREAMS_PER_GPU, ct.uint32_t n_kernels=1):
+                       ct.uint32_t stream_id=0, ct.uint32_t n_kernels=1):
+          cdef ct.uint32_t i=0
           cdef ct.vector_t out_v
           cdef ct.vector_t in_v
          
+          print("in_Vec len :",in_vec.shape[0], in_vec.shape[1])
+          print("gpu_idx :",gpu_id);
+          print("stream_id : ",stream_id);
+          print("n_kernels : ",n_kernels);
+
           out_v.length = params['out_length']
           in_v.length  = in_vec.shape[0]
   
@@ -81,7 +86,7 @@ IF CUDA_DEF:
    
           # create kernel config data
           cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernels * sizeof(ct.kernel_config_t))
-  
+          
           for i in range(n_kernels):
              kconfig[i].blockD = config['blockD'][i]
              kconfig[i].kernel_idx = config['kernel_idx'][i]
@@ -103,21 +108,16 @@ IF CUDA_DEF:
              else:
                  kconfig[i].in_offset = 0
   
+          #Template case
           """
-          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
-          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
-  
-          in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-          in_vec_flat = np.concatenate(in_vec)
-          in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
-  
-          out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-          out_v.data = <ct.uint32_t *>&out_vec_flat[0]
-          """
+          print("allocating async buffer in_vec\n");
           cdef C_AsyncBuf [ct.uint32_t] *in_vec_flat = new C_AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
+          print("Assigning value\n")
           in_vec_flat.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+          print("storing\n")
           in_v.data  = <ct.uint32_t *>in_vec_flat.getBuf()
   
+          print("allocating async buffer out_vec\n");
           cdef C_AsyncBuf [ct.uint32_t] *out_vec_flat = new C_AsyncBuf[ct.uint32_t](out_v.length  * in_vec.shape[1])
           out_v.data = <ct.uint32_t *>out_vec_flat.getBuf()
   
@@ -126,8 +126,23 @@ IF CUDA_DEF:
   
           # create kernel params data
           #cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+          print("allocating async buffer params\n");
           cdef C_AsyncBuf [ct.kernel_params_t] *kparams_buffer = new C_AsyncBuf[ct.kernel_params_t](n_kernels)
           cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
+          """
+
+
+          cdef C_AsyncBuf *in_vec_flat = new C_AsyncBuf(in_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+          in_vec_flat.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+          in_v.data  = <ct.uint32_t *>in_vec_flat.getBuf()
+  
+          cdef C_AsyncBuf *out_vec_flat = new C_AsyncBuf(out_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+          out_v.data = <ct.uint32_t *>out_vec_flat.getBuf()
+  
+          # create kernel params data
+          cdef C_AsyncBuf *kparams_buffer = new C_AsyncBuf(n_kernels, sizeof(ct.kernel_params_t))
+          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
+
           for i in range(n_kernels):
             kparams[i].midx = params['midx'][i]
             kparams[i].in_length = params['in_length'][i]
@@ -158,17 +173,19 @@ IF CUDA_DEF:
             else:
               kparams[i].as_mont = 1
   
-          exec_time = self._cusnarks_ptr.kernelLaunchAsync(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
+
+          cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
          
-          #kdata =  np.reshape(out_v,(-1,in_vec.shape[1]))
-  
+          cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
+
           free(kconfig)
-          #free(kparams)
   
-          return kdata, exec_time
+          return np.asarray(kdata).reshape(-1,in_vec.shape[1]), exec_time
 
       def streamSync(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
-          return
+          cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
+
+          return t
    
       def rand(self, ct.uint32_t n_samples):
           cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
@@ -265,25 +282,50 @@ IF CUDA_DEF:
   # C_AsyncBuf class cython wrapper
   """
   cdef class AsyncBuf:
+      cdef void* buffer
+      cdef ct.uint32_t max_nelems
+      cdef ct.uint32_t el_size
+
       cdef C_AsyncBuf* _async_buffer_ptr
   
-      def __cinit__(self, ct.uint32_t nelems):
-          self._async_buffer_ptr = new C_AsyncBuf(nelems)
+      def __cinit__(self, ct.uint32_t nelems, ct.uint32_t el_size):
+          self._async_buffer_ptr = new C_AsyncBuf(nelems, el_size)
   
       def __dealloc__(self):
           if self._async_buffer_ptr != NULL:
             del self._async_buffer_ptr
 
-      def  getBuf(self):
-        return self.get()
+      def  getBufUint32(self):
+        cdef ct.uint32_t n_elems = self._async_buffer_ptr.getNelems()
+        cdef ct.uint32_t [:] r= <ct.uint32_t [:n_elems]>self._async_buffer_ptr.getBuf()
+
+        return np.asarray(r)
+        
+      def getBufKernelParams(self):       
+        cdef ct.kernel_params_t *kparams = self._async_buffer_ptr.getBuf()
+        dict kparams_dict = {}
+
+        return kparams_dict
 
       def  getNelems(self):
-        return self.getNelems()
+        return self._async_buffer_ptr.getNelems()
+
   
-      def  setBuf(self, T *in_data, ct.uint32_t nelems):
-        return self.setBuf(in_data, nelems)
+      def  setBuf(self, np.ndarray[ndim=1, dtype=np.uint32_t] in_data, ct.uint32_t nelems):
+        return self._async_buffer_ptr.setBuf(&in_data[0], nelems)
       """
 
+def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+        cdef ct.uint32_t n = <int>(len(in_veca)/NWORDS_256BIT)
+        cdef ct.uint32_t i,offset=0
+
+        for i in xrange(n):
+           uh.cmontmult_h(&out_vec[offset], &in_veca[offset], &in_vecb[offset], pidx)
+           offset = <int> (offset + NWORDS_256BIT)
+  
+  
+        return out_vec
 
 def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
@@ -459,7 +501,8 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 
     vin_flat = np.reshape(vin,-1)
 
-    uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
+    with nogil:
+      uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
 
     return idx_flat
 
@@ -651,19 +694,32 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
 
      return out_vec
 
-def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/24)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
+def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
+     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
+     cdef ct.uint32_t out_len
+     if strip_last == 0:
+         out_len = <int>len(in_v)
+     else:
+         out_len = <int> (lenv * 2 * NWORDS_256BIT)
+
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
     
-     uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+     with nogil:
+       uh.cec_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx, strip_last)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
 
-def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/48)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(<int>len(in_v), dtype=np.uint32)
-    
-     uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx)
+def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
+     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
+     cdef ct.uint32_t out_len
+     if strip_last == 0:
+         out_len = <int>len(in_v)
+     else:
+         out_len = <int> (lenv * 4 * NWORDS_256BIT)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
+   
+     with nogil: 
+       uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx, strip_last)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
 
@@ -703,7 +759,8 @@ def to_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pidx
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
      cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
 
-     uh.cto_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
+     with nogil:
+       uh.cto_montgomeryN_h(&out_v[0], &in_v[0], n, pidx)
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
     
@@ -711,7 +768,8 @@ def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pi
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(in_v.shape[0], dtype=np.uint32)
      cdef ct.uint32_t n = <int>(in_v.shape[0]/ct.NWORDS_256BIT)
 
-     uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx, strip_last)
+     with nogil:
+       uh.cfrom_montgomeryN_h(&out_v[0], &in_v[0], n, pidx, strip_last)
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
 

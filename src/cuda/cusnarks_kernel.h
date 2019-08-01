@@ -37,7 +37,7 @@ class CUSnarks {
     protected:
         vector_t **in_vector_device;      // kernel input vector (device size)
         vector_t **out_vector_device;     // kernel output vector (device side)
-        kernel_params_t **params_device; // kernel params (device side)
+        kernel_params_t ***params_device; // kernel params (device side)
 
         uint32_t   ***in_data_host;         // input vector (host side)
         uint32_t   ***out_data_host;        // output vector (host side)
@@ -60,10 +60,10 @@ class CUSnarks {
         void resetDevices(void);
         void allocateCudaResources(uint32_t in_size, uint32_t out_size, 
                                     uint32_t in_len, uint32_t out_len); 
-        void allocateCudaCommonResources(void);
+        void allocateCudaStreamResources(void);
         void allocateCudaCteResources(void);
         void releaseCudaResources(void);
-        void releaseCudaCommonResources(void);
+        void releaseCudaStreamResources(void);
         double elapsedTime(void);
 
     public:
@@ -80,14 +80,14 @@ class CUSnarks {
                 uint32_t id,
                 uint32_t stream_id,
                 uint32_t n_kernel);
-        double kernelLaunchAsync(
-		vector_t *out_vector_host,
-	       	vector_t *in_vector_host,
-                kernel_config_t *config,
-                kernel_params_t *params,
-                uint32_t id,
-                uint32_t stream_id,
-                uint32_t n_kernel);
+        //double kernelLaunchAsync(
+		//vector_t *out_vector_host,
+	       	//vector_t *in_vector_host,
+                //kernel_config_t *config,
+                //kernel_params_t *params,
+                //uint32_t id,
+                //uint32_t stream_id,
+                //uint32_t n_kernel);
         double streamSync(uint32_t gpu_id, uint32_t stream_id);
         void getDeviceInfo();
 };

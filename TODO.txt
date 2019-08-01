@@ -1,0 +1,6 @@
+- create directories data/, circuits
+- download snarkjs, rust circom and update locations
+- generate roots
+- within python retrieve root filename
+- check how we do to have 1M roots and compute any poly length
+- 
