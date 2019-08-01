@@ -102,7 +102,7 @@
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
 
-#define N_STREAMS_PER_GPU (3)
+#define N_STREAMS_PER_GPU (4+1)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;

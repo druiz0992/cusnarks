@@ -29,24 +29,17 @@ EXTRA_CFLAGS2=-I $(AUX_INCLUDES)
 LINKFLAGS2=-L $(LIB_PATH)
 LDFLAGS2=-lm -lcusnarks
 
-CSRC = test_utils_host.cpp
-
-NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)
-CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
+CSRC = gen_roots.cpp 
 
 OBJ= $(CSRC:.cpp=.o)
-TEST= $(subst .cpp,,$(CSRC))
-SCRIPTS= $(subst .cpp,,$(CSRC2))
+SCRIPTS= $(subst .cpp,,$(CSRC))
 
 clean:
 	rm -f *.o 
 
 ##################################################
-test: $(OBJ)
-	@for i in $(TEST); do \
-	  ./$$i; \
-	  echo ""; \
-	done
+config: 
+	python3 cusnarks_config.py
 
 ##################################################
 %.o : %.cpp

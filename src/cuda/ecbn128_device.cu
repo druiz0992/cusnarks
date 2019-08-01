@@ -982,7 +982,7 @@ __forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1
           T1 _inf;
           infz(&_inf, midx);
           zxr->setu256(zoffset,&_inf,x1offset);
-          //logInfoTid("R2=inf %d\n", midx);
+          logInfoTid("R2=inf %d\n", midx);
 	  return;  
         } 
         //logInfoTid("R4=D %d\n", midx);
@@ -1373,7 +1373,7 @@ __device__ void scmulecjac_step_l2r(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset,
 {
    uint32_t  b0 = bselMu256(scl,255-offset);
    //int tid = threadIdx.x + blockDim.x * blockIdx.x;
-   //logInfoTid("B0 : %d\n",b0);
+   logInfoTid("B0 : %d\n",b0);
    doublecjac<T1, T2>(Q,Q, midx);
    //logInfoBigNumberTid(3*T1::getN(),"Q-D : \n",Q);
    if (b0) {

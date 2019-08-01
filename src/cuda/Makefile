@@ -52,7 +52,8 @@ CUSRC = cusnarks_kernel.cu \
 	zpoly.cu \
 	zpoly_device.cu \
         z1_device.cu \
-        z2_device.cu 
+        z2_device.cu \
+        async_buffer.cu
 
 CSRC = rng.cpp \
        utils_host.cpp \

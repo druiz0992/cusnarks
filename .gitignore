@@ -52,4 +52,5 @@ data/public.json
 venv/
 third_party_libs/
 *.npz
-
+config/*.conf
+config/gen_roots

@@ -51,9 +51,13 @@ CUMODE_PROOF  = 1
 CUMODE_SETUP_PROOF  = 2
 
 
+sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
+
+import cusnarks_config as cfg
+
 def run():
     opt = {}
-    opt['data_f'] = '../../circuits/'
+    opt['data_f'] = cfg.get_circuits_folder()
     opt['input_circuit_f'] = 'circuit.bin'
     opt['verification_key_f'] = 'verification_key.json'
     opt['debug_f'] = 'toxic.json'
@@ -63,7 +67,7 @@ def run():
 
     opt['output_circuit_f'] = None
     opt['output_circuit_format'] = FMT_MONT
-    opt['proving_key_f'] = opt['data_f'] + 'proving_key.bin'
+    opt['proving_key_f'] = 'proving_key.bin'
     opt['keys_format'] = FMT_MONT
     opt['charmander_f'] = '../../../charmander-circuit'
     opt['benchmark_f'] = '../../../charmander-circuit/test/compiled_circuits'
@@ -71,7 +75,7 @@ def run():
     opt['maxL'] = 10
     opt['nruns'] = 10
     opt['seed'] = None
-    opt['snarkjs'] = '../../../snarkjs/cli.js'
+    opt['snarkjs'] = cfg.get_snarkjs_folder()
     opt['debug'] = 0
     opt['witness_format'] = FMT_EXT
     opt['proof_format'] = FMT_EXT
@@ -209,13 +213,13 @@ def run():
       return
     
     if args.proving_key is not None:
-        if '//' in args.proving_key :
+        if '/' in args.proving_key :
             opt['proving_key_f'] = args.proving_key
         else:
             opt['proving_key_f'] = opt['data_f']  + args.proving_key
 
     if args.verification_key is not None:
-        if '//' in args.verification_key:
+        if '/' in args.verification_key:
            opt['verification_key_f'] = args.verification_key
         else:
            opt['verification_key_f'] = opt['data_f'] + args.verification_key
@@ -238,15 +242,16 @@ def run():
       opt['mode'] = CUMODE_SETUP
 
       if args.input_circuit is not None :
-        if '//' in args.input_circuit:
+        if '/' in args.input_circuit:
            opt['input_circuit_f'] = args.input_circuit
         else:
            opt['input_circuit_f'] = opt['data_f'] + args.input_circuit
 
-      if '//' in args.output_circuit:
-         opt['output_circuit_f'] = args.output_circuit
-      else:
-         opt['output_circuit_f'] = opt['data_f'] + args.output_circuit
+      if args.output_circuit is not None:
+        if '/' in args.output_circuit:
+           opt['output_circuit_f'] = args.output_circuit
+        else:
+           opt['output_circuit_f'] = opt['data_f'] + args.output_circuit
 
       if args.output_circuit_format is not None:
         opt['output_circuit_format'] = args.output_circuit_format
@@ -278,7 +283,7 @@ def run():
       opt['mode'] = CUMODE_PROOF
   
       if args.witness is not None:
-        if '//' in args.witness:
+        if '/' in args.witness:
            opt['witness_f'] = args.witness
         else:
            opt['witness_f'] = opt['data_f'] + args.witness
@@ -287,13 +292,13 @@ def run():
           opt['witness_format'] = args.witness_format
 
       if args.proof is not None:
-          if '//' in args.proof:
+          if '/' in args.proof:
             opt['proof_f'] = args.proof
           else:
             opt['proof_f'] = opt['data_f'] + args.proof
    
       if args.public_data is not None:
-          if '//' in args.public_data:
+          if '/' in args.public_data:
              opt['public_data_f'] = args.public_data
           else :
              opt['public_data_f'] = opt['data_f'] + args.public_data
@@ -305,7 +310,10 @@ def run():
          opt['public_data_format'] = args.public_data_format
 
       if args.out_proving_key is not None:
-         opt['out_proving_key_f'] = args.out_proving_key
+         if '/' in args.out_proving_key:
+            opt['out_proving_key_f'] = args.out_proving_key
+         else:
+            opt['out_proving_key_f'] = opt['data_f'] + args.out_proving_key
 
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
