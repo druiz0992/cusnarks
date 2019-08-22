@@ -39,13 +39,8 @@
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE           (30)
 #define NBITS_WORD           (32)
-#if 1
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
-#else
-#define MAX_R1CSPOLY_NWORDS  (100000)
-#define MAX_R1CSPOLYTMP_NWORDS  (10000)
-#endif
 
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
@@ -54,20 +49,7 @@
 
 #define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
 #define ECK_INDIMS               (3)
-// Montgomery ladder
-#if 0
-#define ECP_LDR_INDIMS                (2)
-#define ECP_LDR_OUTDIMS               (2)
-#define ECP_LDR_INXOFFSET             (1 * NWORDS_256BIT)
-#define ECP_LDR_INZOFFSET             (2 * NWORDS_256BIT)
-#define ECP_LDR_OUTXOFFSET            (0 * NWORDS_256BIT)
-#define ECP_LDR_OUTZOFFSET             (1 * NWORDS_256BIT)
 
-#define ECK_LDR_INDIMS               (ECP_LDR_INDIMS  + U256_NDIMS)
-#define ECK_LDR_OUTDIMS              (ECP_LDR_OUTDIMS)
-#define ECK_LDR_INOFFSET             (ECK_LDR_INDIMS * NWORDS_256BIT)
-#define ECK_LDR_OUTOFFSET            (ECK_LDR_OUTDIMS * NWORDS_256BIT)
-#endif
 // Jacobian
 #define ECP_JAC_N256W                 (1)
 #define ECP_JAC_INDIMS                (2) // X, Y
@@ -101,6 +83,8 @@
 #define CUSNARKS_MAX_NCB        (32)
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
+
+#define MAX_NCORES_OMP        (32)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
