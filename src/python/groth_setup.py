@@ -512,6 +512,8 @@ class GrothSetup(object):
       #ecbn128_samples = np.concatenate((a_t_u256,G1.as_uint256(G1)[:2]))
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
+      self.assert_isoncurve('A')
+
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
@@ -528,6 +530,8 @@ class GrothSetup(object):
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
+      self.assert_isoncurve('B1')
+
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
@@ -542,6 +546,7 @@ class GrothSetup(object):
       #ec2bn128_samples = np.concatenate((b_t_u256,G2.as_uint256(G2)[:4]))
       self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
+      self.assert_isoncurve('B2')
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
       #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
@@ -565,6 +570,7 @@ class GrothSetup(object):
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
+      self.assert_isoncurve('C')
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
@@ -590,6 +596,7 @@ class GrothSetup(object):
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
+      self.assert_isoncurve('hExps')
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
@@ -618,6 +625,22 @@ class GrothSetup(object):
       end = time.time()
       self.t_S['IC'] =end - start 
       self.t_S['IC gpu'] = t1
+
+    def assert_isoncurve(self, ec_str, max_fails=5):
+      dim2=2
+      ec2=0
+      if ec_str=='B2':
+         dim2=4
+         ec2=1
+
+      pok = np.asarray([ec_isoncurve_h(np.reshape(x,-1), 1, ec2, 
+                    ZField.get_field()) for x in np.reshape(self.pk[ec_str],(-1,dim2,NWORDS_256BIT))])
+      if not all(pok > 0):
+        n_fails = np.asarray(np.where(pok==0)[0]).shape[0]
+        logging.error("%s containts %s points not on curve\n",ec_str, n_fails)
+        logging.error("%s\n", np.asarray(np.where(pok==0)[0])[:max_fails])
+        self.log_f.flush()
+        sys.exit(1)
 
     def calculateValuesAtT(self):
        # Required z_t es Ext, polsA/B/C are in Mont format
@@ -678,7 +701,7 @@ class GrothSetup(object):
 
        else :
          logging.info ("No valid proving key file  %s provided", self.out_pk_f)
-         os.exit(1)
+         sys.exit(1)
        logging.info('')
        logging.info('#################################### ')
        logging.info('')

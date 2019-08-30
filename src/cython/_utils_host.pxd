@@ -34,7 +34,7 @@ cimport _types as ct
 
 cdef extern from "../cuda/utils_host.h" nogil: 
     void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
-    #void cmontmultN_h "montmultN_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t n, ct.uint32_t pidx)
+    void cmontmultN_h "montmultN_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t n, ct.uint32_t pidx)
     void caddm_h "addm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void caddu256_h "addu256_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B)
     void csubm_h "subm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
@@ -60,6 +60,11 @@ cdef extern from "../cuda/utils_host.h" nogil:
     void cmontinv_h "montinv_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t pidx)
     void cec_jac2aff_h "ec_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t strip_last)
     void cec2_jac2aff_h "ec2_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t strip_last)
+    void cec_jacadd_h "ec_jacadd_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t *y, ct.uint32_t pidx)
+    void cec_jacdouble_h "ec_jacdouble_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t pidx)
+    void cec_jacscmul_h "ec_jacscmul_h" (ct.uint32_t *z, ct.uint32_t *scl, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t add_last);
+    ct.uint32_t cec_isoncurve_h "ec_isoncurve_h" (ct.uint32_t *x, ct.uint32_t is_affine, ct.uint32_t pidx)
+    ct.uint32_t cec2_isoncurve_h "ec2_isoncurve_h" (ct.uint32_t *x, ct.uint32_t is_affine, ct.uint32_t pidx)
     void cto_montgomeryN_h "to_montgomeryN_h"(ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx)
     void cfrom_montgomeryN_h "from_montgomeryN_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t strip_last)
     void cec_stripc_h "ec_stripc_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n)

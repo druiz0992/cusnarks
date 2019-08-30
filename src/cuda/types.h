@@ -111,12 +111,25 @@ typedef struct {
 // gy = 2
 typedef struct {
   uint32_t b[NWORDS_256BIT];
+  uint32_t b2[2*NWORDS_256BIT];
   uint32_t g1x[NWORDS_256BIT];
   uint32_t g1y[NWORDS_256BIT];
   uint32_t g2x[2*NWORDS_256BIT];
   uint32_t g2y[2*NWORDS_256BIT];
 
 }ecbn128_t;
+
+typedef enum{
+  ECBN128_PARAM_B = 0,
+  ECBN128_PARAM_B2X = 8,
+  ECBN128_PARAM_B2Y = 16,
+  ECBN128_PARAM_G1X = 24,
+  ECBN128_PARAM_G1Y = 32,
+  ECBN128_PARAM_G2X = 40,
+  ECBN128_PARAM_G2Y = 56,
+
+  ECBN128_PARAM_N = 72,
+}ecbn128_params_t;
 
 // additional constants required
 typedef struct {
