@@ -108,10 +108,10 @@ class GrothProver(object):
         self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
         np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
-        batch_size = 1<<20
+        batch_size = 1<<21  # include roots
         self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
         self.ec2bn128 = EC2BN128(batch_size + 2, seed=self.seed)
-        self.cuzpoly = ZCUPoly(batch_size, seed=self.seed)
+        self.cuzpoly = ZCUPoly(batch_size + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
         self.out_proving_key_format = out_pk_format
@@ -247,6 +247,21 @@ class GrothProver(object):
                           [BigInt(c).as_uint256() for c in f]),(-1,NWORDS_256BIT))
                      )
 
+             #to json
+             """
+             w_arr = []
+             with open(self.witness_f, 'r') as f:
+               for w in f:
+                  w_arr.append(w.rstrip())
+               w_json = json.dumps(w_arr, indent=4)
+             w_file = self.witness_f.replace('txt','json')
+             f = open(w_file, 'w')
+             print(w_json, file=f)
+             f.close()
+             del w_json
+             del w_arr
+             """
+
            self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize)
            self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
           
@@ -256,7 +271,7 @@ class GrothProver(object):
                                                 )
        else:
           logging.error('Witness file %s doesn\'t exist', self.witness_f)
-          os.exit(1)
+          sys.exit(1)
        
     def load_pkdata(self):
        if self.proving_key_f.endswith('npz'):
@@ -444,7 +459,7 @@ class GrothProver(object):
              verification_key_file = self.verification_key_f
           else :
              logging.error(' To launch snarkjs, verification file %s needs to be a json file', self.verification_key_f)
-             os.exit(1)
+             sys.exit(1)
         
           snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
        
@@ -530,6 +545,12 @@ class GrothProver(object):
         # Init r and s scalars
         self.r_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
         self.s_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
+
+        logging.info('#################################### ')
+        logging.info(' Random numbers :')
+        logging.info(' - r : %s',str(BigInt.from_uint256(self.r_scl).as_long()) )
+        logging.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
+        logging.info('#################################### ')
 
         pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize','hExps', 'delta_1','polsA'])
 
@@ -658,13 +679,50 @@ class GrothProver(object):
     def compute_proof_ecp(self, pyCuOjb, K, P, ec2):
             ZField.set_field(MOD_GROUP)
             ecbn128_samples = np.concatenate((K,np.reshape(P,(-1,NWORDS_256BIT))))
-            ecp,t = ec_mad_cuda(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2)
+            in_v, ecp,t = ec_mad_cuda(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2)
             if ec2:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
             else:
               ecp = ec_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
 
-            return ecp, t
+            """
+            # Debug code to test result
+            enable=0
+            if enable:
+              total_samples = int(ecp.shape[0]/3)
+              offset = int((int(in_v.shape[0]/3) - K.shape[0] + 1)/128)
+              first_v_sample = int((int(in_v.shape[0]/3) - K.shape[0] + 1)%128)
+              
+              start_idx = offset
+              n_samples = total_samples - start_idx
+              #p1 = ec_jacscmul_h(in_v[start_idx:start_idx+n_samples].reshape(-1), in_v[total_samples+2*start_idx:total_samples+2*(start_idx+n_samples)].reshape(-1),MOD_GROUP, add_last=1)
+              #p1 = ec_jac2aff_h(p1.reshape(-1),MOD_GROUP)
+              #r1 = all(np.concatenate(p1 == ecp[3*start_idx:3*(start_idx+n_samples)]))
+              p = []
+              p.append(ecp[start_idx*3:start_idx*3+3])
+              #p_ec = ECC.from_uint256(p[-1], in_ectype=2,out_ectype=2,reduced=True)[0]
+              for idx in range(start_idx+1,total_samples):
+                 p.append(ec_jacadd_h(p[-1].reshape(-1), ecp[3*idx:3*idx+3].reshape(-1), MOD_GROUP))
+                 #p1_ec = ECC.from_uint256(p1[3*idx:3*idx+3], in_ectype=2,out_ectype=2,reduced=True)[0]
+                 #p_ec = p_ec + p1_ec
+                 #pr_ec = ECC.from_uint256(p[-1], in_ectype=1,out_ectype=2,reduced=True)[0]
+                 #if p_ec != pr_ec:
+                     #printf(idx)
+                     #break
+              p2 = ec_jac2aff_h(np.reshape(np.asarray(p[-1]),-1),MOD_GROUP)
+              #a = ECC.from_uint256(p2,in_ectype=2, out_ectype=2, reduced=True)
+              #b = [x.extend().as_str() for x in a]
+              #j = json.dumps(b)
+              #f = open('../../circuits/pib1_t2.json', 'w')
+              #print(j,file=f)
+              #f.close()
+            """
+                
+
+            if ec2:
+              return ecp[0:6], t
+            else:
+              return ecp[0:3], t
 
     def findECPoints(self, phase):
     

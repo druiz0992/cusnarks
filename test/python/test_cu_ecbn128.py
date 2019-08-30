@@ -190,7 +190,6 @@ class CUECTest(unittest.TestCase):
         r_mad_rdc = r_mad_rdc_u256
 
 
-
     def test_0is_on_curve(self):
   
         #ecbn128_pt_ec = CUECTest.ecbn128_ecjac
@@ -408,6 +407,29 @@ class CUECTest(unittest.TestCase):
             result_ec = ECC.from_uint256(result, in_ectype=1, out_ectype=2, reduced=True)
             r_mad_ec = ECC.from_uint256(r_mad, in_ectype=1, out_ectype=2, reduced=True)
             self.assertTrue(result_ec == r_mad_ec)
+
+
+    def test_2hostecc(self):
+        npzfile = np.load(ECBN128_datafile,allow_pickle=True)
+        ecbn128_scl   = npzfile['scl']
+        ecbn128_ecjac_rdc = npzfile['ecjac_rdc']
+        r_mul_rdc_u256 = npzfile['rmul_rdc']
+        nsamples = CUECTest.nsamples
+
+        r_add_rdc = [(x + y) for x, y in zip(ecbn128_ecjac_rdc[::2], ecbn128_ecjac_rdc[1::2])]
+        r_add_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_add_rdc])
+        ecbn128_ecjac_rdc_u256 = np.reshape(ECC.as_uint256(ecbn128_ecjac_rdc),(-1,3,8))
+        r2_add_rdc_u256 = np.reshape([ec_jacadd_h(np.reshape(x,-1),np.reshape(y,-1),MOD_FIELD) for x, y in zip(ecbn128_ecjac_rdc_u256[::2], ecbn128_ecjac_rdc_u256[1::2])],(-1,8))
+        self.assertTrue(all(np.concatenate(r2_add_rdc_u256 == r_add_rdc_u256)))
+
+        r_double_rdc = [x.double() for x in ecbn128_ecjac_rdc]
+        r_double_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_double_rdc])
+        r2_double_rdc_u256 = np.reshape([ec_jacdouble_h(np.reshape(x,-1),MOD_FIELD) for x in ecbn128_ecjac_rdc_u256],(-1,8))
+        self.assertTrue(all(np.concatenate(r2_double_rdc_u256 == r_double_rdc_u256)))
+
+        ecbn128_scl_u256 = [ZFieldElExt(scl).as_uint256() for scl in ecbn128_scl]
+        r2_mul_rdc_u256 = np.reshape([ec_jacscmul_h(x,np.reshape(y,-1),MOD_FIELD, add_last=True) for x, y in zip(ecbn128_scl_u256,ecbn128_ecjac_rdc_u256)],(-1,8))
+        self.assertTrue(all(np.concatenate(ec_jac2aff_h(np.reshape(r2_mul_rdc_u256,-1),MOD_FIELD) == ec_jac2aff_h(np.reshape(r_mul_rdc_u256,-1),MOD_FIELD))))
 
 def debugReducedECCAddShfl(r_mul, result1, result2):
 

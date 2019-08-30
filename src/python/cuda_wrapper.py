@@ -191,19 +191,15 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    kernel_params['midx']      = [fidx] * nkernels
    kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
    kernel_config['kernel_idx'] =[kernel] * nkernels
-   #out_len1 = ECP_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS) -1) /
-                                 #(kernel_config['blockD'][0]*kernel_params['stride'][0]/ECP_JAC_OUTDIMS))
-   #out_len2 = ECP_JAC_OUTDIMS * ((out_len1 + (kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP_JAC_OUTDIMS) -1) /
-                                 #(kernel_config['blockD'][1]*kernel_params['stride'][1]/ECP_JAC_OUTDIMS))
    kernel_params['in_length'] = [nsamples* indims_e]*nkernels 
    for l in xrange(1,nkernels):
-      #kernel_params['in_length'][l] = int(kernel_params['in_length'][l-1]/(kernel_config['blockD'][l-1]))
       kernel_params['in_length'][l] = outdims * (
              int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
              (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
 
    kernel_params['out_length'] = 1 * outdims
    #kernel_params['out_length'] = nsamples * outdims
+   #kernel_params['out_length'] = np.product(kernel_config['blockD'][1:]) * outdims
    kernel_params['padding_idx'] = [0] * nkernels
    kernel_config['gridD'] = [0] * nkernels
    kernel_config['gridD'][nkernels-1] = 1
@@ -215,7 +211,7 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
            kernel_params['in_length'][i] = min_length[i]
     
    result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,nkernels )
-   #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,1 )
+   #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params, 1)
 
    #new_vector = new_vector.reshape((-1,8))
    #Kp = [ZFieldElExt(BigInt.from_uint256(k)) for k in new_vector[:new_nsamples]]
@@ -227,7 +223,7 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    #NPp = np.multiply(Kp, Pp)
    #NPp = np.sum(np.multiply(Kp, Pp))
    
-   return result, t
+   return new_vector, result, t
 
 def zpoly_fft_cuda2(pysnark, vector, roots, fidx ):
         nsamples = len(vector)

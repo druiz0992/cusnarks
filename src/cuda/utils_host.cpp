@@ -1284,7 +1284,10 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
   #endif
 }
 
-
+void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
+{
+  montmult_ext_h(U,A,A,pidx);
+}
 // Improved speed (in Cuda at least) by substituting mpAddWithCarryProp by mpAdd
 // I am leaving this as a separate function to test both implementations are equal
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
@@ -1949,11 +1952,11 @@ uint32_t shllu256_h(uint32_t *y, uint32_t *x, uint32_t count)
   }
 
   if(sh == 0) {
-   return out;
+   return out >> (32 - count);
   }
  }
 
- return out;
+ return out >> (32 - count);
 }
 
 uint32_t shlru256_h(uint32_t *y, uint32_t *x, uint32_t count)
@@ -2274,7 +2277,7 @@ void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t
      // N = x; Q=0
      memcpy(
             &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
-            &ECInf[(pidx * MISC_K_INF + MISC_K_INF) * NWORDS_256BIT],
+            &ECInf[(pidx * MISC_K_N + MISC_K_INF) * NWORDS_256BIT],
             sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS
           );
      memcpy(
@@ -2301,7 +2304,7 @@ void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t
      for (uint32_t j=msb; j< (1 << NWORDS_256BIT) ; j++){
         uint32_t b0 = shllu256_h(&utils_K[tid * NWORDS_256BIT],
                                  &utils_K[tid * NWORDS_256BIT],1);
-        ec_jacdouble_h(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS] ,
+        ec_jacdouble_h(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        pidx);
         if (b0) {
@@ -2435,6 +2438,75 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t
         memcpy(&y[4*NWORDS_256BIT+i*ECP2_JAC_OUTDIMS*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
         memset(&y[5*NWORDS_256BIT+i*ECP2_JAC_OUTDIMS*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
      }
+  }
+}
+
+uint32_t ec_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx)
+{
+  const uint32_t *ECInf = CusnarksMiscKGet();
+  const uint32_t *ecbn_params = CusnarksEcbn128ParamsGet();
+  uint32_t tmp_p [ECP_JAC_INDIMS * NWORDS_256BIT];
+  uint32_t y1[NWORDS_256BIT], y2[NWORDS_256BIT];
+
+  if (!memcmp(x,
+               &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
+               sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT)) {
+     return 2;
+
+  } else if (is_affine){
+      memcpy(tmp_p,x,2*NWORDS_256BIT*sizeof(uint32_t));
+
+  } else {
+      ec_jac2aff_h(tmp_p, x, 1, pidx, 1);
+  }
+  
+  montsquare_h(y1, &tmp_p[NWORDS_256BIT], pidx);
+  
+  montsquare_h(y2, tmp_p, pidx);
+  montmult_h(y2, y2, tmp_p, pidx);
+
+  addm_h(y2,y2, &ecbn_params[pidx*ECBN128_PARAM_N + ECBN128_PARAM_B] , pidx);
+
+  if (!memcmp(y1,y2,NWORDS_256BIT*sizeof(uint32_t)) ){
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+uint32_t ec2_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx)
+{
+  const uint32_t *ECInf = CusnarksMiscKGet();
+  const uint32_t *ecbn_params = CusnarksEcbn128ParamsGet();
+  uint32_t tmp_p [ECP2_JAC_INDIMS * NWORDS_256BIT];
+  uint32_t y1[2*NWORDS_256BIT], y2[2*NWORDS_256BIT];
+
+  if (!memcmp(x,
+               &ECInf[(pidx*MISC_K_N+MISC_K_INF2)*NWORDS_256BIT],
+               sizeof(uint32_t) * 4 * NWORDS_256BIT)) {
+     return 2;
+
+  } else if (is_affine){
+      memcpy(tmp_p,x,4*NWORDS_256BIT*sizeof(uint32_t));
+
+  } else {
+      ec2_jac2aff_h(tmp_p, x, 1, pidx, 1);
+  }
+  
+  montsquare_ext_h(y1, &tmp_p[2*NWORDS_256BIT], pidx);
+
+  montsquare_ext_h(y2, tmp_p, pidx);
+  montmult_ext_h(y2, y2,tmp_p, pidx);
+
+  addm_h(y2,y2,
+        &ecbn_params[pidx*ECBN128_PARAM_N + ECBN128_PARAM_B2X] , pidx);
+  addm_h(&y2[NWORDS_256BIT],&y2[NWORDS_256BIT],
+        &ecbn_params[pidx*ECBN128_PARAM_N + ECBN128_PARAM_B2Y] , pidx);
+
+  if (!memcmp(y1,y2,2*NWORDS_256BIT*sizeof(uint32_t)) ){
+    return 1;
+  } else {
+    return 0;
   }
 }
 

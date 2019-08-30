@@ -254,7 +254,7 @@ def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1,
         uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
   
         return out_vec
-
+"""
 def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
         cdef ct.uint32_t n = <int>(len(in_veca)/NWORDS_256BIT)
@@ -266,6 +266,7 @@ def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1
   
   
         return out_vec
+"""
 
 def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
@@ -662,6 +663,40 @@ def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, 
        uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx, strip_last)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
+
+def ec_jacdouble_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_eca, ct.uint32_t pidx):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(in_eca.shape[0], dtype=np.uint32)
+
+     uh.cec_jacdouble_h(&out_ecz[0], &in_eca[0], pidx)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacadd_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_eca, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_ecb,  ct.uint32_t pidx):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(in_eca.shape[0], dtype=np.uint32)
+
+     uh.cec_jacadd_h(&out_ecz[0], &in_eca[0], &in_ecb[0], pidx)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     if add_last:
+        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_INDIMS) )
+     else:
+        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_OUTDIMS) )
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec_jacscmul_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_affine, ct.uint32_t ec2, ct.uint32_t pidx):
+     if ec2:
+       return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
+     else:
+       return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]
