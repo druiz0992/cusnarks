@@ -156,6 +156,7 @@ typedef struct {
         int kernel_idx;
         int return_val;
         int in_offset;
+        int return_offset;
 } kernel_config_t;
 
 
@@ -304,7 +305,7 @@ typedef enum{
    CB_ZPOLY_FFT2DX,
    CB_ZPOLY_FFT2DY,
    CB_ZPOLY_FFT3DXX,
-   CB_ZPOLY_FFT3DXX_PREV,
+   CB_ZPOLY_FFT3DXXPREV,
    CB_ZPOLY_FFT3DXY,
    CB_ZPOLY_FFT3DYX,
    CB_ZPOLY_FFT3DYY,
