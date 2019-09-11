@@ -86,11 +86,15 @@ IF CUDA_DEF:
           for i in range(n_kernel):
              kconfig[i].blockD = config['blockD'][i]
              kconfig[i].kernel_idx = config['kernel_idx'][i]
-             # gridD and smemS and return_val do not need to exist
+             # gridD and smemS and return_val and return offset do not need to exist
              if 'return_val' in config:
                  kconfig[i].return_val  = config['return_val'][i]
              else :
                  kconfig[i].return_val  = 1
+             if 'return_offset' in config:
+                 kconfig[i].return_offset  = config['return_offset'][i]
+             else :
+                 kconfig[i].return_offset  = 0
              if 'gridD' in config:
                  kconfig[i].gridD  = config['gridD'][i]
              else :
@@ -254,7 +258,7 @@ def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1,
         uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
   
         return out_vec
-"""
+
 def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
         cdef ct.uint32_t n = <int>(len(in_veca)/NWORDS_256BIT)
@@ -262,11 +266,10 @@ def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1
 
         for i in xrange(n):
            uh.cmontmult_h(&out_vec[offset], &in_veca[offset], &in_vecb[offset], pidx)
-           offset = <int> (offset + NWORDS_256BIT)
+           offset += NWORDS_256BIT
   
   
-        return out_vec
-"""
+        return np.reshape(out_vec, (-1, NWORDS_256BIT))
 
 def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
@@ -368,24 +371,19 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
 def ntt_build_h(ct.uint32_t nsamples):
      cdef ct.fft_params_t *fft_params = <ct.fft_params_t *> malloc(sizeof(ct.fft_params_t))
-   
+     cdef ct.uint32_t i
+
      uh.cntt_build_h(fft_params, nsamples)
 
      py_fft_params={}
      py_fft_params['fft_type'] = fft_params.fft_type
      py_fft_params['padding'] = fft_params.padding
      py_fft_params['levels'] = fft_params.levels
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] fft_sizes = np.zeros(1<<(ct.FFT_T_N-1), dtype=np.uint32)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] fft_sizes = np.zeros(1<<fft_params.fft_type, dtype=np.uint32)
      py_fft_params['fft_N'] = fft_sizes
 
-     py_fft_params['fft_N'][0] = fft_params.fft_N[0]
-     py_fft_params['fft_N'][1] = fft_params.fft_N[1]
-     py_fft_params['fft_N'][2] = fft_params.fft_N[2]
-     py_fft_params['fft_N'][3] = fft_params.fft_N[3]
-     py_fft_params['fft_N'][4] = fft_params.fft_N[4]
-     py_fft_params['fft_N'][5] = fft_params.fft_N[5]
-     py_fft_params['fft_N'][6] = fft_params.fft_N[6]
-     py_fft_params['fft_N'][7] = fft_params.fft_N[7]
+     for i in xrange(1<<fft_params.fft_type):
+        py_fft_params['fft_N'][i] = fft_params.fft_N[i]
 
      free(fft_params)
 

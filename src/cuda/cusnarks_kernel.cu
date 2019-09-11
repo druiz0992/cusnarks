@@ -250,7 +250,9 @@ double CUSnarks::kernelLaunch(
   // measure data xfer time Host -> Device
   start = elapsedTime();
   //printf("%d. %d, %d\n", config[0].in_offset, in_vector_host->data, in_vector_host->size);
-  CCHECK(cudaMemcpy(&in_vector_device.data[config[0].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  if (in_vector_host->size > 0){
+    CCHECK(cudaMemcpy(&in_vector_device.data[config[0].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  }
   end_copy_in = elapsedTime() - start;
 
   total_kernel = 0.0;
@@ -288,7 +290,7 @@ double CUSnarks::kernelLaunch(
     // retrieve kernel output data from GPU to host
   start = elapsedTime();
   if (config[0].return_val){
-     CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data, out_vector_host->size, cudaMemcpyDeviceToHost));
+     CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data + config[0].return_offset, out_vector_host->size, cudaMemcpyDeviceToHost));
   }
  
   end_copy_out = elapsedTime() - start;

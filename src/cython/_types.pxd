@@ -53,6 +53,7 @@ cdef extern from "types.h":
         int kernel_idx
         int return_val
         int in_offset
+        int return_offset
 
   ctypedef struct vector_t:
       uint32_t *data

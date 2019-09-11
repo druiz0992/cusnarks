@@ -99,6 +99,7 @@
 
 #define MAX_DIGIT 0xFFFFFFFFUL
 #define MAX(X,Y)  ((X)>=(Y) ? (X) : (Y))
+#define MIN(X,Y)  ((X)<(Y) ? (X) : (Y))
 
 //MPROC VARS
 static  pthread_mutex_t utils_lock;
@@ -1554,6 +1555,21 @@ void intt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint
   }
 }
 
+
+void intt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t N_fftx, uint32_t N_ffty, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx)
+{
+  uint32_t i;
+  const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
+
+  ntt_parallel3D_h(A, roots, N_fftx, N_ffty, Nrows, fft_Nyx,  Ncols, fft_Nxx, pidx);
+
+  for (i=0;i < 1 << (N_fftx + N_ffty); i++){
+      montmult_h(&A[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &scaler[(N_fftx + N_ffty)*NWORDS_256BIT], pidx);
+  }
+}
+
+
+
 /*
   4 step N 256 bit sample FFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
    1) Get input samples in a N=N1xN2 matrix, filling the matrix by columns. Compute N1 N2 point FFT (FFT of every row)
@@ -1638,6 +1654,48 @@ void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32
   free(M);
   free(reducedR);
 }
+
+void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint32_t Nfft_y, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx)
+{
+  uint32_t Anrows = (1<<Nfft_y);
+  uint32_t Ancols = (1<<Nfft_x);
+  uint32_t Mnrows = Ancols;
+  uint32_t Mncols = Anrows;
+  uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *reducedR = (uint32_t *) malloc (MAX(Mncols,Mnrows) * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t i,j;
+
+  transpose_h(M,A,Anrows, Ancols);
+  for (i=0;i < Mncols; i++){
+    memcpy(&reducedR[i*NWORDS_256BIT], &roots[i*NWORDS_256BIT*Mnrows],sizeof(uint32_t)*NWORDS_256BIT);
+  }
+
+  for (i=0;i < Mnrows; i++){
+    ntt_parallel2D_h(&M[i*NWORDS_256BIT*Mncols], reducedR, Nrows, fft_Nyx, Nfft_y - Nrows, Nrows - fft_Nyx, pidx, 0);
+    
+    for (j=0;j < Mncols; j++){   
+        montmult_h(&M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &roots[i*j*NWORDS_256BIT], pidx);
+    }
+   
+  }
+  
+  transpose_h(A,M,Mnrows, Mncols);
+
+  for (i=0;i < Mnrows; i++){
+    memcpy(&reducedR[i*NWORDS_256BIT], &roots[i*NWORDS_256BIT*Mncols],sizeof(uint32_t)*NWORDS_256BIT);
+  }
+
+  for (i=0;i < Anrows; i++){
+    ntt_parallel2D_h(&A[i*NWORDS_256BIT*Ancols], reducedR, Ncols,fft_Nxx,  Nfft_x- Ncols, Ncols - fft_Nxx, pidx, 0);
+  }
+
+  transpose_h(M,A,Anrows, Ancols);
+  memcpy(A,M,Ancols * Anrows * NWORDS_256BIT * sizeof(uint32_t));
+
+  free(M);
+  free(reducedR);
+}
+
 
 
 /*
@@ -1824,21 +1882,23 @@ void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels
 */
 void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples)
 {
-  uint32_t levels = (uint32_t) ceil(log2(nsamples));
+  uint32_t min_samples = 1 << 6;
+  uint32_t levels = (uint32_t) ceil(log2(MAX(nsamples, min_samples)));
   memset(ntt_params,0,sizeof(fft_params_t));
   ntt_params->padding = (1 << levels) - nsamples;
   ntt_params->levels = levels;
   
-  if (nsamples <= 32){
+  if (MAX(min_samples, nsamples) <= 32){
     ntt_params->fft_type =  FFT_T_1D;
     ntt_params->fft_N[0] = levels;
 
-  } else if (nsamples <= 1024) {
-    ntt_params->fft_type =  FFT_T_2D;
-    ntt_params->fft_N[(1<<FFT_T_2D)-1] = levels/2;
-    ntt_params->fft_N[(1<<FFT_T_2D)-2] = levels - levels/2;
+// } else if (nsamples <= 1024) {
+//    ntt_params->fft_type =  FFT_T_2D;
+//    ntt_params->fft_N[(1<<FFT_T_2D)-1] = levels/2;
+//    ntt_params->fft_N[(1<<FFT_T_2D)-2] = levels - levels/2;
 
-  } else if (nsamples <= (1<<20) ) {
+  } else if (MAX(min_samples, nsamples) <= (1<<20)){
+  //} else if (MAX(min_samples, nsamples) <= (1<<12)){
     ntt_params->fft_type =  FFT_T_3D;
     ntt_params->fft_N[(1<<FFT_T_3D)-1] = levels/2;
     ntt_params->fft_N[(1<<FFT_T_3D)-2] = levels - levels/2;
@@ -2586,13 +2646,13 @@ void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots)
   if (roots == iroots){
     #pragma omp parallel for if(parallelism_enabled)
     for(i=1; i<nroots/2; i++){
-      swapu256_h(&iroots[i*NWORDS_256BIT], &roots[(32-i)*NWORDS_256BIT]);
+      swapu256_h(&iroots[i*NWORDS_256BIT], &roots[(nroots-i)*NWORDS_256BIT]);
     }
   } else {
     memcpy(iroots, roots,NWORDS_256BIT*sizeof(uint32_t));
     #pragma omp parallel for if(parallelism_enabled)
     for (i=1; i<nroots; i++){
-      memcpy(&iroots[i*NWORDS_256BIT], &roots[(32-i)*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
+      memcpy(&iroots[i*NWORDS_256BIT], &roots[(nroots-i)*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
     }
   }
 }
