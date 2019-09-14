@@ -149,9 +149,9 @@ IF CUDA_DEF:
               kparams[i].as_mont = params['as_mont'][i]
             else:
               kparams[i].as_mont = 1
-  
+ 
           exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
-         
+
           kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
   
           free(kconfig)

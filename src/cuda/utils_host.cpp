@@ -2307,6 +2307,67 @@ void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
   addm_h(Z2, Z2, Z2, pidx);
 }
 
+#if 0
+void ec_inittable(uint32_t, *uint32_t *x, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0 )
+{
+   uint32_t n_tables = (table_order + n - 1)/table_table;
+   uint32_t i, j,k=0;
+   uint32_t table_size = 1<< table_order:
+   const uint32_t *ECInf = CusnarksMiscKGet();
+   const uint32_t *One = CusnarksOneMontGet(pidx);
+   uint32_t ndims = (add_last == 0 ? ECP_JAC_OUTDIMS : ECP_JAC_INDIMS);
+   uint32_t n_els = 0;
+ 
+   af = a >= 3 ? 4 : 3
+   uint32_t *ec_table = (uint32_t *) mallloc(table_size * NWORDS_256BIT * ECP_JAC_OUTDIMS * sizeof(uint32_t));
+
+   for (i=0; i< n_tables; i++){
+      memcpy(&ec_table[(i*table_size)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+            ECInf,
+            sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
+      k=0;
+      for (j=1; j< table_size; j++){
+         if (n_els < n) {    
+            if  ((j & (j-1)) == 0){
+                memcpy(&ec_table[(i*table_size+((1<<k)-1))*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                    x[(i*table_order+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                    sizeof(uint32_t) * ndims * NWORDS_256BIT);
+                    k++;
+   
+                if (add_last){
+                  memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS+ECP_JAC_INDIMS*NWORDS_256BIT],
+                       One,
+                       sizeof(uint32_t) * NWORDS_256BIT);
+               }
+            } else {
+                ec_jacadd_h( &ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                             &ec_table[(i*table_size+j-1)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                             &ec_table[(i*table_size+1)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                             pidx);
+                              
+            }      
+         } else {
+             memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                    &ec_table[(i*table_size+j-1)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                    sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
+         }
+      } 
+   }
+}
+
+uint32_t ec_isInf(uint32_t *x)
+{
+  const uint32_t *ECInf = CusnarksMiscKGet();
+
+  if (!memcmp( &x[i * ndims * NWORDS_256BIT],
+                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
+                   sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT)) {
+    return 1;
+  } else {
+    return 0;
+  } 
+}
+#endif
 void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last=0)
 {
   const uint32_t *ECInf = CusnarksMiscKGet();

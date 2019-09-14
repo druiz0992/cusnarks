@@ -281,10 +281,12 @@ double CUSnarks::kernelLaunch(
     end_kernel = elapsedTime() - start;
     total_kernel +=end_kernel;
 
-    logInfo("Params : premod : %d, midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d\n",
-        params[i].premod, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride, params[i].padding_idx);
-    logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec\n", 
-          kernel_idx, gridD, blockD, smemS,end_kernel);
+    logInfo("Params : premod : %d, premul : %d,  midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d, As mont : %d\n",
+        params[i].premod, params[i].premul, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride, params[i].padding_idx, params[i].as_mont);
+    logInfo("Params (FFT cont.) : fft_Nx : %d, N_fftx : %d, fft_Ny : %d, N_ffty : %d, forward : %d\n",
+        params[i].fft_Nx, params[i].N_fftx, params[i].fft_Ny, params[i].N_ffty, params[i].forward);
+    logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec, Return val : %d, In offset : %d, return offset : %d\n", 
+          kernel_idx, gridD, blockD, smemS,end_kernel, config[i].return_val, config[i].in_offset, config[i].return_offset);
   }
   
     // retrieve kernel output data from GPU to host
