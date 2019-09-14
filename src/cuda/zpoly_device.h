@@ -71,6 +71,23 @@ __global__ void zpoly_fft3DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 __global__ void zpoly_fft3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void zpoly_fft3DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
+__global__ void zpoly_fft4DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_fft4DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_fft4DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_fft4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+
+__global__ void zpoly_interp3DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp3DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp3DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp3Dfinish_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+
+__global__ void zpoly_interp4DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp4DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp4DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void zpoly_interp4Dfinish_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+
 __device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx);
 __device__ void ifft32_dit(uint32_t *z, uint32_t *x, mod_t midx);
 __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t N, mod_t midx);
@@ -83,7 +100,7 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params);
 __device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
 __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
 __device__ void fft3Dyx_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
-__device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, uint32_t *r, kernel_params_t *params);
+__device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, uint32_t *r, uint32_t *scaler, kernel_params_t *params);
 
 __device__ void divsnarks(uint32_t *z, uint32_t *x, uint32_t *y, kernel_params_t *params);
 

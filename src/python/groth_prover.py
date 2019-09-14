@@ -108,10 +108,10 @@ class GrothProver(object):
         self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
         np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
-        batch_size = 1<<21  # include roots
-        self.ecbn128 = ECBN128(batch_size + 2,   seed=self.seed)
-        self.ec2bn128 = EC2BN128(batch_size + 2, seed=self.seed)
-        self.cuzpoly = ZCUPoly(batch_size + 2, seed=self.seed)
+        self.batch_size = 1<<20  # include roots. Max is 1<<20
+        self.ecbn128 = ECBN128(self.batch_size + 2,   seed=self.seed)
+        self.ec2bn128 = EC2BN128(self.batch_size + 2, seed=self.seed)
+        self.cuzpoly = ZCUPoly(4*self.batch_size  + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
         self.out_proving_key_format = out_pk_format
@@ -563,7 +563,6 @@ class GrothProver(object):
         delta_1 = pk_bin[4]
         polH = np.reshape(pk_bin[5][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
 
-        
         # sorted scl array is in shared memory. It keeps a working window for data
         np.copyto(
             self.sorted_scl_array_idx[:nPublic+1],
@@ -614,6 +613,7 @@ class GrothProver(object):
         #  P4 - Poly Operations
         ######################
         start = time.time()
+    
 
         self.calculateH()
 
@@ -895,7 +895,6 @@ class GrothProver(object):
         m = pk_bin[1][0]
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-        #pC = np.reshape(pk_bin[4][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pH = np.reshape(pk_bin[5][:(2*m-1)*NWORDS_256BIT],((2*m-1),NWORDS_256BIT))
 
         # Convert witness to montgomery in zpoly_maddm_h
@@ -904,7 +903,6 @@ class GrothProver(object):
 
         self.evalPoly(pA, nVars, m)
         self.evalPoly(pB, nVars, m)
-        #self.evalPoly(pC, nVars, m)
 
         end = time.time()
         self.t_P['eval'] = end-start
@@ -914,57 +912,22 @@ class GrothProver(object):
         if self.n_bits_roots < ifft_params['levels']:
           logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
           sys.exit(1)
-     
-
-        # polC_S  is extended -> use extended scaler
-        #polC_S,t1 = zpoly_ifft_cuda(self.cuzpoly, pC, ifft_params, ZField.get_field(), as_mont=0, roots=self.roots_rdc_u256)
-        #np.copyto(pC,polC_S)
-        #del polC_S
-        #self.t_P['ifft-C'] = t1
-
-        # polA_S montgomery -> use montgomery scaler
-        polA_S,t1 = zpoly_fft_cuda(self.cuzpoly, pA,ifft_params, ZField.get_field(), as_mont=1, roots=self.roots_rdc_u256, fft=0)
-        np.copyto(pA,polA_S)
-        del polA_S
-        self.t_P['ifft-A'] =  t1
     
-        #TODO : interpolation. Do single N/2 FFT for odd samples and copy original pA samples in even places. Integrate later, ideally
-        # with premultiplication of roots
-        #polB_S = fft(polA_S,N) : polB_S even samples = pA
-        #ifft_params = ntt_build_h(pA.shape[0]*2)
-        #polB_S,t1 = zpoly_fft_cuda(self.cuzpoly, polA_S,ifft_params, ZField.get_field(), as_mont=1, roots=self.roots_rdc_u256, fft=1)
+        # TEST Vectors
+        #pA = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
+        #pB = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
 
-        #polC_S = fft(polA_S,N/2) . polB_S odd samples = polC_S
-        #ifft_params = ntt_build_h(pA.shape[0])
-        #r = montmultN_h(polA_S.reshape(-1),self.roots_rdc_u256[::1<<3][0:1<<16].reshape(-1),MOD_FIELD)
-        #polC_S,t1 = zpoly_fft_cuda(self.cuzpoly, r.reshape((-1,NWORDS_256BIT)),ifft_params, ZField.get_field(), as_mont=1, roots=self.roots_rdc_u256, fft=1)
-
-
-
-        # polB_S montgomery  -> use montgomery scaler
-        # TODO : return_val = 0, out_extra_len= out_len
-        polB_S,t1 = zpoly_fft_cuda(self.cuzpoly, pB, ifft_params, ZField.get_field(), as_mont=1, return_val = 1, out_extra_len=0, fft=0)
-        np.copyto(pB,polB_S)
-        del polB_S
-        self.t_P['ifft-B'] = t1
-
-        mul_params = ntt_build_h(pH.shape[0])
-        #polAB_S is extended -> use extended scaler
-        # TODO : polB_S is stored in device mem already from previous operation. Do not return  value
-        polAB_S,t1 = zpoly_mul_cuda(self.cuzpoly, pA,pB,mul_params, ZField.get_field(), roots=self.roots_rdc_u256, return_val=1, as_mont=0)
-        #nsamplesH = zpoly_norm_h(polAB_S)
-        #np.copyto(pH[:nsamplesH],polAB_S[:nsamplesH])
+        ifft_params = ntt_build_h(pA.shape[0])
+        polAB_S,t1 = zpoly_interp_and_mul_cuda(
+                                              self.cuzpoly,
+                                              np.concatenate((pA,pB)),
+                                              ifft_params, 
+                                              ZField.get_field(), 
+                                              self.roots_rdc_u256,
+                                              self.batch_size)
         np.copyto(pH[:m-1],polAB_S[m:-1])
         del polAB_S
-        self.t_P['mul'] = t1
-
-        # polABC_S is extended
-        # TODO : polAB_S is stored in device moem already from previous operatoin. Do not return value.
-        # TODO : perform several sub operations per thread to improve efficiency
-        #polABC_S,t1 = zpoly_sub_cuda(self.cuzpoly, pH[:nsamplesH], pC, ZField.get_field(), vectorA_len = 0, return_val=1)
-        #np.copyto(pH[:m-1],polABC_S[m:])
-        #del polABC_S
-        #self.t_P['sub'] =  t1
+        self.t_P['fft-interp'] =  t1
 
         end_h = time.time()
         self.t_P['total'] = end_h - start_h

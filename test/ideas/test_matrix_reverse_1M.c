@@ -6,11 +6,11 @@
 //#define NXX  (5)
 //#define NYX  (5)
 
-#define NX (9)
-#define NY (7)
-#define NXX  (5)
+#define NX (4)
+#define NY (5)
+#define NXX  (2)
 #define NXY ((NX) - (NXX))
-#define NYX  (4)
+#define NYX  (3)
 #define NYY  ((NY) - (NYX))
 #define MSIZE ( 1 << (NX+NY))
 
@@ -32,27 +32,34 @@ xx
 
 void fft3d2xx_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nxx)
 {
-   int reverse_idx, new_ridx, new_cidx, new_kidx;
+   int reverse_idx, new_ridx, new_cidx, new_kidx, fft_idx, root_idx, _root_idx;
+   const int Nyn = (1 << Ny) - 1;
    const int Nxn = (1 << Nx) - 1;
    const int Nxxxn = (1 << (Nx-Nxx)) - 1;
    const int Nxxn = (1 << Nxx) - 1;
    const int base = (BASE + BASE32 - Nxx );
    const int base2 = (MOD255 >> (BASE32-Nxx));
+   const int NXYN = (1 << (Nx+Ny)) -1;
 
-   for (int i = 0; i < (1 << (Nx + Ny)); i++){
+   for (int i = 0; i < (1 << (Nx + Ny+1)); i++){
       reverse_idx = ((((((i & Nxxn) * 0x802 & 0x22110) | ( (i & Nxxn) * 0x8020 & 0x88440)) * 0x10101 >> base) & base2)) << (Ny + Nx - Nxx);
       new_cidx = ((i & Nxxn) << (Ny + Nx - Nxx));
       new_ridx = (((i >> Nxx) & Nxxxn) << Ny);
-      new_kidx = (i >> Nx);
+      new_kidx = (i >> Nx) & Nyn;
+      fft_idx = (i >> (Nx + Ny)) << (Nx + Ny);
+      root_idx = ((new_ridx >> Ny) * (reverse_idx >> (Ny + Nx - Nxx)) ) << Ny;
+      _root_idx = root_idx * -1;
+      _root_idx &= NXYN;
+
       //if (i < 2048){
-        printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d, root_idx: %d\n",
+        printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d, root_idx: %d, _root_idx: %d, fft_idx : %d\n",
                                i, new_ridx, new_cidx, new_kidx, reverse_idx, 
                                new_ridx >> Ny, reverse_idx >> (Ny + Nx - Nxx), 
-                               ((new_ridx >> Ny) * (reverse_idx >> (Ny + Nx - Nxx)) ) << Ny);
-        //printf("tid : %d, in_idx : %d, out_idx: %d, root_idx: %d\n",
-                               //i, new_ridx + new_cidx + new_kidx, 
-                               //reverse_idx + new_kidx + new_ridx, 
-                               //(new_ridx >> Ny) * (reverse_idx >> (Ny + Nx - Nxx)) << Nx);
+                               root_idx, _root_idx, fft_idx);
+        printf("tid : %d, in_idx : %d, out_idx: %d, root_idx: %d\n",
+                               i, new_ridx + new_cidx + new_kidx + fft_idx, 
+                               reverse_idx + new_kidx + new_ridx + fft_idx, 
+                               (new_ridx >> Ny) * (reverse_idx >> (Ny + Nx - Nxx)) << Nx);
       //}
 
       out_vector_h[reverse_idx + new_kidx +new_ridx] = in_vector_h[new_cidx + new_kidx + new_ridx];
@@ -62,9 +69,10 @@ void fft3d2xx_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nx
 
 void fft3d2xy_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nxy)
 {
-  int reverse_idx, new_ridx, new_cidx, new_kidx;
+  int reverse_idx, new_ridx, new_cidx, new_kidx, fft_idx;
 
    const int Nyn = (1 << Ny) - 1;
+   const int N2xyn = (1 << (Nx+Ny)) - 1;
    const int Nxxyn = (1 << (Nx-Nxy)) - 1;
    const int Nxyn = (1 << Nxy) - 1;
    const int base = (BASE + BASE32 - Nxy );
@@ -79,7 +87,7 @@ void fft3d2xy_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nx
    }
    #endif
 
-   for (int i = 0; i < (1 << (Nx + Ny)); i++){
+   for (int i = 0; i < (1 << (Nx + Ny + 1)); i++){
       //reverse_idx = ((((((i & Nxxxn) * 0x802 & 0x22110) | ( (i & Nxxxn) * 0x8020 & 0x88440)) * 0x10101 >> base) & 0x7F)) << Ny;
       //new_ridx = ((i & Nxn) >> (Ny-Nxx) << Ny);
       //new_cidx = (i & Nxxn) << Ny;
@@ -89,18 +97,19 @@ void fft3d2xy_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nx
   //int new_kidx = (tid/(1024*32) * 32 * 1024);
       new_cidx = (i & Nxyn) << Ny;  
       new_ridx = ((i >> Nxy )& Nyn);
-      new_kidx = (i >> (Nxy + Ny) << (Nxy + Ny));
+      new_kidx = (i >> (Nxy + Ny) << (Nxy + Ny)) & (N2xyn);
+      fft_idx  = ((i >> (Nxy + Ny)) >> (Nx - Nxy)) << (Nx + Ny);
       reverse_idx = (((((((i&Nxyn) ) * 0x802 & 0x22110) | ( ((i&Nxyn)) * 0x8020 & 0x88440)) * 0x10101 >> base) & base2))<<(Nx-Nxy+Ny);
-        printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d, root_idx: %d\n",
+        printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d, root_idx: %d, fft_idx: %d\n",
                                i, new_ridx, new_cidx, new_kidx, reverse_idx,
                                //new_ridx >> Ny, reverse_idx >>Ny);
                                (reverse_idx + (new_kidx>>(Nxy)) + new_ridx)>>Ny ,
                               ((reverse_idx + (new_kidx>>(Nxy)) + new_ridx)&Nyn),
                                ((reverse_idx + (new_kidx>>(Nxy)) + new_ridx)>>Ny ) *
-                              ((reverse_idx + (new_kidx>>(Nxy)) + new_ridx)&Nyn));
-        //printf("tid : %d, in_idx : %d, out_idx: %d\n",
-                               //i, new_cidx + new_ridx + new_kidx,
-                               //reverse_idx + new_ridx + (new_kidx >> (Nxy)));
+                              ((reverse_idx + (new_kidx>>(Nxy)) + new_ridx)&Nyn), fft_idx);
+        printf("tid : %d, in_idx : %d, out_idx: %d\n",
+                               i, new_cidx + new_ridx + new_kidx + fft_idx,
+                               reverse_idx + new_ridx + (new_kidx >> (Nxy)) + fft_idx);
       //}
 
       out_vector_h[reverse_idx + new_ridx + (new_kidx>>(Nxy))] = in_vector_h[new_cidx + new_ridx + new_kidx];
@@ -150,10 +159,11 @@ void fft3d2xy_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nx
 
 void fft3d2yx_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nyx)
 {
-   int new_ridx,  new_cidx,  new_kidx, reverse_idx;
+   int new_ridx,  new_cidx,  new_kidx, reverse_idx, fft_idx;
    const int Nyn = (1 << Ny) - 1;
    const int Nyyxn = (1 << (Ny-Nyx)) - 1;
    const int Nyxn = (1 << Nyx) - 1;
+   const int Nxyn = (1 << (Ny + Nx)) - 1;
    const int base = (BASE + BASE32 - Nyx );
    const int base2 = (MOD255 >> (BASE32-Nyx));
 
@@ -166,17 +176,18 @@ void fft3d2yx_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Ny
    }
    #endif
 
-   for (int i = 0; i < (1 << (Nx + Ny)); i++){
+   for (int i = 0; i < (1 << (Nx + Ny + 1)); i++){
 
      new_cidx = (i & Nyxn ) << (Ny - Nyx);  
      new_ridx = ((i >> Nyx) & Nyyxn);
-     new_kidx = ((i >> Ny) << Ny);
+     new_kidx = ((i >> Ny) << Ny) & Nxyn;
+     fft_idx = (i >> (Nx + Ny) ) << (Nx + Ny);
      reverse_idx = ((((((i&Nyxn) * 0x802 & 0x22110) | ( (i&Nyxn) * 0x8020 & 0x88440)) * 0x10101 >> base) & base2)) << (Ny - Nyx);
-     printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d, Root_idx: %d\n",
+     printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, root_ridx: %d, root_cidx: %d, Root_idx: %d, fft_idx: %d\n",
                i, new_ridx, new_cidx, new_kidx, reverse_idx, new_ridx, reverse_idx >>(Ny - Nyx),
-               (new_ridx * (reverse_idx >>(Ny - Nyx))) << Nx);
+               (new_ridx * (reverse_idx >>(Ny - Nyx))) << Nx, fft_idx);
      printf("tid : %d, in_idx : %d, out_idx: %d, root_idx: %d\n",
-        i, new_ridx + new_cidx + new_kidx, reverse_idx + new_kidx + new_ridx, (new_ridx * (reverse_idx >> (Ny - Nyx))) << Nx);
+        i, new_ridx + new_cidx + new_kidx + fft_idx, reverse_idx + new_kidx + new_ridx + fft_idx, (new_ridx * (reverse_idx >> (Ny - Nyx))) << Nx);
 
      out_vector_h[reverse_idx + new_kidx +new_ridx] = in_vector_h[new_cidx + new_kidx + new_ridx];
 
@@ -226,8 +237,9 @@ void fft3d2yx_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Ny
 
 void fft3d2yy_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Nyy)
 {
-    int new_ridx,  new_cidx, new_kidx, reverse_idx;
+    int new_ridx,  new_cidx, new_kidx, reverse_idx, fft_idx;
     const int Nyn = (1 << Ny) - 1;
+    const int Nxn = (1 << Nx) - 1;
     const int Nxyyn = (1 << (Nx-Nyy)) - 1;
     const int Nyyn = (1 << Nyy) - 1;
     const int Nyyyn = (1 << (Ny-Nyy)) - 1;
@@ -239,22 +251,24 @@ void fft3d2yy_kernel(int *out_vector_h, int *in_vector_h, int Nx, int Ny, int Ny
      out[i] = 0;
    }
 
-    for (int i = 0; i < (1 << (Nx + Ny)); i++){
+    for (int i = 0; i < (1 << (Nx + Ny + 1)); i++){
       new_cidx = (i & Nyyn);  
       new_ridx = ((i >>  Nyy) & Nyyyn) << Nx;
-      new_kidx = (i >> Ny);
+      new_kidx = (i >> Ny) & (Nxn);
+      fft_idx =  (i >> (Ny + Nx)) << (Nx + Ny);
       reverse_idx = ((((((i&Nyyn) * 0x802 & 0x22110) | ((i&Nyyn) * 0x8020 & 0x88440)) * 0x10101) >> base) &base2)<<(Nx + Ny - Nyy);
 
-      printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d\n",
-              i, new_ridx, new_cidx, new_kidx, reverse_idx);
-      //printf("tid : %d, in_idx : %d, out_idx: %d\n",
-             //i, i, reverse_idx + new_ridx + new_kidx);
+      printf("tid : %d, nr_idx: %d, nc_idx: %d, nk_idx: %d, ridx: %d, fft_idx: %d\n",
+              i, new_ridx, new_cidx, new_kidx, reverse_idx, fft_idx);
+      printf("tid : %d, in_idx : %d, out_idx: %d\n",
+             i, i + fft_idx, reverse_idx + new_ridx + new_kidx +fft_idx);
       out_vector_h[reverse_idx + new_kidx +new_ridx] = in_vector_h[i];
 
-      if (out[reverse_idx + new_ridx + new_kidx] > 0){
+      /*if (out[reverse_idx + new_ridx + new_kidx] > 0){
         printf("error out\n");
         
       } 
+      */
       out[reverse_idx + new_ridx + new_kidx]++;
    }
     printf("\nPending Out\n");
@@ -377,11 +391,11 @@ main()
 {
   int *in_vector_h, *out_vector_h;
   int i,j;
-  int nrows = NY, ncols=NX;
+  int nrows = NY+1, ncols=NX;
   int gridS, blockS;
 
-  in_vector_h = (int *)malloc(MSIZE * sizeof(int));
-  out_vector_h = (int *)malloc(MSIZE * sizeof(int));
+  in_vector_h = (int *)malloc(2*MSIZE * sizeof(int));
+  out_vector_h = (int *)malloc(2*MSIZE * sizeof(int));
 
   for (i=0;i<(1 << nrows);i++){
      for (j=0;j< (1 << ncols); j++){
@@ -404,7 +418,10 @@ main()
 
   printf("XXXXXXXXXXXXXXXXXXXXX\n");
   printf("Out XX\n");
-  for ( i=0;i< (1 << nrows);i++){
+  for ( i=0;i< (1 << nrows );i++){
+     if (i==(1 << (nrows-1)) ){
+        printf(" CHECK THIS\n");
+     }
      for (j=0;j< (1 << ncols); j++){
         printf("%d ",out_vector_h[j+(i<<ncols)]);
      }
