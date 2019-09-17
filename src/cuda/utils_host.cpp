@@ -2084,8 +2084,8 @@ uint32_t getbitu256_h(uint32_t *x, uint32_t n)
 {
   uint32_t w, b;
   
-  w = n / NBITS_WORD;
-  b = n % NBITS_WORD;
+  w = n >> NBITS_WORD_LOG2;
+  b = n & NBITS_WORD_MOD;
 
   return ( (x[w] >> b) & 0x1);
 }
@@ -2528,10 +2528,10 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t
      uint32_t tid = omp_get_thread_num();
      if (!memcmp(&x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],
                  &ECInf[(pidx*MISC_K_N+MISC_K_INF2)*NWORDS_256BIT],
-                 sizeof(uint32_t) * ECP2_JAC_OUTDIMS * NWORDS_256BIT)) {
+                 sizeof(uint32_t) * ndims * NWORDS_256BIT)) {
         memmove(&y[i*ndims*NWORDS_256BIT],
                 &x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],
-                sizeof(uint32_t)*ECP2_JAC_OUTDIMS*NWORDS_256BIT);
+                sizeof(uint32_t)*ndims*NWORDS_256BIT);
         continue;
      }
      montinv_ext_h(&utils_zinv[tid * 2*NWORDS_256BIT],

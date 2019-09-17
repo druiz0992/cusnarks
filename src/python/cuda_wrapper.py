@@ -622,6 +622,7 @@ def zpoly_interp_and_mul_test(vector, interp_params, fidx, roots):
 
      vlen = int(vector.shape[0]/2)
      pA = np.copy(vector[:vlen])
+     pB = np.copy(vector[vlen:])
      nBitsRoots = cfg.get_n_roots()
 
 
@@ -657,54 +658,90 @@ def zpoly_interp_and_mul_test(vector, interp_params, fidx, roots):
      Iroots_WB12[1:] = roots_WB12[::-1][:-1]
 
      pA_S = intt_h(pA, Iroots_W2,1, fidx)
-     pA2_S = montmultN_h(pA_S.reshape(-1),
+     pA1_S = montmultN_h(pA_S.reshape(-1),
                     np.reshape(roots_W3,-1),fidx)
-     pA2 = ntt_h(pA2_S, roots_W2, fidx)
+     pA2 = ntt_h(pA1_S, roots_W2, fidx)
+
+     pB_S = intt_h(pB, Iroots_W2,1, fidx)
+     pB1_S = montmultN_h(pB_S.reshape(-1),
+                    np.reshape(roots_W3,-1),fidx)
+
+     pB2 = ntt_h(pB1_S, roots_W2, fidx)
     
      pA3 = np.zeros((2*pA2.shape[0], NWORDS_256BIT), dtype=np.uint32)
      pA3[1::2] = montmultN_h(pA2.reshape(-1),
-                       pA2.reshape(-1),fidx)
+                       pB2.reshape(-1),fidx)
      pA3[::2] = montmultN_h(pA.reshape(-1),
-                         pA.reshape(-1),fidx)
+                         pB.reshape(-1),fidx)
      r_pA = intt_h(pA3, Iroots_W22,0, fidx)
 
      return pA3, r_pA
 
-     """
-     pAT_S = np.zeros(pA3.shape, dtype=np.uint32)
-     pAT3_S = np.zeros(pA3.shape, dtype=np.uint32)
- 
-     pAT = zpoly_transpose(pA3, Npoints_passB1, Npoints_passB2)
-      
-     for i in xrange(Npoints_passB2):
-        pAT_S[voffset1:voffset1+Npoints_passB1] = ntt_h(pAT[voffset1:voffset1+Npoints_passB1], Iroots_WB11, fidx)
-        if i == 0:
-            pAT_S[voffset1:voffset1+Npoints_passB1] = montmultN_h(pAT_S[voffset1:voffset1+Npoints_passB1].reshape(-1),
-                    np.reshape(np.tile(Iroots_W22[0],(Npoints_passB1,1)),(-1)),fidx)
-        else:   
-            pAT_S[voffset1:voffset1+Npoints_passB1] = montmultN_h(pAT_S[voffset1:voffset1+Npoints_passB1].reshape(-1),
-                    Iroots_W22[::i][:Npoints_passB1].reshape(-1),fidx)
 
-        voffset1+=Npoints_passB1
+def zpoly_fft4d_test(pA, fft_params, fidx, roots, fft=1, as_mont=1):
+     Npoints_pass1 = 1 << (fft_params['fft_N'][-1])
+     Npoints_pass2 = 1 << (fft_params['fft_N'][-2])
+     nBitsRoots = cfg.get_n_roots()
+     voffset1=0
+
+     scalerMont = ZFieldElExt(pA.shape[0]).inv().reduce().as_uint256()
+     scalerExt = ZFieldElExt(pA.shape[0]).inv().as_uint256()
+
+     roots_W11 = np.copy(roots[::(1<<(nBitsRoots-fft_params['fft_N'][-1]))])
+     Iroots_W11 = np.copy(roots_W11)
+     Iroots_W11[1:] = roots_W11[::-1][:-1]
+     
+     roots_W12 = np.copy(roots[::(1<<(nBitsRoots-fft_params['fft_N'][-2]))])
+     Iroots_W12 = np.copy(roots_W12)
+     Iroots_W12[1:] = roots_W12[::-1][:-1]
+
+     roots_W2 = np.copy(roots[::(1<<(nBitsRoots-fft_params['levels']))])
+     Iroots_W2 = np.copy(roots_W2)
+     Iroots_W2[1:] = roots_W2[::-1][:-1]
+
+     pAT_S = np.zeros(pA.shape, dtype=np.uint32)
+     pAT3_S = np.zeros(pA.shape, dtype=np.uint32)
+ 
+     pAT = zpoly_transpose(pA, Npoints_pass1, Npoints_pass2)
+     
+     if fft:
+         W11R = roots_W11 
+         W12R = roots_W12 
+         W2R  = roots_W2
+     else:
+         W11R = Iroots_W11 
+         W12R = Iroots_W12 
+         W2R  = Iroots_W2
+
+     for i in xrange(Npoints_pass2):
+        pAT_S[voffset1:voffset1+Npoints_pass1] = ntt_h(pAT[voffset1:voffset1+Npoints_pass1], W11R, fidx)
+        if i == 0:
+            pAT_S[voffset1:voffset1+Npoints_pass1] = montmultN_h(pAT_S[voffset1:voffset1+Npoints_pass1].reshape(-1),
+                    np.reshape(np.tile(W2R[0],(Npoints_pass1,1)),(-1)),fidx)
+        else:   
+            pAT_S[voffset1:voffset1+Npoints_pass1] = montmultN_h(pAT_S[voffset1:voffset1+Npoints_pass1].reshape(-1),
+                    W2R[::i][:Npoints_pass1].reshape(-1),fidx)
+
+        voffset1+=Npoints_pass1
 
      voffset1=0
-     pAT2_S = zpoly_transpose(pAT_S, Npoints_passB2, Npoints_passB1)
-     for i in xrange(Npoints_passB1):
-        pAT3_S[voffset1:voffset1+Npoints_passB2] = ntt_h(pAT2_S[voffset1:voffset1+Npoints_passB2], Iroots_WB12, fidx)
-        voffset1+=Npoints_passB2
+     pAT2_S = zpoly_transpose(pAT_S, Npoints_pass2, Npoints_pass1)
+     for i in xrange(Npoints_pass1):
+        pAT3_S[voffset1:voffset1+Npoints_pass2] = ntt_h(pAT2_S[voffset1:voffset1+Npoints_pass2], W12R, fidx)
+        voffset1+=Npoints_pass2
 
-     pAT3_S = montmultN_h(pAT3_S.reshape(-1),
-                   np.reshape(np.tile(scalerExt2,vlen*2),-1) ,fidx)
+     if fft==0:
+       if as_mont==1:
+          pAT3_S = montmultN_h(pAT3_S.reshape(-1),
+                     np.reshape(np.tile(scalerMont,pA.shape[0]),-1) ,fidx) 
+       else:
+          pAT3_S = montmultN_h(pAT3_S.reshape(-1),
+                     np.reshape(np.tile(scalerExt,pA.shape[0]),-1) ,fidx)
 
-     pA4 = zpoly_transpose(pAT3_S, Npoints_passB1, Npoints_passB2)
+     pAT3_S = zpoly_transpose(pAT3_S, Npoints_pass1, Npoints_pass2)
 
-     pA4_S = zpoly_transpose(pAT4_S, Npoints_pass1, Npoints_pass2)
+     return pAT2_S, pAT3_S
 
-     pA2 =  ntt_h(r1, roots_3D, fidx)
-
-
-     """
-     ####### End Test
 
 def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_size):
      Npoints_pass1 = 1 << (interp_params['fft_N'][-1])
@@ -720,7 +757,6 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
      scalerMont = ZFieldElExt(vlen).inv().reduce().as_uint256()
      scalerExt = ZFieldElExt(vlen).inv().as_uint256()
-
 
     
      # Build basic vector:
@@ -783,7 +819,17 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      #Transpose and take IFFT (first pass)
      voffset1 = 0
      voffset2 = vlen
-     vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2) 
+
+     """
+     pA = np.copy(vector[:vlen])
+     pB = np.copy(vector[vlen: ])
+     pA_S1, pA_S2 = zpoly_fft4d_test(pA, interp_params, fidx, roots, fft=0, as_mont=1)
+     pA_S3 = montmultN_h(pA_S2.reshape(-1), roots_W3.reshape(-1),fidx)
+     pB_S1, pB_S2 = zpoly_fft4d_test(pB, interp_params, fidx, roots, fft=0, as_mont=1)
+     pB_S3 = montmultN_h(pB_S2.reshape(-1), roots_W3.reshape(-1),fidx)
+     """
+
+     vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2)
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2) 
 
      cols_idx = np.arange(Npoints_pass1)
@@ -797,11 +843,15 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(interp_params, nsamples,
                                                                  len(zpoly_vector), fidx, roots_W1_len,
-                                                                 return_offset=nsamples*NWORDS_256BIT, n_pass=0)
+                                                                 #return_offset=nsamples*NWORDS_256BIT, n_pass=0)
+                                                                 return_offset=0, n_pass=0)
 
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
-        pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-        vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
+        #pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
+        #vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
+        #vector[voffset2:voffset2+nsamples] = np.copy(result[2*nsamples:])
+        pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
+        vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples:])
         vector[voffset2:voffset2+nsamples] = np.copy(result[2*nsamples:])
      
         t+=t_fft
@@ -839,7 +889,13 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
  
          
      vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2) 
-     vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2) 
+     vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2)
+
+     """
+     pA_S1, pA_S2 = zpoly_fft4d_test(pA_S3, interp_params, fidx, roots, fft=1, as_mont=1)
+     pB_S1, pB_S2 = zpoly_fft4d_test(pB_S3, interp_params, fidx, roots, fft=1, as_mont=1)
+     pAB_S = montmultN_h(pA_S2.reshape(-1), pB_S2.reshape(-1),fidx)
+     """
 
      #Transpose and take FFT (first pass)
      voffset1 = 0
@@ -857,7 +913,8 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(interp_params, nsamples,
                                                                  3*nsamples, fidx, roots_W1_len,
-                                                                 return_offset=2*nsamples*NWORDS_256BIT, n_pass=2)
+                                                                 #return_offset=2*nsamples*NWORDS_256BIT, n_pass=2)
+                                                                 return_offset=0, n_pass=2)
 
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
         vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
@@ -998,9 +1055,19 @@ def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch
      else :
         # Data doesnt fit in single FFT
         vector, t = zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_size)
+        """
+        if not all(np.concatenate(vector == p_interp)) : 
+           print("Interp incorrect  ",)
+           vector = p_interp
+        """
 
         mul_params = ntt_build_h(vector.shape[0])
         vector, t1 = zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size)
+        """
+        if not all(np.concatenate(vector == p_mul)) : 
+           print("Mul incorrect  ",)   
+           vector = p_mul
+        """
 
         t +=t1
 

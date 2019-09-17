@@ -39,6 +39,8 @@
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE           (30)
 #define NBITS_WORD           (32)
+#define NBITS_WORD_LOG2      (5)
+#define NBITS_WORD_MOD       (0x1F)
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
