@@ -78,7 +78,7 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20):
  
         # Check valid folder exists
         if keep_f is None:

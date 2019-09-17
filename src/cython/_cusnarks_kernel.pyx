@@ -435,8 +435,12 @@ def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
     return idx
 
 def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
+    if len(vin)==0:
+      return np.asarray([],dtype=np.uint32)
+
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vin_flat = np.zeros(vin.shape[0] * vin.shape[1],dtype=np.uint32)
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] idx_flat = np.zeros(vin.shape[0],dtype=np.uint32)
+
 
     vin_flat = np.reshape(vin,-1)
 

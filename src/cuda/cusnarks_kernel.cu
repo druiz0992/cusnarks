@@ -234,10 +234,12 @@ double CUSnarks::kernelLaunch(
   // check input lengths do not exceed reserved amount
   if (in_vector_host->length > in_vector_device.length) { 
     logInfo("Error IVHL : %d >  IVDL : %d\n",in_vector_host->length, in_vector_device.length);
+    assert(0);
     return 0.0;
   }
   if (out_vector_host->length > out_vector_device.length) {
     logInfo("Error OVHL : %d > OVDL : %d\n",out_vector_host->length, out_vector_device.length);
+    assert(0);
     return 0.0;
   }
 

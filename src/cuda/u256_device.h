@@ -381,4 +381,5 @@ __device__ void submu256(T1 *z, T2 *x, T3 *y, mod_t midx)
   //logInfoBigNumberTid(1,"z:\n",(uint32_t *)z);
 
 }
+
 #endif
