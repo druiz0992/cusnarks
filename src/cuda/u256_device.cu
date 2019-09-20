@@ -1167,8 +1167,8 @@ __device__ uint32_t shl1u256(const uint32_t __restrict__ *x)
 __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
 {
    uint32_t c,i, rc=0; 
-   uint32_t word = bsel >> 5; // bsel/32 gives the word number
-   uint32_t bit = bsel & 0x1F; // bsel % 32 gives bit number
+   uint32_t word = bsel >> NBITS_WORD_LOG2; // bsel/32 gives the word number
+   uint32_t bit = bsel & NBITS_WORD_MOD; // bsel % 32 gives bit number
 
    #pragma unroll
    for (i=0; i< U256_BSELM; i++){

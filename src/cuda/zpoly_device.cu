@@ -595,36 +595,35 @@ __global__ void zpoly_fft2DY_kernel(uint32_t *out_vector, uint32_t *in_vector, k
 __global__ void zpoly_fft3DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x, *w1;
+    uint32_t N1 = params->N_fftx + params->N_ffty;
 
-    uint32_t *x;
-
-    //if(tid >= (params->in_length-2)/params->stride){
-    if(tid >= (params->padding_idx-2)/params->stride){
+    if(tid >= params->padding_idx){
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * U256K_OFFSET];
+    x = (uint32_t *) in_vector;
+    w1 = (uint32_t *) &in_vector[(1<<N1) * U256K_OFFSET];
     
-    if (params->premod){
-       modu256(x,x, params->midx);
-    }
-
-    fft3Dxx_dif(in_vector,in_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
-    //fft3Dxx_dif(out_vector,in_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
-    //fft3Dxx_dif(out_vector,in_vector, params);
+    fft3Dxx_dif(x, x,  w1, params);
 
 }
 
 __global__ void zpoly_fft3DXXprev_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x, *z, *w1;
+    uint32_t N1 = params->N_fftx + params->N_ffty;
 
     if(tid >= params->in_length){
       return;
     }
 
-    fft3Dxx_dif(in_vector,out_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
-    //fft3Dxx_dif(out_vector,in_vector, params);
+    x = (uint32_t *) in_vector;
+    z = (uint32_t *) out_vector;
+    w1 = (uint32_t *) &in_vector[(1<<N1) * U256K_OFFSET];
+
+    fft3Dxx_dif(x, z, w1, params);
  
 }
 
@@ -632,34 +631,423 @@ __global__ void zpoly_fft3DXXprev_kernel(uint32_t *out_vector, uint32_t *in_vect
 __global__ void zpoly_fft3DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x, *z, *w1;
+    uint32_t N1 = params->N_fftx + params->N_ffty;
+
     if(tid >= params->in_length){
       return;
     }
+
+    x = (uint32_t *) in_vector;
+    z = (uint32_t *) out_vector;
+    w1 = (uint32_t *) &in_vector[(1<<N1) * U256K_OFFSET];
     
-    //memcpy(&out_vector[tid*NWORDS_256BIT],&in_vector[tid*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
-    fft3Dxy_dif(out_vector,in_vector, &in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
+    fft3Dxy_dif(z, x, w1, params);
 }
 
 __global__ void zpoly_fft3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x, *z, *w1;
+    uint32_t N1 = params->N_fftx + params->N_ffty;
+
     if(tid >= params->in_length){
       return;
     }
+
+    x = (uint32_t *) in_vector;
+    z = (uint32_t *) out_vector;
+    w1 = (uint32_t *) &in_vector[(1<<N1) * U256K_OFFSET];
     
-    fft3Dyx_dif(in_vector,out_vector,&in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
+    fft3Dyx_dif(x, z, w1, params);
 }
 
 __global__ void zpoly_fft3DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x, *z, *scaler;
+    uint32_t N1 = params->N_fftx + params->N_ffty;
+
     if(tid >= params->in_length){
       return;
     } 
    
-    //memcpy(&out_vector[tid*NWORDS_256BIT],&in_vector[tid*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
-    fft3Dyy_dif(out_vector,in_vector,&in_vector[(1<<(params->N_fftx + params->N_ffty)) * U256K_OFFSET], params);
+    x = (uint32_t *) in_vector;
+    z = (uint32_t *) out_vector;
+    scaler = (uint32_t *) &in_vector[(2<<N1) * U256K_OFFSET];
+
+    fft3Dyy_dif(z,
+                x, NULL,
+                scaler, params);
 }
+
+__global__ void zpoly_fft4DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    uint32_t *x1, *w1, *z1;
+    const uint32_t N1 = params->N_fftx + params->N_ffty;
+
+    if(tid >= params->padding_idx){
+      return;
+    }
+
+    x1 = (uint32_t *) in_vector;
+    z1 = (uint32_t *) out_vector;
+
+    if ( params->premul){
+       w1 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];
+    } else {
+       w1 = (uint32_t *) &in_vector[(2*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
+    }
+
+    fft3Dxx_dif(z1, x1, w1, params);
+
+}
+
+__global__ void zpoly_fft4DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *z1, *w1;
+    const uint32_t N1 = params->N_fftx + params->N_ffty;
+
+    if(tid >= params->padding_idx){
+      return;
+    }
+ 
+    x1 = (uint32_t *) in_vector;   
+    z1 = (uint32_t *) out_vector;
+
+    if ( params->premul){
+       w1 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];
+    } else {
+       w1 = (uint32_t *) &in_vector[(2*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
+    }
+
+    fft3Dxy_dif(x1,z1, w1, params);
+}
+
+__global__ void zpoly_fft4DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *z1, *w1;
+    const uint32_t N1 = params->N_fftx + params->N_ffty;
+
+    if(tid >= params->in_length){
+      return;
+    }
+
+    x1 = (uint32_t *) in_vector;   
+    z1 = (uint32_t *) out_vector;
+
+    if ( params->premul){
+       w1 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];
+    } else {
+       w1 = (uint32_t *) &in_vector[(2*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
+    }
+
+    fft3Dyx_dif(z1, x1, w1, params);
+}
+
+__global__ void zpoly_fft4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *z1, *w2, *scaler;
+
+    if(tid >= params->in_length){
+      return;
+    } 
+
+    x1 = (uint32_t *) in_vector;   
+    z1 = (uint32_t *) out_vector;
+    scaler = (uint32_t *) &in_vector[(2*params->padding_idx + params->stride) * U256K_OFFSET];   
+
+    w2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET]; // N/2 roots 
+  
+    fft3Dyy_dif(z1, z1, w2, scaler, params);
+    
+}
+
+__global__ void zpoly_interp3DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    uint32_t *x1, *x2, *w1, *w3, *z1, *tmp1, *tmp2;
+
+    if(tid >= params->padding_idx){
+      return;
+    }
+
+    x1 = (uint32_t *) in_vector;
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];
+    w1 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];
+    w3 = (uint32_t *) &in_vector[(2*params->padding_idx + params->stride) * U256K_OFFSET];   
+
+    z1 = (uint32_t *) out_vector;
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];
+
+    // X1 * X2
+    if (!params->forward){
+       mulmontu256( &z1[2*tid*U256K_OFFSET], 
+                   &x1[tid*U256K_OFFSET],
+                   &x2[tid*U256K_OFFSET], params->midx);
+    } 
+
+    fft3Dxx_dif(tmp1, x1, w1, params);
+    fft3Dxx_dif(tmp2, x2, w1, params);
+
+}
+
+__global__ void zpoly_interp3DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *tmp1, *tmp2, *w1;
+
+    if(tid >= params->padding_idx){
+      return;
+    }
+ 
+    x1 = (uint32_t *) in_vector;   
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
+    w1 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];   
+
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+
+    fft3Dxy_dif(x1,tmp1, w1, params);
+    fft3Dxy_dif(x2,tmp2, w1, params);
+}
+
+__global__ void zpoly_interp3DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *tmp1, *tmp2, *w1;
+    if(tid >= params->in_length){
+      return;
+    }
+
+    x1 = (uint32_t *) in_vector;   
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
+    w1 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];   
+
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+
+    fft3Dyx_dif(tmp1, x1, w1, params);
+    fft3Dyx_dif(tmp2, x2, w1, params);
+}
+
+__global__ void zpoly_interp3DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *tmp1, *tmp2, *scaler;
+
+    if(tid >= params->in_length){
+      return;
+    } 
+
+    x1 = (uint32_t *) in_vector;   
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
+    scaler = (uint32_t *) &in_vector[(3*params->padding_idx + params->stride) * U256K_OFFSET];   
+
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+   
+    fft3Dyy_dif(x1, tmp1, NULL, scaler,params);
+    fft3Dyy_dif(x2, tmp2, NULL, scaler,params);
+ 
+}
+
+__global__ void zpoly_interp3Dfinish_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *w3, *z1;
+
+    if(tid >= params->in_length){
+      return;
+    } 
+
+    x1 = (uint32_t *) in_vector;
+    x2 = (uint32_t *) &in_vector[params->padding_idx*U256K_OFFSET];
+    w3 = (uint32_t *) &in_vector[3*params->padding_idx*U256K_OFFSET];   
+
+    z1 = (uint32_t *) out_vector;
+  
+    if (!params->forward){
+      mulmontu256( &x1[tid*U256K_OFFSET], 
+                 &x1[tid*U256K_OFFSET],
+                 &w3[tid*U256K_OFFSET], params->midx);
+    
+      mulmontu256( &x2[tid*U256K_OFFSET], 
+                 &x2[tid*U256K_OFFSET],
+                 &w3[tid*U256K_OFFSET], params->midx);
+    } else {
+      mulmontu256( &z1[(2*tid+1)*U256K_OFFSET], 
+                 &x1[tid*U256K_OFFSET],
+                 &x2[tid*U256K_OFFSET], params->midx);
+    }
+}
+
+__global__ void zpoly_interp4DXX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    uint32_t *x1, *x2, *w1, *z2, *tmp1, *tmp2;
+    const uint32_t N1 = params->N_fftx + params->N_ffty;
+
+    if(tid >= params->padding_idx){
+      return;
+    }
+
+    x1 = (uint32_t *) in_vector;
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];
+
+    z2 = (uint32_t *) &out_vector[params->padding_idx * U256K_OFFSET];
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];
+
+    if ( params->premul){
+       w1 = (uint32_t *) &in_vector[3*params->padding_idx * U256K_OFFSET];
+    } else {
+       w1 = (uint32_t *) &in_vector[(3*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
+    }
+
+    // X1 * X2
+    if (!params->forward && params->premul){
+       mulmontu256( &z2[tid*U256K_OFFSET], 
+                   &x1[tid*U256K_OFFSET],
+                   &x2[tid*U256K_OFFSET], params->midx);
+    } 
+
+    fft3Dxx_dif(tmp1, x1, w1, params);
+    fft3Dxx_dif(tmp2, x2, w1, params);
+
+}
+
+__global__ void zpoly_interp4DXY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *tmp1, *tmp2, *w1;
+    const uint32_t N1 = params->N_fftx + params->N_ffty;
+
+    if(tid >= params->padding_idx){
+      return;
+    }
+ 
+    x1 = (uint32_t *) in_vector;   
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
+
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+
+    if ( params->premul){
+       w1 = (uint32_t *) &in_vector[3*params->padding_idx * U256K_OFFSET];
+    } else {
+       w1 = (uint32_t *) &in_vector[(3*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
+    }
+
+    fft3Dxy_dif(x1,tmp1, w1, params);
+    fft3Dxy_dif(x2,tmp2, w1, params);
+}
+
+__global__ void zpoly_interp4DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *tmp1, *tmp2, *w1;
+    const uint32_t N1 = params->N_fftx + params->N_ffty;
+
+    if(tid >= params->in_length){
+      return;
+    }
+
+    x1 = (uint32_t *) in_vector;   
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
+
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+
+    if ( params->premul){
+       w1 = (uint32_t *) &in_vector[3*params->padding_idx * U256K_OFFSET];
+    } else {
+       w1 = (uint32_t *) &in_vector[(3*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
+    }
+
+    fft3Dyx_dif(tmp1, x1, w1, params);
+    fft3Dyx_dif(tmp2, x2, w1, params);
+}
+
+__global__ void zpoly_interp4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *z1, *z2, *tmp1, *tmp2, *w2, *scaler;
+
+    if(tid >= params->in_length){
+      return;
+    } 
+
+    x1 = (uint32_t *) in_vector;   
+    x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
+    scaler = (uint32_t *) &in_vector[(3*params->padding_idx + params->stride) * U256K_OFFSET];   
+
+    z1 = (uint32_t *) out_vector;
+    z2 = (uint32_t *) &out_vector[params->padding_idx * U256K_OFFSET];   
+    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
+    tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+    w2 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET]; // N/2 roots 
+  
+    if (!params->forward && params->premul){ 
+        x1 = z1;
+        x2 = tmp1;
+    } else if (params->forward && params->premul){
+        x1 = z1;
+        x2 = z2;
+    }
+
+    fft3Dyy_dif(x1, tmp1, w2, scaler, params);
+    // TODO : Check if necessary
+    __syncthreads();
+    fft3Dyy_dif(x2, tmp2, w2, scaler, params);
+    
+}
+
+__global__ void zpoly_interp4Dfinish_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t *x1, *x2, *w3, *z1, *z2;
+
+    if(tid >= params->in_length){
+      return;
+    } 
+
+    x1 = (uint32_t *) in_vector;
+    x2 = (uint32_t *) &in_vector[params->padding_idx*U256K_OFFSET];
+    w3 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET];   
+
+    z1 = (uint32_t *) out_vector;
+    z2 = (uint32_t *) &out_vector[params->padding_idx*U256K_OFFSET];
+  
+    if (!params->forward && !params->premul){
+    
+      mulmontu256( &z1[tid*U256K_OFFSET], 
+                 &x1[tid*U256K_OFFSET],
+                 &w3[tid*U256K_OFFSET], params->midx);
+    
+      mulmontu256( &z2[tid*U256K_OFFSET], 
+                 &x2[tid*U256K_OFFSET],
+                 &w3[tid*U256K_OFFSET], params->midx);
+    
+
+    } else if (params->forward && !params->premul) {
+      mulmontu256( &z1[(tid)*U256K_OFFSET], 
+                 &x1[tid*U256K_OFFSET],
+                 &x2[tid*U256K_OFFSET], params->midx);
+
+    }
+}
+
+
+
 
 
 /*
@@ -734,22 +1122,26 @@ __device__ void fft2Dy_dif(uint32_t *z, uint32_t *x, kernel_params_t *params)
 __device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_params_t *params)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  uint32_t Nxx = params->fft_Nx; // size of underlying FFTx
-  uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
-  uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
-  mod_t    midx = params->midx;
+  const uint32_t Nxx = params->fft_Nx; // size of underlying FFTx
+  const uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
+  const uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
+  const mod_t    midx = params->midx;
   const uint32_t offset = ZPOLY_BASE_OFFSET(Nxx);
   const uint32_t mask = ZPOLY_BASE_MASK(Nxx);
-  const int Nxxxn = (1 << (Nx-Nxx)) - 1;
-  const int Nxxn = (1 << Nxx) - 1;
-  const int NXYN = (1 << (Nx+Ny)) - 1;
+  const uint32_t Nxxxn = (1 << (Nx-Nxx)) - 1;
+  const uint32_t Nxxn = (1 << Nxx) - 1;
+  const uint32_t NXYN = (1 << (Nx+Ny)) - 1;
 
-  uint32_t new_cidx = (tid & Nxxn) << (Ny + Nx - Nxx);
-  uint32_t new_ridx = ((tid >> Nxx) & Nxxxn) << Ny;
-  uint32_t new_kidx = tid >> Nx;
-  uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nxxn, offset, mask) << (Ny + Nx - Nxx);
+  const uint32_t new_cidx = (tid & Nxxn) << (Ny + Nx - Nxx);
+  const uint32_t new_ridx = ((tid >> Nxx) & Nxxxn) << Ny;
+  const uint32_t new_kidx = (tid >> Nx) & ((1 << Ny) - 1);
+  const uint32_t fft_idx = (tid >> (Nx + Ny)) << (Nx + Ny);
+  const uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nxxn, offset, mask) << (Ny + Nx - Nxx);
   uint32_t const *W32;
   int root_idx = (((new_ridx >> Ny) * (reverse_idx >> (Ny + Nx  - Nxx))) << Ny);
+
+  const uint32_t tida = reverse_idx + new_kidx + new_ridx + fft_idx;
+  const uint32_t tidb = new_cidx    + new_kidx + new_ridx + fft_idx;
 
   if (params->forward) {
     W32 = W32_ct;
@@ -760,34 +1152,39 @@ __device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
   }
 
   // FFT rows (Every Ny points)
-  fftN_dif(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET], &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET], W32, Nxx, midx);
-  mulmontu256(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
-              &z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
-              ////&roots[(((new_ridx >> Ny) * (reverse_idx >> (Ny + Nx  - Nxx))) << Ny)*U256K_OFFSET], midx);
+  fftN_dif(&z[tida * U256K_OFFSET],
+           &x[tidb * U256K_OFFSET], W32, Nxx, midx);
+
+  mulmontu256(&z[tida*U256K_OFFSET],
+              &z[tida*U256K_OFFSET],
               &roots[root_idx*NWORDS_256BIT], midx);
 }
 
 __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_params_t *params)
 {
-  int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
-  uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
-  uint32_t Nxy = params->fft_Ny;
-  mod_t    midx = params->midx;
+  const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+  const uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
+  const uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
+  const uint32_t Nxy = params->fft_Ny;
+  const mod_t    midx = params->midx;
   const uint32_t offset = ZPOLY_BASE_OFFSET(Nxy);
   const uint32_t mask = ZPOLY_BASE_MASK(Nxy);
-  const int Nxyn = (1 << Nxy) - 1;
-  const int Nyn = (1 << Ny) - 1;
-  const int NXYN = (1 << (Nx+Ny)) - 1;
+  const uint32_t Nxyn = (1 << Nxy) - 1;
+  const uint32_t Nyn = (1 << Ny) - 1;
+  const uint32_t NXYN = (1 << (Nx+Ny)) - 1;
 
-  int new_cidx = (tid & Nxyn) << Ny;  
-  int new_ridx = (tid >> Nxy) & Nyn;
-  int new_kidx = tid >>(Nxy + Ny) << (Nxy + Ny);
-
-  uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nxyn, offset, mask) << (Nx - Nxy + Ny) ;
+  const uint32_t new_cidx = (tid & Nxyn) << Ny;  
+  const uint32_t new_ridx = (tid >> Nxy) & Nyn;
+  const uint32_t new_kidx = (tid >>(Nxy + Ny) << (Nxy + Ny)) & (NXYN);
+  const uint32_t fft_idx = ((tid >> (Nxy + Ny)) >> (Nx - Nxy)) << (Nx + Ny);
   uint32_t const *W32;
-  int root_idx = ((reverse_idx + (new_kidx >> Nxy) + new_ridx) >> Ny) * 
-                     ((reverse_idx + (new_kidx >> Nxy) + new_ridx) & Nyn);
+
+  const uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nxyn, offset, mask) << (Nx - Nxy + Ny) ;
+
+  const uint32_t tida = reverse_idx + (new_kidx >> Nxy) + new_ridx + fft_idx;
+  const uint32_t tidb = new_cidx    +  new_kidx         + new_ridx + fft_idx;
+
+  int root_idx = ((tida - fft_idx) >> Ny) * ((tida - fft_idx) & Nyn);
 
   if (params->forward) {
     W32 = W32_ct;
@@ -796,13 +1193,11 @@ __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
     root_idx *= -1;
     root_idx &= NXYN;
   }
-  fftN_dif(&z[(reverse_idx + (new_kidx >> Nxy) + new_ridx)*U256K_OFFSET],
-           &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET],W32,Nxy,midx);
+  fftN_dif(&z[tida*U256K_OFFSET],
+           &x[tidb*U256K_OFFSET],W32,Nxy,midx);
 
-  mulmontu256(&z[(reverse_idx + (new_kidx >> Nxy) + new_ridx)*U256K_OFFSET],
-           &z[(reverse_idx + (new_kidx >> Nxy) + new_ridx)*U256K_OFFSET],
-           //&roots[((reverse_idx + (new_kidx >> Nxy) + new_ridx) >> Ny) * 
-                     //((reverse_idx + (new_kidx >> Nxy) + new_ridx) & Nyn)*U256K_OFFSET] ,midx);
+  mulmontu256(&z[tida*U256K_OFFSET],
+           &z[tida*U256K_OFFSET],
            &roots[root_idx * NWORDS_256BIT],midx);
 
 }
@@ -810,23 +1205,27 @@ __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
 __device__ void fft3Dyx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_params_t *params)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  uint32_t Nyx = params->fft_Nx; // size of underlying FFTx
-  uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
-  uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
-  mod_t    midx = params->midx;
+  const uint32_t Nyx = params->fft_Nx; // size of underlying FFTx
+  const uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
+  const uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
+  const mod_t    midx = params->midx;
 
   const uint32_t offset = ZPOLY_BASE_OFFSET(Nyx);
   const uint32_t mask = ZPOLY_BASE_MASK(Nyx);
-  const int Nyxn = (1 << Nyx) - 1;
-  const int Nyyxn = (1 << (Ny-Nyx)) - 1;
-  const int NXYN = (1 << (Nx+Ny)) - 1;
+  const uint32_t Nyxn = (1 << Nyx) - 1;
+  const uint32_t Nyyxn = (1 << (Ny-Nyx)) - 1;
+  const uint32_t NXYN = (1 << (Nx+Ny)) - 1;
 
-  uint32_t new_cidx = (tid & Nyxn) << (Ny - Nyx);  
-  uint32_t new_ridx = (tid >> Nyx) & Nyyxn;
-  uint32_t new_kidx = (tid >> Ny) << Ny;
-  uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyxn, offset, mask) << (Ny - Nyx);
-  uint32_t const *W32;
+  const uint32_t new_cidx = (tid & Nyxn) << (Ny - Nyx);  
+  const uint32_t new_ridx = (tid >> Nyx) & Nyyxn;
+  const uint32_t new_kidx = ((tid >> Ny) << Ny) & (NXYN);
+  const uint32_t fft_idx = (tid >> (Nx + Ny)) << (Nx + Ny);
+  const uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyxn, offset, mask) << (Ny - Nyx);
+  const uint32_t const *W32;
   int root_idx = ((new_ridx * (reverse_idx >> (Ny - Nyx))) << Nx);
+
+  const uint32_t tida = reverse_idx + new_kidx + new_ridx + fft_idx;
+  const uint32_t tidb = new_cidx    + new_kidx + new_ridx + fft_idx;
 
   if (params->forward) {
     W32 = W32_ct;
@@ -837,51 +1236,56 @@ __device__ void fft3Dyx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
   }
 
   // FFT rows (Every Ny points)
-  fftN_dif(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
-           &x[(new_ridx + new_cidx + new_kidx)*U256K_OFFSET], W32, Nyx,midx);
+  fftN_dif(&z[tida*U256K_OFFSET],
+           &x[tidb*U256K_OFFSET], W32, Nyx,midx);
 
-  mulmontu256(&z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
-           &z[(reverse_idx + new_kidx + new_ridx)*U256K_OFFSET],
-           //&roots[((new_ridx * (reverse_idx >> (Ny - Nyx))) << Nx)*U256K_OFFSET] ,midx);
+  mulmontu256(&z[tida*U256K_OFFSET],
+           &z[tida*U256K_OFFSET],
            &roots[root_idx * NWORDS_256BIT],midx);
 }
 
-__device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x,uint32_t *roots, kernel_params_t *params)
+__device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, uint32_t *w2, uint32_t *scaler, kernel_params_t *params)
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
-  uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
-  uint32_t Nyy = params->fft_Ny;
+  const uint32_t Nx = params->N_fftx;  // N FFTx of size Nx
+  const uint32_t Ny = params->N_ffty;  // N FFTy of size Ny
+  const uint32_t Nyy = params->fft_Ny;
 
-  mod_t    midx = params->midx;
+  const mod_t    midx = params->midx;
   const uint32_t offset = ZPOLY_BASE_OFFSET(Nyy);
   const uint32_t mask = ZPOLY_BASE_MASK(Nyy);
-  const int Nyyn = (1 << Nyy) - 1;
-  const int Nyyyn = (1 << (Ny-Nyy)) - 1;
+  const uint32_t Nyyn = (1 << Nyy) - 1;
+  const uint32_t Nyyyn = (1 << (Ny-Nyy)) - 1;
 
-  int new_cidx = tid & Nyyn;  
-  int new_ridx = ((tid >> Nyy ) & Nyyyn ) << Nx;
-  int new_kidx = tid >> Ny;
+  const uint32_t new_cidx = tid & Nyyn;  
+  const uint32_t new_ridx = ((tid >> Nyy ) & Nyyyn ) << Nx;
+  const uint32_t new_kidx = (tid >> Ny) & ((1 << Nx) - 1);
+  const uint32_t fft_idx = (tid >> (Nx + Ny) ) << (Nx + Ny);
 
-  logInfoTid("Nx : %d\n",Nx);
-  logInfoTid("Ny : %d\n",Ny);
-  logInfoTid("Nyyn : %d\n",Nyyn);
-  logInfoTid("Nyyyn : %d\n",Nyyyn);
-
-  uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyyn, offset, mask) << (Ny + Nx - Nyy);
-  uint32_t const *inv_scaler = &x[((1<<(Nx+Ny+1))+params->as_mont) * U256K_OFFSET];
+  const uint32_t reverse_idx = ZPOLY_REVERSE_IDX(tid, Nyyn, offset, mask) << (Ny + Nx - Nyy);
+  uint32_t const *inv_scaler = &scaler[params->as_mont * U256K_OFFSET];
   uint32_t const *W32;
+
+  const uint32_t tida = reverse_idx + new_ridx + new_kidx + fft_idx;
 
   if (params->forward) {
     W32 = W32_ct;
   } else {
     W32 = IW32_ct;
   }
-  fftN_dif(&z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET], &x[(tid)*U256K_OFFSET],W32,Nyy,midx);
 
-  
-  if (!params->forward){
-    mulmontu256( &z[(reverse_idx + new_ridx + new_kidx)*U256K_OFFSET],&z[(reverse_idx + new_ridx+new_kidx)*U256K_OFFSET],inv_scaler ,midx);
+  fftN_dif(&z[tida*U256K_OFFSET], &x[tid*U256K_OFFSET],W32,Nyy,midx);
+
+  if ( params->premul){
+   
+    mulmontu256( &z[tida * U256K_OFFSET],
+                 &z[tida * U256K_OFFSET],
+                 &w2[tida * U256K_OFFSET], midx);
+   
+  }
+  else if (!params->forward){
+    mulmontu256( &z[tida*U256K_OFFSET],
+                 &z[tida*U256K_OFFSET],inv_scaler ,midx);
   }
  
 }

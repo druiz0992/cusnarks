@@ -71,11 +71,6 @@ IF CUDA_DEF:
           cdef ct.vector_t out_v
           cdef ct.vector_t in_v
          
-          print("in_Vec len :",in_vec.shape[0], in_vec.shape[1])
-          print("gpu_idx :",gpu_id);
-          print("stream_id : ",stream_id);
-          print("n_kernels : ",n_kernels);
-
           out_v.length = params['out_length']
           in_v.length  = in_vec.shape[0]
   
@@ -90,11 +85,15 @@ IF CUDA_DEF:
           for i in range(n_kernels):
              kconfig[i].blockD = config['blockD'][i]
              kconfig[i].kernel_idx = config['kernel_idx'][i]
-             # gridD and smemS and return_val do not need to exist
+             # gridD and smemS and return_val and return offset do not need to exist
              if 'return_val' in config:
                  kconfig[i].return_val  = config['return_val'][i]
              else :
                  kconfig[i].return_val  = 1
+             if 'return_offset' in config:
+                 kconfig[i].return_offset  = config['return_offset'][i]
+             else :
+                 kconfig[i].return_offset  = 0
              if 'gridD' in config:
                  kconfig[i].gridD  = config['gridD'][i]
              else :
@@ -108,7 +107,7 @@ IF CUDA_DEF:
              else:
                  kconfig[i].in_offset = 0
   
-          #Template case
+          #Template case. Not working, but leave for now
           """
           print("allocating async buffer in_vec\n");
           cdef C_AsyncBuf [ct.uint32_t] *in_vec_flat = new C_AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
@@ -172,10 +171,8 @@ IF CUDA_DEF:
               kparams[i].as_mont = params['as_mont'][i]
             else:
               kparams[i].as_mont = 1
-  
 
           cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
-         
           cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
 
           free(kconfig)
@@ -183,9 +180,21 @@ IF CUDA_DEF:
           return np.asarray(kdata).reshape(-1,in_vec.shape[1]), exec_time
 
       def streamSync(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
-          cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
 
-          return t
+          cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
+          cdef ct.uint32_t vlen = self._cusnarks_ptr.streamGetOutputDataLen(gpu_id, stream_id)
+          cdef ct.uint32_t *data = self._cusnarks_ptr.streamGetOutputData(gpu_id, stream_id)
+          #cdef ct.uint32_t nwords_256bit = <int>(self.out_size/(self.out_dim*32))
+
+          #cdef ct.uint32_t [:] kdata = <ct.uint32_t [:vlen * nwords_256bit * NWORDS_256BIT]>data
+          cdef ct.uint32_t [:] kdata = <ct.uint32_t [:vlen * NWORDS_256BIT]>data
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(vlen * NWORDS_256BIT, dtype=np.uint32)
+
+          # copy  C data to python data and delete C pointer
+          out_v = np.copy(np.asarray(kdata))
+          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+
+          return np.asarray(out_v).reshape(-1, NWORDS_256BIT), t 
    
       def rand(self, ct.uint32_t n_samples):
           cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
@@ -322,10 +331,10 @@ def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1
 
         for i in xrange(n):
            uh.cmontmult_h(&out_vec[offset], &in_veca[offset], &in_vecb[offset], pidx)
-           offset = <int> (offset + NWORDS_256BIT)
+           offset += NWORDS_256BIT
   
   
-        return out_vec
+        return np.reshape(out_vec, (-1, NWORDS_256BIT))
 
 def montmult_neg_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
@@ -427,24 +436,19 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
 
 def ntt_build_h(ct.uint32_t nsamples):
      cdef ct.fft_params_t *fft_params = <ct.fft_params_t *> malloc(sizeof(ct.fft_params_t))
-   
+     cdef ct.uint32_t i
+
      uh.cntt_build_h(fft_params, nsamples)
 
      py_fft_params={}
      py_fft_params['fft_type'] = fft_params.fft_type
      py_fft_params['padding'] = fft_params.padding
      py_fft_params['levels'] = fft_params.levels
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] fft_sizes = np.zeros(1<<(ct.FFT_T_N-1), dtype=np.uint32)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] fft_sizes = np.zeros(1<<fft_params.fft_type, dtype=np.uint32)
      py_fft_params['fft_N'] = fft_sizes
 
-     py_fft_params['fft_N'][0] = fft_params.fft_N[0]
-     py_fft_params['fft_N'][1] = fft_params.fft_N[1]
-     py_fft_params['fft_N'][2] = fft_params.fft_N[2]
-     py_fft_params['fft_N'][3] = fft_params.fft_N[3]
-     py_fft_params['fft_N'][4] = fft_params.fft_N[4]
-     py_fft_params['fft_N'][5] = fft_params.fft_N[5]
-     py_fft_params['fft_N'][6] = fft_params.fft_N[6]
-     py_fft_params['fft_N'][7] = fft_params.fft_N[7]
+     for i in xrange(1<<fft_params.fft_type):
+        py_fft_params['fft_N'][i] = fft_params.fft_N[i]
 
      free(fft_params)
 
@@ -496,8 +500,12 @@ def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
     return idx
 
 def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
+    if len(vin)==0:
+      return np.asarray([],dtype=np.uint32)
+
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vin_flat = np.zeros(vin.shape[0] * vin.shape[1],dtype=np.uint32)
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] idx_flat = np.zeros(vin.shape[0],dtype=np.uint32)
+
 
     vin_flat = np.reshape(vin,-1)
 
@@ -509,10 +517,21 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 def writeU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     uh.cwriteU256DataFile_h(&vin[0], <char *>fname, vin.shape[0])
 
+def writeWitnessFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
+    cdef unsigned long long vlen = vin.shape[0]/NWORDS_256BIT
+    uh.cwriteWitnessFile_h(&vin[0], <char *>fname, vlen)
+
 def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(outsize * NWORDS_256BIT,dtype=np.uint32)
 
     uh.creadU256DataFile_h(&vout[0], <char *>fname, insize, outsize)
+
+    return vout.reshape((-1,NWORDS_256BIT))
+
+def readWitnessFile_h(bytes fname, unsigned long long insize):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(insize * NWORDS_256BIT,dtype=np.uint32)
+
+    uh.creadWitnessFile_h(&vout[0], <char *>fname, insize)
 
     return vout.reshape((-1,NWORDS_256BIT))
 
@@ -722,6 +741,76 @@ def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, 
        uh.cec2_jac2aff_h(&out_vec[0],&in_v[0],lenv, pidx, strip_last)
 
      return out_vec.reshape((-1,NWORDS_256BIT))
+
+def ec_jacdouble_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_eca, ct.uint32_t pidx):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(in_eca.shape[0], dtype=np.uint32)
+
+     uh.cec_jacdouble_h(&out_ecz[0], &in_eca[0], pidx)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacadd_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_eca, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_ecb,  ct.uint32_t pidx):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(in_eca.shape[0], dtype=np.uint32)
+
+     uh.cec_jacadd_h(&out_ecz[0], &in_eca[0], &in_ecb[0], pidx)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     if add_last:
+        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_INDIMS) )
+     else:
+        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_OUTDIMS) )
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec_jacscmul_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_affine, ct.uint32_t ec2, ct.uint32_t pidx):
+     if ec2:
+       return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
+     else:
+       return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
+
+def ec_global_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv_x1,
+                             np.ndarray[ndim=1, dtype = np.uint32_t] inv_x2,
+                             np.ndarray[ndim=1, dtype = np.uint32_t] inv_x3,
+                             np.ndarray[ndim=1, dtype = np.uint32_t] inv_x4,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last, ct.uint32_t ec2_idx):
+
+   cdef ct.uint32_t outdims1 = ECP_JAC_OUTDIMS
+   cdef ct.uint32_t outdims2 = ECP2_JAC_OUTDIMS
+
+   if strip_last:
+      outdims1 = ECP_JAC_INDIMS
+      outdims2 = ECP2_JAC_INDIMS
+
+   cdef np.ndarray[ndim=1, dtype=np.uint32_t] v_outdims = np.ones(GROTH_PROOF_N_ECPOINTS, dtype=np.uint32) * outdims1
+   v_outdims[ec2_idx] = outdims2
+  
+   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z1 = np.ones(v_outdims[0]*NWORDS_256BIT, dtype=np.uint32)
+   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z2 = np.ones(v_outdims[1]*NWORDS_256BIT, dtype=np.uint32)
+   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z3 = np.ones(v_outdims[2]*NWORDS_256BIT, dtype=np.uint32)
+   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z4 = np.ones(v_outdims[3]*NWORDS_256BIT, dtype=np.uint32)
+
+   cdef ct.uint32_t n1 = <int> (inv_x1.shape[0] / NWORDS_256BIT) 
+   cdef ct.uint32_t n2 = <int> (inv_x2.shape[0] / NWORDS_256BIT) 
+   cdef ct.uint32_t n = n1
+
+   if n2 < n1:
+       n = n2
+
+   uh.cec_global_jacaddreduce_h(&outv_z1[0], &outv_z2[0], &outv_z3[0], &outv_z4[0],
+                                &inv_x1[0], &inv_x2[0], &inv_x3[0], &inv_x4[0],
+                                n, pidx, to_aff, add_in, strip_last, ec2_idx)
+
+   return (np.reshape(outv_z1,(-1, NWORDS_256BIT)), np.reshape(outv_z2,(-1, NWORDS_256BIT)),\
+          np.reshape(outv_z3,(-1, NWORDS_256BIT)), np.reshape(outv_z4,(-1, NWORDS_256BIT)))
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]

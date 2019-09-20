@@ -39,14 +39,24 @@
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE           (30)
 #define NBITS_WORD           (32)
-#if 1
+#define NBITS_WORD_LOG2      (5)
+#define NBITS_WORD_MOD       (0x1F)
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
-#else
-#define MAX_R1CSPOLY_NWORDS  (100000)
-#define MAX_R1CSPOLYTMP_NWORDS  (10000)
-#endif
 
+#define WITNESS_HEADER_N_OFFSET_NWORDS (0)
+#define WITNESS_HEADER_SIZE_OFFSET_NWORDS (2)
+#define WITNESS_HEADER_OTHER_OFFSET_NWORDS (3)
+#define WITNESS_HEADER_W_OFFSET_NWORDS (4)
+
+#define WITNESS_HEADER_N_LEN_NWORDS (2)
+#define WITNESS_HEADER_SIZE_LEN_NWORDS (1)
+#define WITNESS_HEADER_OTHER_LEN_NWORDS (1)
+
+#define WITNESS_HEADER_LEN_NWORDS (WITNESS_HEADER_W_OFFSET_NWORDS)
+
+
+#define GROTH_PROOF_N_ECPOINTS (4)
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
 #define U256_NDIMS              (1)
@@ -54,20 +64,7 @@
 
 #define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
 #define ECK_INDIMS               (3)
-// Montgomery ladder
-#if 0
-#define ECP_LDR_INDIMS                (2)
-#define ECP_LDR_OUTDIMS               (2)
-#define ECP_LDR_INXOFFSET             (1 * NWORDS_256BIT)
-#define ECP_LDR_INZOFFSET             (2 * NWORDS_256BIT)
-#define ECP_LDR_OUTXOFFSET            (0 * NWORDS_256BIT)
-#define ECP_LDR_OUTZOFFSET             (1 * NWORDS_256BIT)
 
-#define ECK_LDR_INDIMS               (ECP_LDR_INDIMS  + U256_NDIMS)
-#define ECK_LDR_OUTDIMS              (ECP_LDR_OUTDIMS)
-#define ECK_LDR_INOFFSET             (ECK_LDR_INDIMS * NWORDS_256BIT)
-#define ECK_LDR_OUTOFFSET            (ECK_LDR_OUTDIMS * NWORDS_256BIT)
-#endif
 // Jacobian
 #define ECP_JAC_N256W                 (1)
 #define ECP_JAC_INDIMS                (2) // X, Y
@@ -102,7 +99,8 @@
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
 
-#define N_STREAMS_PER_GPU (4+1)
+#define N_STREAMS_PER_GPU (1+4)
+#define MAX_NCORES_OMP        (32)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
@@ -129,12 +127,25 @@ typedef struct {
 // gy = 2
 typedef struct {
   uint32_t b[NWORDS_256BIT];
+  uint32_t b2[2*NWORDS_256BIT];
   uint32_t g1x[NWORDS_256BIT];
   uint32_t g1y[NWORDS_256BIT];
   uint32_t g2x[2*NWORDS_256BIT];
   uint32_t g2y[2*NWORDS_256BIT];
 
 }ecbn128_t;
+
+typedef enum{
+  ECBN128_PARAM_B = 0,
+  ECBN128_PARAM_B2X = 8,
+  ECBN128_PARAM_B2Y = 16,
+  ECBN128_PARAM_G1X = 24,
+  ECBN128_PARAM_G1Y = 32,
+  ECBN128_PARAM_G2X = 40,
+  ECBN128_PARAM_G2Y = 56,
+
+  ECBN128_PARAM_N = 72,
+}ecbn128_params_t;
 
 // additional constants required
 typedef struct {
@@ -161,6 +172,7 @@ typedef struct {
         int kernel_idx;
         int return_val;
         int in_offset;
+        int return_offset;
 } kernel_config_t;
 
 
@@ -309,10 +321,24 @@ typedef enum{
    CB_ZPOLY_FFT2DX,
    CB_ZPOLY_FFT2DY,
    CB_ZPOLY_FFT3DXX,
-   CB_ZPOLY_FFT3DXX_PREV,
+   CB_ZPOLY_FFT3DXXPREV,
    CB_ZPOLY_FFT3DXY,
    CB_ZPOLY_FFT3DYX,
    CB_ZPOLY_FFT3DYY,
+   CB_ZPOLY_INTERP3DXX,
+   CB_ZPOLY_INTERP3DXY,
+   CB_ZPOLY_INTERP3DYX,
+   CB_ZPOLY_INTERP3DYY,
+   CB_ZPOLY_INTERP3DFINISH,
+   CB_ZPOLY_FFT4DXX,
+   CB_ZPOLY_FFT4DXY,
+   CB_ZPOLY_FFT4DYX,
+   CB_ZPOLY_FFT4DYY,
+   CB_ZPOLY_INTERP4DXX,
+   CB_ZPOLY_INTERP4DXY,
+   CB_ZPOLY_INTERP4DYX,
+   CB_ZPOLY_INTERP4DYY,
+   CB_ZPOLY_INTERP4DFINISH,
    CB_ZPOLY_ADD,
    CB_ZPOLY_SUB,
    CB_ZPOLY_SUBPREV,
