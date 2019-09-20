@@ -47,6 +47,7 @@
 #define MAX_ITER_65K 10
 #define MAX_ITER 10
 #define NROOTS_1M 20
+#define NROOTS_16M 24
 #define NCOLS_1M 10
 #define NROWS_1M 10
 #define FFT_SIZEXX_1M 5
@@ -56,6 +57,37 @@
 #define NROWS_65K 9
 #define FFT_SIZEXX_65K 4
 #define FFT_SIZEYX_65K 5
+
+
+#if 1
+#define NCOLS_131K 8
+#define NROWS_131K 9
+#define FFT_SIZEXX_131K 4
+#define FFT_SIZEYX_131K 5
+
+
+#define NCOLS_131K_3D 5
+#define NROWS_131K_3D 4
+#define FFT_SIZEXX_131K_3D 3
+#define FFT_SIZEYX_131K_3D 2
+#define NFFT_X_131K_3D 9
+#define NFFT_Y_131K_3D 8
+
+#else
+#define NCOLS_131K 9
+#define NROWS_131K 9
+#define FFT_SIZEXX_131K 5
+#define FFT_SIZEYX_131K 5
+
+
+#define NCOLS_131K_3D 5
+#define NROWS_131K_3D 5
+#define FFT_SIZEXX_131K_3D 3
+#define FFT_SIZEYX_131K_3D 3
+#define NFFT_X_131K_3D 9
+#define NFFT_Y_131K_3D 9
+
+#endif
 
 static uint32_t p_root128[] = {
   3202964282, 1415263009, 1631761676, 2375868442,  876590776, 1603946946, 2412717293,  401158326  // 128
@@ -261,6 +293,7 @@ static uint32_t AA_test[] = {
 };
 
 static char roots_1M_filename[]="../../data/zpoly_roots_1M.bin";
+static char roots_16M_filename[]="../../data/zpoly_roots_16M.bin";
 
 static char input_1M_filename[]= "../../test/c/aux_data/zpoly_input_data_1M.bin";
 static char output_1M_filename[]="../../test/c/aux_data/zpoly_output_data_1M.bin";
@@ -8413,6 +8446,62 @@ void test_ntt_parallel2D_file_65K(uint32_t mode)
 }
 
 
+void test_ntt_parallel3D_131K(uint32_t forward)
+{
+   int i,j,k;
+   int pidx=1;
+   int n_errors=0;
+   int Nrows = NROWS_131K, Ncols = NCOLS_131K;
+   int nroots = 1 << (Nrows + Ncols);
+   int levels=Nrows + Ncols;
+   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   int tmp = nroots;
+   uint32_t *samples = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
+   uint32_t *samples2 = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
+   uint32_t *roots = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
+
+
+   for (k=0; k < MAX_ITER_65K; k++){
+     setRandom256(samples,nroots, N);
+     //readU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp3.bin",nroots, nroots);
+     memcpy(samples2, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
+     //writeU256DataFile_h(samples, "./aux_data/zpoly_samples_fft4d.bin",nroots * NWORDS_256BIT * sizeof(uint32_t));
+ 
+     if (forward){ 
+       readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
+       ntt_h(samples2, roots, levels, pidx);
+       ntt_parallel3D_h(samples, roots, NFFT_X_131K_3D, NFFT_Y_131K_3D, NROWS_131K_3D, FFT_SIZEYX_131K_3D, NCOLS_131K_3D, FFT_SIZEXX_131K_3D, pidx);
+     } else {
+       readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
+       computeIRoots_h(roots, roots, nroots);
+       intt_parallel3D_h(samples, roots, 1, NFFT_X_131K_3D, NFFT_Y_131K_3D, NROWS_131K_3D, FFT_SIZEYX_131K_3D, NCOLS_131K_3D, FFT_SIZEXX_131K_3D, pidx);
+       readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
+       ntt_h(samples, roots, levels, pidx);
+     }
+     n_errors = 0;
+     for (j=0;j<nroots; j++){
+         if (compu256_h(&samples[j*NWORDS_256BIT],&samples2[j*NWORDS_256BIT])){
+             //printf("Error in poly coeff %d\n",j);
+             //printf("Expected\n");
+             //printU256Number(&samples2[j*NWORDS_256BIT]);
+             //printf("Obtained\n");
+             //printU256Number(&samples[j*NWORDS_256BIT]);
+             n_errors++;
+          }
+      }
+      if (forward){
+        printf("N errors(FFT 65K) : NTT parallel 3D %d/%d\n",n_errors, j);
+      } else {
+        printf("N errors(IFFT 65K) : INTT parallel 3D %d/%d\n",n_errors, j);
+      }
+    }
+  
+    free(samples);
+    free(samples2);
+    free(roots);
+}
+
+
 void test_ntt_file_1M(void)
 {
    int i,j;
@@ -8794,6 +8883,7 @@ void test_nttmul_randomsize(void)
     }
 
 }
+
 void test_sort(void)
 {
   int n_errors=0;
@@ -9035,7 +9125,10 @@ int main()
   test_ntt_parallel2D_file_65K(3);
   test_ntt_parallel2D_65K(1); // Forward FFT
   test_ntt_parallel2D_65K(0); // IFFT
-  
+
+  test_ntt_parallel3D_131K(1); // Forward FFT
+  test_ntt_parallel3D_131K(0); // IFFT
+
   test_nttmul_parallel2D_65K();
 
   test_nttmul_randomsize();

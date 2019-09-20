@@ -64,6 +64,9 @@ cdef extern from "../cuda/cusnarks_kernel.h":
                           #ct.kernel_config_t *config, ct.kernel_params_t *params, ct.uint32_t did, ct.uint32_t stream_id,
                           #ct.uint32_t n_kernel)
         double streamSync(ct.uint32_t gpu_id, ct.uint32_t stream_id)
+        ct.uint32_t * streamGetOutputData(ct.uint32_t gpu_id, ct.uint32_t stream_id)
+        ct.uint32_t  streamGetOutputDataLen(ct.uint32_t gpu_id, ct.uint32_t stream_id)
+        void streamDel(ct.uint32_t gpu_id, ct.uint32_t stream_id)
         void getDeviceInfo()
 
 cdef extern from "../cuda/u256.h":

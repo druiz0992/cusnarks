@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 /*
     Copyright 2018 0kims association.
@@ -40,6 +41,8 @@
 
 import argparse
 import os
+import sys
+import time
 from subprocess import call
 
 from groth_prover import *
@@ -55,7 +58,7 @@ sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
 import cusnarks_config as cfg
 
-def run():
+def init():
     opt = {}
     opt['data_f'] = cfg.get_circuits_folder()
     opt['input_circuit_f'] = 'circuit.bin'
@@ -83,6 +86,7 @@ def run():
     opt['out_proving_key_format'] = FMT_MONT
     opt['out_proving_key_f'] = None
     opt['verify'] = 0
+    opt['batch_size'] = 20
 
 
     parser = argparse.ArgumentParser(
@@ -184,8 +188,16 @@ def run():
     parser.add_argument(
        '-df', '--data_folder', type=str, help=help_str, required=False)  
 
+    help_str = 'Default batch size (1 << batch_size). Default ' + str(opt['batch_size'])
+    parser.add_argument(
+       '-bs', '--batch_size', type=int, help=help_str, required=False)  
+
+
+    return opt, parser
+
+def run(opt, parser):
     args = parser.parse_args()
- 
+
     if args.min_levels is not None:
        opt['minL'] = args.min_levels
  
@@ -197,6 +209,10 @@ def run():
 
     if args.benchmark is not None:
         opt['benchmark_f'] = args.benchmark
+
+    if args.batch_size is not None:
+       opt['batch_size'] = args.batch_size
+    
 
     if args.data_folder is not None:
         opt['data_f'] = args.data_f
@@ -210,7 +226,7 @@ def run():
         args.mode != 'p' and args.mode != 'proof' and \
         args.mode != 'sp' and args.mode != 'setup_proof' :
       parser.print_help()
-      return
+      return None
     
     if args.proving_key is not None:
         if '/' in args.proving_key :
@@ -273,9 +289,10 @@ def run():
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
-                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
+                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'])
       
       GS.setup()
+      return None
 
 
     if args.mode == 'p' or args.mode == 'proof' or  \
@@ -321,16 +338,39 @@ def run():
       if args.verify is not None:
          opt['verify'] = args.verify
     
+      start = time.time()
       GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'],
                       out_proof_f=opt['proof_f'], out_public_f=opt['public_data_f'],
                       out_proof_format=opt['proof_format'], out_public_format=opt['public_data_format'], test_f=opt['debug_f'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], verify_en=opt['verify'], keep_f=opt['keep_f'] )
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], verify_en=opt['verify'], keep_f=opt['keep_f'],
+                      batch_size = opt['batch_size'] )
       
+      end = time.time() - start
+
+      print("GP init : "+str(end))
       GP.proof(opt['witness_f'])
+      return GP
 
 
   
 if __name__ == '__main__':
 
-   run() 
+   start = time.time()
+   opt, parser = init()
+   end = time.time() - start
+
+   print("Parser Init : "+str(end))
+
+   GP = run(opt, parser)
+   """
+   while True:
+      GP = run(opt, parser)
+      if GP is None:
+          break
+      print("Enter new witness file: ")
+      input_witness = input()
+      opt['witness_f'] = opt['data_f'] + input_witness
+      GP.proof(opt['witness_f'])
+   """
+

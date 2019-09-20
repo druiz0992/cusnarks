@@ -450,11 +450,8 @@ __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 
     Z1_t xr(&out_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
     //Z1_t xr(&out_vector[idx * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  // 
+    //Z1_t xr(&out_vector[0]);
   
-    //if (gridDim.x == 1){
-      //xr.assign(out_vector);
-    //} 
-
     //logInfoBigNumberTid(2,"X in \n",&xo);
     //logInfoBigNumberTid(32*3,"In \n",in_vector);
     madecjac_shfl<Z1_t, uint256_t>(&xr, &xo, scl, &zsmem, params);
@@ -733,14 +730,29 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
         scmulecjac<T1, T2>(&sumX,0, &sumX, 0, scl,  params->midx);
           
         logInfoBigNumberTid(3*T1::getN(),"Xout[x,y,z]:\n",&sumX);
-        //xr->setu256(0,&sumX,0);
-        //return;
+
     } else {
         sumX.setu256(0,xo,0);
         logInfoBigNumberTid(3*T1::getN(),"Xout[x,y,z]:\n",&sumX);
     }
    
     __syncthreads();
+ 
+    /* 
+    /// DELETE -> multiexp in single thread
+    xr->setu256(0,&sumX,0);
+    __syncthreads();
+    if ( idx > 0) { return;}
+    for (i=1; i< params->in_length/params->stride ; i++){
+       sumY.setu256(0,xr,3*i);
+       logInfoBigNumberTid(3*T1::getN(),"Y[x,y,z]:\n",&sumY);
+       addecjac<T1,T2>(&sumX,0,&sumX,0,&sumY ,0, params->midx);
+    }
+    xr->setu256(0,&sumX,0);
+    return;
+    // DELETE
+    */
+    
 
     // block wide warp reduce
     #pragma unroll
@@ -749,10 +761,10 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
       logInfoTid("idx:%d\n",i);
       logInfoBigNumberTid(3*T1::getN(),"sumX1\n",&sumX);
       logInfoBigNumberTid(3*T1::getN(),"sumY1\n",&sumY);
-
+     
       addecjac<T1,T2>(&sumX,0, &sumX,0, &sumY,0, params->midx);
-
       logInfoBigNumberTid(3*T1::getN(),"sumX1+\n",&sumX);
+
     }
 
     __syncthreads();
@@ -781,23 +793,21 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
       logInfoBigNumberTid(3*T1::getN(),"Second\n",&sumX);
   
       #pragma unroll
-      // last warp reduce
       for (i=size2; i > 0; i >>=1){
         shflxoruecc<T1,T2>(&sumY, &sumX, i);
         logInfoTid("idx:%d\n",i);
         logInfoBigNumberTid(3*T1::getN(),"sumY\n",&sumY);
         logInfoBigNumberTid(3*T1::getN(),"sumX\n",&sumX);
+
         addecjac<T1,T2>(&sumX,0, &sumX,0, &sumY,0, params->midx);
         logInfoBigNumberTid(3*T1::getN(),"sumX+\n",&sumX);
       }
     }
 
-    __syncthreads();
     if (tid==0) {
-     //TODO change be movu256
      xr->setu256(0,&sumX,0);
      logInfoBigNumberTid(3*T1::getN(),"Z-sumX : \n",&sumX);
-    }
+    } 
 
   return;
 }
@@ -886,13 +896,19 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
           logInfoTid("R2=inf %d\n",midx);
 	  return;  
       }
-      doublecjac<T1, T2>(zxr,zxr, midx);
+      doublecjac<T1, T2>(zxr,zx1, midx);
       return;
   }
 
   subz(&tmp2, &tmp_z, &tmp1, midx);     // H = tmp2 = u2 - u1
   mulz(&tmp_z, &z1, &z2, midx);      // tmp_z = z1 * z2
   mulz(&zr, &tmp_z, &tmp2, midx);       // zr = z1 * z2  * h
+
+  // TODO TEST => subtitute three lines above by three below and change tmp2 by tmp_z in 
+  // remaining code to remove tmp2
+  //subz(&tmp_z &tmp_z, &tmp1, midx);     // H = tmp2 = u2 - u1
+  //mulz(&zr, &z1, &z2, midx);      // tmp_z = z1 * z2
+  //mulz(&zr, &zr, &tmp_z, midx);       // zr = z1 * z2  * h
 
   /*
   logInfoBigNumberTid(T1::getN(),"H\n",&tmp2);
@@ -924,6 +940,8 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
 
   // TODO muluk256
   mul2z(&tmp4, &tmp1, midx);     // tmp4 = u1*hsq *_2
+  // TEST DAVID -> remove tmp4 => subtitute by xr
+  //mul2z(&xr, &tmp1, midx);     // tmp4 = u1*hsq *_2
 
   /*
   logInfoBigNumberTid(T1::getN(),"Rsq - H3\n",&tmp_x);
@@ -931,6 +949,8 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
   */
 
   subz(&xr, &tmp_x, &tmp4, midx);               // x3 = xr
+  // TEST DAVID -> remove tmp4 => subtitute by xr
+  //subz(&xr, &tmp_x, &xr, midx);               // x3 = xr
   subz(&tmp1, &tmp1, &xr, midx);       // tmp1 = u1*hs1 - x3
   mulz(&tmp1, &tmp1, &tmp3, midx);  // tmp1 = r * (u1 * hsq - x3)
   subz(&yr, &tmp1, &tmp_y, midx);
@@ -1064,7 +1084,7 @@ __forceinline__ __device__ void addecjacaff(T1  *zxr, T1 *zx1, T1 *zx2, mod_t mi
           zxr->setu256(0,&_inf,0);
 	  return;  //  if U1 == U2 and S1 == S2 => P1 == P2 (call double)
      }
-     doublecjac<T1, T2>(zxr,zxr, midx);
+     doublecjacaff<T1, T2>(zxr,zx1, midx);
      return;
   }
 

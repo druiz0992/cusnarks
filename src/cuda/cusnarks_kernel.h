@@ -90,6 +90,9 @@ class CUSnarks {
                 //uint32_t n_kernel);
         double streamSync(uint32_t gpu_id, uint32_t stream_id);
         void getDeviceInfo();
+        uint32_t * streamGetOutputData(uint32_t gpu_id, uint32_t stream_id);
+        uint32_t  streamGetOutputDataLen(uint32_t gpu_id, uint32_t stream_id);
+        void streamDel(uint32_t gpu_id, uint32_t stream_id);
 };
 
 #endif
