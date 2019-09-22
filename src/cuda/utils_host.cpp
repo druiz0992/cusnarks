@@ -2239,14 +2239,14 @@ void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
 
   if (!memcmp( x,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
-                sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT) ) {
+                sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT) ) {
 
           memmove( z, y, sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS);
           return;
 
   } else if (!memcmp( y,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
-                sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT) ) {
+                sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT) ) {
 
           memmove( z, x, sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS);
           return;
@@ -2323,14 +2323,14 @@ void ec2_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
 
   if (!memcmp( x,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
-                sizeof(uint32_t) * ECP2_JAC_OUTDIMS * NWORDS_256BIT) ) {
+                sizeof(uint32_t) * ECP2_JAC_INDIMS * NWORDS_256BIT) ) {
 
           memmove( z, y, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
           return;
 
   } else if (!memcmp( y,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
-                sizeof(uint32_t) * ECP2_JAC_OUTDIMS * NWORDS_256BIT) ) {
+                sizeof(uint32_t) * ECP2_JAC_INDIMS * NWORDS_256BIT) ) {
 
           memmove( z, x, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
           return;
@@ -2827,8 +2827,6 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
   
   One = CusnarksOneMontGet((mod_t)pidx);
 
-  printf("reduce ec1 in \n");
-
   if (strip_last){
     outdims = ECP_JAC_INDIMS;
   }
@@ -2862,7 +2860,6 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
    } else {
      memcpy(z,zout,outdims*NWORDS_256BIT*sizeof(uint32_t));
    }
-  printf("reduce ec1 out \n");
 
 }
 
@@ -2881,7 +2878,6 @@ void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uin
     outdims = ECP2_JAC_INDIMS;
   }
   
-  printf("reduce ec2 in \n");
   if (add_in){
     memcpy(x1,x,NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
     memcpy(&x1[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
@@ -2915,37 +2911,7 @@ void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uin
      memcpy(z,zout,outdims*NWORDS_256BIT*sizeof(uint32_t));
    }
 
-  printf("reduce ec2 out \n");
 }
-
-
-void ec_global_jacaddreduce_h(uint32_t *z1, uint32_t *z2, uint32_t *z3, uint32_t *z4,
-                              uint32_t *x1, uint32_t *x2, uint32_t *x3, uint32_t *x4,
-                              uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, 
-                              uint32_t strip_last, uint32_t ec2_idx)
-{
-  uint32_t i;
-  uint32_t *in_data[GROTH_PROOF_N_ECPOINTS];
-  uint32_t *out_data[GROTH_PROOF_N_ECPOINTS];
-
-  in_data[0] = x1; in_data[1] = x2; in_data[2] = x3; in_data[3] = x4;
-  out_data[0] = z1; out_data[1] = z2; out_data[3] = z3; out_data[4] = z4;
-
-  //#pragma omp parallel for if(parallelism_enabled)
-  printf("Global reduce : N : %d, pidx : %d, to_aff: %d, add_in :%d, strip_last: %d, ec2_idx : %d\n",
-      n,pidx, to_aff, add_in, strip_last, ec2_idx);
-              
-  for(i = 0; i< GROTH_PROOF_N_ECPOINTS; i++){
-     printf("Enter reduce : %d\n",i);
-     if (i== ec2_idx){
-       ec2_jacaddreduce_h(out_data[i],in_data[i],n , pidx, to_aff, add_in, strip_last);
-     } else {
-        ec_jacaddreduce_h(out_data[i],in_data[i],n , pidx, to_aff, add_in, strip_last);
-     }
-     printf("Exit reduce : %d\n",i);
-  }
-}
-
 
 void field_roots_compute_h(uint32_t *roots, uint32_t nbits)
 {

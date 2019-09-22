@@ -339,7 +339,7 @@ void CUSnarks::releaseCudaStreamResources(void)
   /*
     logInfo("Release common resources\n");
   */ 
-  for (i==0; i < deviceCount; i++){
+  for (i=0; i < deviceCount; i++){
       CCHECK(cudaSetDevice(i));
     
       for (j=0; j < N_STREAMS_PER_GPU; j++){

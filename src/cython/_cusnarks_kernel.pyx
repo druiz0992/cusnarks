@@ -129,18 +129,38 @@ IF CUDA_DEF:
           cdef C_AsyncBuf [ct.kernel_params_t] *kparams_buffer = new C_AsyncBuf[ct.kernel_params_t](n_kernels)
           cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
           """
-
-
-          cdef C_AsyncBuf *in_vec_flat = new C_AsyncBuf(in_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
-          in_vec_flat.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
-          in_v.data  = <ct.uint32_t *>in_vec_flat.getBuf()
-  
-          cdef C_AsyncBuf *out_vec_flat = new C_AsyncBuf(out_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
-          out_v.data = <ct.uint32_t *>out_vec_flat.getBuf()
-  
           # create kernel params data
-          cdef C_AsyncBuf *kparams_buffer = new C_AsyncBuf(n_kernels, sizeof(ct.kernel_params_t))
-          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
+          cdef ct.kernel_params_t *kparams
+
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat_sync
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat_sync
+
+          cdef C_AsyncBuf *in_vec_flat_async 
+          cdef C_AsyncBuf *out_vec_flat_async 
+          cdef C_AsyncBuf *kparams_buffer_async
+
+          if stream_id == -1:
+
+             in_vec_flat_sync = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+             in_vec_flat_sync = np.concatenate(in_vec)
+             in_v.data  = <ct.uint32_t *>&in_vec_flat_sync[0]
+  
+             out_vec_flat_sync = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+             out_v.data = <ct.uint32_t *>&out_vec_flat_sync[0]
+  
+             kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+
+          else :
+             in_vec_flat_async = new C_AsyncBuf(in_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+             in_vec_flat_async.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+             in_v.data  = <ct.uint32_t *>in_vec_flat_async.getBuf()
+  
+             out_vec_flat_async = new C_AsyncBuf(out_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+             out_v.data = <ct.uint32_t *>out_vec_flat_async.getBuf()
+  
+             # create kernel params data
+             kparams_buffer_async = new C_AsyncBuf(n_kernels, sizeof(ct.kernel_params_t))
+             kparams = <ct.kernel_params_t *>kparams_buffer_async.getBuf()
 
           for i in range(n_kernels):
             kparams[i].midx = params['midx'][i]
@@ -174,6 +194,9 @@ IF CUDA_DEF:
 
           cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
           cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
+
+          if stream_id == -1:  
+            free(kparams)
 
           free(kconfig)
   
@@ -776,41 +799,50 @@ def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_
      else:
        return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
 
-def ec_global_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv_x1,
-                             np.ndarray[ndim=1, dtype = np.uint32_t] inv_x2,
-                             np.ndarray[ndim=1, dtype = np.uint32_t] inv_x3,
-                             np.ndarray[ndim=1, dtype = np.uint32_t] inv_x4,
+
+def ec_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                             ct.uint32_t strip_last, ct.uint32_t ec2_idx):
+                             ct.uint32_t strip_last):
 
-   cdef ct.uint32_t outdims1 = ECP_JAC_OUTDIMS
-   cdef ct.uint32_t outdims2 = ECP2_JAC_OUTDIMS
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+  cdef ct.uint32_t indims = ECP_JAC_OUTDIMS
 
-   if strip_last:
-      outdims1 = ECP_JAC_INDIMS
-      outdims2 = ECP2_JAC_INDIMS
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
 
-   cdef np.ndarray[ndim=1, dtype=np.uint32_t] v_outdims = np.ones(GROTH_PROOF_N_ECPOINTS, dtype=np.uint32) * outdims1
-   v_outdims[ec2_idx] = outdims2
-  
-   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z1 = np.ones(v_outdims[0]*NWORDS_256BIT, dtype=np.uint32)
-   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z2 = np.ones(v_outdims[1]*NWORDS_256BIT, dtype=np.uint32)
-   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z3 = np.ones(v_outdims[2]*NWORDS_256BIT, dtype=np.uint32)
-   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv_z4 = np.ones(v_outdims[3]*NWORDS_256BIT, dtype=np.uint32)
+  if add_in:
+      indims = ECP_JAC_INDIMS
 
-   cdef ct.uint32_t n1 = <int> (inv_x1.shape[0] / NWORDS_256BIT) 
-   cdef ct.uint32_t n2 = <int> (inv_x2.shape[0] / NWORDS_256BIT) 
-   cdef ct.uint32_t n = n1
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
 
-   if n2 < n1:
-       n = n2
+  cdef ct.uint32_t n = <int> (inv.shape[0] / (indims*NWORDS_256BIT)  )
 
-   uh.cec_global_jacaddreduce_h(&outv_z1[0], &outv_z2[0], &outv_z3[0], &outv_z4[0],
-                                &inv_x1[0], &inv_x2[0], &inv_x3[0], &inv_x4[0],
-                                n, pidx, to_aff, add_in, strip_last, ec2_idx)
+  uh.cec_jacaddreduce_h(&outv[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
 
-   return (np.reshape(outv_z1,(-1, NWORDS_256BIT)), np.reshape(outv_z2,(-1, NWORDS_256BIT)),\
-          np.reshape(outv_z3,(-1, NWORDS_256BIT)), np.reshape(outv_z4,(-1, NWORDS_256BIT)))
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
+  cdef ct.uint32_t indims = ECP2_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP2_JAC_INDIMS
+
+  if add_in:
+      indims = ECP2_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+
+  cdef ct.uint32_t n = <int> (inv.shape[0] / (indims*NWORDS_256BIT) )
+
+  uh.cec2_jacaddreduce_h(&outv[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]

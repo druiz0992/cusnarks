@@ -56,7 +56,6 @@
 #define WITNESS_HEADER_LEN_NWORDS (WITNESS_HEADER_W_OFFSET_NWORDS)
 
 
-#define GROTH_PROOF_N_ECPOINTS (4)
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)
 #define U256_NDIMS              (1)

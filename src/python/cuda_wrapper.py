@@ -119,7 +119,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = 0):
 
      return result_snarks_complete, t
  
-def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, gpu_id=0, stream_id=0 ):
+def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0, gpu_id=0, stream_id=0 ):
     kernel_params={}
     kernel_config={}
    
@@ -136,7 +136,6 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, gpu_id=0, str
       factor = 1
       kernel = CB_EC_JAC_MUL1
 
-    nsamples = len(vector)
 
     kernel_params['stride'] = [1]
     kernel_config['smemS'] =  [0]
@@ -147,16 +146,44 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, gpu_id=0, str
 
     kernel_params['premod'] = [0]
     kernel_params['midx'] = [fidx]
-    kernel_config['kernel_idx'] = [kernel]
-    kernel_params['in_length'] = [nsamples]
-    kernel_params['out_length'] = (nsamples-indims)*outdims
     kernel_params['padding_idx'] = [0]
-    kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-indims-1) /
-                                kernel_config['blockD'][0])]
+    kernel_config['kernel_idx'] = [kernel]
     kernel_config['return_val']=[1]
 
-    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
+    nsamples = len(vector)
+    if batch_size == 0:
 
+       kernel_params['in_length'] = [nsamples]
+       kernel_params['out_length'] = (nsamples-indims)*outdims
+       kernel_config['gridD'] =\
+            [int((kernel_config['blockD'][0] +
+                   kernel_params['in_length'][0]-indims-1) /
+                                         kernel_config['blockD'][0])]
+
+       result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,
+                                       gpu_id, stream_id, n_kernels=1 )
+   
+    else:
+      new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
+      result = np.zeros(((nsamples-indims) * outdims ,NWORDS_256BIT), dtype=np.uint32)
+      t=0.0
+
+      for start_idx in xrange(0,nsamples-indims, batch_size-indims):
+          new_vector[:min(batch_size-indims, nsamples-indims-start_idx)] =\
+                    vector[start_idx:min(start_idx+batch_size-indims,nsamples-indims)]
+          new_vector[min(batch_size-indims, nsamples-indims-start_idx):
+                     min(batch_size-indims, nsamples-indims-start_idx) + indims] = vector[-indims:]
+
+          kernel_params['in_length'] = [min(batch_size, nsamples-start_idx)]
+          kernel_params['out_length'] = min(batch_size-indims, nsamples-indims-start_idx)*outdims
+          kernel_config['gridD'] =\
+            [int((kernel_config['blockD'][0] +
+                   min(batch_size-indims, nsamples-start_idx-indims)-1) /
+                                         kernel_config['blockD'][0])]
+          result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
+                 pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
+          t+=t1
+            
     return result,t
 
 def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = 0):
@@ -919,8 +946,8 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=4)
 
         if stream_id == 0:
-          pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-          vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
+          pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
+          vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
           vector[voffset2:voffset2+nsamples] = np.copy(result[2*nsamples:])
         else :
            pending_dispatch_table.append(de)
@@ -940,7 +967,7 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         voffset1+=nsamples
         voffset2+=nsamples
 
-
+     """
      if len(pending_dispatch_table):
         result = getFFTResults(pysnark, pending_dispatch_table, 0)
         nsamples_ext = int(result.shape[0]/3)
@@ -948,6 +975,7 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         vector[voffset1_ext:voffset1_ext+nsamples_ext] = np.copy(result[nsamples_ext:2*nsamples_ext])
         vector[voffset2_ext:voffset2_ext+nsamples_ext] = np.copy(result[2*nsamples_ext:])
         pending_dispatch_table = []
+     """
 
      #Transpose and Take IFFT (second pass)
      voffset1 = 0
