@@ -143,6 +143,7 @@ class GrothSetup(object):
            self.test_f= self.keep_f + '/' + test_f
 
         self.alfabeta_f = self.keep_f + '/' + 'alfabeta.json'
+        self.batch_size = 1<<batch_size
 
         copy_input_files([in_circuit_f], self.keep_f)
 
@@ -161,6 +162,7 @@ class GrothSetup(object):
         logging.info(' - seed : %s', seed)
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
+        logging.info(' - bs : %s', batch_size)
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
@@ -499,8 +501,10 @@ class GrothSetup(object):
       self.pk['delta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['delta_2']).reshape(-1),ZField.get_field(),1)
       self.pk['gamma_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['gamma_2']).reshape(-1),ZField.get_field(),1)
 
-      self.ecbn128    =  ECBN128(self.pk['domainSize']+3,seed=self.seed)
-      self.ec2bn128    = EC2BN128(self.pk['nVars']+1,seed=self.seed)
+      #self.ecbn128    =  ECBN128(self.pk['domainSize']+3,seed=self.seed)
+      #self.ec2bn128    = EC2BN128(self.pk['nVars']+1,seed=self.seed)
+      self.ecbn128    =  ECBN128(self.batch_size,seed=self.seed)
+      self.ec2bn128    = EC2BN128(self.batch_size,seed=self.seed)
 
       end = time.time()
       self.t_S['init k'] = end - start
@@ -510,7 +514,7 @@ class GrothSetup(object):
       sorted_idx = sortu256_idx_h(a_t_u256)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       #ecbn128_samples = np.concatenate((a_t_u256,G1.as_uint256(G1)[:2]))
-      self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('A')
 
@@ -528,7 +532,7 @@ class GrothSetup(object):
     
       sorted_idx = sortu256_idx_h(b_t_u256)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
-      self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('B1')
 
@@ -544,7 +548,7 @@ class GrothSetup(object):
       start= time.time()
       ec2bn128_samples = np.concatenate((b_t_u256[sorted_idx],G2.as_uint256(G2)[:4]))
       #ec2bn128_samples = np.concatenate((b_t_u256,G2.as_uint256(G2)[:4]))
-      self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True)
+      self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True, batch_size=self.batch_size)
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('B2')
       unsorted_idx = np.argsort(sorted_idx)
@@ -568,7 +572,7 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('C')
       unsorted_idx = np.argsort(sorted_idx)
@@ -588,13 +592,13 @@ class GrothSetup(object):
 
       ZField.set_field(MOD_FIELD)
       pidx = ZField.get_field()
-      zod_u256 = montmult_h(toxic_invDelta.reduce().as_uint256(), z_t_u256, pidx)
-      eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), zod_u256, maxH, pidx)
+      zod_u256 = montmultN_h(toxic_invDelta.reduce().as_uint256(), z_t_u256, pidx)
+      eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), np.reshape(zod_u256,-1), maxH, pidx)
 
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(eT_u256)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('hExps')
       unsorted_idx = np.argsort(sorted_idx)
@@ -616,8 +620,9 @@ class GrothSetup(object):
       ZField.set_field(MOD_GROUP)
       sorted_idx = sortu256_idx_h(ps_u256)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
-      self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field())
+      self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
+      self.assert_isoncurve('IC')
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))

@@ -146,17 +146,7 @@ class GrothProver(object):
 
         ZField.set_field(MOD_FIELD)
         self.t_GP = {}
-        self.t_EC = {}
-        self.t_P = {}
 
-        self.t_EC['pi_a']  = 0.0
-        self.t_EC['pi_b']  = 0.0
-        self.t_EC['pib1']  = 0.0
-        self.t_EC['pi_c']  = 0.0
-        self.t_EC['total'] = 0.0
-
-        self.t_GP['Mexp'] = 0.0
-        self.t_GP['sort'] = 0.0
         init_h()
         
         #scalar array : extended witness / polH
@@ -232,32 +222,26 @@ class GrothProver(object):
     def init_ec_val(self):
         self.pi_a_eccf1 = np.reshape(
                                 np.concatenate((
-                                          ECC.zero[1].as_uint256(),
-                                          ECC.one[1].as_uint256())), 
+                                          ECC.zero[ZUtils.FRDC].as_uint256(),
+                                          ECC.one[ZUtils.FRDC].as_uint256())), 
                                 (-1,NWORDS_256BIT))
         self.pi_b_eccf2 = np.reshape(
                                 np.concatenate((
-                                          ECC.zero[1].as_uint256(),
-                                          ECC.zero[1].as_uint256(),
-                                          ECC.one[1].as_uint256(),
-                                          ECC.zero[1].as_uint256())),
+                                          ECC.zero[ZUtils.FRDC].as_uint256(),
+                                          ECC.zero[ZUtils.FRDC].as_uint256(),
+                                          ECC.one[ZUtils.FRDC].as_uint256(),
+                                          ECC.zero[ZUtils.FRDC].as_uint256())),
                                 (-1,NWORDS_256BIT))
-        self.pi_c2_eccf1 = np.reshape(
-                                np.concatenate((
-                                          ECC.zero[1].as_uint256(),
-                                          ECC.one[1].as_uint256())), 
-                                (-1,NWORDS_256BIT))
-                    
         self.pi_c_eccf1 = np.reshape(
                                 np.concatenate((
-                                          ECC.zero[1].as_uint256(),
-                                          ECC.one[1].as_uint256())),
+                                          ECC.zero[ZUtils.FRDC].as_uint256(),
+                                          ECC.one[ZUtils.FRDC].as_uint256())),
                                 (-1,NWORDS_256BIT))
 
         self.pib1_eccf1 = np.reshape(
                                 np.concatenate((
-                                          ECC.zero[1].as_uint256(),
-                                          ECC.one[1].as_uint256())), 
+                                          ECC.zero[ZUtils.FRDC].as_uint256(),
+                                          ECC.one[ZUtils.FRDC].as_uint256())), 
                                 (-1,NWORDS_256BIT))
 
         self.init_ec_val = np.tile(
@@ -267,12 +251,12 @@ class GrothProver(object):
            (self.n_gpu, self.n_streams, 1))
 
         self.ec_lable = np.asarray(['A', 'B2', 'B1', 'C','hExps'])
-                             # Point Name, cuda pointer, step, idx, ec2
-        self.ec_type_dict = {'A'     : [self.ecbn128,  2, 0, 0],
-                             'B2'    : [self.ec2bn128, 4, 1, 1],
-                             'B1'    : [self.ecbn128,  2, 2, 0],
-                             'C'     : [self.ecbn128,  2, 3, 0],
-                             'hExps' : [self.ecbn128,  2, 3, 0] }
+                             # Point Name, cuda pointer, step, idx, ec2, pi
+        self.ec_type_dict = {'A'     : [self.ecbn128,  2, 0, 0, 0],
+                             'B2'    : [self.ec2bn128, 4, 1, 1, 1],
+                             'B1'    : [self.ecbn128,  2, 2, 0, 2 ],
+                             'C'     : [self.ecbn128,  2, 3, 0, 3 ],
+                             'hExps' : [self.ecbn128,  2, 4, 0, 3 ] }
 
     def __del__(self):
        release_h()
@@ -338,7 +322,8 @@ class GrothProver(object):
            writeWitnessFile_h(np.reshape(self.scl_array,-1),self.w_file.encode("UTF-8"))
            """
 
-           self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize)
+           # Size is domainSize To store polH + three additional coeffs
+           self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
            self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
           
            self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
@@ -399,32 +384,17 @@ class GrothProver(object):
        logging.info('')
        logging.info('')
 
-    def timeStats(self, t):
-      for s in t:
-        for k, v in s.items():
-           if k is not 'total':
-             s[k] = str(round(v,2)) + '(' + str(round(100*v/s['total'],2)) + '%)'
-   
     def logTimeResults(self):
      
-      self.t_EC['total'] = round(self.t_EC['total'] + self.t_EC['Mexp'],2)
-      self.timeStats([self.t_EC, self.t_GP, self.t_P])
-      self.t_P['total'] = round(self.t_P['total'],2)
-      self.t_GP['total'] = round(self.t_GP['total'],2)
-
       logging.info('')
       logging.info('')
       logging.info('#################################### ')
-      logging.info('Total Time to generate proof : %s seconds', self.t_GP['total'])
+      logging.info('Total Time to generate proof : %s seconds', self.t_GP['Proof'])
       logging.info('')
-      logging.info('------ Time EC [sec] : %s ', str(round(self.t_EC['total'],2)) + '(' + str(round(100*self.t_EC['total']/self.t_GP['total'],2)) + '%)')
-      logging.info('%s', self.t_EC)
-      logging.info('')
-      logging.info('----- Time Poly [sec] : %s ', str(round(self.t_P['total'],2)) + '(' + str(round(100*self.t_P['total']/self.t_GP['total'],2)) + '%)')
-      logging.info('%s', self.t_P)
-      logging.info('')
-      logging.info('----- Time GP [sec] : %s ', self.t_GP['total'])
-      logging.info('%s', self.t_GP)
+      logging.info('------ Time Read Witness       : %s ', str(round(self.t_GP['Read_W'],2)) + ' sec. (' + str(round(100*self.t_GP['Read_W']/self.t_GP['Proof'],2)) + '%)')
+      logging.info('------ Time Multi-exp.         : %s ', str(round(self.t_GP['Mexp'],2)) + ' sec.(' + str(round(100*self.t_GP['Mexp']/self.t_GP['Proof'],2)) + '%)')
+      logging.info('------ Time Lagrange Poly Eval : %s ', str(round(self.t_GP['Eval'],2)) + ' sec. (' + str(round(100*self.t_GP['Eval']/self.t_GP['Proof'],2)) + '%)')
+      logging.info('------ Time Compute Poly H     : %s ', str(round(self.t_GP['H'],2)) + 'sec. (' + str(round(100*self.t_GP['H']/self.t_GP['Proof'],2)) + '%)')
       logging.info('#################################### ')
       logging.info('')
       logging.info('')
@@ -609,18 +579,26 @@ class GrothProver(object):
         self.read_witness_data()
 
         end = time.time()
-        self.t_GP['read w'] = end - start
-        print ("Read W : "+str(self.t_GP['read w']))
+        self.t_GP['Read_W'] = end - start
+        print ("Read W : "+str(self.t_GP['Read_W']))
 
         
         ######################
         # Beginning of P2 
         #   - Get witness batch, sort and EC Multiexp
         ######################
+        start = time.time()
+
         ZField.set_field(MOD_FIELD)
         # Init r and s scalars
         self.r_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
         self.s_scl = BigInt(random.randint(1,ZField.get_extended_p().as_long()-1)).as_uint256()
+
+        r_mont = to_montgomeryN_h(np.reshape(self.r_scl, -1), MOD_FIELD)
+        self.neg_rs_scl = montmult_neg_h(
+                                np.reshape(r_mont, -1),
+                                np.reshape(self.s_scl, -1), MOD_FIELD
+                          )
 
         logging.info('#################################### ')
         logging.info(' Random numbers :')
@@ -628,16 +606,18 @@ class GrothProver(object):
         logging.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
         logging.info('#################################### ')
 
-        pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize', 'polsA'])
+        pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize', 'delta_1', 'polsA'])
 
         #large input : hExps. I can overwrite it provided that i don't require comparing to snarkjs
         nVars = pk_bin[0][0]
         nPublic = pk_bin[1][0]
         domainSize = pk_bin[2][0]
-        polH = np.reshape(pk_bin[3][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
+        delta_1 = pk_bin[3]
+        polH = np.reshape(pk_bin[4][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
+
+        self.public_signals = np.copy(self.scl_array[1:nPublic+1])
 
 
-        start = time.time()
 
         nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
 
@@ -646,6 +626,7 @@ class GrothProver(object):
         first_stream_idx = min(self.n_streams-1,1)
 
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps'])
+        pk_bin[4][2*(domainSize+1)*NWORDS_256BIT:2*(domainSize+2)*NWORDS_256BIT] = delta_1
 
         # EC reduce A, B2, B1 and C from nPublic+1 to end	
         dispatch_table = buildDispatchTable( nbatches-1,
@@ -683,11 +664,14 @@ class GrothProver(object):
                              pk_bin = pk_bin[:self.ec_type_dict['B1'][2]+1])
 
         # Assign collected values to pi's
-        self.assignECPvalues()
+        
+        start1 = time.time()
+        self.assignECPvalues(compute_ECP=False)
 
         end = time.time()
-        self.t_GP['Mexp'] += (end - start)
-        print("Mexp : "+str(self.t_GP['Mexp']))
+        self.t_GP['Mexp'] = (end - start)
+        print("Reduce 1 : "+str(end - start1))
+        print("Mexp 1 : "+str(self.t_GP['Mexp']))
 
         ######################
         # Beginning of P3 and P4
@@ -699,7 +683,8 @@ class GrothProver(object):
         self.calculateH()
 
         end = time.time()
-        self.t_GP['pH'] = end - start
+        self.t_GP['H'] = end - start
+
 
         ######################
         # Beginning of P5
@@ -707,10 +692,11 @@ class GrothProver(object):
         ######################
         start = time.time()
 
-        nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1)) + 1
+        nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1))
+        self.scl_array = polH
 
-        # EC reduce A, B2, B1 and C from nPublic+1 to end	
-        dispatch_table = buildDispatchTable( nbatches-1, 1,
+        # EC reduce hExps
+        dispatch_table = buildDispatchTable( nbatches, 1,
                                          self.n_gpu, self.n_streams, self.batch_size-1,
                                          0, domainSize-1,
                                          start_pidx=self.ec_type_dict['hExps'][2],
@@ -719,103 +705,62 @@ class GrothProver(object):
         self.findECPointsDispatch(
                                   dispatch_table,
                                   self.batch_size,
-                                  dispatch_table.shape[0]-(self.ec_type_dict['C'][2]+1),
-                                  change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
-                                  change_r_scl_idx = [self.ec_type_dict['A'][2]],
-                                  pk_bin = pk_bin[:self.ec_type_dict['C'][2]+1])
+                                  dispatch_table.shape[0]-1,
+                                  sort_idx = self.ec_type_dict['hExps'][2],
+                                  change_rs_scl_idx = [self.ec_type_dict['hExps'][2]],
+                                  pk_bin = pk_bin[:self.ec_type_dict['hExps'][2]+1])
 
-
-        # EC reduce A, B2 and B1 from 0 to nPublic+1
-        dispatch_table = buildDispatchTable(1, 
-                                self.ec_type_dict['B1'][2]+1,
-                                self.n_gpu, self.n_streams, nPublic+1,
-                                0, nPublic+1,
-                                start_pidx=self.ec_type_dict['A'][2],
-                                start_gpu_idx=next_gpu_idx,
-                                start_stream_idx=first_stream_idx,
-                                ec_lable = self.ec_lable)
-
-        self.findECPointsDispatch(
-                             dispatch_table,
-                             nPublic+2,
-                             dispatch_table.shape[0]+1,
-                             pk_bin = pk_bin[:self.ec_type_dict['B1'][2]+1])
-
-
-        for i in xrange(nbatches):
-          if i == 0:
-            niter = 3
-            start_idx = 0
-            end_idx = min(self.batch_size-1, domainSize-1)
-
-          elif i < nbatches-1:
-            start_idx = end_idx
-            end_idx += (self.batch_size-1)
-            end_idx = min(end_idx, domainSize-1)
-            niter=4
-        
-          else:
-            start_idx = domainSize-1
-            end_idx = domainSize-1
-            niter=5
-
-          start_sort = time.time()
-
-          self.sorted_scl_array_idx[start_idx:end_idx] =\
-                sortu256_idx_h(polH[start_idx:end_idx])
-
-          self.sorted_scl_array[start_idx:end_idx] = \
-               polH[start_idx:end_idx][self.sorted_scl_array_idx[start_idx:end_idx]]
-
-          end_sort = time.time()
-          self.t_GP['sort'] += (end_sort - start_sort)
-
-          self.findECPoints(niter, start_idx=start_idx, end_idx=end_idx, stream_id=[1,2,3,4])
+        start1 = time.time()
+        self.assignECPvalues(compute_ECP=True)
 
         end = time.time()
-        self.t_GP['Mexp'] += (end - start - self.t_GP['sort'])
-        self.t_EC['Mexp'] = self.t_GP['Mexp']
+        self.t_GP['Mexp'] += (end - start)
+     
+        print("Reduce 2 : "+str(end - start1))
+        print("Mexp Total : "+str(self.t_GP['Mexp']))
 
-        self.public_signals = np.copy(self.scl_array[1:nPublic+1])
+        self.t_GP['Proof'] = end - start_p
 
-        self.t_GP['total'] = end - start_p
+        print("Total Proof: "+str(self.t_GP['Proof']))
 
         return 
  
 
-    def assignECPvalues(self):
+    def assignECPvalues(self, compute_ECP=False):
 
-        first_stream_idx = min(self.n_streams-1,1)
+        EC_A_idx = self.ec_type_dict['A'][4]
+        EC_B2_idx = self.ec_type_dict['B2'][4]
+        EC_B1_idx = self.ec_type_dict['B1'][4]
+        EC_C_idx = self.ec_type_dict['C'][4]
 
-        EC_A_idx = self.ec_type_dict['A'][2]
-        EC_B2_idx = self.ec_type_dict['B2'][2]
-        EC_B1_idx = self.ec_type_dict['B1'][2]
-        EC_C_idx = self.ec_type_dict['C'][2]
-
-        if self.n_gpu == 1:
-            # Single GPU -> only one of the bins in init_ec_val includes initialized value, so no need to reduce
-            self.pi_a_eccf1 = self.init_ec_val[0][(EC_A_idx  % self.n_streams) + first_stream_idx][EC_A_idx]
-            self.pi_b_eccf2 = self.init_ec_val[0][(EC_B2_idx % self.n_streams) + first_stream_idx][EC_B2_idx]
-            self.pib1_eccf1 = self.init_ec_val[0][(EC_B1_idx % self.n_streams) + first_stream_idx][EC_B1_idx]
-            self.pi_c_eccf1 = self.init_ec_val[0][(EC_C_idx  % self.n_streams) + first_stream_idx][EC_C_idx]
-
-        else:
-            #If more than 1 GPU, several bins in init_ec_val include initialized values, so reduce
-            result = ec_global_jacaddreduce_h(
+        if compute_ECP is False:
+            self.pi_a_eccf1 = ec_jacaddreduce_h(
                                  np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_A_idx],-1)),-1),
+                                 MOD_GROUP,
+                                 1,   # to affine
+                                 1,   # Add z coordinate to inout
+                                 0)   # strip z coordinate from affine result
+
+            self.pi_b_eccf2 = ec2_jacaddreduce_h(
                                  np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_B2_idx],-1)),-1),
+                                 MOD_GROUP,
+                                 1,   # to affine
+                                 1,   # Add z coordinate to inout
+                                 0)   # strip z coordinate from affine result
+
+            self.pib1_eccf1 = ec_jacaddreduce_h(
                                  np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_B1_idx],-1)),-1),
+                                 MOD_GROUP,
+                                 1,   # to affine
+                                 1,   # Add z coordinate to inout
+                                 0)   # strip z coordinate from affine result
+        else:
+            self.pi_c_eccf1 = ec_jacaddreduce_h(
                                  np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
                                  MOD_GROUP,
                                  1,   # to affine
-                                 1,   # Add z coordinate
-                                 1,   # strip z coordinate from affine result
-                                 EC_B2_idx)   # index of B2
-
-            self.pi_a_eccf1 = result[EC_A_idx]
-            self.pi_b_eccf2 = result[EC_B2_idx]
-            self.pib1_eccf1 = result[EC_B1_idx]
-            self.pi_c_eccf1 = result[EC_C_idx]
+                                 1,   # Add z coordinate to inout
+                                 0)   # strip z coordinate from affine result
 
 
     def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, gpu_id=0, stream_id=0):
@@ -872,7 +817,7 @@ class GrothProver(object):
           P = p[0]
           cuda_ec128 = self.ec_type_dict[P][0]
           step = self.ec_type_dict[P][1]
-          pidx = self.ec_type_dict[P][2]
+          pidx = self.ec_type_dict[P][4]
           gpu_id = p[3]
           stream_id = p[4]
           result, t = cuda_ec128.streamSync(gpu_id,stream_id)
@@ -916,7 +861,7 @@ class GrothProver(object):
        return nsamples, EC_P, scl_start_idx, ec_start_idx
 
     def findECPointsDispatch(self, dispatch_table, batch_size, last_batch_idx, sort_idx=0,
-                             change_s_scl_idx=[-1], change_r_scl_idx=[-1], pk_bin=[]):
+                             change_s_scl_idx=[-1], change_r_scl_idx=[-1], change_rs_scl_idx=[-1], pk_bin=[]):
 
        ZField.set_field(MOD_GROUP)
        nsamples, EC_P, scl_start_idx, ec_start_idx = self.init_EC_P(batch_size)
@@ -933,7 +878,9 @@ class GrothProver(object):
           cuda_ec128 = self.ec_type_dict[P][0]
           step = self.ec_type_dict[P][1]
           # Retrieve point idx : A->0, B2->1, B1->2, C->3
-          pidx = self.ec_type_dict[P][2]
+          EPidx = self.ec_type_dict[P][2]
+          # Retrieve pis 
+          pidx = self.ec_type_dict[P][4]
           # Retrieve EC type : EC -> 0, EC2 -> 1
           ecidx = self.ec_type_dict[P][3]
           start_idx = p[1]
@@ -946,6 +893,8 @@ class GrothProver(object):
             if bidx == last_batch_idx:
               # End point is end point + 2 additional scalars + previous point
               extra_samples = 2
+              if EPidx in change_rs_scl_idx:
+                  extra_samples +=1
               batch_size = end_idx+extra_samples+1-start_idx
               nsamples, EC_P, scl_start_idx, ec_start_idx = self.init_EC_P(batch_size)
               # 1 * EC_P
@@ -954,18 +903,31 @@ class GrothProver(object):
               self.sorted_scl_array_idx[end_idx+1] = end_idx+1 - start_idx
 
             # r/s * EC_P
-            if pidx in change_r_scl_idx :
+            if EPidx in change_r_scl_idx :
                 self.sorted_scl_array[end_idx+1:end_idx+2] = self.r_scl
-            elif pidx in change_s_scl_idx:
+            elif EPidx in change_s_scl_idx:
                 self.sorted_scl_array[end_idx+1:end_idx+2] = self.s_scl
+            elif EPidx in change_rs_scl_idx:
+                self.sorted_scl_array[end_idx:end_idx+1] = self.s_scl
+                self.sorted_scl_array[end_idx+1:end_idx+2] = self.r_scl
+                self.sorted_scl_array[end_idx+2:end_idx+3] = self.neg_rs_scl
+
+                self.sorted_scl_array_idx[end_idx+2] = end_idx+2 - start_idx
+
+                pk_bin[EPidx][step*end_idx*NWORDS_256BIT:step*(end_idx+1)*NWORDS_256BIT] =\
+                        np.reshape(self.pi_a_eccf1,-1)[:step*NWORDS_256BIT]
+                pk_bin[EPidx][step*(end_idx+1)*NWORDS_256BIT:step*(end_idx+2)*NWORDS_256BIT] =\
+                       np.reshape(self.pib1_eccf1,-1)[:step*NWORDS_256BIT]
+
             else:
                 self.sorted_scl_array[end_idx:end_idx+1]  = np.asarray([0,0,0,0,0,0,0,0], dtype=np.uint32)
                 self.sorted_scl_array[end_idx:end_idx+2]  = np.asarray([0,0,0,0,0,0,0,0], dtype=np.uint32)
                 self.sorted_scl_array_idx[end_idx] = 0
                 self.sorted_scl_array_idx[end_idx+1] = 0
+
             EC_P[ecidx][nsamples-1-extra_samples:nsamples-1] = self.sorted_scl_array[end_idx:end_idx+extra_samples]
 
-          if pidx==sort_idx:
+          if EPidx==sort_idx:
               # Sort scl batch
               self.sorted_scl_array_idx[start_idx:end_idx] = \
                    sortu256_idx_h(self.scl_array[start_idx:end_idx])
@@ -975,12 +937,11 @@ class GrothProver(object):
               EC_P[0][scl_start_idx:nsamples-1] = self.sorted_scl_array[start_idx:end_idx+extra_samples]
               EC_P[1][scl_start_idx:nsamples-1] = self.sorted_scl_array[start_idx:end_idx+extra_samples]
 
-
           # Copy sorted EC points batch
           EC_P[ecidx][ec_start_idx[ecidx]:-step] = \
                      np.reshape(
                         np.reshape(
-                           pk_bin[pidx][step*start_idx*NWORDS_256BIT:step*(end_idx+extra_samples)*NWORDS_256BIT],
+                           pk_bin[EPidx][step*start_idx*NWORDS_256BIT:step*(end_idx+extra_samples)*NWORDS_256BIT],
                            (-1,step,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx+extra_samples]],
                         (-1, NWORDS_256BIT)
                     )
@@ -999,226 +960,15 @@ class GrothProver(object):
              n_dispatch +=1
 
 
-          # Collect results. Leave last batch uncollected to maximize parallelization
-          if n_dispatch == n_par_batches:
-              n_dispatch=0
+             # Collect results. Leave last batch uncollected to maximize parallelization
+             if n_dispatch == n_par_batches:
+                 n_dispatch=0
 
-              self.getECResults(pending_dispatch_table)
-              pending_dispatch_table = []
+                 self.getECResults(pending_dispatch_table)
+                 pending_dispatch_table = []
 
        # Collect final results
        self.getECResults(pending_dispatch_table)
-
-
-    def findECPoints(self, phase, start_idx=0, end_idx=0, stream_id=[0,0,0,0]):
-    
-        start_ec = time.time()
-
-        ZField.set_field(MOD_GROUP)
-
-  
-        # A, B1, B2 
-        if phase == 0:
-          start_idx2 = start_idx
-
-          pk_bin = pkbin_get(self.pk,['nPublic', 'A', 'B1', 'B2', 'C'])
-          nPublic = pk_bin[0][0]
-          A = pk_bin[1]
-          B1 = pk_bin[2]
-          B2 = pk_bin[3]
-          C = pk_bin[4]
-
-          C[2*(nPublic)*NWORDS_256BIT:2*(nPublic+1)*NWORDS_256BIT] =\
-              np.reshape(self.pi_c2_eccf1[:2],-1)
-
-        # A, B1, B2, C
-        elif phase == 1:
-          start_idx2 = start_idx - 1
-          end_idx2 = end_idx
-          self.sorted_scl_array[start_idx-1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-
-          pk_bin = pkbin_get(self.pk,['A', 'B1', 'B2', 'C'])
-          A = pk_bin[0]
-          B1 = pk_bin[1]
-          B2 = pk_bin[2]
-          C = pk_bin[3]
-
-        # A, B1, B2, C => Last computation
-        elif phase == 2:
-          start_idx2 = start_idx - 1
-          self.sorted_scl_array[start_idx-1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-          self.sorted_scl_array[end_idx:end_idx+1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-          self.sorted_scl_array[end_idx+1:end_idx+2] = self.r_scl
-          self.sorted_scl_array_idx[end_idx] = end_idx - start_idx
-          self.sorted_scl_array_idx[end_idx+1] = end_idx+1 - start_idx
-          end_idx2 = end_idx
-          end_idx += 2
-
-          pk_bin = pkbin_get(self.pk,['A', 'B1', 'B2','C'])
-          A = pk_bin[0]
-          B1 = pk_bin[1]
-          B2 = pk_bin[2]
-          C = pk_bin[3]
-
-        # hExps => First round
-        elif phase == 3:
-         start_idx2 = start_idx
-         end_idx2 = end_idx
-
-         pk_bin = pkbin_get(self.pk,['domainSize','hExps' ])
-         domainSize = pk_bin[0][0]
-         hExps = pk_bin[1]
-
-
-        # hExps => Second to previous to last
-        elif phase == 4:
-          start_idx2 = start_idx - 1
-          end_idx2 = end_idx
-          self.sorted_scl_array[start_idx-1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-
-          pk_bin = pkbin_get(self.pk,['domainSize', 'hExps' ])
-          domainSize = pk_bin[0][0]
-          hExps = pk_bin[1]
-
-        # hExps last Round
-        elif phase == 5:
-          start_idx2 = start_idx - 1
-
-          pk_bin = pkbin_get(self.pk,['domainSize','delta_1', 'hExps' ])
-          domainSize = pk_bin[0][0]
-          delta_1 = pk_bin[1]
-          hExps = pk_bin[2]
-
-          ZField.set_field(MOD_FIELD)
-          r_mont = to_montgomeryN_h(np.reshape(self.r_scl, -1), MOD_FIELD)
-          self.sorted_scl_array[start_idx + 3:start_idx + 4] = montmult_neg_h(
-                np.reshape(r_mont, -1),
-                np.reshape(self.s_scl, -1), MOD_FIELD
-          )
-
-          ZField.set_field(MOD_GROUP)
-
-          self.sorted_scl_array[start_idx-1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-          self.sorted_scl_array[start_idx]   = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32).reshape((-1,NWORDS_256BIT))
-          self.sorted_scl_array[start_idx + 1:start_idx + 2] = self.s_scl
-          self.sorted_scl_array[start_idx + 2:start_idx + 3] = self.r_scl
-
-          hExps[2*start_idx    *NWORDS_256BIT:2*(start_idx+1)*NWORDS_256BIT] = np.reshape(self.pi_c2_eccf1[:2],-1)
-          hExps[2*(start_idx+1)*NWORDS_256BIT:2*(start_idx+2)*NWORDS_256BIT] = np.reshape(self.pi_a_eccf1[:2],-1)
-          hExps[2*(start_idx+2)*NWORDS_256BIT:2*(start_idx+3)*NWORDS_256BIT] = np.reshape(self.pib1_eccf1[:2],-1)
-          hExps[2*(start_idx+3)*NWORDS_256BIT:2*(start_idx+4)*NWORDS_256BIT] = np.reshape(delta_1,-1)
-
-          end_idx2 = end_idx
-          end_idx += 4
-       
-
-        if phase <= 2:
-          #pi_a -> add 1 and r_u256 to scl, and alpha1 and delta1 to P
-          A[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-              np.reshape(
-                   np.reshape(A[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
-                             (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
-  
-          self.pi_a_eccf1,t1 = self.compute_proof_ecp(
-                                          self.ecbn128,
-                                          self.sorted_scl_array[start_idx2:end_idx],
-                                          A[2*start_idx2*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
-                                          False, gpu_id=0, stream_id=stream_id[0])
-
-          if phase == 2:
-            self.sorted_scl_array[end_idx-1] = self.s_scl
-  
-          B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT] =\
-              np.reshape(
-                    np.reshape(B2[4*start_idx*NWORDS_256BIT:4*end_idx*NWORDS_256BIT], 
-                                 (-1,4,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
-  
-          self.pi_b_eccf2,t2 = self.compute_proof_ecp(
-                                           self.ec2bn128, 
-                                           self.sorted_scl_array[start_idx2:end_idx],
-                                           B2[4*start_idx2*NWORDS_256BIT:4*end_idx*NWORDS_256BIT],
-                                           True, gpu_id=0, stream_id=stream_id[1])
-
-          B1[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-               np.reshape(
-                    np.reshape(B1[2*start_idx*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
-                                            (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx]],-1)
-  
-          self.pib1_eccf1,t3 = self.compute_proof_ecp(
-                                            self.ecbn128,
-                                            self.sorted_scl_array[start_idx2:end_idx], 
-                                            B1[2*start_idx2*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
-                                            False, gpu_id=0, stream_id=stream_id[2])
-
-        if phase ==1 or phase == 2:
-           C[2*start_idx*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT] =\
-               np.reshape(
-                  np.reshape(C[2*start_idx*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
-                                           (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx2]],-1)
-
-           self.pi_c2_eccf1,t4 = self.compute_proof_ecp(
-                                               self.ecbn128,
-                                               self.sorted_scl_array[start_idx2:end_idx2],
-                                               C[2*start_idx2*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
-                                               False, gpu_id=0, stream_id=stream_id[3])
-
-        if phase >= 3:
-           hExps[2*start_idx*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT] =\
-               np.reshape(
-                  np.reshape(hExps[2*start_idx*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT],
-                                           (-1,2,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx2]],-1)
-
-           self.pi_c_eccf1,t5 = self.compute_proof_ecp(
-                                               self.ecbn128,
-                                               self.sorted_scl_array[start_idx2:end_idx],
-                                               hExps[2*start_idx2*NWORDS_256BIT:2*end_idx*NWORDS_256BIT],
-                                               False, gpu_id=0, stream_id=stream_id[3])
-
-        # Copy result for carrying sum
-        if phase == 0:
-          A[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pi_a_eccf1[:2],-1)
-
-          B2[4*(end_idx-1)*NWORDS_256BIT:4*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pi_b_eccf2[:4],-1)
-
-          B1[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pib1_eccf1[:2],-1)
-
-        elif phase <= 2:
-          self.pi_a_eccf1, t = self.ecbn128.streamSync(0,stream_id[0])
-
-          """
-          self.t_EC['pi_a'] += t1 if stream_id[0] == 0 else self.ecbn128.streamSync(0,stream_id[0])
-          self.t_EC['pi_b'] += t2 if stream_id[1] == 0 else self.ec2bn128.streamSync(0,stream_id[1]) 
-          self.t_EC['pib1'] += t3 if stream_id[2] == 0 else self.ecbn128.streamSync(0,stream_id[2]) 
-          """
-
-
-          A[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pi_a_eccf1[:2],-1)
-
-          """
-          B2[4*(end_idx-1)*NWORDS_256BIT:4*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pi_b_eccf2[:4],-1)
-
-          B1[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pib1_eccf1[:2],-1)
-
-           self.t_EC['pi_c'] += t4 if stream_id[3] == 0 else self.ecbn128.streamSync(0,stream_id[3]) 
-           C[2*(end_idx2-1)*NWORDS_256BIT:2*end_idx2*NWORDS_256BIT] =\
-               np.reshape(self.pi_c2_eccf1[:2],-1)
-          """
-        
-        if phase >= 3:
-           self.t_EC['pi_c'] += t5 if stream_id[3] == 0 else self.ecbn128.streamSync(0,stream_id[3])
-           hExps[2*(end_idx-1)*NWORDS_256BIT:2*end_idx*NWORDS_256BIT] =\
-               np.reshape(self.pi_c_eccf1[:2],-1)
-
-        end_ec = time.time()
-        self.t_EC['total']  += (end_ec - start_ec)
-
-        return
 
 
     def write_pdata(self):
@@ -1240,13 +990,23 @@ class GrothProver(object):
         if self.out_proof_f.endswith('.json'):
            ZField.set_field(MOD_GROUP)
            # write proof file
-           P = ECC.from_uint256(self.pi_a_eccf1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+           P = ECC.from_uint256(
+                            self.pi_a_eccf1,
+                       in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+
            pi_a = [el.extend().as_str() for el in P][0]
    
-           P = ECC.from_uint256(self.pi_c_eccf1, in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
+           P = ECC.from_uint256(
+                            self.pi_c_eccf1,
+                       in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True)
            pi_c = [el.extend().as_str() for el in P][0]
    
-           P = ECC.from_uint256(np.reshape(self.pi_b_eccf2,(-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)
+           P = ECC.from_uint256(
+                          np.reshape(
+                                   self.pi_b_eccf2,
+                              (-1,2,NWORDS_256BIT)),
+                            in_ectype=EC_T_AFFINE, out_ectype=EC_T_AFFINE, reduced=True, ec2=True)
+
            pi_b = [el.extend().as_str() for el in P][0]
            proof = {"pi_a" : pi_a, "pi_b" : pi_b, "pi_c" : pi_c, "protocol" : "groth"}
            j = json.dumps(proof, indent=4, sort_keys=True)
@@ -1293,7 +1053,11 @@ class GrothProver(object):
         self.evalPoly(pB, nVars, m)
 
         end = time.time()
-        self.t_P['eval'] = end-start
+        self.t_GP['Eval'] = end-start
+   
+        print("Lagrange : "+str(self.t_GP['Eval']))
+
+        start = time.time()
 
         ifft_params = ntt_build_h(pA.shape[0])
 
@@ -1317,9 +1081,7 @@ class GrothProver(object):
 
         np.copyto(pH[:m-1],polAB_S[m:-1])
         del polAB_S
-        self.t_P['fft-interp'] =  t1
 
-        end_h = time.time()
-        self.t_P['total'] = end_h - start_h
-
+        print("interpol/Multiply : "+str(time.time()-start))
+  
         return

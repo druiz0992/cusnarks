@@ -86,6 +86,11 @@ Furthermore, if you want to generate a proof and verify the proof using snarkjs:
 ```sh
 python pysnarks.py -m -pk <INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p >OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -v 1 -snarkjs <SNARKJS location>
 ```
+
+```sh
+python3 pysnarks.py -m p -pk r1cs400k_pk.bin -vk r1cs400k_vk.json  -w r1cs400k_w.bin -p r1cs400k_proof.json -pd r1cs400k_pd.json -v 1 -seed 12346 -bs 16
+```
+
 ## Architecture
 
 Modules are divided into 4 categories depending on functionality:

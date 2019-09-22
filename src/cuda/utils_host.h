@@ -74,10 +74,6 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
 void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last);
 uint32_t ec_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx);
 uint32_t ec2_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx);
-void ec_global_jacaddreduce_h(uint32_t *z1, uint32_t *z2, uint32_t *z3, uint32_t *z4,
-                              uint32_t *x1, uint32_t *x2, uint32_t *x3, uint32_t *x4,
-                              uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, 
-                              uint32_t strip_last, uint32_t ec2_idx);
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last);
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);

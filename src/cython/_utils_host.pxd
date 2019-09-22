@@ -67,11 +67,10 @@ cdef extern from "../cuda/utils_host.h" nogil:
     void cec_jacscmul_h "ec_jacscmul_h" (ct.uint32_t *z, ct.uint32_t *scl, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t add_last);
     ct.uint32_t cec_isoncurve_h "ec_isoncurve_h" (ct.uint32_t *x, ct.uint32_t is_affine, ct.uint32_t pidx)
     ct.uint32_t cec2_isoncurve_h "ec2_isoncurve_h" (ct.uint32_t *x, ct.uint32_t is_affine, ct.uint32_t pidx)
-    void cec_global_jacaddreduce_h "ec_global_jacaddreduce_h" (
-                 ct.uint32_t *z1, ct.uint32_t *z2, ct.uint32_t *z3, ct.uint32_t *z4,
-                 ct.uint32_t *x1, ct.uint32_t *x2, ct.uint32_t *x3, ct.uint32_t *x4,
-                 ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in, 
-                 ct.uint32_t strip_last, ct.uint32_t ec2_idx)
+    void cec_jacaddreduce_h "ec_jacaddreduce_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n,
+                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in, ct.uint32_t strip_last)
+    void cec2_jacaddreduce_h "ec2_jacaddreduce_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, 
+                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in, ct.uint32_t strip_last);
     void cto_montgomeryN_h "to_montgomeryN_h"(ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx)
     void cfrom_montgomeryN_h "from_montgomeryN_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n, ct.uint32_t pidx, ct.uint32_t strip_last)
     void cec_stripc_h "ec_stripc_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n)

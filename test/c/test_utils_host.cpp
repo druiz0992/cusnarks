@@ -295,6 +295,9 @@ static uint32_t AA_test[] = {
 static char roots_1M_filename[]="../../data/zpoly_roots_1M.bin";
 static char roots_16M_filename[]="../../data/zpoly_roots_16M.bin";
 
+static char ecp_jacaddreduce_filename[]="../../test/c/aux_data/ecp_reduction.bin";
+static char ec2p_jacaddreduce_filename[]="../../test/c/aux_data/ec2p_reduction.bin";
+
 static char input_1M_filename[]= "../../test/c/aux_data/zpoly_input_data_1M.bin";
 static char output_1M_filename[]="../../test/c/aux_data/zpoly_output_data_1M.bin";
 static char inputxx_1M_filename[]= "../../test/c/aux_data/zpoly_input_dataxx_1M.bin";
@@ -9095,6 +9098,39 @@ void test_mulu256()
   printf("N errors(Test_Mulu) : %d/%d\n",n_errors, N/2);
 }
 
+void  test_ec_jacaddreduce(uint32_t ec2)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_INDIMS;
+   if (ec2){
+        indims = ECP2_JAC_INDIMS;
+        outdims = ECP2_JAC_OUTDIMS;
+   }
+
+   uint32_t *samples = (uint32_t *) malloc( N_STREAMS_PER_GPU * indims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   uint32_t *ecp = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t));
+
+   uint32_t pidx = 0;
+   uint32_t to_aff = 1;
+   uint32_t add_in = 1;
+   uint32_t strip_last = 1;
+
+   if (ec2){
+     readU256DataFile_h(samples, ec2p_jacaddreduce_filename, 
+                       N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
+     ec2_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+   } else {
+     readU256DataFile_h(samples, ecp_jacaddreduce_filename, 
+                       N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
+
+     ec_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+   }
+
+   free(samples);
+   free(ecp);
+}
+
+
 int main()
 {
   test_mul();  // test montgomery mul with predefined results
@@ -9143,6 +9179,10 @@ int main()
   test_inv_ext1();
   test_inv_ext2();
   test_mulu256();
+
+  test_ec_jacaddreduce(0);    // EC1
+  test_ec_jacaddreduce(1);    // EC2
+  
 
   return 1;
 }
