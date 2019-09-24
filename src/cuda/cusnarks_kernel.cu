@@ -439,9 +439,9 @@ double CUSnarks::kernelLaunch(
   double _start, _end, _total_start, _total_end;
   _total_start = elapsedTime();
   _start = elapsedTime();
+  in_data_host[gpu_id][stream_id] = in_vector_host->data;
   if (stream_id == 0){
      start_copy_in = elapsedTime();
-
      CCHECK(cudaMemcpy(
               &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
               in_vector_host->data,
@@ -449,7 +449,6 @@ double CUSnarks::kernelLaunch(
               cudaMemcpyHostToDevice));
      end_copy_in = elapsedTime() - start_copy_in;
   } else {
-    in_data_host[gpu_id][stream_id] = in_vector_host->data;
     CCHECK(cudaMemcpyAsync(
              &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
              in_vector_host->data,
@@ -457,9 +456,9 @@ double CUSnarks::kernelLaunch(
              cudaMemcpyHostToDevice,
              this->stream[gpu_id][stream_id]));
     _end = elapsedTime() - _start;
-    logInfo("In Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
-           in_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
   }
+  logInfo("In Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
+         in_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
   // depending on input data length and stride (how many samples of input data are 
@@ -470,7 +469,7 @@ double CUSnarks::kernelLaunch(
     if (stream_id == 0){
       start_copy_in = elapsedTime();
       CCHECK(cudaMemcpy(params_device[gpu_id][stream_id],
-                        &params[i],
+                        &params_host[gpu_id][stream_id][i],
                         sizeof(kernel_params_t),
                         cudaMemcpyHostToDevice));
       end_copy_in = +(elapsedTime() - start_copy_in);
@@ -481,9 +480,9 @@ double CUSnarks::kernelLaunch(
                         cudaMemcpyHostToDevice,
                         this->stream[gpu_id][stream_id]));
       _end = elapsedTime() - _start;
-       logInfo("In Params : Ptr : %x, gpu_id : %u, stream_id : %u, time : %f\n",
-           params_host[gpu_id][stream_id], gpu_id, stream_id, _end);
     }
+    logInfo("In Params : Ptr : %x, gpu_id : %u, stream_id : %u, time : %f\n",
+           params_host[gpu_id][stream_id], gpu_id, stream_id, _end);
     blockD = config[i].blockD;
     if (config[i].gridD == 0){
        config[i].gridD = (blockD + in_vector_host->length/params[i].stride - 1) / blockD;
@@ -530,6 +529,7 @@ double CUSnarks::kernelLaunch(
   start_copy_out = elapsedTime();
   _start = elapsedTime();
   if (config[0].return_val){
+     out_data_host[gpu_id][stream_id] = out_vector_host->data;
      if (stream_id == 0){
         CCHECK(cudaMemcpy(
             out_vector_host->data,
@@ -538,7 +538,6 @@ double CUSnarks::kernelLaunch(
             cudaMemcpyDeviceToHost));
      } else {
         //out_data_host[gpu_id][stream_id] = out_vector_host->data;
-        out_data_host[gpu_id][stream_id] = out_vector_host->data;
         CCHECK(cudaMemcpyAsync(
             out_data_host[gpu_id][stream_id],
             out_vector_device[gpu_id][stream_id].data + config[0].return_offset,
@@ -546,9 +545,9 @@ double CUSnarks::kernelLaunch(
             cudaMemcpyDeviceToHost,
             stream[gpu_id][stream_id]));
         _end = elapsedTime() - _start;
-        logInfo("Out Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
-           out_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
      }
+     logInfo("Out Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
+        out_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
   }
  
   end_copy_out = elapsedTime() - start_copy_out;

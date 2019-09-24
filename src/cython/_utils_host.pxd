@@ -34,6 +34,7 @@ cimport _types as ct
 
 cdef extern from "../cuda/utils_host.h" nogil: 
     void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
+    void cmontsquare_h "montsquare_h" (ct.uint32_t *U, ct.uint32_t *B, ct.uint32_t pidx)
     #void cmontmultN_h "montmultN_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t n, ct.uint32_t pidx)
     void caddm_h "addm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
     void caddu256_h "addu256_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B)
@@ -48,7 +49,7 @@ cdef extern from "../cuda/utils_host.h" nogil:
     ct.uint32_t czpoly_norm_h "zpoly_norm_h" (ct.uint32_t *pin, ct.uint32_t cidx)
     void csortu256_idx_h "sortu256_idx_h" (ct.uint32_t *idx, ct.uint32_t *v, ct.uint32_t l)
     void creadU256DataFile_h "readU256DataFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t insize, ct.uint32_t outsize)
-    void creadWitnessFile_h "readWitnessFile_h"(ct.uint32_t *samples, const char *filename, const unsigned long long inlen)
+    void creadWitnessFile_h "readWitnessFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t fmt, const unsigned long long inlen)
     void cwriteU256DataFile_h "writeU256DataFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void cwriteWitnessFile_h "writeWitnessFile_h"(ct.uint32_t *samples, const char *filename, const unsigned long longnwords)
     void creadU256CircuitFile_h "readU256CircuitFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)

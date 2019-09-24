@@ -44,6 +44,9 @@ CUSNARKS_REPO = CUSNARKS_HOME.replace('cusnarks/','')
 CUSNARKS_ROOTS = CUSNARKS_HOME + 'data/'
 CUSNARKS_CIRCUITS = CUSNARKS_HOME + 'circuits/'
 
+CUSNARKS_ROOTS_F = CUSNARKS_CONFIG + '.root_f'
+CUSNARKS_ROOTS_N = CUSNARKS_CONFIG + '.nroots'
+
 snarkjs = { 
     'url'   :  'http://github.com/druiz0992/snarkjs.git',
     'folder' : CUSNARKS_REPO + 'snarkjs',
@@ -120,6 +123,14 @@ def generate_config_f():
     f.close()
 
     sys.stdout.write('####################################\n\n')
+
+    f = open(CUSNARKS_ROOTS_F,'w')
+    print(roots['folder'],file=f)
+    f.close()
+
+    f = open(CUSNARKS_ROOTS_N,'w')
+    print(roots['nbits'],file=f)
+    f.close()
 
 def get_roots_file():
     return parse_configfile(config['folder'],'ROOTS_FILE')

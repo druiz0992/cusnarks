@@ -74,18 +74,18 @@
 #define NFFT_Y_131K_3D 8
 
 #else
-#define NCOLS_131K 9
-#define NROWS_131K 9
+#define NCOLS_131K 10
+#define NROWS_131K 11
 #define FFT_SIZEXX_131K 5
 #define FFT_SIZEYX_131K 5
 
 
-#define NCOLS_131K_3D 5
+#define NCOLS_131K_3D 6
 #define NROWS_131K_3D 5
 #define FFT_SIZEXX_131K_3D 3
 #define FFT_SIZEYX_131K_3D 3
-#define NFFT_X_131K_3D 9
-#define NFFT_Y_131K_3D 9
+#define NFFT_X_131K_3D 11
+#define NFFT_Y_131K_3D 10
 
 #endif
 
@@ -8466,9 +8466,9 @@ void test_ntt_parallel3D_131K(uint32_t forward)
 
    for (k=0; k < MAX_ITER_65K; k++){
      setRandom256(samples,nroots, N);
-     //readU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp3.bin",nroots, nroots);
+     //readU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp2.bin",nroots, nroots);
      memcpy(samples2, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
-     //writeU256DataFile_h(samples, "./aux_data/zpoly_samples_fft4d.bin",nroots * NWORDS_256BIT * sizeof(uint32_t));
+     //writeU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp2.bin",nroots * NWORDS_256BIT * sizeof(uint32_t));
  
      if (forward){ 
        readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
@@ -9129,6 +9129,28 @@ void  test_ec_jacaddreduce(uint32_t ec2)
    free(samples);
    free(ecp);
 }
+/*
+
+void  test_ec_jacscmul_opt(void)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_INDIMS;
+   uint32_t order = 7;
+
+   uint32_t *samples = (uint32_t *) malloc( order * indims * NWORDS_256BIT * sizeof(uint32_t)) ;
+
+   //readU256DataFile_h(samples, ecp_jacaddreduce_filename, 
+                       //N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
+   uint32_t pidx = 0;
+   uint32_t to_aff = 1;
+   uint32_t add_in = 1;
+   uint32_t strip_last = 1;
+
+   ec_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+
+   free(samples);
+}
+*/
 
 
 int main()
@@ -9137,6 +9159,7 @@ int main()
   test_mul2(); // test optimized impl of montgomery mul
   test_mul3(); // test SOS impl of montgomery mul
   test_mul4(); // test SOS impl of montgomery squaring
+
   //test_mul5(); // test FIOS impl of montgomery squaring
   test_findroots();
   test_ntt(1);
@@ -9164,7 +9187,6 @@ int main()
 
   test_ntt_parallel3D_131K(1); // Forward FFT
   test_ntt_parallel3D_131K(0); // IFFT
-
   test_nttmul_parallel2D_65K();
 
   test_nttmul_randomsize();
@@ -9180,10 +9202,13 @@ int main()
   test_inv_ext2();
   test_mulu256();
 
+  /*
   test_ec_jacaddreduce(0);    // EC1
   test_ec_jacaddreduce(1);    // EC2
-  
 
+  test_ec_jacscmul_opt();
+  */
+  
   return 1;
 }
 

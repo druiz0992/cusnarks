@@ -356,11 +356,7 @@ def run(opt, parser):
   
 if __name__ == '__main__':
 
-   start = time.time()
    opt, parser = init()
-   end = time.time() - start
-
-   print("Parser Init : "+str(end))
 
    GP = run(opt, parser)
    """

@@ -709,30 +709,40 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
            mpoly_to_montgomery_h(pk['polsB'], MOD_FIELD)
            mpoly_to_montgomery_h(pk['polsC'], MOD_FIELD)
         else:
+           pk_bin = np.concatenate((pk_bin, pk['polsA'], polsA_ext))
+           del pk['polsA']
+           del polsA_ext
+           pk_bin = np.concatenate((pk_bin, pk['polsB'], polsB_ext))
+           del pk['polsB']
+           del polsB_ext
+           pk_bin = np.concatenate((pk_bin, pk['polsC'], polsC_ext))
+           del pk['polsC']
+           del polsC_ext
+ 
            pk_bin = np.concatenate((
                   pk_bin,
-                  pk['polsA'],
-                  polsA_ext,
-                  pk['polsB'],
-                  polsB_ext,
-                  pk['polsC'],
-                  polsC_ext,
                   np.reshape(pk['alfa_1'],-1),
                   np.reshape(pk['beta_1'],-1),
                   np.reshape(pk['delta_1'],-1),
                   np.reshape(pk['beta_2'],-1),
-                  np.reshape(pk['delta_2'],-1),
-                  np.reshape(pk['A'],-1),
-                  A_ext,
-                  np.reshape(pk['B1'],-1),
-                  B1_ext,
-                  np.reshape(pk['B2'],-1),
-                  B2_ext,
-                  np.reshape(pk['C'],-1),
-                  C_ext,
-                  np.reshape(pk['hExps'],-1), 
-                  hExps_ext) )
-       
+                  np.reshape(pk['delta_2'],-1)))
+
+           pk_bin = np.concatenate((pk_bin, np.reshape(pk['A'],-1), np.reshape(A_ext,-1)))
+           del pk['A']
+           del A_ext
+           pk_bin = np.concatenate((pk_bin, np.reshape(pk['B1'],-1), np.reshape(B1_ext,-1)))
+           del pk['B1']
+           del B1_ext
+           pk_bin = np.concatenate((pk_bin, np.reshape(pk['B2'],-1), np.reshape(B2_ext,-1)))
+           del pk['B2']
+           del B2_ext
+           pk_bin = np.concatenate((pk_bin, np.reshape(pk['C'],-1), np.reshape(C_ext,-1)))
+           del pk['C']
+           del C_ext
+           pk_bin = np.concatenate((pk_bin, np.reshape(pk['hExps'],-1), np.reshape(hExps_ext,-1)))
+           del pk['hExps']
+           del hExps_ext
+
         pk_bin[0] = pk_bin.shape[0]
         return pk_bin
 

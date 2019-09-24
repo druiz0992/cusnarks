@@ -752,7 +752,7 @@ __global__ void zpoly_fft4DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 __global__ void zpoly_fft4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    uint32_t *x1, *z1, *w2, *scaler;
+    uint32_t *x1, *z1, *w2, *tmp1, *scaler;
 
     if(tid >= params->in_length){
       return;
@@ -760,11 +760,12 @@ __global__ void zpoly_fft4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, 
 
     x1 = (uint32_t *) in_vector;   
     z1 = (uint32_t *) out_vector;
+    tmp1 = (uint32_t *) &out_vector[params->padding_idx * U256K_OFFSET];
     scaler = (uint32_t *) &in_vector[(2*params->padding_idx + params->stride) * U256K_OFFSET];   
 
     w2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET]; // N/2 roots 
   
-    fft3Dyy_dif(z1, z1, w2, scaler, params);
+    fft3Dyy_dif(tmp1, z1, w2, scaler, params);
     
 }
 

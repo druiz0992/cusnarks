@@ -45,7 +45,7 @@
 #Aux data files
 data/proof.json
 data/public.json
-.idea
+.idea*
 *.cubin
 *.asm
 *.bin
@@ -53,4 +53,6 @@ venv/
 third_party_libs/
 *.npz
 config/*.conf
+config/.nroots
+config/.root_f
 config/gen_roots
