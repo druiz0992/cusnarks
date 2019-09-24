@@ -202,6 +202,9 @@ IF CUDA_DEF:
   
           return np.asarray(kdata).reshape(-1,in_vec.shape[1]), exec_time
 
+      def streamDel(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
+          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+
       def streamSync(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
 
           cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
@@ -347,6 +350,13 @@ IF CUDA_DEF:
         return self._async_buffer_ptr.setBuf(&in_data[0], nelems)
       """
 
+def montsquare_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+
+        uh.cmontsquare_h(&out_vec[0], &in_veca[0], pidx)
+  
+        return np.reshape(out_vec, (-1, NWORDS_256BIT))
+
 def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
         cdef ct.uint32_t n = <int>(len(in_veca)/NWORDS_256BIT)
@@ -355,7 +365,6 @@ def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1
         for i in xrange(n):
            uh.cmontmult_h(&out_vec[offset], &in_veca[offset], &in_vecb[offset], pidx)
            offset += NWORDS_256BIT
-  
   
         return np.reshape(out_vec, (-1, NWORDS_256BIT))
 
@@ -551,10 +560,10 @@ def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
 
     return vout.reshape((-1,NWORDS_256BIT))
 
-def readWitnessFile_h(bytes fname, unsigned long long insize):
+def readWitnessFile_h(bytes fname, ct.uint32_t fmt, unsigned long long insize):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(insize * NWORDS_256BIT,dtype=np.uint32)
 
-    uh.creadWitnessFile_h(&vout[0], <char *>fname, insize)
+    uh.creadWitnessFile_h(&vout[0], <char *>fname, fmt, insize)
 
     return vout.reshape((-1,NWORDS_256BIT))
 

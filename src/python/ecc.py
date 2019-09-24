@@ -393,11 +393,12 @@ class ECC(object):
 
         newP = self.point_at_inf()
         result = self
-        while scalar != 0:
-            if scalar & 1 != 0:
-                newP += result
-            result = result.double()
-            scalar >>= 1
+
+        for idx in xrange(256):
+            b0 = (scalar & (1 << (255-idx))) >> (255 - idx)
+            newP = newP.double()
+            if b0 != 0:
+                newP = result + newP
         return newP
 
     def __rmul__(self, alpha):
@@ -1030,8 +1031,8 @@ class ECCJacobian(ECC):
         Z2sq = Z2 * Z2
         Z2cube = Z2sq * Z2
 
-        U1 = X1 * Z2sq   
-        U2 = X2 * Z1sq   
+        U1 = X1 * Z2sq
+        U2 = X2 * Z1sq
         S1 = Y1 * Z2cube 
         S2 = Y2 * Z1cube 
 
@@ -1106,15 +1107,13 @@ class ECCJacobian(ECC):
             M = M + a * Zsq * Zsq
 
         X3 = M * M
+
         Z3 = Y * Z
-        #X3 = X3 - (S * ECC.two[self.FIDX])
         X3 = X3 - (S + S)
-        #Y3 = M * (S - X3) - (Ysqsq * ECC.eight[self.FIDX])
         t = Ysqsq + Ysqsq
         t = t + t
         t = t + t
         Y3 = M * (S - X3) - t
-        #Z3 = Z3 * ECC.two[self.FIDX]
         Z3 = Z3 + Z3 
 
         return ECCJacobian([X3, Y3, Z3])

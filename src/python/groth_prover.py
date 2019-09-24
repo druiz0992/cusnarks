@@ -108,6 +108,8 @@ class GrothProver(object):
         self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
         np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
+        if batch_size > 20:
+            batch_size = 20
         self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
         self.ecbn128 = ECBN128(2*self.batch_size + 4,   seed=self.seed)
         self.ec2bn128 = EC2BN128(2*self.batch_size + 4, seed=self.seed)
@@ -310,8 +312,12 @@ class GrothProver(object):
            elif self.witness_f.endswith('.bin'):
              np.copyto(
                 self.scl_array[:nVars],
-                readWitnessFile_h(self.witness_f.encode("UTF-8"), nVars ))
- 
+                readWitnessFile_h(self.witness_f.encode("UTF-8"),1, nVars ))
+
+           elif self.witness_f.endswith('.dat'):
+             np.copyto(
+                self.scl_array[:nVars],
+                readWitnessFile_h(self.witness_f.encode("UTF-8"),0, nVars ))
            #from json/txt to bin
            """
            if self.witness_f.endswith('.txt'):
@@ -618,7 +624,6 @@ class GrothProver(object):
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
 
 
-
         nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
 
         next_gpu_idx = 0
@@ -679,7 +684,7 @@ class GrothProver(object):
         #  P4 - Poly Operations
         ######################
         start = time.time()
- 
+
         self.calculateH()
 
         end = time.time()
@@ -694,6 +699,7 @@ class GrothProver(object):
 
         nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1))
         self.scl_array = polH
+        #TODO : Check that last batch includes last four samples 
 
         # EC reduce hExps
         dispatch_table = buildDispatchTable( nbatches, 1,

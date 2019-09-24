@@ -162,6 +162,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
 
        result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,
                                        gpu_id, stream_id, n_kernels=1 )
+       pysnark.streamDel(gpu_id,stream_id)
    
     else:
       new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
@@ -182,6 +183,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
                                          kernel_config['blockD'][0])]
           result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
                  pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
+          pysnark.streamDel(gpu_id,stream_id)
           t+=t1
             
     return result,t
@@ -408,7 +410,7 @@ def zpoly_fft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, re
         return result,t
 
 
-def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d_len, return_offset=0, n_pass=0):
+def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d_len, return_offset=0, n_pass=0, fft=-1):
         Npoints_pass1 = 1 << (interp_params['fft_N'][-1])
         Npoints_pass2 = 1 << (interp_params['fft_N'][-2])
 
@@ -448,7 +450,8 @@ def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d
         elif n_pass == 4 :
            fft_pass_params = ntt_build_h(Npoints_pass1)
 
-           fft = 0
+           if fft==-1:
+             fft = 0
            premul = 1
            as_mont = 0
            out_length = nsamples
@@ -461,7 +464,8 @@ def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d
         elif n_pass == 5:
            fft_pass_params = ntt_build_h(Npoints_pass2)
 
-           fft = 0
+           if fft == -1:
+             fft = 0
            premul = 0
            as_mont = 0
            out_length = nsamples
@@ -1173,6 +1177,7 @@ def  getFFTResults(pysnark, dispatch_table, n_pass):
        #return out_vector
 
 def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n_gpu=1):
+     #vector = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<21 , 1<<21 )
      ### Start Final IFFT with combined results
      Npoints_pass1 = 1 << (mul_params['fft_N'][-1])
      Npoints_pass2 = 1 << (mul_params['fft_N'][-2])
@@ -1198,6 +1203,12 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
      # Add Scaler -> Fixed
      zpoly_vector[2*nsamples + roots_W1_len] = scalerExt2
      zpoly_vector[2*nsamples + roots_W1_len + 1] = scalerMont2
+
+     # Test code
+     """
+     pA = np.copy(vector)
+     pA_S1, pA_S2 = zpoly_fft4d_test(pA, mul_params, fidx, roots, fft=0, as_mont=0)
+     """
 
      #Transpose and take IFFT (first pass)
      voffset1 = 0
@@ -1225,10 +1236,10 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
         zpoly_vector[nsamples : 2*nsamples] = np.reshape(roots_W2[root_idx],(-1,NWORDS_256BIT))
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(mul_params, nsamples,
-                                                                 len(zpoly_vector),
-                                                                 fidx, roots_W1_len,
-                                                                 return_offset=0, n_pass=4)
-
+                                                         len(zpoly_vector),
+                                                         fidx, roots_W1_len,
+                                               return_offset=nsamples*NWORDS_256BIT, n_pass=4,fft=0)
+                                                                 
         result,t_fft =\
                pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels= 4)
 
@@ -1267,7 +1278,7 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(mul_params, nsamples,
                                                                  nsamples, fidx, roots_W1_len,
-                                                                 return_offset=0, n_pass=5)
+                                           return_offset=nsamples*NWORDS_256BIT, n_pass=5, fft=0)
 
         result,t_fft =\
                pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=4)
