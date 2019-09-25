@@ -52,7 +52,7 @@ export LD_LIBRARY_PATH=$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH
 5. Generate required metadata
 
 ```sh
-make scripts
+make config
 ```
 
 6. Launch units tests (optional) -> Currently, most not working, but don't worry. Bugs are in the test :-))
