@@ -54,9 +54,10 @@ class Z1_t {
 };
 
 __device__ uint32_t eq0z(Z1_t *x);
-__device__ uint32_t eq1z(Z1_t *x);
+__device__ uint32_t eq0z(Z1_t *x, uint32_t offset);
 __device__ uint32_t eqz(Z1_t *x, Z1_t *y);
 __device__ uint32_t eqz(Z1_t *x, uint32_t *y);
+__device__ uint32_t eqz(Z1_t *x, uint32_t xoffset, uint32_t *y );
 __device__ void squarez(Z1_t *z, Z1_t *x, mod_t midx);
 __device__ void mulz(Z1_t *z, Z1_t *x, Z1_t *y, mod_t midx);
 __device__ void mul2z(Z1_t *z, Z1_t *x, mod_t midx);

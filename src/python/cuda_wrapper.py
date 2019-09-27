@@ -188,7 +188,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
             
     return result,t
 
-def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = 0):
+def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0):
    kernel_params={}
    kernel_config={}
    
@@ -204,14 +204,13 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = 0):
  
    nsamples = int(len(vector)/indims_e)
    
-   kernel_config['blockD']    = get_shfl_blockD(nsamples)
+   if shamir_en == 0 or nsamples < 32 * U256_BSELM :
+     kernel_config['blockD']    = get_shfl_blockD(nsamples)
+     shamir_en = 0
+   else:
+     kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM))
+
    nkernels = len(kernel_config['blockD'])
-   #new_nsamples = np.product(kernel_config['blockD'])
-   #new_vector = np.zeros((indims_e*new_nsamples,NWORDS_256BIT), dtype=np.uint32)
-   #new_vector[new_nsamples-nsamples:new_nsamples] = vector[:nsamples]
-   #new_vector[new_nsamples+indims*(new_nsamples -nsamples):] = vector[nsamples:]
-   #nsamples = np.product(kernel_config['blockD'])
-   #new_vector = np.copy(vector)
    kernel_params['stride']    = [outdims] * nkernels
    kernel_params['stride'][0]    =  indims_e
    kernel_params['premul']    = [0] * nkernels
@@ -220,32 +219,24 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = 0):
    kernel_params['midx']      = [fidx] * nkernels
    kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
    kernel_config['kernel_idx'] =[kernel] * nkernels
-   kernel_params['in_length'] = [nsamples* indims_e]*nkernels 
+   kernel_params['in_length'] = [nsamples* indims_e]*nkernels
    for l in xrange(1,nkernels):
       kernel_params['in_length'][l] = outdims * (
              int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
              (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
 
    kernel_params['out_length'] = 1 * outdims
-   #kernel_params['out_length'] = nsamples * outdims
+   #kernel_params['out_length'] = int(nsamples/8 * outdims)
    #kernel_params['out_length'] = np.product(kernel_config['blockD'][1:]) * outdims
-   kernel_params['padding_idx'] = [0] * nkernels
+   kernel_params['padding_idx'] = [shamir_en] * nkernels
    kernel_config['gridD'] = [0] * nkernels
+   kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
    kernel_config['gridD'][nkernels-1] = 1
+   #kernel_params['out_length'] = kernel_config['gridD'][0] * outdims
     
    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )
-   #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params, 1)
+   #result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels= 1)
 
-   #new_vector = new_vector.reshape((-1,8))
-   #Kp = [ZFieldElExt(BigInt.from_uint256(k)) for k in new_vector[:new_nsamples]]
-   #Pp = np.zeros((new_nsamples, 3, 8), dtype=np.uint32)
-   #Pp[:,0] = np.reshape(new_vector[new_nsamples:],(-1,2,8))[:,0]
-   #Pp[:, 1] = np.reshape(new_vector[new_nsamples:], (-1, 2, 8))[:, 1]
-   #Pp[:, 2, 0] = np.ones(new_nsamples,dtype=np.uint32)
-   #Pp = ECC.from_uint256(np.reshape(Pp,(-1,NWORDS_256BIT)), in_ectype=1, out_ectype=2, reduced=True)
-   #NPp = np.multiply(Kp, Pp)
-   #NPp = np.sum(np.multiply(Kp, Pp))
-   
    return vector, result, t
 
 

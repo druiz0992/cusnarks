@@ -295,22 +295,24 @@ static uint32_t AA_test[] = {
 static char roots_1M_filename[]="../../data/zpoly_roots_1M.bin";
 static char roots_16M_filename[]="../../data/zpoly_roots_16M.bin";
 
-static char ecp_jacaddreduce_filename[]="../../test/c/aux_data/ecp_reduction.bin";
-static char ec2p_jacaddreduce_filename[]="../../test/c/aux_data/ec2p_reduction.bin";
+static char ecp_jacaddreduce_filename[]="./aux_data/ecp_reduction.bin";
+static char ec2p_jacaddreduce_filename[]="./aux_data/ec2p_reduction.bin";
 
-static char input_1M_filename[]= "../../test/c/aux_data/zpoly_input_data_1M.bin";
-static char output_1M_filename[]="../../test/c/aux_data/zpoly_output_data_1M.bin";
-static char inputxx_1M_filename[]= "../../test/c/aux_data/zpoly_input_dataxx_1M.bin";
-static char inputxy_1M_filename[]= "../../test/c/aux_data/zpoly_input_dataxy_1M.bin";
-static char inputyx_1M_filename[]= "../../test/c/aux_data/zpoly_input_datayx_1M.bin";
-static char inputyy_1M_filename[]= "../../test/c/aux_data/zpoly_input_datayy_1M.bin";
+static char input_1M_filename[]= "./aux_data/zpoly_input_data_1M.bin";
+static char output_1M_filename[]="./aux_data/zpoly_output_data_1M.bin";
+static char inputxx_1M_filename[]= "./aux_data/zpoly_input_dataxx_1M.bin";
+static char inputxy_1M_filename[]= "./aux_data/zpoly_input_dataxy_1M.bin";
+static char inputyx_1M_filename[]= "./aux_data/zpoly_input_datayx_1M.bin";
+static char inputyy_1M_filename[]= "./aux_data/zpoly_input_datayy_1M.bin";
 
-static char input_65K_filename[]= "../../test/c/aux_data/zpoly_input_data_65K.bin";
-static char output_65K_filename[]="../../test/c/aux_data/zpoly_output_data_65K.bin";
-static char inputxx_65K_filename[]= "../../test/c/aux_data/zpoly_input_dataxx_65K.bin";
-static char inputxy_65K_filename[]= "../../test/c/aux_data/zpoly_input_dataxy_65K.bin";
-static char inputyx_65K_filename[]= "../../test/c/aux_data/zpoly_input_datayx_65K.bin";
-static char inputyy_65K_filename[]= "../../test/c/aux_data/zpoly_input_datayy_65K.bin";
+static char input_65K_filename[]= "./aux_data/zpoly_input_data_65K.bin";
+static char output_65K_filename[]="./aux_data/zpoly_output_data_65K.bin";
+static char inputxx_65K_filename[]= "./aux_data/zpoly_input_dataxx_65K.bin";
+static char inputxy_65K_filename[]= "./aux_data/zpoly_input_dataxy_65K.bin";
+static char inputyx_65K_filename[]= "./aux_data/zpoly_input_datayx_65K.bin";
+static char inputyy_65K_filename[]= "./aux_data/zpoly_input_datayy_65K.bin";
+
+static char input_test_scmul_filename[] = "./aux_data/test_scmul_samples.bin";
 
 static uint32_t roots_128_test[] = {
 1342177275, 2895524892, 2673921321,  922515093, 2021213742,
@@ -9101,7 +9103,7 @@ void test_mulu256()
 void  test_ec_jacaddreduce(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
-   uint32_t outdims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
    if (ec2){
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
@@ -9129,28 +9131,54 @@ void  test_ec_jacaddreduce(uint32_t ec2)
    free(samples);
    free(ecp);
 }
-/*
 
 void  test_ec_jacscmul_opt(void)
 {
    uint32_t indims = ECP_JAC_INDIMS;
-   uint32_t outdims = ECP_JAC_INDIMS;
-   uint32_t order = 7;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t nec_points = 1024;
+   uint32_t order = 8;
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2, *out_ecp3, *out_ecp4, *samples;
+   uint32_t i;
+   uint32_t n_tables = (order + nec_points - 1)/order;
+   uint32_t n_errors=0;
 
-   uint32_t *samples = (uint32_t *) malloc( order * indims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp1 = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp2 = (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp3 = (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp4= (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
 
-   //readU256DataFile_h(samples, ecp_jacaddreduce_filename, 
-                       //N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
-   uint32_t pidx = 0;
-   uint32_t to_aff = 1;
-   uint32_t add_in = 1;
-   uint32_t strip_last = 1;
+   readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
 
-   ec_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+   scl = samples;
+   in_ecp = &samples[nec_points * NWORDS_256BIT];
+   ec_jacscmul_opt_h(out_ecp2, scl, in_ecp, nec_points, order, 0,1); 
+   ec_jac2aff_h(out_ecp3, out_ecp2,n_tables, 0, 0);
+
+   // Multiply points
+   ec_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
+
+   for (i=0; i< n_tables-1; i++){
+     ec_jacaddreduce_h(&out_ecp4[i*ECP_JAC_OUTDIMS*NWORDS_256BIT], 
+                       &out_ecp1[i*order*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+                       order, 0, 1, 0, 0);
+     if (memcmp(&out_ecp3[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+               &out_ecp4[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+               ECP_JAC_OUTDIMS*NWORDS_256BIT*sizeof(uint32_t)) ){
+        n_errors++;
+     }
+   }
+
+   printf("N errors(JACSCMUL_OPT) : %d/%d\n",n_errors,n_tables);
 
    free(samples);
+   free(out_ecp1);
+   free(out_ecp2);
+   free(out_ecp3);
+   free(out_ecp4);
 }
-*/
 
 
 int main()
@@ -9202,12 +9230,10 @@ int main()
   test_inv_ext2();
   test_mulu256();
 
-  /*
   test_ec_jacaddreduce(0);    // EC1
   test_ec_jacaddreduce(1);    // EC2
 
   test_ec_jacscmul_opt();
-  */
   
   return 1;
 }

@@ -55,6 +55,10 @@
 
 #define WITNESS_HEADER_LEN_NWORDS (WITNESS_HEADER_W_OFFSET_NWORDS)
 
+#define U256_BSELM  (8)
+#define WARP_SIZE  (32)
+#define WARP_HALF_SIZE (16)
+#define WARP_DOUBLE_SIZE_NBITS (6)
 
 #define U256_XOFFSET            (0 * NWORDS_256BIT)
 #define U256_YOFFSET            (1 * NWORDS_256BIT)

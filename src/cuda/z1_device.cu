@@ -99,19 +99,25 @@ __device__ uint32_t eq0z(Z1_t *x)
 { 
    return eq0u256(x->getu256());
 }
-
-__device__ uint32_t eq1z(Z1_t *x)
+__device__ uint32_t eq0z(Z1_t *x, uint32_t offset)
 { 
-   return eq1u256(x->getu256());
+   return eq0u256(x->getu256(offset));
 }
+
 __device__ uint32_t eqz(Z1_t *x, Z1_t *y)
 {
   return equ256(x->getu256(), y->getu256());
+}
+__device__ uint32_t eqz(Z1_t *x, uint32_t xoffset, uint32_t *y )
+{
+  return equ256(x->getu256(xoffset), y);
 }
 __device__ uint32_t eqz(Z1_t *x, uint32_t *y)
 {
   return equ256(x->getu256(), y);
 }
+
+
 __device__  void squarez(Z1_t *z, Z1_t *x, mod_t midx)
 {
   sqmontu256(z->getu256(), x->getu256(),         midx);  

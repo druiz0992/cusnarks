@@ -76,6 +76,7 @@ IF CUDA_DEF:
   
           #print (in_v.length, self.in_dim, out_v.length, self.out_dim)
           if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
+              print(in_v.length, self.in_dim, out_v.length, sel.out_dim)
               assert False, "Incorrect arguments"
               return 0.0
    
