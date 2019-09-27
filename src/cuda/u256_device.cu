@@ -1364,6 +1364,21 @@ __device__ uint32_t shl1u256(const uint32_t __restrict__ *x)
 /*
    (x & (1<< bsel)) >> bsel  for 256 bit number
 */
+__device__ uint32_t bselu256(const uint32_t __restrict__ *x, uint32_t bsel)
+{
+   uint32_t c;
+   uint32_t word = bsel >> NBITS_WORD_LOG2; // bsel/32 gives the word number
+   uint32_t bit = bsel & NBITS_WORD_MOD; // bsel % 32 gives bit number
+
+   asm("{                                       \n\t"
+         "bfe.u32            %0,   %1,  %2, 1;  \n\t"      
+       "}                                       \n\t"
+       : "=r"(c)
+       : "r"(x[word]), "r"(bit));
+    
+   return c;
+}
+
 __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
 {
    uint32_t c,i, rc=0; 
@@ -1372,17 +1387,6 @@ __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
 
    #pragma unroll
    for (i=0; i< U256_BSELM; i++){
-    #if 0
-     asm("{                                       \n\t"
-           ".reg .u32          %tmp;             \n\t"
-           "bfe.u32            %0,   %2,  %3, 1;  \n\t"      
-           "shl.b32            %tmp,   %0,  %4;  \n\t"      
-           "add.u32            %1, %5, %tmp;        \n\t"      
-         "}                                       \n\t"
-         : "=r"(c), "=r"(rc)
-         : "r"(x[NWORDS_256BIT*i+word]), "r"(bit), "r"(i), "r"(rc));
-   }
-   #else
      asm("{                                       \n\t"
            "bfe.u32            %0,   %1,  %2, 1;  \n\t"      
          "}                                       \n\t"
@@ -1391,10 +1395,11 @@ __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
     
      rc += (c << i);  
    }
-   #endif
 
    return rc;
 }
+
+
 
 /*
   returns number of leading zeros in a 256 bit number
@@ -1402,8 +1407,8 @@ __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
 __device__ uint32_t clzMu256(const uint32_t __restrict__ *x)
 {
    uint32_t i,j, c, rc, mrc=255; 
-   
-   #pragma unroll
+  
+   #pragma unroll 
    for (i=0; i< U256_BSELM; i++){
      c = 32;    
      rc = 0;
@@ -1420,6 +1425,22 @@ __device__ uint32_t clzMu256(const uint32_t __restrict__ *x)
    return mrc;
 }
 
+__device__ uint32_t clzu256(const uint32_t __restrict__ *x)
+{
+   uint32_t j, c, rc, mrc=255; 
+   
+   c = 32;    
+   rc = 0;
+   for (j=NWORDS_256BIT; j >= 1 && c == 32; j--){
+      asm("{                                    \n\t"
+          "   clz.b32           %0,%2;          \n\t"
+          "   add.u32           %1, %3, %0;     \n\t"      
+          "}                   \n\t"
+          :"=r"(c), "=r"(rc) : "r"(x[j-1]), "r"(rc));
+   }
+
+   return rc;
+}
 
 // returns 1 if x - y >= y and x = x-y
 // returns 0 if x - y <= y

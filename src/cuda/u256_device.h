@@ -34,8 +34,6 @@
 #define _U256_DEVICE_H_
 
 #define U256_MAX_SMALLK (32)
-#define U256_BSELM (1)
-#define  U256_MBSCLUSTER (2)
 
 #include "log.h"
 
@@ -63,6 +61,8 @@ extern __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __r
 extern __device__ uint32_t shr1u256(const uint32_t __restrict__ *x);
 extern __device__ uint32_t shl1u256(const uint32_t __restrict__ *x);
 extern __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel);
+extern __device__ uint32_t bselu256(const uint32_t __restrict__ *x, uint32_t bsel);
+extern __device__ uint32_t clzu256(const uint32_t __restrict__ *x);
 extern __device__ uint32_t clzMu256(const uint32_t __restrict__ *x);
 
 

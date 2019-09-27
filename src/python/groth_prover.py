@@ -111,8 +111,8 @@ class GrothProver(object):
         if batch_size > 20:
             batch_size = 20
         self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
-        self.ecbn128 = ECBN128(2*self.batch_size + 4,   seed=self.seed)
-        self.ec2bn128 = EC2BN128(2*self.batch_size + 4, seed=self.seed)
+        self.ecbn128 = ECBN128(self.batch_size,   seed=self.seed)
+        self.ec2bn128 = EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS)* self.batch_size), seed=self.seed)
         self.cuzpoly = ZCUPoly(5*self.batch_size  + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
@@ -627,6 +627,7 @@ class GrothProver(object):
         nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
 
         next_gpu_idx = 0
+        # Set to one to force sync stream
         #self.n_streams = 1
         first_stream_idx = min(self.n_streams-1,1)
 
@@ -697,9 +698,15 @@ class GrothProver(object):
         ######################
         start = time.time()
 
-        nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1))
+        #Theck that last batch includes last three samples 
+        while True:
+           nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1))
+           if domainSize -1 - (nbatches-1)*(self.batch_size - 1)  < 3:
+              self.batch_size -= 1
+           else :
+             break
+
         self.scl_array = polH
-        #TODO : Check that last batch includes last four samples 
 
         # EC reduce hExps
         dispatch_table = buildDispatchTable( nbatches, 1,
@@ -769,10 +776,10 @@ class GrothProver(object):
                                  0)   # strip z coordinate from affine result
 
 
-    def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, gpu_id=0, stream_id=0):
+    def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0):
             ZField.set_field(MOD_GROUP)
             #TODO : remove in_v
-            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, gpu_id, stream_id)
+            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id)
 
             if ec2 and stream_id == 0:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
@@ -958,7 +965,7 @@ class GrothProver(object):
           result, t = self.compute_proof_ecp(
                                        cuda_ec128,
                                        EC_P[ecidx],
-                                       step==4, gpu_id=gpu_id, stream_id=stream_id)
+                                       step==4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
           if stream_id == 0:
              self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
           else :
