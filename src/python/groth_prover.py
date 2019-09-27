@@ -132,14 +132,15 @@ class GrothProver(object):
         ZField.set_field(MOD_GROUP)
 
         self.pk = getPK()
-        self.n_gpu = get_ngpu(max_used_percent=95.)
+        #TODO : limit to 2 GPUs 
+        self.n_gpu = min(get_ngpu(max_used_percent=95.),2)
         if self.n_gpu == 0:
           logging.error('No available GPUs')
           sys.exit(1)
           
         self.n_streams = get_nstreams()
 
-        self.init_ec_val()
+        self.initECVal()
 
         self.public_signals = None
         self.witness_f = None
@@ -221,7 +222,7 @@ class GrothProver(object):
         del pk_bin
              
 
-    def init_ec_val(self):
+    def initECVal(self):
         self.pi_a_eccf1 = np.reshape(
                                 np.concatenate((
                                           ECC.zero[ZUtils.FRDC].as_uint256(),

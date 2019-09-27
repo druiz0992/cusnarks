@@ -254,7 +254,7 @@ class GrothSetup(object):
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
-        logging.info('Starting setup....')
+        logging.info(' Starting setup....')
 
         ZField.set_field(MOD_FIELD)
         start_s = time.time()
@@ -391,7 +391,7 @@ class GrothSetup(object):
 
 
     def calculatePoly(self):
-        logging.info(' starting calculatePoly')
+        logging.info(' Starting calculatePoly')
         self.computeHeader()
 
 
@@ -435,7 +435,7 @@ class GrothSetup(object):
         m : int
         t : ZFieldElRedc
        """
-       logging.info(' starting evalLagrangePoly')
+       logging.info(' Starting evalLagrangePoly')
        m = 1 << bits
        t_rdc = self.toxic['t'].reduce()
        tm = (t_rdc ** int(m))
@@ -687,7 +687,7 @@ class GrothSetup(object):
        # u is Mont
        z_t_u256, u = self.evalLagrangePoly(self.pk['domainBits'])
 
-       logging.info(' starting mpoly_madd_h')
+       logging.info(' Starting mpoly_madd_h')
        pidx = ZField.get_field()
 
        worker = mp.Pool(processes=min(3,mp.cpu_count()))
