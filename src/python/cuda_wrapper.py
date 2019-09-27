@@ -204,7 +204,8 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
  
    nsamples = int(len(vector)/indims_e)
    
-   if shamir_en == 0 or nsamples < 32 * U256_BSELM :
+   #if shamir_en == 0 or nsamples < 32 * U256_BSELM :
+   if shamir_en == 0 :
      kernel_config['blockD']    = get_shfl_blockD(nsamples)
      shamir_en = 0
    else:
