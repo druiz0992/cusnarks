@@ -91,6 +91,9 @@ void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename);
 void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
 void readU256PKFileHeader_h(pkbin_hfile_t *hfile, const char *filename);
 void readU256PKFile_h(uint32_t *samples, const char *filename, uint32_t nwords);
+void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename);
+void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1cs_idx_t r1cs_idx );
+
 void mpoly_eval_server_h(mpoly_eval_t *mpoly_args);
 void *mpoly_eval_h(void *args);
 //void mpoly_eval_h(uint32_t *pout, const uint32_t *scalar, uint32_t *pin, uint32_t reduce_coeff, uint32_t last_idx, uint32_t pidx);

@@ -76,7 +76,7 @@ IF CUDA_DEF:
   
           #print (in_v.length, self.in_dim, out_v.length, self.out_dim)
           if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
-              print(in_v.length, self.in_dim, out_v.length, sel.out_dim)
+              print(in_v.length, self.in_dim, out_v.length, self.out_dim)
               assert False, "Incorrect arguments"
               return 0.0
    
@@ -616,6 +616,44 @@ def readU256PKFileHeader_h(bytes fname):
     
     return header_d
 
+def readR1CSFile_h(bytes filename):
+    cdef ct.r1csv1_t *r1cs_header = <ct.r1csv1_t *> malloc(sizeof(ct.r1csv1_t))
+
+    uh.creadR1CSFileHeader_h(r1cs_header, filename)
+    
+    cdef ct.uint32_t ncoeff_A, ncoeff_B, ncoeff_C
+    ncoeff_A = r1cs_header.R1CSA_nCoeff
+    ncoeff_B = r1cs_header.R1CSB_nCoeff
+    ncoeff_C = r1cs_header.R1CSC_nCoeff
+    print(ncoeff_A, ncoeff_B, ncoeff_C)
+
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csA_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_A * (NWORDS_256BIT + 1),dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csB_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_B * (NWORDS_256BIT + 1),dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csC_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_C * (NWORDS_256BIT + 1),dtype=np.uint32)
+
+    uh.creadR1CSFile_h(&r1csA_samples[0], filename, r1cs_header, ct.R1CSA_IDX)
+    uh.creadR1CSFile_h(&r1csB_samples[0], filename, r1cs_header, ct.R1CSB_IDX)
+    uh.creadR1CSFile_h(&r1csC_samples[0], filename, r1cs_header, ct.R1CSC_IDX)
+
+    
+    header = {}
+    header['magic_number'] = r1cs_header.magic_number
+    header['version'] = r1cs_header.version
+    header['word_width_bytes'] = r1cs_header.word_width_bytes
+    header['nVars'] = r1cs_header.nVars
+    header['nPubOutputs'] = r1cs_header.nPubOutputs
+    header['nPubInputs'] = r1cs_header.nPubInputs
+    header['nPrivInputs'] = r1cs_header.nPrivInputs
+    header['nConstraints'] = r1cs_header.nConstraints
+
+    header['R1CSA_nCoeff'] = r1cs_header.R1CSA_nCoeff
+    header['R1CSB_nCoeff'] = r1cs_header.R1CSB_nCoeff
+    header['R1CSC_nCoeff'] = r1cs_header.R1CSC_nCoeff
+    
+    free(r1cs_header)
+
+    return header, r1csA_samples, r1csB_samples, r1csC_samples
+  
 def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict header, ct.uint32_t extend):
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
 

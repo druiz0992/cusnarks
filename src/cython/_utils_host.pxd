@@ -56,6 +56,8 @@ cdef extern from "../cuda/utils_host.h" nogil:
     void creadU256CircuitFileHeader_h "readU256CircuitFileHeader_h"( ct.cirbin_hfile_t *hfile, const char *filename)
     void creadU256PKFile_h "readU256PKFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t nwords)
     void creadU256PKFileHeader_h "readU256PKFileHeader_h"( ct.pkbin_hfile_t *hfile, const char *filename)
+    void creadR1CSFileHeader_h "readR1CSFileHeader_h" (ct.r1csv1_t *r1cs_hdr, const char *filename)
+    void creadR1CSFile_h "readR1CSFile_h"(ct.uint32_t *samples, const char *filename, ct.r1csv1_t *r1cs, ct.r1cs_idx_t r1cs_idx )
     void *cmpoly_eval_h "mpoly_eval_h" (ct.mpoly_eval_t *args)
     void cmpoly_eval_server_h "mpoly_eval_server_h" (ct.mpoly_eval_t *args)
     void cr1cs_to_mpoly_h "r1cs_to_mpoly_h" (ct.uint32_t *pout, ct.uint32_t *cin, ct.cirbin_hfile_t *header, ct.uint32_t to_mont, ct.uint32_t pidx, ct.uint32_t extend)
