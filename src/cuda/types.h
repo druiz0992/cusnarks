@@ -44,6 +44,10 @@
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
+#define R1CS_HDR_MAGIC_NUMBER  (0x73633172)
+#define R1CS_HDR_V01           (1)
+#define R1CS_HDR_START_OFFSET_NWORDS (8)
+
 #define WITNESS_HEADER_N_OFFSET_NWORDS (0)
 #define WITNESS_HEADER_SIZE_OFFSET_NWORDS (2)
 #define WITNESS_HEADER_OTHER_OFFSET_NWORDS (3)
@@ -466,4 +470,28 @@ typedef enum{
 
   KERNEL_T_N
 }kernel_t;
+
+typedef struct {
+  uint32_t magic_number;
+  uint32_t version;
+  uint32_t word_width_bytes;
+  uint32_t nVars;
+  uint32_t nPubOutputs;
+  uint32_t nPubInputs;
+  uint32_t nPrivInputs;
+  uint32_t nConstraints;
+
+  uint32_t R1CSA_nCoeff;
+  uint32_t R1CSB_nCoeff;
+  uint32_t R1CSC_nCoeff;
+
+}r1csv1_t;
+
+typedef enum{
+  R1CSA_IDX = 0,
+  R1CSB_IDX = 1,
+  R1CSC_IDX = 2,
+  R1CS_N_IDX = 3
+
+}r1cs_idx_t;
 #endif

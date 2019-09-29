@@ -211,6 +211,11 @@ class GrothSetup(object):
              cir_u256 = readU256CircuitFile_h(self.in_circuit_f.encode("UTF-8"))
              self.cir = cirbin_to_vars(cir_u256)
 
+        elif self.in_circuit_f.endswith('.r1cs'):
+             r1cs_header, r1csa, r1csb, r1csc = readR1CSFile_h(self.in_circuit_f.encode("UTF-8"))
+             self.cir = cirr1cs_to_vars(r1cs_header, r1csa, r1csb, r1csc)
+           
+
         logging.info('############################################## ')
         logging.info(' - NVars        : %s',int(self.cir['nVars']))
         logging.info(' - nOutputs     : %s',int(self.cir['nOutputs']))

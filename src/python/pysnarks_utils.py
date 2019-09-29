@@ -345,7 +345,24 @@ def cirbin_to_vars(ciru256_data):
         return cir
 
     
-    
+def cirr1cs_to_vars(header, r1csA, r1csB, r1csC ):
+        cir = getCircuit()
+
+        cir['nWords']        =  np.uint32()
+        cir['nPubInputs']    =  np.uint32(header['nPubInputs'])
+        cir['nOutputs']      =  np.uint32(header['nPubOutputs'])
+        cir['nVars']         =  np.uint32(header['nVars'])
+        cir['nConstraints']  =  np.uint32(header['nConstraints'])
+        cir['cirformat']     =  np.uint32(ZUtils.FEXT)
+        cir['R1CSA_nWords'] =  np.uint32(r1csA.shape[0])
+        cir['R1CSB_nWords'] =  np.uint32(r1csB.shape[0])
+        cir['R1CSC_nWords'] =  np.uint32(r1csC.shape[0])
+        cir['R1CSA']        =  r1csA
+        cir['R1CSB']       =  r1csB
+        cir['R1CSC']        =  r1csC
+   
+        return cir 
+
 def cirr1cs_to_mpoly(r1cs, cir_header, fmat, extend):
         to_mont = 0
         ZField.set_field(MOD_FIELD)
@@ -527,7 +544,7 @@ def pkbin_get(pk_bin, labels):
     polsA_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT]
     polsB_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 1]
     polsC_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 2]
-    polsH_nWords = (pk_bin[PKBIN_H_DOMAINSIZE_OFFSET]*2-1)*NWORDS_256BIT 
+    #polsH_nWords = (pk_bin[PKBIN_H_DOMAINSIZE_OFFSET]*2-1)*NWORDS_256BIT 
     A_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 3]
     B1_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 4]
     B2_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 5]
@@ -547,9 +564,9 @@ def pkbin_get(pk_bin, labels):
        elif label== 'polsA':
          polsA_offset = offset_data
          ret_val.append(pk_bin[polsA_offset:polsA_offset+polsA_nWords])
-       elif label== 'polsH':
-         polsH_offset = offset_data
-         ret_val.append(pk_bin[polsH_offset:polsH_offset+polsH_nWords])
+       #elif label== 'polsH':
+       #  polsH_offset = offset_data
+       #  ret_val.append(pk_bin[polsH_offset:polsH_offset+polsH_nWords])
        elif label== 'polsB':
          polsB_offset = offset_data + polsA_nWords
          ret_val.append(pk_bin[polsB_offset:polsB_offset+polsB_nWords])

@@ -690,6 +690,107 @@ void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwo
 
 }
 
+void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
+{
+  FILE *ifp = fopen(filename,"rb");
+  uint32_t k=0,i;
+  uint32_t tmp_word, n_coeff;
+
+  r1cs_hdr->R1CSA_nCoeff=0;
+  r1cs_hdr->R1CSB_nCoeff=0;
+  r1cs_hdr->R1CSC_nCoeff=0;
+
+  fread(&r1cs_hdr->magic_number, sizeof(uint32_t), 1, ifp); 
+  if (r1cs_hdr->magic_number != R1CS_HDR_MAGIC_NUMBER){
+    printf("Unexpected R1CS header format\n");
+    fclose(ifp);
+    exit(1);
+  }
+
+  fread(&r1cs_hdr->version, sizeof(uint32_t), 1, ifp); 
+  if (r1cs_hdr->version != R1CS_HDR_V01){
+    printf("Unexpected R1CS version\n");
+    fclose(ifp);
+    exit(1);
+  }
+
+  fread(&r1cs_hdr->word_width_bytes, sizeof(uint32_t), 1, ifp); 
+  if (r1cs_hdr->word_width_bytes != 4){
+    printf("Unexpected R1CS word width\n");
+    fclose(ifp);
+    exit(1);
+  }
+
+  fread(&r1cs_hdr->nVars, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nPubOutputs, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nPubInputs, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nPrivInputs, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nConstraints, sizeof(uint32_t), 1, ifp); 
+
+  while (!feof(ifp)){
+    fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
+    if (k%3 == R1CSA_IDX){
+      r1cs_hdr->R1CSA_nCoeff+= (n_coeff);
+    } else if (k%3 == R1CSB_IDX){
+      r1cs_hdr->R1CSB_nCoeff+= (n_coeff);
+    } else {
+      r1cs_hdr->R1CSC_nCoeff+= (n_coeff);
+    }
+    for (i=0; i< n_coeff; i++){
+      fseek(ifp, 4, SEEK_CUR);
+      fread(&tmp_word, 1, 1, ifp); 
+      fseek(ifp, tmp_word, SEEK_CUR);
+    }
+    k++;
+  }
+  fclose(ifp);
+  
+  return;
+}
+  
+
+void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1cs_idx_t r1cs_idx )
+{
+  FILE *ifp = fopen(filename,"rb");
+  uint32_t tmp_word, n_coeff;
+  uint32_t r1cs_offset=0, r1cs_coeff_offset=1+r1cs->nConstraints, r1cs_val_offset = 1+r1cs->nConstraints;
+  uint32_t k=0, accum_coeffs=0, i,j;
+
+  samples[r1cs_offset++] = r1cs->nConstraints;
+  
+  fseek(ifp, R1CS_HDR_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_SET);
+
+  while (!feof(ifp)){
+    fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
+    if (k%3 == r1cs_idx) {
+      accum_coeffs+= ((uint32_t) n_coeff);
+      samples[r1cs_offset++] = accum_coeffs;
+      r1cs_val_offset += n_coeff;
+      for (i=0; i< n_coeff; i++){
+        fread(&samples[r1cs_coeff_offset++], sizeof(uint32_t), 1, ifp); 
+        fread(&tmp_word, 1,1, ifp);
+        for(j=0; j <tmp_word; j++){
+           fread(&samples[r1cs_val_offset+j], 1, 1, ifp); 
+        }
+        r1cs_val_offset += NWORDS_256BIT;
+      }
+      r1cs_coeff_offset = r1cs_val_offset;
+
+    }  else {
+      for (i=0; i< n_coeff; i++){
+        fseek(ifp, 4, SEEK_CUR);
+        fread(&tmp_word, 1, 1, ifp); 
+        fseek(ifp, tmp_word, SEEK_CUR);
+      }
+    }
+    
+    k++;
+  }
+
+  fclose(ifp);
+}
+
+
 /*
   Read header PK binary file
 

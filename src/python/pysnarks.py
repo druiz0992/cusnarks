@@ -51,8 +51,8 @@ from pysnarks_utils import *
 
 CUMODE_SETUP  = 0
 CUMODE_PROOF  = 1
-CUMODE_SETUP_PROOF  = 2
 
+GP = None
 
 sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
@@ -81,19 +81,19 @@ def init():
     opt['snarkjs'] = cfg.get_snarkjs_folder()
     opt['debug'] = 0
     opt['witness_format'] = FMT_EXT
-    opt['proof_format'] = FMT_EXT
-    opt['public_data_format'] = FMT_EXT
     opt['out_proving_key_format'] = FMT_MONT
     opt['out_proving_key_f'] = None
     opt['verify'] = 0
     opt['batch_size'] = 20
+    opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),2)
+    opt['max_streams'] = get_nstreams()
 
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
 
     parser.add_argument(
-       '-m', '--mode', type=str, help='Operation mode : s|setup, p|proof, sp|setup_proof', required=True)  
+       '-m', '--mode', type=str, help='Operation mode : s|setup, p|proof', required=True)  
 
     help_str = 'Input circuit location (.json or .bin). Default : ' + opt['input_circuit_f']
     parser.add_argument(
@@ -151,15 +151,6 @@ def init():
     parser.add_argument(
        '-pd', '--public_data', type=str, help=help_str, required=False)  
   
-    help_str = 'Output Proof format (normal['+str(FMT_EXT)+'], montgomery['+str(FMT_MONT)+ ']). Default : ' + str(opt['proof_format'])
-    parser.add_argument(
-       '-pf', '--proof_format', type=int, help=help_str, required=False)  
-
-    help_str = 'Output Public Data format (normal['+str(FMT_EXT)+'], montgomery['+str(FMT_MONT)+ ']). Default : ' + str(opt['public_data_f'])
-    parser.add_argument(
-       '-pdf', '--public_data_format', type=int, help=help_str, required=False)  
-
-
     help_str = 'Mininum number of levels for benchmark testing. Default : ' +str(opt['minL'])
     parser.add_argument(
        '-ml', '--min_levels', type=int, help=help_str, required=False)  
@@ -188,9 +179,17 @@ def init():
     parser.add_argument(
        '-df', '--data_folder', type=str, help=help_str, required=False)  
 
-    help_str = 'Default batch size (1 << batch_size). Default ' + str(opt['batch_size'])
+    help_str = 'Batch size (1 << batch_size). Default ' + str(opt['batch_size'])
     parser.add_argument(
        '-bs', '--batch_size', type=int, help=help_str, required=False)  
+
+    help_str = 'Maximum nuumber of GPUs limit. Default ' + str(opt['max_gpus'])
+    parser.add_argument(
+       '-gpu', '--max_gpus', type=int, help=help_str, required=False)  
+
+    help_str = 'Maximum nuumber of Streans limit. Default ' + str(opt['max_streams'])
+    parser.add_argument(
+       '-stream', '--max_streams', type=int, help=help_str, required=False)  
 
 
     return opt, parser
@@ -213,6 +212,12 @@ def run(opt, parser):
     if args.batch_size is not None:
        opt['batch_size'] = args.batch_size
     
+    if args.max_gpus is not None:
+       opt['max_gpus'] = args.max_gpus
+    
+    if args.max_streams is not None:
+       opt['max_streams'] = args.max_streams
+    
 
     if args.data_folder is not None:
         opt['data_f'] = args.data_f
@@ -223,11 +228,10 @@ def run(opt, parser):
     opt['keep_f'] = opt['data_f']
         
     if args.mode != "s" and args.mode != 'setup' and \
-        args.mode != 'p' and args.mode != 'proof' and \
-        args.mode != 'sp' and args.mode != 'setup_proof' :
+        args.mode != 'p' and args.mode != 'proof' :
       parser.print_help()
-      return None
-    
+      
+
     if args.proving_key is not None:
         if '/' in args.proving_key :
             opt['proving_key_f'] = args.proving_key
@@ -252,8 +256,7 @@ def run(opt, parser):
          opt['debug_f'] = opt['debug_f']
 
 
-    if args.mode == 's' or args.mode == 'setup' or   \
-       args.mode == 'sp' or args.mode == 'setup_proof':
+    if args.mode == 's' or args.mode == 'setup':
 
       opt['mode'] = CUMODE_SETUP
 
@@ -292,13 +295,10 @@ def run(opt, parser):
                     snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'])
       
       GS.setup()
-      return None
 
-
-    if args.mode == 'p' or args.mode == 'proof' or  \
-       args.mode == 'sp' or args.mode == 'setup_proof':
+    if args.mode == 'p' or args.mode == 'proof':
       opt['mode'] = CUMODE_PROOF
-  
+
       if args.witness is not None:
         if '/' in args.witness:
            opt['witness_f'] = args.witness
@@ -320,11 +320,8 @@ def run(opt, parser):
           else :
              opt['public_data_f'] = opt['data_f'] + args.public_data
 
-      if args.proof_format is not None:
-         opt['proof_format'] = args.proof_format
-   
-      if args.public_data_format is not None:
-         opt['public_data_format'] = args.public_data_format
+      if args.verify is not None:
+         opt['verify'] = args.verify
 
       if args.out_proving_key is not None:
          if '/' in args.out_proving_key:
@@ -334,37 +331,33 @@ def run(opt, parser):
 
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
-
-      if args.verify is not None:
-         opt['verify'] = args.verify
     
       start = time.time()
+
       GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
-                      out_pk_format = opt['out_proving_key_format'],
-                      out_proof_f=opt['proof_f'], out_public_f=opt['public_data_f'],
-                      out_proof_format=opt['proof_format'], out_public_format=opt['public_data_format'], test_f=opt['debug_f'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], verify_en=opt['verify'], keep_f=opt['keep_f'],
-                      batch_size = opt['batch_size'] )
-      
+                      out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'],
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
       end = time.time() - start
-
       print("GP init : "+str(end))
-      GP.proof(opt['witness_f'])
-      return GP
 
-
+      GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'],
+              batch_size=opt['batch_size'], verify_en=opt['verify'], n_gpus=opt['max_gpus'], n_streams=opt['max_streams'] )
+      
   
 if __name__ == '__main__':
 
    opt, parser = init()
 
-   GP = run(opt, parser)
+   run(opt, parser)
+
    """
    while True:
-      GP = run(opt, parser)
-      if GP is None:
-          break
-      print("Enter new witness file: ")
+      run(opt, parser)
+
+      sys.stdout.write('Enter new witness file: ')
+      input_witness= sys.stdin.readline().rstrip()
+
+
       input_witness = input()
       opt['witness_f'] = opt['data_f'] + input_witness
       GP.proof(opt['witness_f'])

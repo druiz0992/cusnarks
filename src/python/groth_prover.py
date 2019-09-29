@@ -76,10 +76,9 @@ import cusnarks_config as cfg
 
 class GrothProver(object):
     
-    def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',  out_proof_f = None,
-                 out_public_f = None, out_pk_f=None, out_pk_format=FMT_MONT,
-                 out_proof_format= FMT_EXT, out_public_format=FMT_EXT, test_f=None, 
-                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, batch_size=20):
+    def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',
+                 out_pk_f=None, out_pk_format=FMT_MONT, test_f=None, 
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None):
 
         # Check valid folder exists
         if keep_f is None:
@@ -108,19 +107,18 @@ class GrothProver(object):
         self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
         np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
-        if batch_size > 20:
-            batch_size = 20
-        self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
-        self.ecbn128 = ECBN128(self.batch_size,   seed=self.seed)
-        self.ec2bn128 = EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS)* self.batch_size), seed=self.seed)
-        self.cuzpoly = ZCUPoly(5*self.batch_size  + 2, seed=self.seed)
+        self.batch_size = None
+        batch_size = 1<< 20
+        self.ecbn128 = ECBN128(batch_size,   seed=self.seed)
+        self.ec2bn128 = EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS)* batch_size), seed=self.seed)
+        self.cuzpoly = ZCUPoly(5*batch_size  + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
         self.out_proving_key_format = out_pk_format
         self.proving_key_f = proving_key_f
         self.verification_key_f = verification_key_f
-        self.out_proof_f = out_proof_f
-        self.out_public_f = out_public_f
+        self.out_proof_f = None
+        self.out_public_f = None
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group 
         ZField(self.curve_data['prime'])
@@ -132,20 +130,17 @@ class GrothProver(object):
         ZField.set_field(MOD_GROUP)
 
         self.pk = getPK()
-        #TODO : limit to 2 GPUs 
-        self.n_gpu = min(get_ngpu(max_used_percent=95.),2)
+
+        self.n_gpu = get_ngpu(max_used_percent=95.)
         if self.n_gpu == 0:
           logging.error('No available GPUs')
           sys.exit(1)
           
-        self.n_streams = get_nstreams()
-
-        self.initECVal()
 
         self.public_signals = None
         self.witness_f = None
         self.snarkjs = snarkjs
-        self.verify_en = verify_en
+        self.verify_en = None
 
         ZField.set_field(MOD_FIELD)
         self.t_GP = {}
@@ -165,22 +160,17 @@ class GrothProver(object):
            self.test_f= self.keep_f + '/' + test_f
 
         logging.info('#################################### ')
-        logging.info('Staring Groth prover with the follwing parameters :')
+        logging.info('Initializing Groth prover with the follwing parameters :')
         logging.info(' - curve : %s',curve)
         logging.info(' - proving_key_f : %s', proving_key_f)
         logging.info(' - verification_key_f : %s',verification_key_f)
-        logging.info(' - out_proof_f : %s',out_proof_f)
         logging.info(' - out_pk_f : %s',out_pk_f)
         logging.info(' - out_pk_format : %s',out_pk_format) 
-        logging.info(' - out_proof_format : %s',out_proof_format)
-        logging.info(' - out_public_format :  %s',out_public_format)
         logging.info(' - test_f : %s',self.test_f)
         logging.info(' - benchmark_f : %s', benchmark_f)
         logging.info(' - seed : %s', self.seed)
         logging.info(' - snarkjs : %s', snarkjs)
-        logging.info(' - verify_en : %s', verify_en)
         logging.info(' - keep_f : %s', keep_f)
-        logging.info(' - batch_size : %s', batch_size)
         logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info('#################################### ')
   
@@ -406,12 +396,53 @@ class GrothProver(object):
       logging.info('')
       logging.info('')
 
-    def proof(self, witness_f, mproc = False):
-      self.witness_f = witness_f
-      logging.info('#################################### ')
-      logging.info("Starting proof...")
+    def proof(self, witness_f, out_proof_f , out_public_f, batch_size=20, verify_en=0, n_gpus=None, n_streams=None):
 
-      self.gen_proof(mproc)
+      # Initaliization
+      start = time.time()
+
+      self.out_proof_f = out_proof_f
+      self.out_public_f = out_public_f
+      self.witness_f = witness_f
+
+      self.verify_en = verify_en
+      self.t_GP = {}
+
+      if batch_size > 20:
+            batch_size = 20
+
+      self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
+
+      self.n_gpu = min(get_ngpu(max_used_percent=95.),n_gpus)
+      if self.n_gpu == 0:
+          logging.error('No available GPUs')
+          sys.exit(1)
+
+      if n_streams > get_nstreams():
+        self.n_streams = get_nstreams()
+      else :
+        self.n_streams = n_streams
+
+      self.initECVal()
+
+      logging.info('#################################### ')
+      logging.info("Starting new proof...")
+      logging.info(' - out_proof_f : %s',out_proof_f)
+      logging.info(' - out_public_f : %s',out_public_f)
+      logging.info(' - witness_f : %s',witness_f)
+      logging.info(' - verify_en : %s', verify_en)
+      logging.info(' - batch_size : %s', batch_size)
+      logging.info(' - gpus used : %s', self.n_gpu)
+      logging.info(' - streams used: %s', self.n_streams)
+
+      self.t_GP['init'] = time.time() - start
+      print("Proof init : "+str(self.t_GP['init']))
+      ##### Starting proof
+
+      self.gen_proof()
+
+      self.t_GP['Proof'] = time.time() - start
+      print("Total Proof: "+str(self.t_GP['Proof']))
 
       logging.info("Proof completed" )
       logging.info('#################################### ')
@@ -518,7 +549,7 @@ class GrothProver(object):
        
         return snarkjs
 
-    def gen_proof(self, mproc=False):
+    def gen_proof(self ):
         """
           public_signals, pi_a_eccf1, pi_b_eccf2, pi_c_eccf1 
 
@@ -580,8 +611,6 @@ class GrothProver(object):
         # Beginning of P1 - Read Witness
         ######################
         start = time.time()
-        start_p = time.time()
-
         # Read witness info
         self.read_witness_data()
 
@@ -613,17 +642,15 @@ class GrothProver(object):
         logging.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
         logging.info('#################################### ')
 
-        pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize', 'delta_1', 'polsA'])
+        pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize', 'delta_1'])
 
         #large input : hExps. I can overwrite it provided that i don't require comparing to snarkjs
         nVars = pk_bin[0][0]
         nPublic = pk_bin[1][0]
         domainSize = pk_bin[2][0]
         delta_1 = pk_bin[3]
-        polH = np.reshape(pk_bin[4][:(domainSize-1)*NWORDS_256BIT],((domainSize-1),NWORDS_256BIT))
 
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
-
 
         nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
 
@@ -687,7 +714,7 @@ class GrothProver(object):
         ######################
         start = time.time()
 
-        self.calculateH()
+        polH = self.calculateH()
 
         end = time.time()
         self.t_GP['H'] = end - start
@@ -733,9 +760,6 @@ class GrothProver(object):
         print("Reduce 2 : "+str(end - start1))
         print("Mexp Total : "+str(self.t_GP['Mexp']))
 
-        self.t_GP['Proof'] = end - start_p
-
-        print("Total Proof: "+str(self.t_GP['Proof']))
 
         return 
  
@@ -1044,7 +1068,7 @@ class GrothProver(object):
         pidx = ZField.get_field()
         reduce_coeff = 0  
         polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
-        np.copyto(pX, polX_T)
+        return polX_T
 
 
     def calculateH(self):
@@ -1052,19 +1076,18 @@ class GrothProver(object):
         start_h = time.time()
 
         ZField.set_field(MOD_FIELD)
-        pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB', 'polsC', 'polsH'])
+        pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-        pH = np.reshape(pk_bin[5][:(2*m-1)*NWORDS_256BIT],((2*m-1),NWORDS_256BIT))
 
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
         start = time.time()
 
-        self.evalPoly(pA, nVars, m)
-        self.evalPoly(pB, nVars, m)
+        pA_T = self.evalPoly(pA, nVars, m)
+        pB_T = self.evalPoly(pB, nVars, m)
 
         end = time.time()
         self.t_GP['Eval'] = end-start
@@ -1073,29 +1096,25 @@ class GrothProver(object):
 
         start = time.time()
 
-        ifft_params = ntt_build_h(pA.shape[0])
+        ifft_params = ntt_build_h(pA_T.shape[0])
 
         if self.n_bits_roots < ifft_params['levels']:
           logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
           sys.exit(1)
     
         # TEST Vectors
-        #pA = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
-        #pB = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
+        #pA_T = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
+        #pB_T = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
 
-        ifft_params = ntt_build_h(pA.shape[0])
-        polAB_S,t1 = zpoly_interp_and_mul_cuda(
+        pH,t1 = zpoly_interp_and_mul_cuda(
                                               self.cuzpoly,
-                                              np.concatenate((pA,pB)),
+                                              np.concatenate((pA_T,pB_T)),
                                               ifft_params, 
                                               ZField.get_field(), 
                                               self.roots_rdc_u256,
                                               self.batch_size, n_gpu=self.n_gpu)
 
 
-        np.copyto(pH[:m-1],polAB_S[m:-1])
-        del polAB_S
-
         print("interpol/Multiply : "+str(time.time()-start))
   
-        return
+        return pH[m:-1]

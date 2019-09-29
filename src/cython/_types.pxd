@@ -157,6 +157,23 @@ cdef extern from "types.h":
     uint32_t max_threads
     uint32_t thread_id
     uint32_t pidx
+
+  ctypedef struct r1csv1_t:
+    uint32_t magic_number
+    uint32_t version
+    uint32_t word_width_bytes
+    uint32_t nVars
+    uint32_t nPubOutputs
+    uint32_t nPubInputs
+    uint32_t nPrivInputs
+    uint32_t nConstraints
+
+    uint32_t R1CSA_nCoeff
+    uint32_t R1CSB_nCoeff
+    uint32_t R1CSC_nCoeff
+
+  ctypedef enum r1cs_idx_t:
+     R1CSA_IDX=0, R1CSB_IDX, R1CSC_IDX, R1CS_N_IDX
   
   ctypedef enum misc_const_len_t:
     MISC_K_1 = 0, MISC_K_INF = 2, MISC_K_INF2 = 5, MISC_K_N = 11 
