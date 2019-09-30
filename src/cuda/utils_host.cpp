@@ -3074,28 +3074,40 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
   }
   
   if (add_in){
-    memcpy(x1,x,NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
-    memcpy(&x1[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    if (n > 1) {
+      memcpy(x1,x,NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x1[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
 
-    memcpy(x2,&x[ECP_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
-    memcpy(&x2[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      memcpy(x2,&x[ECP_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x2[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    } else {
+      memcpy(zout,x,NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&zout[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    }
 
   } else {
-    x1_ptr = x;
-    x2_ptr = &x[ECP_JAC_OUTDIMS*NWORDS_256BIT];
-  }
-
-  ec_jacadd_h(zout,x1_ptr,x2_ptr,pidx);
-
-  for (i=2; i<n; i++){
-    if (add_in){
-      memcpy(x1,&x[i*ECP_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
-      memcpy(&x1[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    if (n > 1){
+      x1_ptr = x;
+      x2_ptr = &x[ECP_JAC_OUTDIMS*NWORDS_256BIT];
     } else {
-      x1_ptr = &x[i*ECP_JAC_OUTDIMS*NWORDS_256BIT];
+      memcpy(zout,x,NWORDS_256BIT*ECP_JAC_OUTDIMS*sizeof(uint32_t));
     }
-    ec_jacadd_h(zout,zout,x1_ptr,pidx);
+    
   }
+
+  if (n > 1) {
+    ec_jacadd_h(zout,x1_ptr,x2_ptr,pidx);
+
+    for (i=2; i<n; i++){
+      if (add_in){
+        memcpy(x1,&x[i*ECP_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+        memcpy(&x1[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      } else {
+        x1_ptr = &x[i*ECP_JAC_OUTDIMS*NWORDS_256BIT];
+      }
+      ec_jacadd_h(zout,zout,x1_ptr,pidx);
+    }
+   }
 
    if (to_aff){
      ec_jac2aff_h(z,zout,1,pidx, strip_last);
@@ -3121,30 +3133,42 @@ void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uin
   }
   
   if (add_in){
-    memcpy(x1,x,NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
-    memcpy(&x1[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
-    memset(&x1[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
-
-    memcpy(x2,&x[ECP2_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
-    memcpy(&x2[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
-    memset(&x2[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
-  } else {
-    x1_ptr = x;
-    x2_ptr = &x[ECP2_JAC_OUTDIMS*NWORDS_256BIT];
-  }
-
-  ec2_jacadd_h(zout,x1_ptr,x2_ptr,pidx);
-
-  for (i=2; i<n; i++){
-    if (add_in){
-      memcpy(x1,&x[i*ECP2_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+    if (n > 1){
+      memcpy(x1,x,NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
       memcpy(&x1[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
       memset(&x1[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
 
+      memcpy(x2,&x[ECP2_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x2[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      memset(&x2[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
     } else {
-      x1_ptr = &x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+      memcpy(zout,x,NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&zout[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      memset(&zout[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
     }
-    ec2_jacadd_h(zout,zout,x1_ptr,pidx);
+  } else {
+    if (n > 1){
+      x1_ptr = x;
+      x2_ptr = &x[ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+    } else {
+      memcpy(zout,x,NWORDS_256BIT*ECP2_JAC_OUTDIMS*sizeof(uint32_t));
+    }
+  }
+
+  if (n > 1){
+    ec2_jacadd_h(zout,x1_ptr,x2_ptr,pidx);
+
+    for (i=2; i<n; i++){
+      if (add_in){
+        memcpy(x1,&x[i*ECP2_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+        memcpy(&x1[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+        memset(&x1[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+  
+      } else {
+        x1_ptr = &x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+      }
+      ec2_jacadd_h(zout,zout,x1_ptr,pidx);
+    }
   }
 
    if (to_aff){

@@ -211,6 +211,20 @@ class GrothProver(object):
         np.copyto(self.pk, pk_bin)
         del pk_bin
              
+        pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
+        nVars = int(pkbin_vars[0][0])
+        domainSize = int(pkbin_vars[1][0])
+
+        self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
+        self.scl_array = np.frombuffer(
+                     self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
+        # Size is domainSize To store polH + three additional coeffs
+        self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
+        self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
+          
+        self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
+        self.sorted_scl_array = np.frombuffer(
+                             self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
 
     def initECVal(self):
         self.pi_a_eccf1 = np.reshape(
@@ -262,9 +276,6 @@ class GrothProver(object):
            nVars = int(pkbin_vars[0][0])
            domainSize = int(pkbin_vars[1][0])
 
-           self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
-           self.scl_array = np.frombuffer(
-                     self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
            if self.witness_f.endswith('.json'):
              f = open(self.witness_f,'r')
              np.copyto(
@@ -319,14 +330,6 @@ class GrothProver(object):
            writeWitnessFile_h(np.reshape(self.scl_array,-1),self.w_file.encode("UTF-8"))
            """
 
-           # Size is domainSize To store polH + three additional coeffs
-           self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
-           self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
-          
-           self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
-           self.sorted_scl_array = np.frombuffer(
-                             self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT)
-                                                )
        else:
           logging.error('Witness file %s doesn\'t exist', self.witness_f)
           sys.exit(1)
@@ -655,8 +658,6 @@ class GrothProver(object):
         nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
 
         next_gpu_idx = 0
-        # Set to one to force sync stream
-        #self.n_streams = 1
         first_stream_idx = min(self.n_streams-1,1)
 
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps'])
@@ -718,7 +719,6 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['H'] = end - start
-
 
         ######################
         # Beginning of P5
@@ -993,6 +993,12 @@ class GrothProver(object):
                                        step==4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
           if stream_id == 0:
              self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
+             try:
+               cuda_ec128.streamDel(gpu_id, stream_id)
+             except ValueError:
+               logging.error('Exception occurred when getting EC results. Exiting program...')
+               sys.exit(1)
+               
           else :
              pending_dispatch_table.append(p)
              n_dispatch +=1
@@ -1002,7 +1008,11 @@ class GrothProver(object):
              if n_dispatch == n_par_batches:
                  n_dispatch=0
 
-                 self.getECResults(pending_dispatch_table)
+                 try:
+                    self.getECResults(pending_dispatch_table)
+                 except ValueError:
+                    logging.error('Exception occurred when getting EC results. Exiting program...')
+                    sys.exit(1)
                  pending_dispatch_table = []
 
        # Collect final results
@@ -1105,7 +1115,6 @@ class GrothProver(object):
         # TEST Vectors
         #pA_T = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
         #pB_T = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
-
         pH,t1 = zpoly_interp_and_mul_cuda(
                                               self.cuzpoly,
                                               np.concatenate((pA_T,pB_T)),

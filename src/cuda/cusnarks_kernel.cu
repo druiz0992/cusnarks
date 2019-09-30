@@ -581,11 +581,14 @@ void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)
       gpu_id, stream_id);
   // free params, in_host_data and out_host_data
 
-  // free params, in_host_data and out_host_data
+  logInfo("Release in_data_host[%d][%d] : %x\n",gpu_id, stream_id,in_data_host[gpu_id][stream_id]);
   CCHECK(cudaFreeHost(in_data_host[gpu_id][stream_id]));
+
+  logInfo("Release out_data_host[%d][%d] : %x\n",gpu_id, stream_id,out_data_host[gpu_id][stream_id]);
   CCHECK(cudaFreeHost(out_data_host[gpu_id][stream_id]));
-  //TODO pending release params host
-  //CCHECK(cudaFreeHost(params_host[gpu_id][stream_id]));
+
+  logInfo("Release params_hostt[%d][%d] : %x\n",gpu_id, stream_id,params_host[gpu_id][stream_id]);
+  CCHECK(cudaFreeHost(params_host[gpu_id][stream_id]));
 
 }
 

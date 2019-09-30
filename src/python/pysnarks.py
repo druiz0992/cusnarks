@@ -183,11 +183,11 @@ def init():
     parser.add_argument(
        '-bs', '--batch_size', type=int, help=help_str, required=False)  
 
-    help_str = 'Maximum nuumber of GPUs limit. Default ' + str(opt['max_gpus'])
+    help_str = 'Maximum number of GPUs limit. Default ' + str(opt['max_gpus'])
     parser.add_argument(
        '-gpu', '--max_gpus', type=int, help=help_str, required=False)  
 
-    help_str = 'Maximum nuumber of Streans limit. Default ' + str(opt['max_streams'])
+    help_str = 'Maximum number of Streans limit. Default ' + str(opt['max_streams'])
     parser.add_argument(
        '-stream', '--max_streams', type=int, help=help_str, required=False)  
 
@@ -334,6 +334,7 @@ def run(opt, parser):
     
       start = time.time()
 
+      
       GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'],
                       benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
@@ -345,6 +346,8 @@ def run(opt, parser):
       
   
 if __name__ == '__main__':
+   import socket
+   import threading 
 
    opt, parser = init()
 
