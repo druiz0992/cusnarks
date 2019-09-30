@@ -41,8 +41,8 @@
 
 AsyncBuf::AsyncBuf(uint32_t nelems, uint32_t elsize):max_nelems(nelems), el_size(elsize)
 {
-    logInfo("Nelems : %d, Elsize : %d\n",nelems, elsize);	
     CCHECK(cudaMallocHost((void **)&buffer, nelems*el_size));
+    logInfo("Nelems : %d, Elsize : %d, Buffer : %x\n",nelems, elsize, buffer);	
 }        
 
 AsyncBuf::~AsyncBuf()

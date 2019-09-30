@@ -688,10 +688,22 @@ def zpoly_interp_and_mul_single_cuda(pysnark, vector, interp_params, fidx, roots
      # Data fits in single kernel lot, so no need to use streams
      zpoly_vector, t_interp = zpoly_interp_cuda(pysnark, zpoly_vector, interp_params,
                                   fidx, gpu_id=0, stream_id=0)
+     try:
+       pysnark.streamDel(0,0)
+     except ValueError:
+       print("Error releasing stream")
+       sys.exit(1)
+
      if mul == 1:
         ifft_params = ntt_build_h(zpoly_vector.shape[0])
         zpoly_vector,t_ifft = zpoly_fft_cuda(pysnark, zpoly_vector,ifft_params, fidx,
                                  as_mont=0, roots=roots, fft=0, gpu_id=0, stream_id=0)
+        try:
+          pysnark.streamDel(0,0)
+        except ValueError:
+          print("Error releasing stream")
+          sys.exit(1)
+
      t = t_interp + t_ifft
 
      return zpoly_vector, t
@@ -910,23 +922,19 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2)
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2) 
 
-     #n_streams = get_nstreams()
-     #dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
-     #pending_dispatch_table = []
-     #n_dispatch = 0
-     #n_par_batches = n_gpu * max((n_streams - 1),1)
-     #n_par_batches = 0
-     #voffset1_ext = 0
-     #voffset2_ext = vlen
+     n_streams = get_nstreams()
+     #n_streams = 1
+     dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
+     pending_dispatch_table = []
+     n_dispatch = 0
+     n_par_batches = n_gpu * max((n_streams - 1),1)
 
      cols_idx = np.arange(Npoints_pass1)
      for i in range(nbatches):
-        #de = dispatch_table[i]
-        #gpu_id = de[3]
-        #stream_id = de[4]
+        de = dispatch_table[i]
+        gpu_id = de[3]
+        stream_id = de[4]
 
-        gpu_id    = 0
-        stream_id = 0
 
         # Add samples
         zpoly_vector[:nsamples] = np.copy(vector[voffset1:voffset1+nsamples])
@@ -937,41 +945,33 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(interp_params, nsamples,
                                                                  len(zpoly_vector), fidx, roots_W1_len,
-                                                                 #return_offset=nsamples*NWORDS_256BIT, n_pass=0)
                                                                  return_offset=0, n_pass=0)
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=4)
 
         if stream_id == 0:
-          pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
-          vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-          vector[voffset2:voffset2+nsamples] = np.copy(result[2*nsamples:])
+          pAB_vector[voffset1:voffset1+nsamples] = result[nsamples:2*nsamples]
+          vector[voffset1:voffset1+nsamples] = result[:nsamples]
+          vector[voffset2:voffset2+nsamples] = result[2*nsamples:]
+          try:
+            pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+            print("Error releasing stream")
+            sys.exit(1)
         else :
            pending_dispatch_table.append(de)
            n_dispatch+=1
      
            if n_dispatch == n_par_batches:
-             getFFTResults(pysnark, pending_dispatch_table, 0)
-             nsamples_ext = int(result.shape[0]/3)
-             #pAB_vector[voffset1_ext:voffset1_ext+nsamples_ext] = np.copy(result2[:nsamples_ext])
-             #vector[voffset1_ext:voffset1_ext+nsamples_ext] = np.copy(result2[nsamples_ext:2*nsamples_ext])
-             #vector[voffset2_ext:voffset2_ext+nsamples_ext] = np.copy(result2[2*nsamples_ext:])
+             getFFTResults(pysnark, pending_dispatch_table, vector, 0, vector2=pAB_vector)
              pending_dispatch_table = []
              n_dispatch = 0
-             voffset1_ext+=nsamples_ext
-             voffset2_ext+=nsamples_ext
 
         voffset1+=nsamples
         voffset2+=nsamples
 
-     """
-     if len(pending_dispatch_table):
-        result = getFFTResults(pysnark, pending_dispatch_table, 0)
-        nsamples_ext = int(result.shape[0]/3)
-        pAB_vector[voffset1_ext:voffset1_ext+nsamples_ext] = np.copy(result[:nsamples_ext])
-        vector[voffset1_ext:voffset1_ext+nsamples_ext] = np.copy(result[nsamples_ext:2*nsamples_ext])
-        vector[voffset2_ext:voffset2_ext+nsamples_ext] = np.copy(result[2*nsamples_ext:])
-        pending_dispatch_table = []
-     """
+     getFFTResults(pysnark, pending_dispatch_table, vector, 0, vector2=pAB_vector)
+     pending_dispatch_table = []
+     n_dispatch = 0
 
      #Transpose and Take IFFT (second pass)
      voffset1 = 0
@@ -980,12 +980,10 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass2, Npoints_pass1) 
 
      for i in range(nbatches):
-        #de = dispatch_table[i]
-        #gpu_id    = de[3]
-        #stream_id = de[4]
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
 
-        gpu_id    = 0
-        stream_id = 0
 
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
         zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
@@ -1001,8 +999,13 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=5)
 
         if stream_id == 0:
-           vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-           vector[voffset2:voffset2+nsamples] = np.copy(result[nsamples:])
+           vector[voffset1:voffset1+nsamples] = result[:nsamples]
+           vector[voffset2:voffset2+nsamples] = result[nsamples:]
+           try:
+              pysnark.streamDel(gpu_id,stream_id)
+           except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
 
         else:
            pending_dispatch_table.append(de)
@@ -1019,11 +1022,10 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         voffset2+=nsamples
  
 
-     """
      getFFTResults(pysnark, pending_dispatch_table, vector, 1)
      pending_dispatch_table = []
-     """
-         
+     n_dispatch = 0
+
      vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2) 
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2)
 
@@ -1041,12 +1043,9 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
      cols_idx = np.arange(Npoints_pass1)
      for i in range(nbatches):
-        #de = dispatch_table[i]
-        #gpu_id    = de[3]
-        #stream_id = de[4]
-
-        gpu_id    = 0
-        stream_id = 0
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
 
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
         zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
@@ -1056,13 +1055,17 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(interp_params, nsamples,
                                                                  3*nsamples, fidx, roots_W1_len,
-                                                                 #return_offset=2*nsamples*NWORDS_256BIT, n_pass=2)
                                                                  return_offset=0, n_pass=2)
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=4)
 
         if stream_id==0:
-          vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-          vector[voffset2:voffset2+nsamples] = np.copy(result[nsamples:])
+          vector[voffset1:voffset1+nsamples] = result[:nsamples]
+          vector[voffset2:voffset2+nsamples] = result[nsamples:]
+          try:
+              pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1077,10 +1080,9 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         voffset2+=nsamples
 
 
-     """
      getFFTResults(pysnark, pending_dispatch_table, vector, 2)
      pending_dispatch_table = []
-     """
+     n_dispatch = 0
 
 
      #Transpose and Take FFT (second pass)
@@ -1090,12 +1092,10 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass2, Npoints_pass1) 
 
      for i in range(nbatches):
-        #de = dispatch_table[i]
-        #gpu_id    = de[3]
-        #stream_id = de[4]
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
 
-        gpu_id    = 0
-        stream_id = 0
 
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
         zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
@@ -1107,7 +1107,12 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels = 5)
 
         if stream_id == 0:
-           vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
+           vector[voffset1:voffset1+nsamples] = result[:nsamples]
+           try:
+              pysnark.streamDel(gpu_id,stream_id)
+           except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1123,50 +1128,38 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         t+=t_fft
 
 
-     """
      getFFTResults(pysnark, pending_dispatch_table, vector, 3)
-     pending_dispatch_table = []
-     """
-     
+
      vector[1::2] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2)
      vector[::2] = zpoly_transpose(pAB_vector, Npoints_pass2, Npoints_pass1)
      
      return vector, t
 
 #TODO review this function
-def  getFFTResults(pysnark, dispatch_table, n_pass):
-       # For interpolation steps 0,1 and 2, input vector 1 includes two vectors
-       start_idx = dispatch_table[0][1]
-       end_idx = dispatch_table[-1][2]
-       nsamples = end_idx - dispatch_table[-1][1]
-       if n_pass < 3:
-         vlen = end_idx - start_idx
-         out_vector = np.zeros((3*vlen, NWORDS_256BIT), dtype=np.uint32)
-       # For interpolation step 3 or multiplication, input vector 1 includes a single vector
-       #else:
-       #  vlen = in_vector1.shape[0]
-
+def  getFFTResults(pysnark, dispatch_table, vector, n_pass, vector2=None):
        for bidx,p in enumerate(dispatch_table):
           gpu_id = p[3]
           stream_id = p[4]
-          #nsamples = p[2] - p[1]
-          #start_idx = p[1]
-          #end_idx = p[2]
+          nsamples = p[2] - p[1]
+          start_idx = p[1]
+          end_idx = p[2]
           result, t = pysnark.streamSync(gpu_id,stream_id)
           
           # Step 0 interpolation : output is 3 vectors
           if n_pass == 0:
-            #in_vector2[start_idx:end_idx] =result[:nsamples]
-            out_vector[p[1]-start_idx:p[2]-start_idx] = np.copy(result[:nsamples])
-            out_vector[vlen+p[1]-start_idx:vlen+p[2]-start_idx] = np.copy(result[nsamples:2*nsamples])
-            out_vector[2*vlen+p[1]-start_idx:2*vlen+p[2]-start_idx] = np.copy(result[2*nsamples:])
-
-          #in_vector1[start_idx:end_idx] = result[nsamples:2*nsamples]
-
-          #if n_pass < 3:
-            #in_vector1[vlen+start_idx:vlen+end_idx] = result[2*nsamples:]
-
-       #return out_vector
+            vlen = int(vector.shape[0]/2)
+            vector[start_idx:end_idx] = result[:nsamples]
+            vector[vlen+start_idx:vlen+end_idx] = result[2*nsamples:]
+            vector2[start_idx:end_idx] = result[nsamples:2*nsamples]
+          elif n_pass <= 2:
+            vlen = int(vector.shape[0]/2)
+            vector[start_idx:end_idx] = result[:nsamples]
+            vector[vlen+start_idx:vlen+end_idx] = result[nsamples:]
+          elif n_pass == 3:
+             vector[start_idx:end_idx] = result[:nsamples]
+          # Step 4,5 interpolation : output is 1 vector
+          elif n_pass >= 4:
+              vector[start_idx:end_idx] = result
 
 def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n_gpu=1):
      #vector = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<21 , 1<<21 )
@@ -1206,21 +1199,17 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
      voffset1 = 0
      vector = zpoly_transpose(vector, Npoints_pass1, Npoints_pass2)
 
-     ## TODO I launch single stream and single GPU as there is no benefit in several??
-     #n_streams = get_nstreams()
-     #dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
-     #pending_dispatch_table = []
-     #n_dispatch = 0
-     #n_par_batches = n_gpu * max((n_streams - 1),1)
+     n_streams = get_nstreams()
+     dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
+     pending_dispatch_table = []
+     n_dispatch = 0
+     n_par_batches = n_gpu * max((n_streams - 1),1)
                                     
      cols_idx = np.arange(Npoints_pass1)
      for i in range(nbatches):
-        #de = dispatch_table[i]
-        #gpu_id    = de[3]
-        #stream_id = de[4]
-
-        gpu_id    = 0
-        stream_id = 0
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
 
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
 
@@ -1237,6 +1226,11 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         if stream_id == 0:
           vector[voffset1:voffset1+nsamples] = result
+          try:
+              pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1249,10 +1243,8 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         voffset1+=nsamples
 
-     """
      getFFTResults(pysnark, pending_dispatch_table, vector, 4)
      pending_dispatch_table = []
-     """
 
 
      #Transpose and Take IFFT (second pass)
@@ -1260,12 +1252,10 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
      vector = zpoly_transpose(vector, Npoints_pass2, Npoints_pass1) 
 
      for i in range(nbatches):
-        #de = dispatch_table[i]
-        #gpu_id    = de[3]
-        #stream_id = de[4]
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
 
-        gpu_id    = 0
-        stream_id = 0
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(mul_params, nsamples,
@@ -1277,6 +1267,11 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         if stream_id == 0:
           vector[voffset1:voffset1+nsamples] = result
+          try:
+              pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1290,10 +1285,8 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         voffset1+=nsamples
 
-     """
      getFFTResults(pysnark, pending_dispatch_table, vector, 5)
      pending_dispatch_table = []
-     """
 
      vector = zpoly_transpose(vector, Npoints_pass1, Npoints_pass2)
 

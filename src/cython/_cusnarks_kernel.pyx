@@ -201,7 +201,7 @@ IF CUDA_DEF:
 
           free(kconfig)
   
-          return np.asarray(kdata).reshape(-1,in_vec.shape[1]), exec_time
+          return np.copy(np.asarray(kdata).reshape(-1,in_vec.shape[1])), exec_time
 
       def streamDel(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
           self._cusnarks_ptr.streamDel(gpu_id, stream_id)
@@ -625,7 +625,6 @@ def readR1CSFile_h(bytes filename):
     ncoeff_A = r1cs_header.R1CSA_nCoeff
     ncoeff_B = r1cs_header.R1CSB_nCoeff
     ncoeff_C = r1cs_header.R1CSC_nCoeff
-    print(ncoeff_A, ncoeff_B, ncoeff_C)
 
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csA_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_A * (NWORDS_256BIT + 1),dtype=np.uint32)
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csB_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_B * (NWORDS_256BIT + 1),dtype=np.uint32)
