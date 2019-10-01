@@ -62,6 +62,9 @@ from constants import *
 from pysnarks_utils import *
 import multiprocessing as mp
 from cuda_wrapper import *
+import socket
+import sys
+import json_socket
 
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 try:
@@ -78,7 +81,7 @@ class GrothProver(object):
     
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None, 
-                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None):
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, start_server=0):
 
         # Check valid folder exists
         if keep_f is None:
@@ -130,6 +133,7 @@ class GrothProver(object):
         ZField.set_field(MOD_GROUP)
 
         self.pk = getPK()
+        self.verify = 0
 
         self.n_gpu = get_ngpu(max_used_percent=95.)
         if self.n_gpu == 0:
@@ -225,6 +229,41 @@ class GrothProver(object):
         self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
         self.sorted_scl_array = np.frombuffer(
                              self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
+
+
+        if start_server:
+           jsocket = json_socket.jsonSocket()
+
+           s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+           s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+           s.bind((jsocket.host,jsocket.port))
+           s.listen(1)
+           print('Server ready...')
+           while True: # Accept connections from multiple clients
+               logging.info('Listening for client...')
+               conn, addr = s.accept()
+               logging.info('New connecton from address %s', addr)
+               msg = jsocket.receive_message(conn)
+               if len(msg):
+                 # Call some action and return results
+                 parsed_dict = ast.literal_eval(json.loads(json.dumps(msg)))
+                 if 'stop_server' in parsed_dict and parsed_dict['stop_server'] == 1:
+                    logging.info('Stopping server')
+                    sys.exit(1)
+                
+                 self.proof(parsed_dict['witness_f'], parsed_dict['proof_f'], parsed_dict['public_data_f'],
+                         batch_size=int(parsed_dict['batch_size']), verify_en=int(parsed_dict['verify_en']),
+                         n_gpus=int(parsed_dict['n_gpus']), n_streams=int(parsed_dict['n_streams']))
+                 if verify_en:
+                   new_msg = dict(self.t_GP)
+                   new_msg['status'] = self.verify
+                 else:
+                   new_msg = dict(self.t_GP)
+                   new_msg['status'] =  1
+   
+                 jsocket.send_message(new_msg, conn)
+                 conn.close()
+   
 
     def initECVal(self):
         self.pi_a_eccf1 = np.reshape(
@@ -385,16 +424,23 @@ class GrothProver(object):
        logging.info('')
 
     def logTimeResults(self):
-     
+    
+      self.t_GP['init'] = [round(self.t_GP['init'],4), round(100*self.t_GP['init']/self.t_GP['Proof'],2)] 
+      self.t_GP['Read_W'] = [round(self.t_GP['Read_W'],4), round(100*self.t_GP['Read_W']/self.t_GP['Proof'],2)] 
+      self.t_GP['Mexp'] = [round(self.t_GP['Mexp'],4), round(100*self.t_GP['Mexp']/self.t_GP['Proof'],2)] 
+      self.t_GP['Eval'] = [round(self.t_GP['Eval'],4), round(100*self.t_GP['Eval']/self.t_GP['Proof'],2)] 
+      self.t_GP['H'] = [round(self.t_GP['H'],4), round(100*self.t_GP['H']/self.t_GP['Proof'],2)] 
+      self.t_GP['Proof'] = round(self.t_GP['Proof'],4)
       logging.info('')
       logging.info('')
       logging.info('#################################### ')
       logging.info('Total Time to generate proof : %s seconds', self.t_GP['Proof'])
       logging.info('')
-      logging.info('------ Time Read Witness       : %s ', str(round(self.t_GP['Read_W'],2)) + ' sec. (' + str(round(100*self.t_GP['Read_W']/self.t_GP['Proof'],2)) + '%)')
-      logging.info('------ Time Multi-exp.         : %s ', str(round(self.t_GP['Mexp'],2)) + ' sec.(' + str(round(100*self.t_GP['Mexp']/self.t_GP['Proof'],2)) + '%)')
-      logging.info('------ Time Lagrange Poly Eval : %s ', str(round(self.t_GP['Eval'],2)) + ' sec. (' + str(round(100*self.t_GP['Eval']/self.t_GP['Proof'],2)) + '%)')
-      logging.info('------ Time Compute Poly H     : %s ', str(round(self.t_GP['H'],2)) + 'sec. (' + str(round(100*self.t_GP['H']/self.t_GP['Proof'],2)) + '%)')
+      logging.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + '%)')
+      logging.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + '%)')
+      logging.info('------ Time Multi-exp.         : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + '%)')
+      logging.info('------ Time Lagrange Poly Eval : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + '%)')
+      logging.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + '%)')
       logging.info('#################################### ')
       logging.info('')
       logging.info('')
@@ -407,6 +453,7 @@ class GrothProver(object):
       self.out_proof_f = out_proof_f
       self.out_public_f = out_public_f
       self.witness_f = witness_f
+      self.verify = 0
 
       self.verify_en = verify_en
       self.t_GP = {}
@@ -439,13 +486,11 @@ class GrothProver(object):
       logging.info(' - streams used: %s', self.n_streams)
 
       self.t_GP['init'] = time.time() - start
-      print("Proof init : "+str(self.t_GP['init']))
       ##### Starting proof
 
       self.gen_proof()
 
       self.t_GP['Proof'] = time.time() - start
-      print("Total Proof: "+str(self.t_GP['Proof']))
 
       logging.info("Proof completed" )
       logging.info('#################################### ')
@@ -497,8 +542,10 @@ class GrothProver(object):
         snarkjs = self.launch_snarkjs("verify")
         if snarkjs['verify'] == 0:
           logging.info("Verification SUCCEDED")
+          self.verify = 1
         else:
           logging.info("Verification FAILED")
+          self.verify = 0
         logging.info('#################################### ')
 
       return
@@ -619,8 +666,6 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Read_W'] = end - start
-        print ("Read W : "+str(self.t_GP['Read_W']))
-
         
         ######################
         # Beginning of P2 
@@ -705,9 +750,6 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Mexp'] = (end - start)
-        print("Reduce 1 : "+str(end - start1))
-        print("Mexp 1 : "+str(self.t_GP['Mexp']))
-
         ######################
         # Beginning of P3 and P4
         #  P3 - Poly Eval
@@ -757,10 +799,6 @@ class GrothProver(object):
         end = time.time()
         self.t_GP['Mexp'] += (end - start)
      
-        print("Reduce 2 : "+str(end - start1))
-        print("Mexp Total : "+str(self.t_GP['Mexp']))
-
-
         return 
  
 
@@ -1102,8 +1140,6 @@ class GrothProver(object):
         end = time.time()
         self.t_GP['Eval'] = end-start
    
-        print("Lagrange : "+str(self.t_GP['Eval']))
-
         start = time.time()
 
         ifft_params = ntt_build_h(pA_T.shape[0])
@@ -1124,6 +1160,4 @@ class GrothProver(object):
                                               self.batch_size, n_gpu=self.n_gpu)
 
 
-        print("interpol/Multiply : "+str(time.time()-start))
-  
         return pH[m:-1]
