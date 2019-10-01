@@ -238,12 +238,13 @@ def run(opt, parser):
         os.makedirs(opt['data_f'][:-1])
     opt['keep_f'] = opt['data_f']
         
-    if args.stop_server is not None:
+    if args.stop_server is not None :
+      if is_port_in_use(PORT):
           query = { 'stop_server' : 1 }
           jsocket = jsonSocket()
           result = jsocket.send_message(query)
           print("Stopping proof server")
-          return
+      return
 
     if args.mode != "s" and args.mode != 'setup' and \
         args.mode != 'p' and args.mode != 'proof' :
