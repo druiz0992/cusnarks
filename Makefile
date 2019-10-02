@@ -133,22 +133,9 @@ build:
 		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
 
 
-all:
-	echo "checking third pary libs...";
-	if ! test -d $(AUX_PATH); \
-		then mkdir $(AUX_PATH); cd $(AUX_PATH); fi
-	@for j in $(AUX_REPOS); do \
-		git clone $$j; done; 
-	@for i in $(AUX_CSUBDIRS); do \
-		(cd $$i; $(MAKE)); done
-	@for i in $(AUX_JSSUBDIRS); do \
-		(cd $$i; $(NPM)); done
-	@for i in $(AUX_RSUBDIRS); do \
-		(cd $$i; $(CARGO)); done
-	@for i in $(SUBDIRS); do \
-		echo "make build in $$i..."; \
-		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+all: third_party_libs build
 
+force_all: clean third_party_libs_clean all
 
 test:   
 	@for i in $(TEST_SUBDIRS); do \
@@ -168,4 +155,20 @@ clean:
 cubin:
 	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
 
-.PHONY:	config test build clean all
+third_party_libs:
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done;  fi
+	@for i in $(AUX_CSUBDIRS); do \
+		(cd $$i; $(MAKE)); done
+	@for i in $(AUX_JSSUBDIRS); do \
+		(cd $$i; $(NPM)); done
+	@for i in $(AUX_RSUBDIRS); do \
+		(cd $$i; $(CARGO)); done
+
+
+third_party_libs_clean:
+	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
+
+.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs
+
