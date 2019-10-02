@@ -955,7 +955,7 @@ __global__ void zpoly_interp4DXY_kernel(uint32_t *out_vector, uint32_t *in_vecto
 __global__ void zpoly_interp4DYX_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    uint32_t *x1, *x2, *tmp1, *tmp2, *w1;
+    uint32_t *x1, *x2, *tmp2, *tmp3, *w1;
     const uint32_t N1 = params->N_fftx + params->N_ffty;
 
     if(tid >= params->in_length){
@@ -965,8 +965,8 @@ __global__ void zpoly_interp4DYX_kernel(uint32_t *out_vector, uint32_t *in_vecto
     x1 = (uint32_t *) in_vector;   
     x2 = (uint32_t *) &in_vector[params->padding_idx * U256K_OFFSET];   
 
-    tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
     tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+    tmp3 = (uint32_t *) &out_vector[4*params->padding_idx * U256K_OFFSET];   
 
     if ( params->premul){
        w1 = (uint32_t *) &in_vector[3*params->padding_idx * U256K_OFFSET];
@@ -974,14 +974,14 @@ __global__ void zpoly_interp4DYX_kernel(uint32_t *out_vector, uint32_t *in_vecto
        w1 = (uint32_t *) &in_vector[(3*params->padding_idx + params->stride - (1 << N1)) * U256K_OFFSET];
     }
 
-    fft3Dyx_dif(tmp1, x1, w1, params);
-    fft3Dyx_dif(tmp2, x2, w1, params);
+    fft3Dyx_dif(tmp2, x1, w1, params);
+    fft3Dyx_dif(tmp3, x2, w1, params);
 }
 
 __global__ void zpoly_interp4DYY_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    uint32_t *x1, *x2, *z1, *z2, *tmp1, *tmp2, *w2, *scaler;
+    uint32_t *x1, *x2, *z1, *z2, *tmp1, *tmp2, *tmp3, *w2, *scaler;
 
     if(tid >= params->in_length){
       return;
@@ -995,6 +995,7 @@ __global__ void zpoly_interp4DYY_kernel(uint32_t *out_vector, uint32_t *in_vecto
     z2 = (uint32_t *) &out_vector[params->padding_idx * U256K_OFFSET];   
     tmp1 = (uint32_t *) &out_vector[2*params->padding_idx * U256K_OFFSET];   
     tmp2 = (uint32_t *) &out_vector[3*params->padding_idx * U256K_OFFSET];   
+    tmp3 = (uint32_t *) &out_vector[4*params->padding_idx * U256K_OFFSET];   
     w2 = (uint32_t *) &in_vector[2*params->padding_idx * U256K_OFFSET]; // N/2 roots 
   
     if (!params->forward && params->premul){ 
@@ -1005,10 +1006,8 @@ __global__ void zpoly_interp4DYY_kernel(uint32_t *out_vector, uint32_t *in_vecto
         x2 = z2;
     }
 
-    fft3Dyy_dif(x1, tmp1, w2, scaler, params);
-    // TODO : Check if necessary
-    __syncthreads();
-    fft3Dyy_dif(x2, tmp2, w2, scaler, params);
+    fft3Dyy_dif(x1, tmp2, w2, scaler, params);
+    fft3Dyy_dif(x2, tmp3, w2, scaler, params);
     
 }
 

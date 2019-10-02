@@ -913,16 +913,33 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      """
      pA = np.copy(vector[:vlen])
      pB = np.copy(vector[vlen: ])
+     pAB = montmultN_h(pA.reshape(-1), pB.reshape(-1),fidx)
      pA_S1, pA_S2 = zpoly_fft4d_test(pA, interp_params, fidx, roots, fft=0, as_mont=1)
      pA_S3 = montmultN_h(pA_S2.reshape(-1), roots_W3.reshape(-1),fidx)
      pB_S1, pB_S2 = zpoly_fft4d_test(pB, interp_params, fidx, roots, fft=0, as_mont=1)
      pB_S3 = montmultN_h(pB_S2.reshape(-1), roots_W3.reshape(-1),fidx)
+     #writeU256DataFile_h(np.reshape(pAB,-1), "../../test/c/aux_data/pAB_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pA_S1,-1), "../../test/c/aux_data/pA_S1_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pA_S2,-1), "../../test/c/aux_data/pA_S2_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pA_S3,-1), "../../test/c/aux_data/pA_S3_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pB_S1,-1), "../../test/c/aux_data/pB_S1_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pB_S2,-1), "../../test/c/aux_data/pB_S2_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pB_S3,-1), "../../test/c/aux_data/pB_S3_samples.bin".encode("UTF-8"))
+     #p_len = interp_params['fft_N'][-1] + interp_params['fft_N'][-2]
+     #pAB = readU256DataFile_h("../../test/c/aux_data/pAB_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pA_S1 = readU256DataFile_h("../../test/c/aux_data/pA_S1_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pA_S2 = readU256DataFile_h("../../test/c/aux_data/pA_S2_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pA_S3 = readU256DataFile_h("../../test/c/aux_data/pA_S3_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pB_S1 = readU256DataFile_h("../../test/c/aux_data/pB_S1_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pB_S2 = readU256DataFile_h("../../test/c/aux_data/pB_S2_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pB_S3 = readU256DataFile_h("../../test/c/aux_data/pB_S3_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
      """
 
      vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2)
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2) 
 
      n_streams = get_nstreams()
+     #n_gpu = 1
      #n_streams = 1
      dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
      pending_dispatch_table = []
@@ -1030,9 +1047,20 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2)
 
      """
-     pA_S1, pA_S2 = zpoly_fft4d_test(pA_S3, interp_params, fidx, roots, fft=1, as_mont=1)
-     pB_S1, pB_S2 = zpoly_fft4d_test(pB_S3, interp_params, fidx, roots, fft=1, as_mont=1)
-     pAB_S = montmultN_h(pA_S2.reshape(-1), pB_S2.reshape(-1),fidx)
+     pA_S4, pA_S5 = zpoly_fft4d_test(pA_S3, interp_params, fidx, roots, fft=1, as_mont=1)
+     pB_S4, pB_S5 = zpoly_fft4d_test(pB_S3, interp_params, fidx, roots, fft=1, as_mont=1)
+     pAB_S = montmultN_h(pA_S5.reshape(-1), pB_S5.reshape(-1),fidx)
+     #writeU256DataFile_h(np.reshape(pA_S4,-1), "../../test/c/aux_data/pA_S4_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pA_S5,-1), "../../test/c/aux_data/pA_S5_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pB_S4,-1), "../../test/c/aux_data/pB_S4_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pB_S5,-1), "../../test/c/aux_data/pB_S5_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(pAB_S,-1), "../../test/c/aux_data/pAB_S_samples.bin".encode("UTF-8"))
+     #p_len = interp_params['fft_N'][-1] + interp_params['fft_N'][-2]
+     #pAB_S = readU256DataFile_h("../../test/c/aux_data/pAB_S_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pA_S4 = readU256DataFile_h("../../test/c/aux_data/pA_S4_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pA_S5 = readU256DataFile_h("../../test/c/aux_data/pA_S5_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pB_S4 = readU256DataFile_h("../../test/c/aux_data/pB_S4_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
+     #pB_S5 = readU256DataFile_h("../../test/c/aux_data/pB_S5_samples.bin".encode("UTF-8"), 1<<p_len , 1<<p_len )
      """
 
      #Transpose and take FFT (first pass)
@@ -1304,6 +1332,10 @@ def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch
        vlen = 1<< interp_params['levels']
 
      #p_interp, p_mul = zpoly_interp_and_mul_test(vector, interp_params,fidx, roots)
+     #writeU256DataFile_h(np.reshape(p_interp,-1), "../../test/c/aux_data/p_interp_samples.bin".encode("UTF-8"))
+     #writeU256DataFile_h(np.reshape(p_mul,-1), "../../test/c/aux_data/p_mul_samples.bin".encode("UTF-8"))
+     #p_interp = readU256DataFile_h("../../test/c/aux_data/p_interp_samples.bin".encode("UTF-8"), 1<<23 , 1<<23 )
+     #p_mul = readU256DataFile_h("../../test/c/aux_data/p_mul_samples.bin".encode("UTF-8"), 1<<23 , 1<<23 )
 
      if batch_size >= vlen*2:
         # Data fits in single FFT
