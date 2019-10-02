@@ -72,28 +72,3 @@ ECBN128::ECBN128 (uint32_t len, const uint32_t seed) :  CUSnarks(len * (ECP_JAC_
 {
 }
 
-#if 0
-// samples[n] = k[0], Px[0], Py[0],...,k[N-1], Px[N-1], Py[N-1]
-void ECBN128::rand(uint32_t *samples, uint32_t n_samples)
-{
-  // TODO : Implement random EC point. Problem is that 
-  // i need to compute random scalar 256 bits (OK), and 
-  // and one additional random scalar 256 bits K (OK).
-  // EC Point = K * G(Gx,Gy) => For this, I need to 
-  // call kernel to compute operation and convert point
-  // back to affine coordinates (implement inverse). Instead of doing this, I will
-  // generate random points in python for now
-
-  uint32_t *k = new uint32_t[n_samples];
-  CUSnarks::rand(k, n_samples);
-
-  CUSnarks::kernelLaunch();
-
-  for (uint32_t i=0; i < 0; i++){
-    memcpy(&samples[i*ECK_INDIMS*NWORDS_256BIT + ECP_SCLOFFSET] , k[i], sizeof(uint32_t) * NWORDS_256BIT);
-    memcpy(&samples[i*ECK_INDIMS*NWORDS_256BIT + ECP_JAC_INXOFFSET], , sizeof(uint32_t) * NWORDS_256BIT);
-    memcpy(&samples[i*ECK_INDIMS*NWORDS_256BIT + ECP_JAC_INYOFFSET], , sizeof(uint32_t) * NWORDS_256BIT);
-  }
-  delete [] k;
-}
-#endif

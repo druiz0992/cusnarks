@@ -144,7 +144,7 @@ def profile_ec2bn128():
          ec2bn128_vector = cu_ec2bn128.randu256(5*nsamples,pu256)
          idx_v = sortu256_idx_h(ec2bn128_vector[:nsamples])
          input_vector = np.concatenate((ec2bn128_vector[:nsamples][idx_v], ec2bn128_vector[nsamples:]))
-         _,kernel_time = cu_ec2bn128.kernelLaunch(input_vector, kernel_config, kernel_params,nkernels)
+         _,kernel_time = cu_ec2bn128.kernelLaunch(input_vector, kernel_config, kernel_params,n_kernels = nkernels)
          if i :
              kernel_stats.append(kernel_time)
   

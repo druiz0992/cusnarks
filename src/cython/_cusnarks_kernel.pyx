@@ -1,7 +1,7 @@
 #cython: language_level=3
 #cython.wraparound(False)
 #cython.boundscheck(False)
-#cython.nonecheck(False):w
+#cython.nonecheck(False)
 
 """
     Copyright 2018 0kims association.
@@ -48,7 +48,7 @@ from libc.stdlib cimport malloc, free
 from libc.math cimport log2, ceil
 
 IF CUDA_DEF:
-  from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly
+  from _cusnarks_kernel cimport C_CUSnarks, C_U256, C_ECBN128, C_EC2BN128, C_ZCUPoly, C_AsyncBuf
 
 
   # CUSnarks class cython wrapper
@@ -64,8 +64,10 @@ IF CUDA_DEF:
              self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
           if out_size == 0:
              self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
-  
-      def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t n_kernel=1):
+ 
+      def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
+                       ct.uint32_t stream_id=0, ct.uint32_t n_kernels=1):
+          cdef ct.uint32_t i=0
           cdef ct.vector_t out_v
           cdef ct.vector_t in_v
          
@@ -74,16 +76,14 @@ IF CUDA_DEF:
   
           #print (in_v.length, self.in_dim, out_v.length, self.out_dim)
           if  in_v.length > self.in_dim  or out_v.length > self.out_dim:
+              print(in_v.length, self.in_dim, out_v.length, self.out_dim)
               assert False, "Incorrect arguments"
               return 0.0
-  
-          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat
-          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat
-  
+   
           # create kernel config data
-          cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernel * sizeof(ct.kernel_config_t))
-  
-          for i in range(n_kernel):
+          cdef ct.kernel_config_t *kconfig = <ct.kernel_config_t *> malloc(n_kernels * sizeof(ct.kernel_config_t))
+          
+          for i in range(n_kernels):
              kconfig[i].blockD = config['blockD'][i]
              kconfig[i].kernel_idx = config['kernel_idx'][i]
              # gridD and smemS and return_val and return offset do not need to exist
@@ -108,19 +108,62 @@ IF CUDA_DEF:
              else:
                  kconfig[i].in_offset = 0
   
-          in_vec_flat = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-          in_vec_flat = np.concatenate(in_vec)
-          in_v.data  = <ct.uint32_t *>&in_vec_flat[0]
+          #Template case. Not working, but leave for now
+          """
+          print("allocating async buffer in_vec\n");
+          cdef C_AsyncBuf [ct.uint32_t] *in_vec_flat = new C_AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
+          print("Assigning value\n")
+          in_vec_flat.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+          print("storing\n")
+          in_v.data  = <ct.uint32_t *>in_vec_flat.getBuf()
   
-          out_vec_flat = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-          out_v.data = <ct.uint32_t *>&out_vec_flat[0]
+          print("allocating async buffer out_vec\n");
+          cdef C_AsyncBuf [ct.uint32_t] *out_vec_flat = new C_AsyncBuf[ct.uint32_t](out_v.length  * in_vec.shape[1])
+          out_v.data = <ct.uint32_t *>out_vec_flat.getBuf()
   
           # TODO :I am trying to represent input data as ndarray. I don't
           # know how other way to do this but to overwrite ndarray with input data
   
           # create kernel params data
-          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernel * sizeof(ct.kernel_params_t))
-          for i in range(n_kernel):
+          #cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+          print("allocating async buffer params\n");
+          cdef C_AsyncBuf [ct.kernel_params_t] *kparams_buffer = new C_AsyncBuf[ct.kernel_params_t](n_kernels)
+          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
+          """
+          # create kernel params data
+          cdef ct.kernel_params_t *kparams
+
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_vec_flat_sync
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec_flat_sync
+
+          cdef C_AsyncBuf *in_vec_flat_async 
+          cdef C_AsyncBuf *out_vec_flat_async 
+          cdef C_AsyncBuf *kparams_buffer_async
+
+          if stream_id == -1:
+
+             in_vec_flat_sync = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+             in_vec_flat_sync = np.concatenate(in_vec)
+             in_v.data  = <ct.uint32_t *>&in_vec_flat_sync[0]
+  
+             out_vec_flat_sync = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+             out_v.data = <ct.uint32_t *>&out_vec_flat_sync[0]
+  
+             kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+
+          else :
+             in_vec_flat_async = new C_AsyncBuf(in_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+             in_vec_flat_async.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+             in_v.data  = <ct.uint32_t *>in_vec_flat_async.getBuf()
+  
+             out_vec_flat_async = new C_AsyncBuf(out_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+             out_v.data = <ct.uint32_t *>out_vec_flat_async.getBuf()
+  
+             # create kernel params data
+             kparams_buffer_async = new C_AsyncBuf(n_kernels, sizeof(ct.kernel_params_t))
+             kparams = <ct.kernel_params_t *>kparams_buffer_async.getBuf()
+
+          for i in range(n_kernels):
             kparams[i].midx = params['midx'][i]
             kparams[i].in_length = params['in_length'][i]
             kparams[i].out_length = params['out_length']
@@ -149,15 +192,36 @@ IF CUDA_DEF:
               kparams[i].as_mont = params['as_mont'][i]
             else:
               kparams[i].as_mont = 1
- 
-          exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams, n_kernel) 
 
-          kdata =  np.reshape(out_vec_flat,(-1,in_vec.shape[1]))
-  
+          cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
+          cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
+
+          if stream_id == -1:  
+            free(kparams)
+
           free(kconfig)
-          free(kparams)
   
-          return kdata, exec_time
+          return np.copy(np.asarray(kdata).reshape(-1,in_vec.shape[1])), exec_time
+
+      def streamDel(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
+          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+
+      def streamSync(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
+
+          cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
+          cdef ct.uint32_t vlen = self._cusnarks_ptr.streamGetOutputDataLen(gpu_id, stream_id)
+          cdef ct.uint32_t *data = self._cusnarks_ptr.streamGetOutputData(gpu_id, stream_id)
+          #cdef ct.uint32_t nwords_256bit = <int>(self.out_size/(self.out_dim*32))
+
+          #cdef ct.uint32_t [:] kdata = <ct.uint32_t [:vlen * nwords_256bit * NWORDS_256BIT]>data
+          cdef ct.uint32_t [:] kdata = <ct.uint32_t [:vlen * NWORDS_256BIT]>data
+          cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(vlen * NWORDS_256BIT, dtype=np.uint32)
+
+          # copy  C data to python data and delete C pointer
+          out_v = np.copy(np.asarray(kdata))
+          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+
+          return np.asarray(out_v).reshape(-1, NWORDS_256BIT), t 
    
       def rand(self, ct.uint32_t n_samples):
           cdef np.ndarray[ndim=1, dtype=np.uint32_t] samples = np.zeros(n_samples * ct.NWORDS_256BIT, dtype=np.uint32)
@@ -251,13 +315,48 @@ IF CUDA_DEF:
       def __dealloc__(self):
           del self._zpoly_ptr
   
+  # C_AsyncBuf class cython wrapper
+  """
+  cdef class AsyncBuf:
+      cdef void* buffer
+      cdef ct.uint32_t max_nelems
+      cdef ct.uint32_t el_size
+
+      cdef C_AsyncBuf* _async_buffer_ptr
   
-def montmult_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+      def __cinit__(self, ct.uint32_t nelems, ct.uint32_t el_size):
+          self._async_buffer_ptr = new C_AsyncBuf(nelems, el_size)
+  
+      def __dealloc__(self):
+          if self._async_buffer_ptr != NULL:
+            del self._async_buffer_ptr
+
+      def  getBufUint32(self):
+        cdef ct.uint32_t n_elems = self._async_buffer_ptr.getNelems()
+        cdef ct.uint32_t [:] r= <ct.uint32_t [:n_elems]>self._async_buffer_ptr.getBuf()
+
+        return np.asarray(r)
+        
+      def getBufKernelParams(self):       
+        cdef ct.kernel_params_t *kparams = self._async_buffer_ptr.getBuf()
+        dict kparams_dict = {}
+
+        return kparams_dict
+
+      def  getNelems(self):
+        return self._async_buffer_ptr.getNelems()
+
+  
+      def  setBuf(self, np.ndarray[ndim=1, dtype=np.uint32_t] in_data, ct.uint32_t nelems):
+        return self._async_buffer_ptr.setBuf(&in_data[0], nelems)
+      """
+
+def montsquare_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
-        uh.cmontmult_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
+        uh.cmontsquare_h(&out_vec[0], &in_veca[0], pidx)
   
-        return out_vec
+        return np.reshape(out_vec, (-1, NWORDS_256BIT))
 
 def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
@@ -267,7 +366,6 @@ def montmultN_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1
         for i in xrange(n):
            uh.cmontmult_h(&out_vec[offset], &in_veca[offset], &in_vecb[offset], pidx)
            offset += NWORDS_256BIT
-  
   
         return np.reshape(out_vec, (-1, NWORDS_256BIT))
 
@@ -452,10 +550,21 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
 def writeU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     uh.cwriteU256DataFile_h(&vin[0], <char *>fname, vin.shape[0])
 
+def writeWitnessFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
+    cdef unsigned long long vlen = vin.shape[0]/NWORDS_256BIT
+    uh.cwriteWitnessFile_h(&vin[0], <char *>fname, vlen)
+
 def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(outsize * NWORDS_256BIT,dtype=np.uint32)
 
     uh.creadU256DataFile_h(&vout[0], <char *>fname, insize, outsize)
+
+    return vout.reshape((-1,NWORDS_256BIT))
+
+def readWitnessFile_h(bytes fname, ct.uint32_t fmt, unsigned long long insize):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(insize * NWORDS_256BIT,dtype=np.uint32)
+
+    uh.creadWitnessFile_h(&vout[0], <char *>fname, fmt, insize)
 
     return vout.reshape((-1,NWORDS_256BIT))
 
@@ -507,6 +616,43 @@ def readU256PKFileHeader_h(bytes fname):
     
     return header_d
 
+def readR1CSFile_h(bytes filename):
+    cdef ct.r1csv1_t *r1cs_header = <ct.r1csv1_t *> malloc(sizeof(ct.r1csv1_t))
+
+    uh.creadR1CSFileHeader_h(r1cs_header, filename)
+    
+    cdef ct.uint32_t ncoeff_A, ncoeff_B, ncoeff_C
+    ncoeff_A = r1cs_header.R1CSA_nCoeff
+    ncoeff_B = r1cs_header.R1CSB_nCoeff
+    ncoeff_C = r1cs_header.R1CSC_nCoeff
+
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csA_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_A * (NWORDS_256BIT + 1),dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csB_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_B * (NWORDS_256BIT + 1),dtype=np.uint32)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csC_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_C * (NWORDS_256BIT + 1),dtype=np.uint32)
+
+    uh.creadR1CSFile_h(&r1csA_samples[0], filename, r1cs_header, ct.R1CSA_IDX)
+    uh.creadR1CSFile_h(&r1csB_samples[0], filename, r1cs_header, ct.R1CSB_IDX)
+    uh.creadR1CSFile_h(&r1csC_samples[0], filename, r1cs_header, ct.R1CSC_IDX)
+
+    
+    header = {}
+    header['magic_number'] = r1cs_header.magic_number
+    header['version'] = r1cs_header.version
+    header['word_width_bytes'] = r1cs_header.word_width_bytes
+    header['nVars'] = r1cs_header.nVars
+    header['nPubOutputs'] = r1cs_header.nPubOutputs
+    header['nPubInputs'] = r1cs_header.nPubInputs
+    header['nPrivInputs'] = r1cs_header.nPrivInputs
+    header['nConstraints'] = r1cs_header.nConstraints
+
+    header['R1CSA_nCoeff'] = r1cs_header.R1CSA_nCoeff
+    header['R1CSB_nCoeff'] = r1cs_header.R1CSB_nCoeff
+    header['R1CSC_nCoeff'] = r1cs_header.R1CSC_nCoeff
+    
+    free(r1cs_header)
+
+    return header, r1csA_samples, r1csB_samples, r1csC_samples
+  
 def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict header, ct.uint32_t extend):
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
 
@@ -699,6 +845,51 @@ def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_
        return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
      else:
        return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
+
+
+def ec_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+  cdef ct.uint32_t indims = ECP_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
+
+  if add_in:
+      indims = ECP_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+
+  cdef ct.uint32_t n = <int> (inv.shape[0] / (indims*NWORDS_256BIT)  )
+
+  uh.cec_jacaddreduce_h(&outv[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
+  cdef ct.uint32_t indims = ECP2_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP2_JAC_INDIMS
+
+  if add_in:
+      indims = ECP2_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+
+  cdef ct.uint32_t n = <int> (inv.shape[0] / (indims*NWORDS_256BIT) )
+
+  uh.cec2_jacaddreduce_h(&outv[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]

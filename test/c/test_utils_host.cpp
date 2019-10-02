@@ -74,18 +74,18 @@
 #define NFFT_Y_131K_3D 8
 
 #else
-#define NCOLS_131K 9
-#define NROWS_131K 9
+#define NCOLS_131K 10
+#define NROWS_131K 11
 #define FFT_SIZEXX_131K 5
 #define FFT_SIZEYX_131K 5
 
 
-#define NCOLS_131K_3D 5
+#define NCOLS_131K_3D 6
 #define NROWS_131K_3D 5
 #define FFT_SIZEXX_131K_3D 3
 #define FFT_SIZEYX_131K_3D 3
-#define NFFT_X_131K_3D 9
-#define NFFT_Y_131K_3D 9
+#define NFFT_X_131K_3D 11
+#define NFFT_Y_131K_3D 10
 
 #endif
 
@@ -295,19 +295,24 @@ static uint32_t AA_test[] = {
 static char roots_1M_filename[]="../../data/zpoly_roots_1M.bin";
 static char roots_16M_filename[]="../../data/zpoly_roots_16M.bin";
 
-static char input_1M_filename[]= "../../test/c/aux_data/zpoly_input_data_1M.bin";
-static char output_1M_filename[]="../../test/c/aux_data/zpoly_output_data_1M.bin";
-static char inputxx_1M_filename[]= "../../test/c/aux_data/zpoly_input_dataxx_1M.bin";
-static char inputxy_1M_filename[]= "../../test/c/aux_data/zpoly_input_dataxy_1M.bin";
-static char inputyx_1M_filename[]= "../../test/c/aux_data/zpoly_input_datayx_1M.bin";
-static char inputyy_1M_filename[]= "../../test/c/aux_data/zpoly_input_datayy_1M.bin";
+static char ecp_jacaddreduce_filename[]="./aux_data/ecp_reduction.bin";
+static char ec2p_jacaddreduce_filename[]="./aux_data/ec2p_reduction.bin";
 
-static char input_65K_filename[]= "../../test/c/aux_data/zpoly_input_data_65K.bin";
-static char output_65K_filename[]="../../test/c/aux_data/zpoly_output_data_65K.bin";
-static char inputxx_65K_filename[]= "../../test/c/aux_data/zpoly_input_dataxx_65K.bin";
-static char inputxy_65K_filename[]= "../../test/c/aux_data/zpoly_input_dataxy_65K.bin";
-static char inputyx_65K_filename[]= "../../test/c/aux_data/zpoly_input_datayx_65K.bin";
-static char inputyy_65K_filename[]= "../../test/c/aux_data/zpoly_input_datayy_65K.bin";
+static char input_1M_filename[]= "./aux_data/zpoly_input_data_1M.bin";
+static char output_1M_filename[]="./aux_data/zpoly_output_data_1M.bin";
+static char inputxx_1M_filename[]= "./aux_data/zpoly_input_dataxx_1M.bin";
+static char inputxy_1M_filename[]= "./aux_data/zpoly_input_dataxy_1M.bin";
+static char inputyx_1M_filename[]= "./aux_data/zpoly_input_datayx_1M.bin";
+static char inputyy_1M_filename[]= "./aux_data/zpoly_input_datayy_1M.bin";
+
+static char input_65K_filename[]= "./aux_data/zpoly_input_data_65K.bin";
+static char output_65K_filename[]="./aux_data/zpoly_output_data_65K.bin";
+static char inputxx_65K_filename[]= "./aux_data/zpoly_input_dataxx_65K.bin";
+static char inputxy_65K_filename[]= "./aux_data/zpoly_input_dataxy_65K.bin";
+static char inputyx_65K_filename[]= "./aux_data/zpoly_input_datayx_65K.bin";
+static char inputyy_65K_filename[]= "./aux_data/zpoly_input_datayy_65K.bin";
+
+static char input_test_scmul_filename[] = "./aux_data/test_scmul_samples.bin";
 
 static uint32_t roots_128_test[] = {
 1342177275, 2895524892, 2673921321,  922515093, 2021213742,
@@ -8463,9 +8468,9 @@ void test_ntt_parallel3D_131K(uint32_t forward)
 
    for (k=0; k < MAX_ITER_65K; k++){
      setRandom256(samples,nroots, N);
-     //readU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp3.bin",nroots, nroots);
+     //readU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp2.bin",nroots, nroots);
      memcpy(samples2, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
-     //writeU256DataFile_h(samples, "./aux_data/zpoly_samples_fft4d.bin",nroots * NWORDS_256BIT * sizeof(uint32_t));
+     //writeU256DataFile_h(samples, "./aux_data/zpoly_samples_tmp2.bin",nroots * NWORDS_256BIT * sizeof(uint32_t));
  
      if (forward){ 
        readU256DataFile_h(roots,roots_1M_filename,1<<NROOTS_1M,nroots);
@@ -9095,12 +9100,94 @@ void test_mulu256()
   printf("N errors(Test_Mulu) : %d/%d\n",n_errors, N/2);
 }
 
+void  test_ec_jacaddreduce(uint32_t ec2)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
+   if (ec2){
+        indims = ECP2_JAC_INDIMS;
+        outdims = ECP2_JAC_OUTDIMS;
+   }
+
+   uint32_t *samples = (uint32_t *) malloc( N_STREAMS_PER_GPU * indims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   uint32_t *ecp = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t));
+
+   uint32_t pidx = 0;
+   uint32_t to_aff = 1;
+   uint32_t add_in = 1;
+   uint32_t strip_last = 1;
+
+   if (ec2){
+     readU256DataFile_h(samples, ec2p_jacaddreduce_filename, 
+                       N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
+     ec2_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+   } else {
+     readU256DataFile_h(samples, ecp_jacaddreduce_filename, 
+                       N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
+
+     ec_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+   }
+
+   free(samples);
+   free(ecp);
+}
+
+void  test_ec_jacscmul_opt(void)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t nec_points = 1024;
+   uint32_t order = 8;
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2, *out_ecp3, *out_ecp4, *samples;
+   uint32_t i;
+   uint32_t n_tables = (order + nec_points - 1)/order;
+   uint32_t n_errors=0;
+
+   samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp1 = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp2 = (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp3 = (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp4= (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+
+   readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+
+   scl = samples;
+   in_ecp = &samples[nec_points * NWORDS_256BIT];
+   ec_jacscmul_opt_h(out_ecp2, scl, in_ecp, nec_points, order, 0,1); 
+   ec_jac2aff_h(out_ecp3, out_ecp2,n_tables, 0, 0);
+
+   // Multiply points
+   ec_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
+
+   for (i=0; i< n_tables-1; i++){
+     ec_jacaddreduce_h(&out_ecp4[i*ECP_JAC_OUTDIMS*NWORDS_256BIT], 
+                       &out_ecp1[i*order*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+                       order, 0, 1, 0, 0);
+     if (memcmp(&out_ecp3[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+               &out_ecp4[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+               ECP_JAC_OUTDIMS*NWORDS_256BIT*sizeof(uint32_t)) ){
+        n_errors++;
+     }
+   }
+
+   printf("N errors(JACSCMUL_OPT) : %d/%d\n",n_errors,n_tables);
+
+   free(samples);
+   free(out_ecp1);
+   free(out_ecp2);
+   free(out_ecp3);
+   free(out_ecp4);
+}
+
+
 int main()
 {
   test_mul();  // test montgomery mul with predefined results
   test_mul2(); // test optimized impl of montgomery mul
   test_mul3(); // test SOS impl of montgomery mul
   test_mul4(); // test SOS impl of montgomery squaring
+
   //test_mul5(); // test FIOS impl of montgomery squaring
   test_findroots();
   test_ntt(1);
@@ -9128,7 +9215,6 @@ int main()
 
   test_ntt_parallel3D_131K(1); // Forward FFT
   test_ntt_parallel3D_131K(0); // IFFT
-
   test_nttmul_parallel2D_65K();
 
   test_nttmul_randomsize();
@@ -9144,6 +9230,11 @@ int main()
   test_inv_ext2();
   test_mulu256();
 
+  test_ec_jacaddreduce(0);    // EC1
+  test_ec_jacaddreduce(1);    // EC2
+
+  test_ec_jacscmul_opt();
+  
   return 1;
 }
 

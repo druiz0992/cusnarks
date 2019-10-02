@@ -83,7 +83,10 @@ __constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
 
 __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];
 
-uint32_t CUSnarks::init_constants=0;
+
+static  int deviceCount = 0;
+
+uint32_t CUSnarks::init_resources=0;
 /*
     Constructor : Reserves global (vector) and constant (prime info) memory 
     Arguments :
@@ -106,54 +109,167 @@ CUSnarks::CUSnarks (uint32_t in_len, uint32_t in_size,
                     kernel_cb *kcb,uint32_t seed) : 
                        kernel_callbacks(kcb)
 {
-  int deviceCount = 0;
-  uint32_t id;
-  CCHECK(cudaGetDeviceCount(&deviceCount));
 
-  if (CUSnarks::init_constants==0){
-    CUSnarks::init_constants = 1;
-    for (id=0; id< deviceCount; id++){
-       CCHECK(cudaSetDevice(id));
-       CCHECK(cudaDeviceReset());
-       CUSnarks::allocateCudaCteResources();
-    }
-    CCHECK(cudaSetDevice(0));
+  if (CUSnarks::init_resources==0){
+    CUSnarks::init_resources = 1;
+
+    // initialize device count
+    CCHECK(cudaGetDeviceCount(&deviceCount));
+    // reset devices
+    resetDevices();
+    // alocate constant mem objects
+    allocateCudaCteResources();
   }
+  //allocate streams and events
+  allocateCudaStreamResources();
+  // alocate global mem objects
+  allocateCudaResources(in_size, out_size, in_len, out_len);
+}
 
-  in_vector_device.data = NULL;
-  in_vector_device.length = in_len;
-  in_vector_device.size = in_size;
-  out_vector_device.data = NULL;
-  out_vector_device.length = out_len;
-  out_vector_device.size = out_size;
-
-  allocateCudaResources(in_size, out_size);
-  //initRNG(seed);
+void CUSnarks::resetDevices(void)
+{
+   uint32_t i;
+   for(i=0; i< deviceCount; i++){
+    CCHECK(cudaSetDevice(i));
+    CCHECK(cudaDeviceReset());
+   }
 }
 
 /*
-   Reserve GPU memory for input and output vectors and input kernel params (global memory),
-   as well as some constant info (constant memory)
+   Reserve streams, events,...
  */
-void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size)
+void CUSnarks::allocateCudaStreamResources(void)
 {
-  // Allocate kernel input and putput data vectors in global memory 
-  CCHECK(cudaMalloc((void**) &this->in_vector_device.data, in_size));
-  CCHECK(cudaMalloc((void**) &this->out_vector_device.data, out_size));
+  uint32_t i,j;
 
-  // Allocate kernel params in global memory 
-  CCHECK(cudaMalloc((void**) &this->params_device, sizeof(kernel_params_t)));
+  // create vectors for all devices
+  stream = (cudaStream_t **)malloc(deviceCount * sizeof(cudaStream_t *));
+  start_event = (cudaEvent_t **)malloc(deviceCount * sizeof(cudaEvent_t *));
+  end_event = (cudaEvent_t **)malloc(deviceCount * sizeof(cudaEvent_t *));
+
+  if ((stream== NULL) || 
+       (start_event == NULL) || (end_event == NULL) ) { 
+    logInfo("Cannot allocate memory. Exiting program...\n");
+    exit(1);
+  }
+  
+  for (i=0; i < deviceCount; i++){
+    CCHECK(cudaSetDevice(i));
+
+    stream[i] = (cudaStream_t *)malloc(N_STREAMS_PER_GPU * sizeof(cudaStream_t ));
+    start_event[i] = (cudaEvent_t *)malloc(N_STREAMS_PER_GPU * sizeof(cudaEvent_t ));
+    end_event[i] = (cudaEvent_t *)malloc(N_STREAMS_PER_GPU * sizeof(cudaEvent_t ));
+
+    if ((stream[i] == NULL) || (start_event[i]==NULL) || (end_event[i]==NULL)){
+      logInfo("Cannot allocate memory. Exiting program...\n");
+      exit(1);
+    }
+     
+    for (j=0; j < N_STREAMS_PER_GPU; j++){
+       CCHECK(cudaStreamCreate(&stream[i][j]));
+       CCHECK(cudaEventCreate(&start_event[i][j]));
+       CCHECK(cudaEventCreate(&end_event[i][j]));
+    }
+  }
+}
+
+
+
+/*
+   Reserve GPU memory for input and output vectors and input kernel params (global memory),
+ */
+void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size, uint32_t in_len, uint32_t out_len)
+{
+  uint32_t i,j;
+
+  // Init resources in device. Do it for all GPUs:
+  //  - We will use all GPUs for every stage, so it is not a waste
+  //  - I have to change a lot of code to allow to specify destinaton GPU
+  // Allocate kernel input and putput data vectors in global memory 
+
+  // create vectors for all devices
+  in_vector_device = (vector_t **)malloc(deviceCount * sizeof(vector_t *));
+  out_vector_device = (vector_t **)malloc(deviceCount * sizeof(vector_t *));
+  params_device = (kernel_params_t ***)malloc(deviceCount * sizeof(kernel_params_t **));
+
+
+  in_data_host = (uint32_t ***)malloc(deviceCount * sizeof(uint32_t **));
+  out_data_host = (uint32_t ***)malloc(deviceCount * sizeof(uint32_t **));
+  params_host = (kernel_params_t ***)malloc(deviceCount * sizeof(kernel_params_t **));
+
+
+  if ((in_vector_device == NULL) || (in_data_host == NULL) ||
+       (out_vector_device == NULL) || (out_data_host == NULL) ||
+       (params_device == NULL) || (params_host == NULL)){
+    logInfo("Cannot allocate memory. Exiting program...\n");
+    exit(1);
+  }
+  
+  for (i=0; i < deviceCount; i++){
+
+    CCHECK(cudaSetDevice(i));
+
+    in_vector_device[i] = (vector_t *)malloc(N_STREAMS_PER_GPU * sizeof(vector_t));
+    out_vector_device[i] = (vector_t *)malloc(N_STREAMS_PER_GPU * sizeof(vector_t));
+    params_device[i] = (kernel_params_t **)malloc(N_STREAMS_PER_GPU * sizeof(kernel_params_t *));
+  
+
+    out_data_host[i] = (uint32_t **)malloc(N_STREAMS_PER_GPU * sizeof(uint32_t *));
+    in_data_host[i] = (uint32_t **)malloc(N_STREAMS_PER_GPU * sizeof(uint32_t *));
+    params_host[i] = (kernel_params_t **)malloc(N_STREAMS_PER_GPU * sizeof(kernel_params_t *));
+
+    if ((in_vector_device[i] == NULL) || (in_data_host[i] == NULL) ||
+       (out_vector_device[i] == NULL) || (out_data_host[i] == NULL) ||
+       (params_device[i] == NULL) || (params_host[i] == NULL)){
+        logInfo("Cannot allocate memory. Exiting program...\n");
+         exit(1);
+    }
+
+    for (j=0; j < N_STREAMS_PER_GPU; j++){
+      // initialize vectors in host mem
+      in_vector_device[i][j].data = NULL;
+      in_vector_device[i][j].length = in_len;
+      in_vector_device[i][j].size = in_size;
+
+
+      out_vector_device[i][j].data = NULL;
+      out_vector_device[i][j].length = out_len;
+      out_vector_device[i][j].size = out_size;
+
+
+      // create buffer in device
+      CCHECK(cudaMalloc((void**) &this->in_vector_device[i][j].data, in_size));
+      CCHECK(cudaMalloc((void**) &this->out_vector_device[i][j].data, out_size));
+
+      // Allocate kernel params in global memory 
+      CCHECK(cudaMalloc((void**) &this->params_device[i][j], sizeof(kernel_params_t)));
+      logInfo("in size (%d-%d) : %d, data  in: %x, data out : %x, params : %x \n",
+          i,j,in_size,
+          this->in_vector_device[i][j].data,
+          this->out_vector_device[i][j].data,
+          this->params_device[i][j]);
+    }
+  }
 }
 
 void CUSnarks::allocateCudaCteResources()
 {
+  // init constant memory in all GPUS. Do only once, when 
+  //  CUsnarks oject is created
   // Copy modulo info to device constant
-  CCHECK(cudaMemcpyToSymbol(mod_info_ct,       CusnarksModInfoGet(),     MOD_N * sizeof(mod_info_t)));  // prime info
-  CCHECK(cudaMemcpyToSymbol(ecbn128_params_ct, CusnarksEcbn128ParamsGet(), MOD_N * sizeof(ecbn128_t)));   // ecbn128
-  CCHECK(cudaMemcpyToSymbol(misc_const_ct,    CusnarksMiscKGet(),    MOD_N * sizeof(misc_const_t)));// misc
-  CCHECK(cudaMemcpyToSymbol(W32_ct,           CusnarksW32RootsGet(), sizeof(uint32_t) * NWORDS_256BIT * 16));// W32roots
-  CCHECK(cudaMemcpyToSymbol(IW32_ct,          CusnarksIW32RootsGet(), sizeof(uint32_t) * NWORDS_256BIT * 16));// IW32roots
-  CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   CusnarksIW32NRootsGet(), sizeof(uint32_t) * NWORDS_256BIT * (FFT_SIZE_N -1) ));// inverse 2,4,8,16,32
+  uint32_t i;
+
+  for (i=0; i < deviceCount; i++){
+    CCHECK(cudaSetDevice(i));
+
+
+    CCHECK(cudaMemcpyToSymbol(mod_info_ct,       CusnarksModInfoGet(),     MOD_N * sizeof(mod_info_t)));  // prime info
+    CCHECK(cudaMemcpyToSymbol(ecbn128_params_ct, CusnarksEcbn128ParamsGet(), MOD_N * sizeof(ecbn128_t)));   // ecbn128
+    CCHECK(cudaMemcpyToSymbol(misc_const_ct,    CusnarksMiscKGet(),    MOD_N * sizeof(misc_const_t)));// misc
+    CCHECK(cudaMemcpyToSymbol(W32_ct,           CusnarksW32RootsGet(), sizeof(uint32_t) * NWORDS_256BIT * 16));// W32roots
+    CCHECK(cudaMemcpyToSymbol(IW32_ct,          CusnarksIW32RootsGet(), sizeof(uint32_t) * NWORDS_256BIT * 16));// IW32roots
+    CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   CusnarksIW32NRootsGet(), sizeof(uint32_t) * NWORDS_256BIT * (FFT_SIZE_N -1) ));// inverse 2,4,8,16,32
+  }
 }
 
 /*
@@ -175,9 +291,11 @@ void CUSnarks::initRNG(uint32_t seed)
 */
 void CUSnarks::rand(uint32_t *samples, uint32_t n_samples)
 {
-    uint32_t size_sample = in_vector_device.size / (in_vector_device.length * sizeof(uint32_t));
-    //rng->randu32(samples, n_samples * size_sample);
-    setRandom(samples, n_samples * size_sample);
+     uint32_t size_sample;
+    
+     size_sample = in_vector_device[0][0].size / (in_vector_device[0][0].length * sizeof(uint32_t));
+      //rng->randu32(samples, n_samples * size_sample);
+     setRandom(samples, n_samples * size_sample);
 }
 
 void CUSnarks::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod=NULL)
@@ -206,10 +324,65 @@ void CUSnarks::saveFile(uint32_t *samples, uint32_t n_samples, char *fname)
 */
 CUSnarks::~CUSnarks()
 {
-  logInfo("Release resources\n");
-  cudaFree(in_vector_device.data);
-  cudaFree(out_vector_device.data);
-  cudaFree(params_device);
+  if (CUSnarks::init_resources){
+
+     CUSnarks::init_resources = 0;
+  }
+ 
+  releaseCudaStreamResources();
+  releaseCudaResources();
+}
+
+void CUSnarks::releaseCudaStreamResources(void)
+{
+  int i,j;
+  /*
+    logInfo("Release common resources\n");
+  */ 
+  for (i=0; i < deviceCount; i++){
+      CCHECK(cudaSetDevice(i));
+    
+      for (j=0; j < N_STREAMS_PER_GPU; j++){
+        CCHECK(cudaStreamDestroy(stream[i][j]));
+        CCHECK(cudaEventDestroy(start_event[i][j]));
+        CCHECK(cudaEventDestroy(end_event[i][j]));
+      }
+
+      free(stream[i]);
+      free(start_event[i]);
+      free(end_event[i]);
+  }
+
+  free(stream);
+  free(start_event);
+  free(end_event);
+}
+
+void CUSnarks::releaseCudaResources(void)
+{
+  int i,j;
+  /*
+  logInfo("Release Var resources\n");
+  */
+  
+  for (i==0; i < deviceCount; i++){
+    
+      free(in_vector_device[i]);
+      free(out_vector_device[i]);
+      free(params_device[i]);
+
+      free(out_data_host[i]);
+      free(in_data_host[i]);
+      free(params_host[i]);
+  }
+
+  free(in_vector_device);
+  free(out_vector_device);
+  free(params_device);
+
+  free(out_data_host);
+  free(in_data_host);
+  free(params_host);
 }
 
 /*
@@ -222,50 +395,94 @@ CUSnarks::~CUSnarks()
     in_vector_host  : kernel input data vector (host size)
     config          : kernel configuration info (grid, block, smem,...)
     params          : Kernel input parameters
+    gpu_id          : GPU ID
+    stream_id	    : stream ID
+    n_kernel        : Number of kernels
 */
 double CUSnarks::kernelLaunch(
 		vector_t *out_vector_host,
 	       	vector_t *in_vector_host,
                 kernel_config_t *config,
                 kernel_params_t *params,
+                uint32_t gpu_id=0,
+                uint32_t stream_id=0,
                 uint32_t n_kernel=1)
 {
   uint32_t i;
+  
   // check input lengths do not exceed reserved amount
-  if (in_vector_host->length > in_vector_device.length) { 
-    logInfo("Error IVHL : %d >  IVDL : %d\n",in_vector_host->length, in_vector_device.length);
+  if (in_vector_host->length > in_vector_device[gpu_id][stream_id].length) { 
+    logInfo("Error IVHL : %d >  IVDL : %d\n",in_vector_host->length, in_vector_device[gpu_id][stream_id].length);
     assert(0);
     return 0.0;
   }
-  if (out_vector_host->length > out_vector_device.length) {
-    logInfo("Error OVHL : %d > OVDL : %d\n",out_vector_host->length, out_vector_device.length);
+  if (out_vector_host->length > out_vector_device[gpu_id][stream_id].length) {
+    logInfo("Error OVHL : %d > OVDL : %d\n",out_vector_host->length, out_vector_device[gpu_id][stream_id].length);
     assert(0);
     return 0.0;
   }
 
-  in_vector_host->size = in_vector_host->length * (in_vector_device.size / in_vector_device.length  );
-  out_vector_host->size = out_vector_host->length * (out_vector_device.size / out_vector_device.length );
+  in_vector_host->size = 
+        in_vector_host->length *
+                 (in_vector_device[gpu_id][stream_id].size / in_vector_device[gpu_id][stream_id].length  );
+  out_vector_host->size =
+        out_vector_host->length *
+               (out_vector_device[gpu_id][stream_id].size / out_vector_device[gpu_id][stream_id].length );
 
-  double start, end_copy_in, end_kernel, end_copy_out, total_kernel;
+  double end_copy_in=0.0, end_copy_out=0.0, total_kernel=0.0;
+  double start_copy_in, start_kernel, end_kernel,start_copy_out;
+
   int blockD, gridD, smemS, kernel_idx;
 
   // measure data xfer time Host -> Device
-  start = elapsedTime();
-  //printf("%d. %d, %d\n", config[0].in_offset, in_vector_host->data, in_vector_host->size);
-  if (in_vector_host->size > 0){
-    CCHECK(cudaMemcpy(&in_vector_device.data[config[0].in_offset], in_vector_host->data, in_vector_host->size, cudaMemcpyHostToDevice));
+  cudaSetDevice(gpu_id);
+  double _start, _end, _total_start, _total_end;
+  _total_start = elapsedTime();
+  _start = elapsedTime();
+  in_data_host[gpu_id][stream_id] = in_vector_host->data;
+  if (stream_id == 0){
+     start_copy_in = elapsedTime();
+     CCHECK(cudaMemcpy(
+              &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
+              in_vector_host->data,
+              in_vector_host->size,
+              cudaMemcpyHostToDevice));
+     end_copy_in = elapsedTime() - start_copy_in;
+  } else {
+    CCHECK(cudaMemcpyAsync(
+             &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
+             in_vector_host->data,
+             in_vector_host->size,
+             cudaMemcpyHostToDevice,
+             this->stream[gpu_id][stream_id]));
+    _end = elapsedTime() - _start;
   }
-  end_copy_in = elapsedTime() - start;
-
-  total_kernel = 0.0;
+  logInfo("In Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
+         in_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
   // depending on input data length and stride (how many samples of input data are 
   // used per thread
+  _start = elapsedTime();
+  params_host[gpu_id][stream_id]= (kernel_params_t *) params;
   for (i=0; i < n_kernel; i++){
-    start = elapsedTime();
-    CCHECK(cudaMemcpy(params_device, &params[i], sizeof(kernel_params_t), cudaMemcpyHostToDevice));
-    end_copy_in = +(elapsedTime() - start);
+    if (stream_id == 0){
+      start_copy_in = elapsedTime();
+      CCHECK(cudaMemcpy(params_device[gpu_id][stream_id],
+                        &params_host[gpu_id][stream_id][i],
+                        sizeof(kernel_params_t),
+                        cudaMemcpyHostToDevice));
+      end_copy_in = +(elapsedTime() - start_copy_in);
+    } else {
+      CCHECK(cudaMemcpyAsync(params_device[gpu_id][stream_id],
+                        &params_host[gpu_id][stream_id][i],
+                        sizeof(kernel_params_t),
+                        cudaMemcpyHostToDevice,
+                        this->stream[gpu_id][stream_id]));
+      _end = elapsedTime() - _start;
+    }
+    logInfo("In Params : Ptr : %x, gpu_id : %u, stream_id : %u, time : %f\n",
+           params_host[gpu_id][stream_id], gpu_id, stream_id, _end);
     blockD = config[i].blockD;
     if (config[i].gridD == 0){
        config[i].gridD = (blockD + in_vector_host->length/params[i].stride - 1) / blockD;
@@ -274,14 +491,31 @@ double CUSnarks::kernelLaunch(
     smemS = config[i].smemS;
     kernel_idx = config[i].kernel_idx;
 
-
+    _start = elapsedTime();
     // launch kernel
-    start = elapsedTime();
-    kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS>>>(out_vector_device.data, in_vector_device.data, params_device);
+    if (stream_id == 0){
+       start_kernel = elapsedTime();
+       kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS>>>(
+                                                  out_vector_device[gpu_id][stream_id].data,
+                                                  in_vector_device[gpu_id][stream_id].data,
+                                                   params_device[gpu_id][stream_id]
+                                                             );
+       end_kernel = elapsedTime() - start_kernel;
+       total_kernel +=end_kernel;
+    } else {
+       CCHECK(cudaEventRecord(start_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
+       kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS, this->stream[gpu_id][stream_id]>>>(
+                                                                  out_vector_device[gpu_id][stream_id].data,
+                                                                  in_vector_device[gpu_id][stream_id].data,
+                                                                  params_device[gpu_id][stream_id]
+                                                                  );
+       CCHECK(cudaEventRecord(end_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
+       _end = elapsedTime() - _start;
+       logInfo("Launch async stream : ptr: %x, gpu_id : %d, stream_id : %d, Time : %f\n",
+                       this->stream[gpu_id][stream_id],gpu_id, stream_id, _end);  
+    }
     CCHECK(cudaGetLastError());
-    CCHECK(cudaDeviceSynchronize());
-    end_kernel = elapsedTime() - start;
-    total_kernel +=end_kernel;
+    //CCHECK(cudaDeviceSynchronize());
 
     logInfo("Params : premod : %d, premul : %d,  midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d, As mont : %d\n",
         params[i].premod, params[i].premul, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride, params[i].padding_idx, params[i].as_mont);
@@ -290,25 +524,46 @@ double CUSnarks::kernelLaunch(
     logInfo("Kernel IDX :%d <<<%d, %d, %d>>> Time Elapsed Kernel : %f.sec, Return val : %d, In offset : %d, return offset : %d\n", 
           kernel_idx, gridD, blockD, smemS,end_kernel, config[i].return_val, config[i].in_offset, config[i].return_offset);
   }
-  
+
     // retrieve kernel output data from GPU to host
-  start = elapsedTime();
+  start_copy_out = elapsedTime();
+  _start = elapsedTime();
   if (config[0].return_val){
-     CCHECK(cudaMemcpy(out_vector_host->data, out_vector_device.data + config[0].return_offset, out_vector_host->size, cudaMemcpyDeviceToHost));
+     out_data_host[gpu_id][stream_id] = out_vector_host->data;
+     if (stream_id == 0){
+        CCHECK(cudaMemcpy(
+            out_vector_host->data,
+            out_vector_device[gpu_id][stream_id].data + config[0].return_offset,
+            out_vector_host->size,
+            cudaMemcpyDeviceToHost));
+     } else {
+        //out_data_host[gpu_id][stream_id] = out_vector_host->data;
+        CCHECK(cudaMemcpyAsync(
+            out_data_host[gpu_id][stream_id],
+            out_vector_device[gpu_id][stream_id].data + config[0].return_offset,
+            out_vector_host->size,
+            cudaMemcpyDeviceToHost,
+            stream[gpu_id][stream_id]));
+        _end = elapsedTime() - _start;
+     }
+     logInfo("Out Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
+        out_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
   }
  
-  end_copy_out = elapsedTime() - start;
+  end_copy_out = elapsedTime() - start_copy_out;
+  _total_end = elapsedTime() - _total_start;
+  logInfo("Kernel total time : %f,\n\n", _total_end);
 
   logInfo("----- Info -------\n");
   logInfo("IVHS : %d, IVHL : %d, IVDS : %d, IVDL : %d\n",in_vector_host->size, 
 		                                        in_vector_host->length,
-						       	in_vector_device.size,
-						       	in_vector_device.length);
+						       	in_vector_device[gpu_id][stream_id].size,
+						       	in_vector_device[gpu_id][stream_id].length);
 
   logInfo("OVHS : %d, OVHL : %d, OVDS : %d, OVDL : %d\n",out_vector_host->size,
 		                                        out_vector_host->length, 
-							out_vector_device.size,
-						       	out_vector_device.length);
+							out_vector_device[gpu_id][stream_id].size,
+						       	out_vector_device[gpu_id][stream_id].length);
 
   logInfo("Time Elapsed Xfering in %d bytes : %f sec\n",
           in_vector_host->size, end_copy_in);
@@ -318,7 +573,64 @@ double CUSnarks::kernelLaunch(
   return total_kernel;
 }
 
+void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)
+{
+  uint32_t i;
+  logInfo("Sync del : In Data ptr : %x, Out Data ptr : %x, In Params ptr : %x, gpu_id : %d, stream_id : %d\n\n\n",
+      in_data_host[gpu_id][stream_id], out_data_host[gpu_id][stream_id], params_host[gpu_id][stream_id],
+      gpu_id, stream_id);
+  // free params, in_host_data and out_host_data
 
+  logInfo("Release in_data_host[%d][%d] : %x\n",gpu_id, stream_id,in_data_host[gpu_id][stream_id]);
+  CCHECK(cudaFreeHost(in_data_host[gpu_id][stream_id]));
+
+  logInfo("Release out_data_host[%d][%d] : %x\n",gpu_id, stream_id,out_data_host[gpu_id][stream_id]);
+  CCHECK(cudaFreeHost(out_data_host[gpu_id][stream_id]));
+
+  logInfo("Release params_hostt[%d][%d] : %x\n",gpu_id, stream_id,params_host[gpu_id][stream_id]);
+  CCHECK(cudaFreeHost(params_host[gpu_id][stream_id]));
+
+}
+
+double CUSnarks::streamSync(uint32_t gpu_id, uint32_t stream_id)
+{
+  float kernel_time;
+
+  logInfo("Sync Stream : Ptr : %x, gpu_id : %u, stream_id : %u\n",
+           stream[gpu_id][stream_id], gpu_id, stream_id);
+  logInfo("Sync Event  : Ptr : %x, gpu_id : %u, stream_id : %u\n",
+           end_event[gpu_id][stream_id], gpu_id, stream_id);
+  CCHECK(cudaStreamSynchronize(stream[gpu_id][stream_id]));
+  //CCHECK(cudaEventSynchronize(end_event[gpu_id][stream_id]));
+
+  /*
+  CCHECK(cudaEventElapsedTime(
+                &kernel_time,
+                start_event[gpu_id][stream_id],
+                end_event[gpu_id][stream_id]));
+  */
+
+  return  (double) kernel_time;
+   
+}
+
+uint32_t * CUSnarks::streamGetOutputData(uint32_t gpu_id, uint32_t stream_id)
+{   
+   logInfo("Sync Out Data : Ptr :%x, gpu_id : %d, stream_id : %d \n", 
+       out_data_host[gpu_id][stream_id], gpu_id, stream_id);
+
+   return out_data_host[gpu_id][stream_id];
+}
+
+uint32_t  CUSnarks::streamGetOutputDataLen(uint32_t gpu_id, uint32_t stream_id)
+{  
+   logInfo("Sync Params : Ptr :%x, gpu_id : %d, stream_id : %d, len : %d\n", 
+       params_host[gpu_id][stream_id], gpu_id, stream_id, 
+       params_host[gpu_id][stream_id][0].out_length);
+ 
+       
+   return params_host[gpu_id][stream_id][0].out_length;
+}
 /*
   Professional CUDA C Programming by John Cheng, Max Grossman, Ty McKercher
 */
@@ -334,7 +646,6 @@ double CUSnarks::elapsedTime(void)
 */
 void CUSnarks::getDeviceInfo(void)
 {
-   int deviceCount = 0;
    CCHECK(cudaGetDeviceCount(&deviceCount));
   
    if (deviceCount == 0) {

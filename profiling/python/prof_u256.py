@@ -107,7 +107,7 @@ def profile_u256():
 
     for i in range(niter):
        u256 = U256(nsamples, seed=10)
-       _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params, nkernels )
+       _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params, n_kernels = nkernels )
        if i :
            kernel_stats.append(kernel_time)
 

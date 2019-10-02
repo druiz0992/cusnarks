@@ -33,6 +33,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "types.h"
 #include "utils_host.h"
 #include "constants.h"
@@ -272,7 +273,10 @@ static uint32_t misc_const_init[] = {
                   0,          0,          0,          0,          0,          0,          0,          0    
 };
 
-static char roots_1M_filename[]="../../data/zpoly_roots_1M.bin";
+static char roots_1M_filename[]="../../data/zpoly_roots_16M.bin";
+static char config_roots_filename[]="../../config/.root_f";
+static char config_nroots_filename[]="../../config/.nroots";
+
 // 32 roots of unitity of field prime (only first 16)
 static uint32_t W32_roots[32*NWORDS_256BIT];
 // 32 inverse roots of unitity of field prime (only first 16)
@@ -381,13 +385,64 @@ const uint32_t * CusnarksMiscKGet(void)
 }
 const uint32_t * CusnarksW32RootsGet(void)
 {
-  readU256DataFile_h(W32_roots,roots_1M_filename,1<<20,32);
+  //TODO Retrieve root file name and number of roots from config file
+  FILE *ifp;
+  char roots_f[1000];
+  char n_roots_c[1000];
+  char *end;
+  uint32_t n_roots;
+ 
+  ifp = fopen(config_roots_filename,"r");
+  
+  fgets(roots_f,sizeof(roots_f) , ifp);
+
+  fclose(ifp);
+
+  if( (end = strchr(roots_f, '\n')) != NULL)
+    *end = '\0';
+
+  ifp = fopen(config_nroots_filename,"r");
+
+  fgets(n_roots_c, sizeof(n_roots_c), ifp);
+
+  fclose(ifp);
+
+  n_roots = strtol(n_roots_c, &end, 10);
+
+  readU256DataFile_h(W32_roots,roots_f,1<<n_roots,32);
+
   return W32_roots;
 }
+
 const uint32_t * CusnarksIW32RootsGet(void)
 {
-  uint32_t i;
-  readU256DataFile_h(IW32_roots,roots_1M_filename,1<<20,32);
+  //TODO Retrieve root file name and number of roots from config file
+  FILE *ifp;
+  char roots_f[1000];
+  char n_roots_c[1000];
+  char *end;
+  uint32_t n_roots;
+ 
+  ifp = fopen(config_roots_filename,"r");
+  
+  fgets(roots_f,sizeof(roots_f) , ifp);
+
+  fclose(ifp);
+
+  if( (end = strchr(roots_f, '\n')) != NULL)
+    *end = '\0';
+
+  ifp = fopen(config_nroots_filename,"r");
+
+  fgets(n_roots_c, sizeof(n_roots_c), ifp);
+
+  fclose(ifp);
+
+  n_roots = strtol(n_roots_c, &end, 10);
+
+  readU256DataFile_h(IW32_roots,roots_f,1<<n_roots,32);
+
+
   computeIRoots_h(IW32_roots, IW32_roots, 32);
   return IW32_roots;
 }

@@ -105,7 +105,7 @@ def profile_zpoly_1024():
 
 
     for i in range(niter):
-       _,kernel_time = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,2)
+       _,kernel_time = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,n_kernels = 2)
        if i :
            kernel_stats.append(kernel_time)
 
@@ -178,7 +178,7 @@ def profile_zpoly_1M():
 
 
     for i in range(niter):
-       _,kernel_time = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,4)
+       _,kernel_time = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,n_kernels = 4)
        if i :
            kernel_stats.append(kernel_time)
 

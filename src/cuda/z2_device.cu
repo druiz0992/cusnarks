@@ -64,7 +64,7 @@ __device__ uint32_t * Z2_t::getu256(uint32_t offset)
 
 __device__ uint32_t * Z2_t::get2u256(uint32_t offset)
 {
-  return &el[offset*(ECP2_JAC_N256W+1)*NWORDS_256BIT];
+  return &el[offset*ECP2_JAC_N256W*NWORDS_256BIT+NWORDS_256BIT];
 }
 
 __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
@@ -73,6 +73,7 @@ __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
          //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
          //3 * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
    movu256x6(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
+   //movu256x6(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
    //movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
    //movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
    //movu256(&el[(xoffset+3)*NWORDS_256BIT],&y->el[(yoffset+3)*NWORDS_256BIT]);
@@ -95,7 +96,6 @@ __device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
 
 __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-       //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
               //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
               //ysize * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
    movu256(&el[(xoffset)*2*NWORDS_256BIT],&y->el[(yoffset)*2*NWORDS_256BIT]);
@@ -136,15 +136,18 @@ __device__ uint32_t eq0z(Z2_t *x)
 { 
    return (eq0u256(x->getu256()) && eq0u256(x->get2u256()));
 }
-
-__device__ uint32_t eq1z(Z2_t *x)
+__device__ uint32_t eq0z(Z2_t *x, uint32_t offset)
 { 
-   return (eq1u256(x->getu256()) && eq0u256(x->get2u256()));
+   return (eq0u256(x->getu256(offset)) && eq0u256(x->get2u256(offset)));
 }
 
 __device__ uint32_t eqz(Z2_t *x, Z2_t *y)
 {
   return (equ256(x->getu256(), y->getu256()) && equ256(x->get2u256(), y->get2u256()));
+}
+__device__ uint32_t eqz(Z2_t *x, uint32_t xoffset, uint32_t *y)
+{
+  return (equ256(x->getu256(xoffset), y) && equ256(x->get2u256(xoffset), &y[NWORDS_256BIT]));
 }
 __device__ uint32_t eqz(Z2_t *x, uint32_t *y)
 {
