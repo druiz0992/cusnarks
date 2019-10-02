@@ -136,7 +136,9 @@ build:
 all:
 	echo "checking third pary libs...";
 	if ! test -d $(AUX_PATH); \
-		then mkdir $(AUX_PATH); cd $(AUX_PATH);  for j in $(AUX_REPOS); do git clone $$j; done; fi
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); fi
+	@for j in $(AUX_REPOS); do \
+		git clone $$j; done; 
 	@for i in $(AUX_CSUBDIRS); do \
 		(cd $$i; $(MAKE)); done
 	@for i in $(AUX_JSSUBDIRS); do \
