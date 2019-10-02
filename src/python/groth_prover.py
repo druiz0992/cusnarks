@@ -104,6 +104,7 @@ class GrothProver(object):
 
         random.seed(self.seed) 
 
+        logging.info('Initializing memories...')
         self.roots_f = cfg.get_roots_file()
         self.n_bits_roots = cfg.get_n_roots()
         self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
@@ -178,6 +179,7 @@ class GrothProver(object):
         logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info('#################################### ')
   
+        logging.info('Reading Proving Key...')
         self.load_pkdata()
 
         if self.out_proving_key_f is not None:
@@ -436,11 +438,11 @@ class GrothProver(object):
       logging.info('#################################### ')
       logging.info('Total Time to generate proof : %s seconds', self.t_GP['Proof'])
       logging.info('')
-      logging.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + '%)')
-      logging.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + '%)')
-      logging.info('------ Time Multi-exp.         : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + '%)')
-      logging.info('------ Time Lagrange Poly Eval : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + '%)')
-      logging.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + '%)')
+      logging.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + ' %)')
+      logging.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + ' %)')
+      logging.info('------ Time Multi-exp.         : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + ' %)')
+      logging.info('------ Time Lagrange Poly Eval : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + ' %)')
+      logging.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + ' %)')
       logging.info('#################################### ')
       logging.info('')
       logging.info('')
@@ -484,6 +486,9 @@ class GrothProver(object):
       logging.info(' - batch_size : %s', batch_size)
       logging.info(' - gpus used : %s', self.n_gpu)
       logging.info(' - streams used: %s', self.n_streams)
+      logging.info('#################################### ')
+      logging.info('')
+      logging.info('')
 
       self.t_GP['init'] = time.time() - start
       ##### Starting proof
@@ -662,6 +667,7 @@ class GrothProver(object):
         ######################
         start = time.time()
         # Read witness info
+        logging.info(' Reading Witness...')
         self.read_witness_data()
 
         end = time.time()
@@ -690,6 +696,7 @@ class GrothProver(object):
         logging.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
         logging.info('#################################### ')
 
+        logging.info(' Starting First Mexp...')
         pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize', 'delta_1'])
 
         #large input : hExps. I can overwrite it provided that i don't require comparing to snarkjs
@@ -754,6 +761,7 @@ class GrothProver(object):
         #  P3 - Poly Eval
         #  P4 - Poly Operations
         ######################
+
         polH = self.calculateH()
 
         ######################
@@ -762,6 +770,7 @@ class GrothProver(object):
         ######################
         start = time.time()
 
+        logging.info(' Starting Last Mexp...')
         #Theck that last batch includes last three samples 
         while True:
            nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1))
@@ -1126,13 +1135,17 @@ class GrothProver(object):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
 
+        logging.info(' Evaluating Poly A...')
         pA_T = self.evalPoly(pA, nVars, m)
+        logging.info(' Evaluating Poly B...')
         pB_T = self.evalPoly(pB, nVars, m)
 
         end = time.time()
         self.t_GP['Eval'] = end-start
    
         start = time.time()
+
+        logging.info(' Calculating H...')
 
         ifft_params = ntt_build_h(pA_T.shape[0])
 
