@@ -745,7 +745,6 @@ class GrothProver(object):
 
         # Assign collected values to pi's
         
-        start1 = time.time()
         self.assignECPvalues(compute_ECP=False)
 
         end = time.time()
@@ -755,12 +754,7 @@ class GrothProver(object):
         #  P3 - Poly Eval
         #  P4 - Poly Operations
         ######################
-        start = time.time()
-
         polH = self.calculateH()
-
-        end = time.time()
-        self.t_GP['H'] = end - start
 
         ######################
         # Beginning of P5
@@ -793,7 +787,6 @@ class GrothProver(object):
                                   change_rs_scl_idx = [self.ec_type_dict['hExps'][2]],
                                   pk_bin = pk_bin[:self.ec_type_dict['hExps'][2]+1])
 
-        start1 = time.time()
         self.assignECPvalues(compute_ECP=True)
 
         end = time.time()
@@ -1121,7 +1114,7 @@ class GrothProver(object):
 
     def calculateH(self):
 
-        start_h = time.time()
+        start = time.time()
 
         ZField.set_field(MOD_FIELD)
         pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB'])
@@ -1132,7 +1125,6 @@ class GrothProver(object):
 
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-        start = time.time()
 
         pA_T = self.evalPoly(pA, nVars, m)
         pB_T = self.evalPoly(pB, nVars, m)
@@ -1159,5 +1151,6 @@ class GrothProver(object):
                                               self.roots_rdc_u256,
                                               self.batch_size, n_gpu=self.n_gpu)
 
+        self.t_GP['H'] = time.time()-start
 
         return pH[m:-1]
