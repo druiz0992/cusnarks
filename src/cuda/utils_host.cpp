@@ -690,6 +690,107 @@ void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwo
 
 }
 
+void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
+{
+  FILE *ifp = fopen(filename,"rb");
+  uint32_t k=0,i;
+  uint32_t tmp_word, n_coeff;
+
+  r1cs_hdr->R1CSA_nCoeff=0;
+  r1cs_hdr->R1CSB_nCoeff=0;
+  r1cs_hdr->R1CSC_nCoeff=0;
+
+  fread(&r1cs_hdr->magic_number, sizeof(uint32_t), 1, ifp); 
+  if (r1cs_hdr->magic_number != R1CS_HDR_MAGIC_NUMBER){
+    printf("Unexpected R1CS header format\n");
+    fclose(ifp);
+    exit(1);
+  }
+
+  fread(&r1cs_hdr->version, sizeof(uint32_t), 1, ifp); 
+  if (r1cs_hdr->version != R1CS_HDR_V01){
+    printf("Unexpected R1CS version\n");
+    fclose(ifp);
+    exit(1);
+  }
+
+  fread(&r1cs_hdr->word_width_bytes, sizeof(uint32_t), 1, ifp); 
+  if (r1cs_hdr->word_width_bytes != 4){
+    printf("Unexpected R1CS word width\n");
+    fclose(ifp);
+    exit(1);
+  }
+
+  fread(&r1cs_hdr->nVars, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nPubOutputs, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nPubInputs, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nPrivInputs, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->nConstraints, sizeof(uint32_t), 1, ifp); 
+
+  while (!feof(ifp)){
+    fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
+    if (k%3 == R1CSA_IDX){
+      r1cs_hdr->R1CSA_nCoeff+= (n_coeff);
+    } else if (k%3 == R1CSB_IDX){
+      r1cs_hdr->R1CSB_nCoeff+= (n_coeff);
+    } else {
+      r1cs_hdr->R1CSC_nCoeff+= (n_coeff);
+    }
+    for (i=0; i< n_coeff; i++){
+      fseek(ifp, 4, SEEK_CUR);
+      fread(&tmp_word, 1, 1, ifp); 
+      fseek(ifp, tmp_word, SEEK_CUR);
+    }
+    k++;
+  }
+  fclose(ifp);
+  
+  return;
+}
+  
+
+void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1cs_idx_t r1cs_idx )
+{
+  FILE *ifp = fopen(filename,"rb");
+  uint32_t tmp_word, n_coeff;
+  uint32_t r1cs_offset=0, r1cs_coeff_offset=1+r1cs->nConstraints, r1cs_val_offset = 1+r1cs->nConstraints;
+  uint32_t k=0, accum_coeffs=0, i,j;
+
+  samples[r1cs_offset++] = r1cs->nConstraints;
+  
+  fseek(ifp, R1CS_HDR_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_SET);
+
+  while (!feof(ifp)){
+    fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
+    if (k%3 == r1cs_idx) {
+      accum_coeffs+= ((uint32_t) n_coeff);
+      samples[r1cs_offset++] = accum_coeffs;
+      r1cs_val_offset += n_coeff;
+      for (i=0; i< n_coeff; i++){
+        fread(&samples[r1cs_coeff_offset++], sizeof(uint32_t), 1, ifp); 
+        fread(&tmp_word, 1,1, ifp);
+        for(j=0; j <tmp_word; j++){
+           fread(&samples[r1cs_val_offset+j], 1, 1, ifp); 
+        }
+        r1cs_val_offset += NWORDS_256BIT;
+      }
+      r1cs_coeff_offset = r1cs_val_offset;
+
+    }  else {
+      for (i=0; i< n_coeff; i++){
+        fseek(ifp, 4, SEEK_CUR);
+        fread(&tmp_word, 1, 1, ifp); 
+        fseek(ifp, tmp_word, SEEK_CUR);
+      }
+    }
+    
+    k++;
+  }
+
+  fclose(ifp);
+}
+
+
 /*
   Read header PK binary file
 
@@ -765,6 +866,46 @@ void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize
   
   fclose(ifp);
 }
+
+void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt,  const unsigned long long inlen)
+{
+  unsigned long long i;
+  unsigned long long nwords;
+  uint32_t wsize;
+  uint32_t wmore;
+  uint32_t nwords32;
+  uint32_t r[NWORDS_256BIT];
+  FILE *ifp = fopen(filename,"rb");
+  
+
+  fread(&nwords,sizeof(uint32_t),WITNESS_HEADER_N_LEN_NWORDS,ifp);
+  fread(&wsize,sizeof(uint32_t),WITNESS_HEADER_SIZE_LEN_NWORDS,ifp);
+  fread(&wmore,sizeof(uint32_t),WITNESS_HEADER_OTHER_LEN_NWORDS,ifp); 
+  if (!fmt){
+    fseek(ifp, 32, SEEK_SET);
+  }
+
+  for (i=0;i<inlen; i++){
+    fread(&samples[i*NWORDS_256BIT],sizeof(uint32_t),NWORDS_256BIT,ifp);
+  }
+  
+  fclose(ifp);
+}
+void writeWitnessFile_h(uint32_t *samples, const char *filename, const unsigned long long nwords)
+{
+  uint32_t wsize = NWORDS_256BIT;
+  uint32_t wmore = 0;
+  FILE *ifp = fopen(filename,"wb");
+
+  fwrite(&nwords, sizeof(uint64_t), 1, ifp); 
+  fwrite(&wsize, sizeof(uint32_t), 1, ifp); 
+  fwrite(&wmore, sizeof(uint32_t), 1, ifp); 
+
+  fseek(ifp, WITNESS_HEADER_LEN_NWORDS * sizeof(uint32_t), SEEK_SET);
+
+  fwrite(samples, sizeof(uint32_t), nwords*NWORDS_256BIT, ifp); 
+
+}
 /*
   Display u256 samples
  
@@ -808,7 +949,9 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
 
   memset(x,0,NWORDS_256BIT*sizeof(uint32_t));
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for (j=0; j < nsamples; j++){
     uint32_t nwords;
     uint32_t nbits;
@@ -903,7 +1046,9 @@ void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
 {
   uint32_t i;
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for(i=0; i<n;i++){
     to_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
   }
@@ -913,7 +1058,9 @@ void montmultN_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t n, uint32_t pid
 {
   uint32_t i;
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for (i=0; i<n; i++){
      montmult_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], &y[i*NWORDS_256BIT], pidx);
   }
@@ -940,12 +1087,16 @@ void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pid
   uint32_t i;
 
   if (!strip_last){
-    #pragma omp parallel for if(parallelism_enabled)
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
     for(i=0; i<n;i++){
       from_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
     }
   } else if (strip_last == 1) {
-    #pragma omp parallel for if(parallelism_enabled)
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
     for(i=0; i<n;i++){
       int rem = i%3;
       if (rem != 2){
@@ -954,7 +1105,9 @@ void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pid
       
     }
   } else if (strip_last == 2){
-    #pragma omp parallel for if(parallelism_enabled)
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
     for(i=0; i<n;i++){
       int rem = i%6;
       if (rem < 4){
@@ -1012,7 +1165,9 @@ void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len)
 {
   uint32_t i;
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for (i=0;i < len; i++){  
     idx[i] = i;
   }
@@ -1294,7 +1449,7 @@ void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
 {
   int i, j;
-  uint32_t S, C, C1, C2, M[2], X[2], carry;
+  uint32_t S, C, C1, C2, C3=0, M[2], X[2], carry;
   uint32_t T[NWORDS_256BIT_FIOS];
   const uint32_t *NPrime = CusnarksNPGet((mod_t)pidx);
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
@@ -1306,6 +1461,11 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
   printU256Number(A);
   printf("B\n");
   printU256Number(B);
+
+  printf("N\n");
+  printU256Number(N);
+
+  printf("NPrime[0] : %u\n",NPrime[0]);
   */
 
   for(i=0; i<NWORDS_256BIT; i++) {
@@ -1316,13 +1476,13 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
 
     /*
     printf("0 - C : %u, S: %u\n",C,S);
+    printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
     */
-    //printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
     // ADD(t[1],C)
     //mpAddWithCarryProp(T, C, 1);
     carry = mpAdd(&T[1], &T[1], &C, 1); 
     /*
-    printf("C3: %d\n",carry);
+    printf("C3: %u\n",carry);
     printf("T\n");
     printU256Number(T);
     */
@@ -1336,10 +1496,13 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
 
     // (C,S) = S + m*n[0], worst case 2 words
     spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
+    /*
+    printf("1 - X[1] %u, X[0] : %u\n",X[1], X[0]);
+    */
     C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
     mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
     /*
-    printf("1 - C : %u, S: %u\n",C,S);
+    printf("1 - C : %u, S: %u, X[1] %u, X[0] : %u\n\n",C,S, X[1], X[0]);
     */
 
     for(j=1; j<NWORDS_256BIT; j++) {
@@ -1358,35 +1521,47 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
       /*
       printf("4 - C : %u\n",C);
       */
-      mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, doesn't produce carry
+      C3 = mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, it DOES produce carry
       /*
-      printf("5 - C : %u\n",C);
+      printf("5 - C : %u, C3 : %u\n",C, C3);
       */
-   
+       
+      /*
+      // Fix this!!!! TODO
+      if (C3 > 0){
+        printf("Te pille\n");
+      }
+      */
       // ADD(t[j+1],C)
-      C += carry;
-      carry = mpAdd(&T[j+1], &T[j+1], &C, 1); 
+      //C += carry;
+      C3 += mpAdd(&C, &C, &carry, 1);    // (~,C)  = C + C2, It DOES produce carry
+      /*
+      if (C3 > 0){
+        printf("Te pille v2\n");
+      }
+      */
+
+      carry = mpAdd(&T[j+1], &T[j+1], &C, 1) + C3; 
       //mpAddWithCarryProp(T, C, j+1);
       /*
-      printf("T\n");
+      printf("T(%u)\n", carry);
       printU256Number(T);
-      */
+     */
    
       // (C,S) = S + m*n[j]
       spMultiply(X, M[0], N[j]); // X[Upper,Lower] = m*n[j]
       C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
       mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-      //printf("6 - C : %u, S: %u\n",C,S);
    
       // t[j-1] = S
       T[j-1] = S;
       /*
-      printf("T\n");
+      printf("T[%d]\n", j-1);
       printU256Number(T);
       */
     }
 
-    mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
+    //mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
     // (C,S) = t[s] + C
     C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
     /*
@@ -1940,6 +2115,11 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
    memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
 }
 
+void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
+{
+   addm_h(z,x,y,pidx);
+   addm_h(&z[NWORDS_256BIT],&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
+}
 /*
   modular substraction of 256 bit numbers : Z = X - Y mod P
 
@@ -1959,6 +2139,11 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
    }
 
    memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
+}
+void subm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
+{
+   subm_h(z,x,y,pidx);
+   subm_h(&z[NWORDS_256BIT],&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
 }
 
 /*
@@ -2089,6 +2274,19 @@ uint32_t getbitu256_h(uint32_t *x, uint32_t n)
 
   return ( (x[w] >> b) & 0x1);
 }
+uint32_t getbitu256g_h(uint32_t *x, uint32_t n, uint32_t group_size)
+{
+  uint32_t w, b,i, val=0;
+  
+  w = n >> NBITS_WORD_LOG2;
+  b = n & NBITS_WORD_MOD;
+
+  for (i = 0; i < group_size; i++){
+    val |= (( (x[w+NWORDS_256BIT*i] >> b) & 0x1) << i);
+  }
+
+  return val;
+}
 /*
   Montgomery Modular Inverse - Revisited
   E. Savas, C.K.Koc
@@ -2193,14 +2391,14 @@ void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
 
   if (!memcmp( x,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
-                sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT) ) {
+                sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT) ) {
 
           memmove( z, y, sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS);
           return;
 
   } else if (!memcmp( y,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
-                sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT) ) {
+                sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT) ) {
 
           memmove( z, x, sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS);
           return;
@@ -2254,6 +2452,91 @@ void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
 
 }
 
+void ec2_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
+{
+  const uint32_t *ECInf = CusnarksMiscKGet();
+  uint32_t x_cpy[NWORDS_256BIT * ECP2_JAC_OUTDIMS];
+  uint32_t y_cpy[NWORDS_256BIT * ECP2_JAC_OUTDIMS];
+
+  uint32_t Z1sq[NWORDS_256BIT*2], Z1cube[NWORDS_256BIT*2];
+  uint32_t Z2sq[NWORDS_256BIT*2], Z2cube[NWORDS_256BIT*2];
+  uint32_t U1[NWORDS_256BIT*2], U2[NWORDS_256BIT*2];
+  uint32_t S1[NWORDS_256BIT*2], S2[NWORDS_256BIT*2];
+
+  uint32_t *X1, *Y1, *Z1;
+  uint32_t *X2, *Y2, *Z2;
+  uint32_t *X3, *Y3, *Z3;
+  uint32_t *H, *R, *Hsq, *Hcube;
+  
+  X1 = x_cpy; Y1 = &x_cpy[2*NWORDS_256BIT]; Z1 = &x_cpy[4*NWORDS_256BIT];
+  X2 = y_cpy; Y2 = &y_cpy[2*NWORDS_256BIT]; Z2 = &y_cpy[4*NWORDS_256BIT];
+  X3 = z;     Y3 = &z[2*NWORDS_256BIT];    Z3 = &z[4*NWORDS_256BIT];
+  H = U2;  R = S2; Hsq = Y3; Hcube = Z3;
+
+  if (!memcmp( x,
+                &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
+                sizeof(uint32_t) * ECP2_JAC_INDIMS * NWORDS_256BIT) ) {
+
+          memmove( z, y, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
+          return;
+
+  } else if (!memcmp( y,
+                &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
+                sizeof(uint32_t) * ECP2_JAC_INDIMS * NWORDS_256BIT) ) {
+
+          memmove( z, x, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
+          return;
+  }
+
+  memcpy(x_cpy, x, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
+  memcpy(y_cpy, y, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
+
+  montsquare_ext_h(Z1sq, Z1, pidx);
+  montmult_ext_h(Z1cube, Z1sq, Z1, pidx);
+  montsquare_ext_h(Z2sq, Z2, pidx);
+  montmult_ext_h(Z2cube, Z2sq, Z2, pidx);
+
+  montmult_ext_h(U1, X1, Z2sq, pidx);
+  montmult_ext_h(U2, X2, Z1sq, pidx);
+  montmult_ext_h(S1, Y1, Z2cube, pidx);
+  montmult_ext_h(S2, Y2, Z1cube, pidx);
+
+  if (!memcmp(U1, U2, 2*NWORDS_256BIT * sizeof(uint32_t))){
+     if (memcmp(S1, S2, 2*NWORDS_256BIT * sizeof(uint32_t))){
+              memmove(
+                  &z,
+                  &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
+                  sizeof(uint32_t)*ECP2_JAC_OUTDIMS * NWORDS_256BIT);
+               return;
+     } else {
+          ec2_jacdouble_h(z, x, pidx);
+          return;
+     }
+  }
+
+ subm_ext_h(H,U2,U1,pidx);  // H is U2
+ subm_ext_h(R, S2, S1, pidx);  // R is S2
+
+ montsquare_ext_h(Hsq, H, pidx);  // Hsq is Y3
+ montmult_ext_h(Hcube, H, Hsq, pidx);  // Hcube is Z3
+
+ montsquare_ext_h(X3, R, pidx);
+ subm_ext_h(X3, X3, Hcube, pidx);
+ montmult_ext_h(U1,U1, Hsq, pidx);
+ subm_ext_h(X3, X3, U1, pidx);
+ subm_ext_h(X3, X3, U1, pidx);
+
+ montmult_ext_h(S1,S1,Hcube, pidx);
+ subm_ext_h(U1, U1, X3, pidx);
+ montmult_ext_h(Y3,R, U1, pidx);
+ subm_ext_h(Y3, Y3, S1, pidx);
+
+ montmult_ext_h(Z3, Z1, Z2, pidx);
+ montmult_ext_h(Z3, Z3, H, pidx);
+
+}
+
+
 void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
 {
   const uint32_t *ECInf = CusnarksMiscKGet();
@@ -2266,6 +2549,7 @@ void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
   uint32_t *Z2 = &z[2*NWORDS_256BIT];
   uint32_t Ysq[NWORDS_256BIT], Ysqsq[NWORDS_256BIT];
   uint32_t Zsq[NWORDS_256BIT], S[NWORDS_256BIT], M[NWORDS_256BIT];
+
 
   if (!memcmp( x,
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
@@ -2289,16 +2573,17 @@ void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
   addm_h(M, X2, M, pidx);
 
   montsquare_h(X2, M, pidx);
+
   montmult_h(Z2, Y1, Z1, pidx);
   subm_h(X2, X2, S, pidx);
   subm_h(X2, X2, S, pidx);
 
-  
   addm_h(Y2, Ysqsq, Ysqsq, pidx);
  
   addm_h(Y2, Y2, Y2, pidx);
   addm_h(Y2, Y2, Y2, pidx);
 
+  //addm_h(Y2, Y2, Y2, pidx);
   
   subm_h(S, S, X2, pidx);
   montmult_h(S, M, S, pidx);
@@ -2307,67 +2592,203 @@ void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
   addm_h(Z2, Z2, Z2, pidx);
 }
 
-#if 0
-void ec_inittable(uint32_t, *uint32_t *x, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0 )
+void ec2_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
 {
-   uint32_t n_tables = (table_order + n - 1)/table_table;
-   uint32_t i, j,k=0;
-   uint32_t table_size = 1<< table_order:
+  const uint32_t *ECInf = CusnarksMiscKGet();
+  uint32_t x_cpy[NWORDS_256BIT*ECP2_JAC_OUTDIMS];
+  uint32_t *X1 = x_cpy;
+  uint32_t *Y1 = &x_cpy[2*NWORDS_256BIT];
+  uint32_t *Z1 = &x_cpy[4*NWORDS_256BIT];
+  uint32_t *X2 = z;
+  uint32_t *Y2 = &z[2*NWORDS_256BIT];
+  uint32_t *Z2 = &z[4*NWORDS_256BIT];
+  uint32_t Ysq[2*NWORDS_256BIT], Ysqsq[2*NWORDS_256BIT];
+  uint32_t Zsq[2*NWORDS_256BIT], S[2*NWORDS_256BIT], M[2*NWORDS_256BIT];
+
+  if (!memcmp( x,
+                &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
+                sizeof(uint32_t) * ECP2_JAC_OUTDIMS * NWORDS_256BIT) ) {
+
+          memcpy( z, x, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
+          return;
+  }
+  memcpy(x_cpy, x, sizeof(uint32_t) * NWORDS_256BIT * ECP2_JAC_OUTDIMS);
+  montsquare_ext_h(Ysq, Y1, pidx);
+  montsquare_ext_h(Ysqsq,  Ysq, pidx);
+  montsquare_ext_h(Zsq, Z1, pidx);
+ 
+  montmult_ext_h(S, X1, Ysq, pidx);
+  addm_ext_h(S, S, S, pidx);
+  addm_ext_h(S, S, S, pidx);
+  
+  montsquare_ext_h(M, X1, pidx);
+
+  addm_ext_h(X2, M, M, pidx);
+  addm_ext_h(M, X2, M, pidx);
+
+  montsquare_ext_h(X2, M, pidx);
+  montmult_ext_h(Z2, Y1, Z1, pidx);
+  subm_ext_h(X2, X2, S, pidx);
+  subm_ext_h(X2, X2, S, pidx);
+
+  
+  addm_ext_h(Y2, Ysqsq, Ysqsq, pidx);
+ 
+  addm_ext_h(Y2, Y2, Y2, pidx);
+  addm_ext_h(Y2, Y2, Y2, pidx);
+
+  
+  subm_ext_h(S, S, X2, pidx);
+  montmult_ext_h(S, M, S, pidx);
+  subm_ext_h(Y2, S, Y2, pidx);
+   
+  addm_ext_h(Z2, Z2, Z2, pidx);
+}
+
+
+uint32_t * ec_inittable(uint32_t *x, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0 )
+{
+   uint32_t n_tables = (table_order + n - 1)/table_order;
+   uint32_t i,j,k;
+   uint32_t table_size = 1<< table_order;
    const uint32_t *ECInf = CusnarksMiscKGet();
    const uint32_t *One = CusnarksOneMontGet(pidx);
-   uint32_t ndims = (add_last == 0 ? ECP_JAC_OUTDIMS : ECP_JAC_INDIMS);
+   uint32_t last_pow2;
+   uint32_t ndims = ECP_JAC_OUTDIMS;
+   if (add_last){
+      ndims = ECP_JAC_INDIMS;
+   }
    uint32_t n_els = 0;
  
-   af = a >= 3 ? 4 : 3
-   uint32_t *ec_table = (uint32_t *) mallloc(table_size * NWORDS_256BIT * ECP_JAC_OUTDIMS * sizeof(uint32_t));
+   uint32_t *ec_table = (uint32_t *) malloc(n_tables * table_size * NWORDS_256BIT * ECP_JAC_OUTDIMS * sizeof(uint32_t));
 
    for (i=0; i< n_tables; i++){
+      // init element 0 of table
       memcpy(&ec_table[(i*table_size)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-            ECInf,
+            &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
             sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
       k=0;
       for (j=1; j< table_size; j++){
-         if (n_els < n) {    
-            if  ((j & (j-1)) == 0){
-                memcpy(&ec_table[(i*table_size+((1<<k)-1))*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                    x[(i*table_order+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                    sizeof(uint32_t) * ndims * NWORDS_256BIT);
-                    k++;
-   
+         // if power of 2    
+         if  ((j & (j-1)) == 0){
+             last_pow2 = j;
+             if (n_els < n){
+                memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                   &x[(i*table_order+k)*NWORDS_256BIT*ndims],
+                   sizeof(uint32_t) * ndims * NWORDS_256BIT);
+
                 if (add_last){
-                  memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS+ECP_JAC_INDIMS*NWORDS_256BIT],
-                       One,
-                       sizeof(uint32_t) * NWORDS_256BIT);
-               }
-            } else {
-                ec_jacadd_h( &ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                             &ec_table[(i*table_size+j-1)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                             &ec_table[(i*table_size+1)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                             pidx);
-                              
-            }      
+                   memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS+ECP_JAC_INDIMS*NWORDS_256BIT],
+                      One,
+                      sizeof(uint32_t) * NWORDS_256BIT);
+                }
+             } else {
+                 memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                        &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
+                        sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
+             }
+             k++;
+             n_els++;
          } else {
-             memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                    &ec_table[(i*table_size+j-1)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                    sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
-         }
+             ec_jacadd_h( &ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                          &ec_table[(i*table_size+last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                          &ec_table[(i*table_size+j-last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                          pidx);
+                           
+         }      
       } 
-   }
+   } 
+
+   return ec_table;
 }
 
-uint32_t ec_isInf(uint32_t *x)
+void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t order, uint32_t pidx, uint32_t add_last=0)
 {
   const uint32_t *ECInf = CusnarksMiscKGet();
+  uint32_t i;
+  int debug_tid = 8191;
+  uint32_t ndims = ECP_JAC_OUTDIMS;
+  if (add_last){
+      ndims = ECP_JAC_INDIMS;
+  }
+  uint32_t n_tables = (order + n - 1)/order;
+  uint32_t table_size = 1 << order; 
 
-  if (!memcmp( &x[i * ndims * NWORDS_256BIT],
-                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
-                   sizeof(uint32_t) * ECP_JAC_INDIMS * NWORDS_256BIT)) {
-    return 1;
-  } else {
-    return 0;
-  } 
+  uint32_t * ec_table = ec_inittable(x, n, order, pidx, add_last );
+
+ /*
+  for(i=debug_tid * table_size; i< (debug_tid+1)*table_size; i++){
+        printf("T[%d] :\n",i-debug_tid*table_size);
+        printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
+        printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
+        printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
+  }
+  */
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (i=0; i<n_tables ; i++){
+     uint32_t tid = omp_get_thread_num();
+
+     // Q=0
+     memcpy(
+            &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+            &ECInf[(pidx * MISC_K_N + MISC_K_INF) * NWORDS_256BIT],
+            sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS
+          );
+
+     uint32_t msb = 255;
+     uint32_t tmp_msb;
+
+     for(uint32_t j=0; j< order; j++){
+       if (order*i + j < n){
+          tmp_msb = msbu256_h(&scl[i*order*NWORDS_256BIT+j*NWORDS_256BIT]); 
+          if (tmp_msb < msb){
+             msb = tmp_msb;
+          }
+       }
+
+     }
+     /*
+     if (i == debug_tid){
+         printf("msb : %d\n",msb);
+     }
+      */
+     msb = 255 - msb;
+     for (int j=msb; j>=0 ; j--){
+        uint32_t b = getbitu256g_h(&scl[i*order * NWORDS_256BIT], j, order);
+
+
+        ec_jacdouble_h(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+                       &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+                       pidx);
+        if (b) {
+           ec_jacadd_h(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+                       &ec_table[(i * table_size + b) * NWORDS_256BIT *ECP_JAC_OUTDIMS],
+                       &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+                       pidx);
+        }
+        /*
+        if (i==debug_tid){ 
+          printf("offset : %d, b : %d\n",j, b);
+          printf("Q :\n");
+          printU256Number(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
+          printU256Number(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
+          printU256Number(&utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
+        }
+        */
+
+     }
+
+     memcpy(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+           &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
+           sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS);
+  }
+
+  free(ec_table);
 }
-#endif
+
 void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last=0)
 {
   const uint32_t *ECInf = CusnarksMiscKGet();
@@ -2379,7 +2800,9 @@ void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t
       ndims = ECP_JAC_INDIMS;
   }
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for (i=0; i<n ; i++){
      uint32_t tid = omp_get_thread_num();
       // if x == inf || scl == 0 => y = inf
@@ -2434,7 +2857,6 @@ void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t
                        &utils_Q[tid * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        pidx);
         }
-
      }
 
      memcpy(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
@@ -2468,7 +2890,9 @@ void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t 
      ndims = ECP_JAC_INDIMS;
   }
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for (uint32_t i=0; i< n; i++){
      uint32_t tid = omp_get_thread_num();
      if (!memcmp(
@@ -2523,7 +2947,9 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t
   }
 
 
-  #pragma omp parallel for if(parallelism_enabled)
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
   for (uint32_t i=0; i< n; i++){
      uint32_t tid = omp_get_thread_num();
      if (!memcmp(&x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT],
@@ -2564,6 +2990,7 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t
 
 uint32_t ec_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx)
 {
+  // TODO : Check ec_jac2aff_h and copy parallel omp
   const uint32_t *ECInf = CusnarksMiscKGet();
   const uint32_t *ecbn_params = CusnarksEcbn128ParamsGet();
   uint32_t tmp_p [ECP_JAC_INDIMS * NWORDS_256BIT];
@@ -2629,6 +3056,127 @@ uint32_t ec2_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx)
   } else {
     return 0;
   }
+}
+
+void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last)
+{
+  uint32_t i;
+  uint32_t zout[ECP_JAC_OUTDIMS*NWORDS_256BIT];
+  uint32_t x1[ECP_JAC_OUTDIMS*NWORDS_256BIT], x2[ECP_JAC_OUTDIMS*NWORDS_256BIT];
+  uint32_t *x1_ptr = x1, *x2_ptr = x2;
+  uint32_t outdims = ECP_JAC_OUTDIMS;
+  const uint32_t *One;
+  
+  One = CusnarksOneMontGet((mod_t)pidx);
+
+  if (strip_last){
+    outdims = ECP_JAC_INDIMS;
+  }
+  
+  if (add_in){
+    if (n > 1) {
+      memcpy(x1,x,NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x1[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+
+      memcpy(x2,&x[ECP_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x2[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    } else {
+      memcpy(zout,x,NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&zout[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+    }
+
+  } else {
+    if (n > 1){
+      x1_ptr = x;
+      x2_ptr = &x[ECP_JAC_OUTDIMS*NWORDS_256BIT];
+    } else {
+      memcpy(zout,x,NWORDS_256BIT*ECP_JAC_OUTDIMS*sizeof(uint32_t));
+    }
+    
+  }
+
+  if (n > 1) {
+    ec_jacadd_h(zout,x1_ptr,x2_ptr,pidx);
+
+    for (i=2; i<n; i++){
+      if (add_in){
+        memcpy(x1,&x[i*ECP_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP_JAC_INDIMS*sizeof(uint32_t));
+        memcpy(&x1[2*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      } else {
+        x1_ptr = &x[i*ECP_JAC_OUTDIMS*NWORDS_256BIT];
+      }
+      ec_jacadd_h(zout,zout,x1_ptr,pidx);
+    }
+   }
+
+   if (to_aff){
+     ec_jac2aff_h(z,zout,1,pidx, strip_last);
+   } else {
+     memcpy(z,zout,outdims*NWORDS_256BIT*sizeof(uint32_t));
+   }
+
+}
+
+void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last)
+{
+  uint32_t i;
+  uint32_t zout[ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+  uint32_t x1[ECP2_JAC_OUTDIMS*NWORDS_256BIT], x2[ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+  uint32_t *x1_ptr = x1, *x2_ptr = x2;
+  uint32_t outdims = ECP2_JAC_OUTDIMS;
+  const uint32_t *One;
+  
+  One = CusnarksOneMontGet((mod_t)pidx);
+
+  if (strip_last){
+    outdims = ECP2_JAC_INDIMS;
+  }
+  
+  if (add_in){
+    if (n > 1){
+      memcpy(x1,x,NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x1[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      memset(&x1[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+
+      memcpy(x2,&x[ECP2_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&x2[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      memset(&x2[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+    } else {
+      memcpy(zout,x,NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+      memcpy(&zout[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+      memset(&zout[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+    }
+  } else {
+    if (n > 1){
+      x1_ptr = x;
+      x2_ptr = &x[ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+    } else {
+      memcpy(zout,x,NWORDS_256BIT*ECP2_JAC_OUTDIMS*sizeof(uint32_t));
+    }
+  }
+
+  if (n > 1){
+    ec2_jacadd_h(zout,x1_ptr,x2_ptr,pidx);
+
+    for (i=2; i<n; i++){
+      if (add_in){
+        memcpy(x1,&x[i*ECP2_JAC_INDIMS*NWORDS_256BIT],NWORDS_256BIT*ECP2_JAC_INDIMS*sizeof(uint32_t));
+        memcpy(&x1[4*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+        memset(&x1[5*NWORDS_256BIT], 0, sizeof(uint32_t)*NWORDS_256BIT);
+  
+      } else {
+        x1_ptr = &x[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT];
+      }
+      ec2_jacadd_h(zout,zout,x1_ptr,pidx);
+    }
+  }
+
+   if (to_aff){
+     ec2_jac2aff_h(z,zout,1,pidx, strip_last);
+   } else {
+     memcpy(z,zout,outdims*NWORDS_256BIT*sizeof(uint32_t));
+   }
+
 }
 
 void field_roots_compute_h(uint32_t *roots, uint32_t nbits)
@@ -2705,13 +3253,17 @@ void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots)
   uint32_t i;
 
   if (roots == iroots){
-    #pragma omp parallel for if(parallelism_enabled)
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
     for(i=1; i<nroots/2; i++){
       swapu256_h(&iroots[i*NWORDS_256BIT], &roots[(nroots-i)*NWORDS_256BIT]);
     }
   } else {
     memcpy(iroots, roots,NWORDS_256BIT*sizeof(uint32_t));
-    #pragma omp parallel for if(parallelism_enabled)
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
     for (i=1; i<nroots; i++){
       memcpy(&iroots[i*NWORDS_256BIT], &roots[(nroots-i)*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
     }

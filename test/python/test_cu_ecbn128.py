@@ -374,7 +374,7 @@ class CUECTest(unittest.TestCase):
                  kernel_params['in_length'][bidx] = min_length[bidx]
                  kernel_params['padding_idx'][bidx] = l/ECP_JAC_OUTDIMS
 
-        result,_ = ecbn128.kernelLaunch(ecbn128_vector_mad, kernel_config, kernel_params, 2 )
+        result,_ = ecbn128.kernelLaunch(ecbn128_vector_mad, kernel_config, kernel_params, n_kernels=2 )
 
         #a = ZFieldElExt(BigInt.from_uint256(ecbn128_vector[0]))
         #x1 = ZFieldElRedc(BigInt.from_uint256(ecbn128_vector[1]))

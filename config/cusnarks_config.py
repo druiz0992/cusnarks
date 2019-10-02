@@ -44,9 +44,12 @@ CUSNARKS_REPO = CUSNARKS_HOME.replace('cusnarks/','')
 CUSNARKS_ROOTS = CUSNARKS_HOME + 'data/'
 CUSNARKS_CIRCUITS = CUSNARKS_HOME + 'circuits/'
 
+CUSNARKS_ROOTS_F = CUSNARKS_CONFIG + '.root_f'
+CUSNARKS_ROOTS_N = CUSNARKS_CONFIG + '.nroots'
+
 snarkjs = { 
     'url'   :  'http://github.com/druiz0992/snarkjs.git',
-    'folder' : CUSNARKS_REPO + 'snarkjs',
+    'folder' : CUSNARKS_REPO + 'third_party_libs/snarkjs',
     'Q1'     : 'Snarkjs is required to verify proofs and to compute bindings during Setup stage.\n' + \
                 'Cusnarks uses druiz0992\'s fork. Do you want to download it now [Y/N] - Y?\n',
     'Q2'     :  '\n\nHave you downloaded snarkjs already?\n' + \
@@ -57,7 +60,7 @@ snarkjs = {
 
 rust_circom = {
     'url'   :  'http://github.com/adria0/rust-circom-experimental.git',
-    'folder' :  CUSNARKS_REPO + 'rust-circom',
+    'folder' :  CUSNARKS_REPO + 'third_party_libs/rust-circom-experimental',
     'Q1'     : '\n\n\nrust-circom-experimental is used to accelerate the compilation of snarks circuits.\n'+ \
                '\n\nCusnarks uses adria0\'s fork. Do you want to download it now [Y/N] - Y?\n',
     'Q2'     : 'Have you downloaded rust_circom already?\n' + \
@@ -84,7 +87,7 @@ def run():
     sys.stdout.write('####################################\n')
     sys.stdout.write('Configuring cusnarks....\n\n')
 
-    download_repos([snarkjs, rust_circom])
+    #download_repos([snarkjs, rust_circom])
     generate_roots()
     generate_circuit_folder()
     generate_config_f()
@@ -120,6 +123,14 @@ def generate_config_f():
     f.close()
 
     sys.stdout.write('####################################\n\n')
+
+    f = open(CUSNARKS_ROOTS_F,'w')
+    print(roots['folder'],file=f)
+    f.close()
+
+    f = open(CUSNARKS_ROOTS_N,'w')
+    print(roots['nbits'],file=f)
+    f.close()
 
 def get_roots_file():
     return parse_configfile(config['folder'],'ROOTS_FILE')

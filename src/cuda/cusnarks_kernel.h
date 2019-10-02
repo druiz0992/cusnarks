@@ -35,9 +35,17 @@
 
 class CUSnarks {
     protected:
-        vector_t in_vector_device;      // kernel input vector (device size)
-        vector_t out_vector_device;     // kernel output vector (device side)
-        kernel_params_t *params_device; // kernel params (device side)
+        vector_t **in_vector_device;      // kernel input vector (device size)
+        vector_t **out_vector_device;     // kernel output vector (device side)
+        kernel_params_t ***params_device; // kernel params (device side)
+
+        uint32_t   ***in_data_host;         // input vector (host side)
+        uint32_t   ***out_data_host;        // output vector (host side)
+        kernel_params_t ***params_host;     // input params (host side)
+
+        cudaStream_t **stream;
+        cudaEvent_t **start_event;
+        cudaEvent_t **end_event;
 
         kernel_cb *kernel_callbacks;    // pointer to kernel callbacks
         //_RNG *rng;
@@ -49,14 +57,18 @@ class CUSnarks {
 	      	uint32_t seed);
         ~CUSnarks();
 
-        void allocateCudaResources(uint32_t in_size, uint32_t out_size);
+        void resetDevices(void);
+        void allocateCudaResources(uint32_t in_size, uint32_t out_size, 
+                                    uint32_t in_len, uint32_t out_len); 
+        void allocateCudaStreamResources(void);
         void allocateCudaCteResources(void);
-        //void initRNG(uint32_t seed);
+        void releaseCudaResources(void);
+        void releaseCudaStreamResources(void);
         double elapsedTime(void);
 
     public:
 
-        static uint32_t init_constants;
+        static uint32_t init_resources;
         void rand(uint32_t *samples, uint32_t n_samples);
         void randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod);
         void saveFile(uint32_t *samples, uint32_t n_samples, char *fname);
@@ -65,8 +77,22 @@ class CUSnarks {
 	       	vector_t *in_vector_host,
                 kernel_config_t *config,
                 kernel_params_t *params,
+                uint32_t id,
+                uint32_t stream_id,
                 uint32_t n_kernel);
+        //double kernelLaunchAsync(
+		//vector_t *out_vector_host,
+	       	//vector_t *in_vector_host,
+                //kernel_config_t *config,
+                //kernel_params_t *params,
+                //uint32_t id,
+                //uint32_t stream_id,
+                //uint32_t n_kernel);
+        double streamSync(uint32_t gpu_id, uint32_t stream_id);
         void getDeviceInfo();
+        uint32_t * streamGetOutputData(uint32_t gpu_id, uint32_t stream_id);
+        uint32_t  streamGetOutputDataLen(uint32_t gpu_id, uint32_t stream_id);
+        void streamDel(uint32_t gpu_id, uint32_t stream_id);
 };
 
 #endif

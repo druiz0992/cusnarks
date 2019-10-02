@@ -71,7 +71,7 @@ try:
 except ImportError:
   sys.exit()
 
-def zpoly_div_cuda(pysnark, poly ,n, fidx):
+def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = 0):
      nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
      ne = n + nd
      nsamples = len(poly) + nd
@@ -97,7 +97,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
                    #kernel_params['in_length'][0]-2*ne+nd - 1)/ kernel_config['blockD'][0])]
      kernel_config['kernel_idx']= [CB_ZPOLY_DIVSNARKS]
 
-     result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,1)
+     result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=1)
 
      result_snarks_complete = np.zeros((nsamples-ne,NWORDS_256BIT),dtype=np.uint32)
      result_snarks_complete[:nsamples-2*ne+nd] = result_snarks
@@ -119,7 +119,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx):
 
      return result_snarks_complete, t
  
-def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False ):
+def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0, gpu_id=0, stream_id=0 ):
     kernel_params={}
     kernel_config={}
    
@@ -136,7 +136,6 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False ):
       factor = 1
       kernel = CB_EC_JAC_MUL1
 
-    nsamples = len(vector)
 
     kernel_params['stride'] = [1]
     kernel_config['smemS'] =  [0]
@@ -147,19 +146,103 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False ):
 
     kernel_params['premod'] = [0]
     kernel_params['midx'] = [fidx]
-    kernel_config['kernel_idx'] = [kernel]
-    kernel_params['in_length'] = [nsamples]
-    kernel_params['out_length'] = (nsamples-indims)*outdims
     kernel_params['padding_idx'] = [0]
-    kernel_config['gridD'] = [int((kernel_config['blockD'][0] + kernel_params['in_length'][0]-indims-1) /
-                                kernel_config['blockD'][0])]
+    kernel_config['kernel_idx'] = [kernel]
     kernel_config['return_val']=[1]
 
-    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,1 )
+    nsamples = len(vector)
+    if batch_size == 0:
 
+       kernel_params['in_length'] = [nsamples]
+       kernel_params['out_length'] = (nsamples-indims)*outdims
+       kernel_config['gridD'] =\
+            [int((kernel_config['blockD'][0] +
+                   kernel_params['in_length'][0]-indims-1) /
+                                         kernel_config['blockD'][0])]
+
+       result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,
+                                       gpu_id, stream_id, n_kernels=1 )
+       pysnark.streamDel(gpu_id,stream_id)
+   
+    else:
+      new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
+      result = np.zeros(((nsamples-indims) * outdims ,NWORDS_256BIT), dtype=np.uint32)
+      t=0.0
+
+      for start_idx in xrange(0,nsamples-indims, batch_size-indims):
+          new_vector[:min(batch_size-indims, nsamples-indims-start_idx)] =\
+                    vector[start_idx:min(start_idx+batch_size-indims,nsamples-indims)]
+          new_vector[min(batch_size-indims, nsamples-indims-start_idx):
+                     min(batch_size-indims, nsamples-indims-start_idx) + indims] = vector[-indims:]
+
+          kernel_params['in_length'] = [min(batch_size, nsamples-start_idx)]
+          kernel_params['out_length'] = min(batch_size-indims, nsamples-indims-start_idx)*outdims
+          kernel_config['gridD'] =\
+            [int((kernel_config['blockD'][0] +
+                   min(batch_size-indims, nsamples-start_idx-indims)-1) /
+                                         kernel_config['blockD'][0])]
+          result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
+                 pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
+          pysnark.streamDel(gpu_id,stream_id)
+          t+=t1
+            
     return result,t
 
-def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
+def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0):
+   kernel_params={}
+   kernel_config={}
+   
+   if ec2:
+      outdims = ECP2_JAC_OUTDIMS
+      indims_e = ECP2_JAC_INDIMS + U256_NDIMS
+      kernel = CB_EC2_JAC_MAD_SHFL
+   else:
+      outdims = ECP_JAC_OUTDIMS 
+      indims_e = ECP_JAC_INDIMS + U256_NDIMS
+      kernel = CB_EC_JAC_MAD_SHFL
+
+ 
+   nsamples = int(len(vector)/indims_e)
+   
+   #if shamir_en == 0 or nsamples < 32 * U256_BSELM :
+   if shamir_en == 0 :
+     kernel_config['blockD']    = get_shfl_blockD(nsamples)
+     shamir_en = 0
+   else:
+     kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM))
+
+   nkernels = len(kernel_config['blockD'])
+   kernel_params['stride']    = [outdims] * nkernels
+   kernel_params['stride'][0]    =  indims_e
+   kernel_params['premul']    = [0] * nkernels
+   kernel_params['premul'][0] = 1
+   kernel_params['premod']    = [0] * nkernels
+   kernel_params['midx']      = [fidx] * nkernels
+   kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
+   kernel_config['kernel_idx'] =[kernel] * nkernels
+   kernel_params['in_length'] = [nsamples* indims_e]*nkernels
+   for l in xrange(1,nkernels):
+      kernel_params['in_length'][l] = outdims * (
+             int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
+             (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
+
+   kernel_params['out_length'] = 1 * outdims
+   #kernel_params['out_length'] = int(nsamples/8 * outdims)
+   #kernel_params['out_length'] = np.product(kernel_config['blockD'][1:]) * outdims
+   kernel_params['padding_idx'] = [shamir_en] * nkernels
+   kernel_config['gridD'] = [0] * nkernels
+   kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
+   kernel_config['gridD'][nkernels-1] = 1
+   #kernel_params['out_length'] = kernel_config['gridD'][0] * outdims
+    
+   result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )
+   #result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels= 1)
+
+   return vector, result, t
+
+
+
+def ec_mad_cuda(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = 0):
    kernel_params={}
    kernel_config={}
    
@@ -207,14 +290,8 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    kernel_params['padding_idx'] = [0] * nkernels
    kernel_config['gridD'] = [0] * nkernels
    kernel_config['gridD'][nkernels-1] = 1
-   min_length = [outdims * \
-                    int(kernel_config['blockD'][idx]) for idx in range(nkernels)]
-   for i in xrange(1,nkernels):
-       if min_length[i] > kernel_params['in_length'][i]:
-           kernel_params['padding_idx'][i] = int(kernel_params['in_length'][i]/outdims)
-           kernel_params['in_length'][i] = min_length[i]
     
-   result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params,nkernels )
+   result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )
    #result,t = pysnark.kernelLaunch(new_vector, kernel_config, kernel_params, 1)
 
    #new_vector = new_vector.reshape((-1,8))
@@ -229,7 +306,7 @@ def ec_mad_cuda(pysnark, vector, fidx, ec2=False):
    
    return new_vector, result, t
 
-def zpoly_fft_cuda2(pysnark, vector, roots, fidx ):
+def zpoly_fft_cuda2(pysnark, vector, roots, fidx, gpu_id=0, stream_id=0 ):
         nsamples = len(vector)
 
         n_cols = 10
@@ -256,12 +333,12 @@ def zpoly_fft_cuda2(pysnark, vector, roots, fidx ):
                                      (kernel_config['blockD'][2] + nsamples-1)/kernel_config['blockD'][2]]
         kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
         zpoly_vector = np.concatenate((vector, roots))
-        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=4)
 
         return result, t
 
 
-def zpoly_fft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0, fft=1 ):
+def zpoly_fft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, return_val=1, out_extra_len=0, gpu_id=0, stream_id=0, fft=1 ):
         nsamples = 1<<ifft_params['levels']
         expanded_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
         expanded_vector[:len(vector)] = vector
@@ -308,7 +385,7 @@ def zpoly_fft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, re
 
         kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
 
-        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id,n_kernels=4)
         if return_val == 0:
            result = nsamples
 
@@ -322,12 +399,10 @@ def zpoly_fft_cuda(pysnark, vector, ifft_params, fidx, roots=None, as_mont=1, re
         #result3 = ntt_h(result2,expanded_roots,fidx)
         #result3 = ntt_h(result,expanded_roots,fidx)
          
-
-
         return result,t
 
 
-def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d_len, return_offset=0, n_pass=0):
+def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d_len, return_offset=0, n_pass=0, fft=-1):
         Npoints_pass1 = 1 << (interp_params['fft_N'][-1])
         Npoints_pass2 = 1 << (interp_params['fft_N'][-2])
 
@@ -367,7 +442,8 @@ def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d
         elif n_pass == 4 :
            fft_pass_params = ntt_build_h(Npoints_pass1)
 
-           fft = 0
+           if fft==-1:
+             fft = 0
            premul = 1
            as_mont = 0
            out_length = nsamples
@@ -380,7 +456,8 @@ def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d
         elif n_pass == 5:
            fft_pass_params = ntt_build_h(Npoints_pass2)
 
-           fft = 0
+           if fft == -1:
+             fft = 0
            premul = 0
            as_mont = 0
            out_length = nsamples
@@ -430,7 +507,7 @@ def zpoly_interp3d_kernel_get(interp_params, nsamples, nsamples0, fidx, roots_2d
      
         return kernel_config, kernel_params
 
-def zpoly_interp_cuda(pysnark, zpoly_vector, interp_params, fidx ):
+def zpoly_interp_cuda(pysnark, zpoly_vector, interp_params, fidx, gpu_id=0, stream_id=0 ):
         nsamples = 1 << (interp_params['levels'])
 
         Nrows = interp_params['fft_N'][(1<<FFT_T_3D)-1]
@@ -474,7 +551,7 @@ def zpoly_interp_cuda(pysnark, zpoly_vector, interp_params, fidx ):
                                       CB_ZPOLY_INTERP3DXX, CB_ZPOLY_INTERP3DXY, CB_ZPOLY_INTERP3DYX,
                                       CB_ZPOLY_INTERP3DYY, CB_ZPOLY_INTERP3DFINISH]
 
-        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,10)
+        result,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=10)
 
         return result, t
         #return kernel_params ,kernel_config, zpoly_vector
@@ -490,7 +567,7 @@ def zpoly_interp_cuda(pysnark, zpoly_vector, interp_params, fidx ):
         #result3 = ntt_h(result,expanded_roots,fidx)
          
 
-def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, return_val=0, as_mont=1):
+def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, return_val=0, as_mont=1, gpu_id=0, stream_id=0):
     nsamples = 1<<mul_params['levels']
     expanded_vectorA = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
     expanded_vectorB = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
@@ -542,13 +619,13 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
 
     kernel_config['kernel_idx']= [CB_ZPOLY_FFT3DXX, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY]
 
-    X1S,t1 = pysnark.kernelLaunch(zpoly_vectorA, kernel_config, kernel_params,n_kernels1)
+    X1S,t1 = pysnark.kernelLaunch(zpoly_vectorA, kernel_config, kernel_params,gpu_id, stream_id, n_kernels = n_kernels1)
 
     kernel_params['in_length'][0] = nsamples
     kernel_params['stride'][0] = 1
     kernel_config['return_val'][0] = 1
 
-    Y1S,t2 = pysnark.kernelLaunch(zpoly_vectorB, kernel_config, kernel_params,n_kernels1)
+    Y1S,t2 = pysnark.kernelLaunch(zpoly_vectorB, kernel_config, kernel_params,gpu_id, stream_id, n_kernels = n_kernels1)
 
     kernel_params['padding_idx'] = [nsamples] * n_kernels2
     kernel_params['in_length'] = [nsamples] * n_kernels2
@@ -570,7 +647,7 @@ def zpoly_mul_cuda(pysnark, vectorA, vectorB, mul_params, fidx, roots=None, retu
     kernel_config['kernel_idx']= [CB_ZPOLY_MULCPREV,
                                   CB_ZPOLY_FFT3DXXPREV, CB_ZPOLY_FFT3DXY, CB_ZPOLY_FFT3DYX, CB_ZPOLY_FFT3DYY ]
 
-    fftmul_result,t3 = pysnark.kernelLaunch(X1S, kernel_config, kernel_params,n_kernels2)
+    fftmul_result,t3 = pysnark.kernelLaunch(X1S, kernel_config, kernel_params,gpu_id, stream_id, n_kernels = n_kernels2)
     if return_val == 0:
       fftmul_result = nsamples
 
@@ -608,12 +685,25 @@ def zpoly_interp_and_mul_single_cuda(pysnark, vector, interp_params, fidx, roots
      zpoly_vector[-1] = scalerMont
 
 
+     # Data fits in single kernel lot, so no need to use streams
      zpoly_vector, t_interp = zpoly_interp_cuda(pysnark, zpoly_vector, interp_params,
-                                  fidx)
+                                  fidx, gpu_id=0, stream_id=0)
+     try:
+       pysnark.streamDel(0,0)
+     except ValueError:
+       print("Error releasing stream")
+       sys.exit(1)
+
      if mul == 1:
         ifft_params = ntt_build_h(zpoly_vector.shape[0])
         zpoly_vector,t_ifft = zpoly_fft_cuda(pysnark, zpoly_vector,ifft_params, fidx,
-                                 as_mont=0, roots=roots, fft=0)
+                                 as_mont=0, roots=roots, fft=0, gpu_id=0, stream_id=0)
+        try:
+          pysnark.streamDel(0,0)
+        except ValueError:
+          print("Error releasing stream")
+          sys.exit(1)
+
      t = t_interp + t_ifft
 
      return zpoly_vector, t
@@ -743,7 +833,7 @@ def zpoly_fft4d_test(pA, fft_params, fidx, roots, fft=1, as_mont=1):
      return pAT2_S, pAT3_S
 
 
-def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_size):
+def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_size, n_gpu=1):
      Npoints_pass1 = 1 << (interp_params['fft_N'][-1])
      Npoints_pass2 = 1 << (interp_params['fft_N'][-2])
      vlen = 1<< interp_params['levels']
@@ -832,33 +922,56 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2)
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2) 
 
+     n_streams = get_nstreams()
+     #n_streams = 1
+     dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
+     pending_dispatch_table = []
+     n_dispatch = 0
+     n_par_batches = n_gpu * max((n_streams - 1),1)
+
      cols_idx = np.arange(Npoints_pass1)
      for i in range(nbatches):
+        de = dispatch_table[i]
+        gpu_id = de[3]
+        stream_id = de[4]
+
+
         # Add samples
-        zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
-        zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
+        zpoly_vector[:nsamples] = np.copy(vector[voffset1:voffset1+nsamples])
+        zpoly_vector[nsamples : 2*nsamples] = np.copy(vector[voffset2:voffset2+nsamples])
         # Add W2 roots
         root_idx = np.outer(cols_idx,-1*np.arange(int(i*batch_size/Npoints_pass1),int((i+1)*batch_size/Npoints_pass1))).T
-        zpoly_vector[2*nsamples : 3*nsamples] = np.reshape(roots_W2[root_idx],(-1,NWORDS_256BIT))
+        zpoly_vector[2*nsamples : 3*nsamples] = np.copy(np.reshape(roots_W2[root_idx],(-1,NWORDS_256BIT)))
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(interp_params, nsamples,
                                                                  len(zpoly_vector), fidx, roots_W1_len,
-                                                                 #return_offset=nsamples*NWORDS_256BIT, n_pass=0)
                                                                  return_offset=0, n_pass=0)
+        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=4)
 
-        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
-        #pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-        #vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
-        #vector[voffset2:voffset2+nsamples] = np.copy(result[2*nsamples:])
-        pAB_vector[voffset1:voffset1+nsamples] = np.copy(result[nsamples:2*nsamples])
-        vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples:])
-        vector[voffset2:voffset2+nsamples] = np.copy(result[2*nsamples:])
+        if stream_id == 0:
+          pAB_vector[voffset1:voffset1+nsamples] = result[nsamples:2*nsamples]
+          vector[voffset1:voffset1+nsamples] = result[:nsamples]
+          vector[voffset2:voffset2+nsamples] = result[2*nsamples:]
+          try:
+            pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+            print("Error releasing stream")
+            sys.exit(1)
+        else :
+           pending_dispatch_table.append(de)
+           n_dispatch+=1
      
-        t+=t_fft
+           if n_dispatch == n_par_batches:
+             getFFTResults(pysnark, pending_dispatch_table, vector, 0, vector2=pAB_vector)
+             pending_dispatch_table = []
+             n_dispatch = 0
 
         voffset1+=nsamples
         voffset2+=nsamples
 
+     getFFTResults(pysnark, pending_dispatch_table, vector, 0, vector2=pAB_vector)
+     pending_dispatch_table = []
+     n_dispatch = 0
 
      #Transpose and Take IFFT (second pass)
      voffset1 = 0
@@ -867,6 +980,11 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass2, Npoints_pass1) 
 
      for i in range(nbatches):
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
+
+
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
         zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
 
@@ -878,16 +996,36 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
                                                                  3*nsamples, fidx, roots_W1_len,
                                                                  return_offset=0, n_pass=1)
 
-        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,5)
-        vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-        vector[voffset2:voffset2+nsamples] = np.copy(result[nsamples:])
+        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=5)
+
+        if stream_id == 0:
+           vector[voffset1:voffset1+nsamples] = result[:nsamples]
+           vector[voffset2:voffset2+nsamples] = result[nsamples:]
+           try:
+              pysnark.streamDel(gpu_id,stream_id)
+           except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
+
+        else:
+           pending_dispatch_table.append(de)
+           n_dispatch+=1
+
+           if n_dispatch == n_par_batches:
+             getFFTResults(pysnark, pending_dispatch_table, vector, 1)
+             pending_dispatch_table = []
+             n_dispatch = 0
         
         t+=t_fft
 
         voffset1+=nsamples
         voffset2+=nsamples
  
-         
+
+     getFFTResults(pysnark, pending_dispatch_table, vector, 1)
+     pending_dispatch_table = []
+     n_dispatch = 0
+
      vector[:vlen] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2) 
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass1, Npoints_pass2)
 
@@ -905,6 +1043,10 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
      cols_idx = np.arange(Npoints_pass1)
      for i in range(nbatches):
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
+
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
         zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
 
@@ -913,17 +1055,34 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(interp_params, nsamples,
                                                                  3*nsamples, fidx, roots_W1_len,
-                                                                 #return_offset=2*nsamples*NWORDS_256BIT, n_pass=2)
                                                                  return_offset=0, n_pass=2)
+        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=4)
 
-        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
-        vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
-        vector[voffset2:voffset2+nsamples] = np.copy(result[nsamples:])
+        if stream_id==0:
+          vector[voffset1:voffset1+nsamples] = result[:nsamples]
+          vector[voffset2:voffset2+nsamples] = result[nsamples:]
+          try:
+              pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
+        else:
+           pending_dispatch_table.append(de)
+           n_dispatch+=1
+           if n_dispatch == n_par_batches:
+             getFFTResults(pysnark, pending_dispatch_table, vector, 2)
+             pending_dispatch_table = []
+             n_dispatch = 0
 
         t+=t_fft
 
         voffset1+=nsamples
         voffset2+=nsamples
+
+
+     getFFTResults(pysnark, pending_dispatch_table, vector, 2)
+     pending_dispatch_table = []
+     n_dispatch = 0
 
 
      #Transpose and Take FFT (second pass)
@@ -933,6 +1092,11 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
      vector[vlen:] = zpoly_transpose(vector[vlen:], Npoints_pass2, Npoints_pass1) 
 
      for i in range(nbatches):
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
+
+
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
         zpoly_vector[nsamples : 2*nsamples] = vector[voffset2:voffset2+nsamples]
 
@@ -940,21 +1104,65 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
                                                                  2*nsamples, fidx, roots_W1_len,
                                                                  return_offset=0, n_pass=3)
 
-        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,5)
-        vector[voffset1:voffset1+nsamples] = np.copy(result[:nsamples])
+        result,t_fft = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels = 5)
+
+        if stream_id == 0:
+           vector[voffset1:voffset1+nsamples] = result[:nsamples]
+           try:
+              pysnark.streamDel(gpu_id,stream_id)
+           except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
+        else:
+           pending_dispatch_table.append(de)
+           n_dispatch+=1
+           if n_dispatch == n_par_batches:
+             getFFTResults(pysnark, pending_dispatch_table, vector, 3)
+             pending_dispatch_table = []
+             n_dispatch = 0
+
 
         voffset1+=nsamples
         voffset2+=nsamples
 
         t+=t_fft
-     
+
+
+     getFFTResults(pysnark, pending_dispatch_table, vector, 3)
+
      vector[1::2] = zpoly_transpose(vector[:vlen], Npoints_pass1, Npoints_pass2)
      vector[::2] = zpoly_transpose(pAB_vector, Npoints_pass2, Npoints_pass1)
      
      return vector, t
 
+#TODO review this function
+def  getFFTResults(pysnark, dispatch_table, vector, n_pass, vector2=None):
+       for bidx,p in enumerate(dispatch_table):
+          gpu_id = p[3]
+          stream_id = p[4]
+          nsamples = p[2] - p[1]
+          start_idx = p[1]
+          end_idx = p[2]
+          result, t = pysnark.streamSync(gpu_id,stream_id)
+          
+          # Step 0 interpolation : output is 3 vectors
+          if n_pass == 0:
+            vlen = int(vector.shape[0]/2)
+            vector[start_idx:end_idx] = result[:nsamples]
+            vector[vlen+start_idx:vlen+end_idx] = result[2*nsamples:]
+            vector2[start_idx:end_idx] = result[nsamples:2*nsamples]
+          elif n_pass <= 2:
+            vlen = int(vector.shape[0]/2)
+            vector[start_idx:end_idx] = result[:nsamples]
+            vector[vlen+start_idx:vlen+end_idx] = result[nsamples:]
+          elif n_pass == 3:
+             vector[start_idx:end_idx] = result[:nsamples]
+          # Step 4,5 interpolation : output is 1 vector
+          elif n_pass >= 4:
+              vector[start_idx:end_idx] = result
 
-def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size):
+def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n_gpu=1):
+     #vector = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<21 , 1<<21 )
      ### Start Final IFFT with combined results
      Npoints_pass1 = 1 << (mul_params['fft_N'][-1])
      Npoints_pass2 = 1 << (mul_params['fft_N'][-2])
@@ -981,28 +1189,62 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size):
      zpoly_vector[2*nsamples + roots_W1_len] = scalerExt2
      zpoly_vector[2*nsamples + roots_W1_len + 1] = scalerMont2
 
+     # Test code
+     """
+     pA = np.copy(vector)
+     pA_S1, pA_S2 = zpoly_fft4d_test(pA, mul_params, fidx, roots, fft=0, as_mont=0)
+     """
+
      #Transpose and take IFFT (first pass)
      voffset1 = 0
      vector = zpoly_transpose(vector, Npoints_pass1, Npoints_pass2)
 
+     n_streams = get_nstreams()
+     dispatch_table = buildDispatchTable( nbatches, 1, n_gpu, n_streams, nsamples, 0, vlen)
+     pending_dispatch_table = []
+     n_dispatch = 0
+     n_par_batches = n_gpu * max((n_streams - 1),1)
+                                    
      cols_idx = np.arange(Npoints_pass1)
      for i in range(nbatches):
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
+
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
 
         root_idx = np.outer(cols_idx,-1*np.arange(int(i*batch_size/Npoints_pass1),int((i+1)*batch_size/Npoints_pass1))).T
         zpoly_vector[nsamples : 2*nsamples] = np.reshape(roots_W2[root_idx],(-1,NWORDS_256BIT))
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(mul_params, nsamples,
-                                                                 len(zpoly_vector),
-                                                                 fidx, roots_W1_len,
-                                                                 return_offset=0, n_pass=4)
+                                                         len(zpoly_vector),
+                                                         fidx, roots_W1_len,
+                                               return_offset=nsamples*NWORDS_256BIT, n_pass=4,fft=0)
+                                                                 
+        result,t_fft =\
+               pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels= 4)
 
-        vector[voffset1:voffset1+nsamples],t_fft =\
-               pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        if stream_id == 0:
+          vector[voffset1:voffset1+nsamples] = result
+          try:
+              pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
+        else:
+           pending_dispatch_table.append(de)
+           n_dispatch+=1
+           if n_dispatch == n_par_batches:
+             getFFTResults(pysnark, pending_dispatch_table, vector, 4)
+             pending_dispatch_table = []
+             n_dispatch = 0
 
         t+=t_fft
 
         voffset1+=nsamples
+
+     getFFTResults(pysnark, pending_dispatch_table, vector, 4)
+     pending_dispatch_table = []
 
 
      #Transpose and Take IFFT (second pass)
@@ -1010,24 +1252,47 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size):
      vector = zpoly_transpose(vector, Npoints_pass2, Npoints_pass1) 
 
      for i in range(nbatches):
+        de = dispatch_table[i]
+        gpu_id    = de[3]
+        stream_id = de[4]
+
         zpoly_vector[:nsamples] = vector[voffset1:voffset1+nsamples]
 
         kernel_config, kernel_params = zpoly_interp3d_kernel_get(mul_params, nsamples,
                                                                  nsamples, fidx, roots_W1_len,
-                                                                 return_offset=0, n_pass=5)
+                                           return_offset=nsamples*NWORDS_256BIT, n_pass=5, fft=0)
 
-        vector[voffset1:voffset1+nsamples],t_fft =\
-               pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,4)
+        result,t_fft =\
+               pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=4)
+
+        if stream_id == 0:
+          vector[voffset1:voffset1+nsamples] = result
+          try:
+              pysnark.streamDel(gpu_id,stream_id)
+          except ValueError:
+              print("Error releasing stream")
+              sys.exit(1)
+        else:
+           pending_dispatch_table.append(de)
+           n_dispatch+=1
+           if n_dispatch == n_par_batches:
+             getFFTResults(pysnark, pending_dispatch_table, vector, 5)
+             pending_dispatch_table = []
+             n_dispatch = 0
+
 
         t+=t_fft
 
         voffset1+=nsamples
 
+     getFFTResults(pysnark, pending_dispatch_table, vector, 5)
+     pending_dispatch_table = []
+
      vector = zpoly_transpose(vector, Npoints_pass1, Npoints_pass2)
 
      return vector, t
 
-def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch_size):
+def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch_size, n_gpu=1):
      vlen = int(vector.shape[0]/2)
      
      # if in vector's length is not power of two, append zeros
@@ -1046,15 +1311,18 @@ def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch
 
      elif batch_size >= vlen :
         # Data fits in single FFT but not after interpolation
-        vector, t = zpoly_interp_and_mul_single_cuda(pysnark, vector, interp_params, fidx, roots, mul=0)
+        vector, t = zpoly_interp_and_mul_single_cuda(pysnark, vector, interp_params, fidx, roots,
+                                                     mul=0)
         mul_params = ntt_build_h(vector.shape[0])
-        vector, t1 = zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size)
-
+        vector, t1 = zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n_gpu=n_gpu)
+        
         t += t1
 
      else :
         # Data doesnt fit in single FFT
-        vector, t = zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_size)
+        vector, t = zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots,
+                                            batch_size, n_gpu=n_gpu)
+
         """
         if not all(np.concatenate(vector == p_interp)) : 
            print("Interp incorrect  ",)
@@ -1062,7 +1330,7 @@ def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch
         """
 
         mul_params = ntt_build_h(vector.shape[0])
-        vector, t1 = zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size)
+        vector, t1 = zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size,n_gpu=n_gpu)
         """
         if not all(np.concatenate(vector == p_mul)) : 
            print("Mul incorrect  ",)   
@@ -1076,6 +1344,7 @@ def zpoly_interp_and_mul_cuda(pysnark, vector, interp_params, fidx, roots, batch
 
 
 def zpoly_transpose(zpoly_in, nrows_in,  ncols_in):
+      #TODO : Change to c function xform (similar to transpose, but passing input and output dims)
       return  np.reshape(
                        np.swapaxes(
                            np.reshape(
@@ -1085,7 +1354,7 @@ def zpoly_transpose(zpoly_in, nrows_in,  ncols_in):
                        (-1,NWORDS_256BIT))
 
         
-def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0):  
+def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0, gpu_id=0, stream_id=0):  
 
      kernel_config={}
      kernel_params={}
@@ -1133,7 +1402,7 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
      #kernel_config['kernel_idx'] = [CB_ZPOLY_SUBPREV]
      kernel_config['kernel_idx'] = [CB_ZPOLY_SUB]
      kernel_config['return_val'] = [return_val] 
-     result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params )
+     result,t = pysnark.kernelLaunch(vector, kernel_config, gpu_id, stream_id, kernel_params )
 
      if return_val == 0:
         result = kernel_params['out_length']
@@ -1142,7 +1411,7 @@ def zpoly_sub_cuda(pysnark, vectorA, vectorB, fidx, vectorA_len=1, return_val=0)
 
      return result,t
 
-def u256_mul_cuda(pysnark, vectorA, vectorB, fidx):
+def u256_mul_cuda(pysnark, vectorA, vectorB, fidx, gpu_id=0, stream_id=0):
      vector = np.zeros((int(2*len(vectorA)), NWORDS_256BIT),dtype=np.uint32)
      vector[::2] = vectorA
      vector[1::2] = vectorB
@@ -1158,12 +1427,12 @@ def u256_mul_cuda(pysnark, vectorA, vectorB, fidx):
      kernel_config['blockD'] = [U256_BLOCK_DIM]
      kernel_config['kernel_idx'] = [CB_U256_MULM]
 
-     result, t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,2 )
+     result, t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=2 )
 
      return result, t
 
 
-def zpoly_mulK_cuda(pysnark, vectorA, K, fidx):  
+def zpoly_mulK_cuda(pysnark, vectorA, K, fidx, gpu_id=0, stream_id=0):  
      #TODO revie
      vector =np.concatenate((K, vector))
      nsamples = len(vectorA)
@@ -1178,11 +1447,11 @@ def zpoly_mulK_cuda(pysnark, vectorA, K, fidx):
      kernel_config['smemS'] = [0]
      kernel_config['blockD'] = [U256_BLOCK_DIM]
      kernel_config['kernel_idx'] = [CB_ZPOLY_MULK]
-     result,t= pysnark.kernelLaunch(vector, kernel_config, kernel_params )
+     result,t= pysnark.kernelLaunch(vector, kernel_config, gpu_id, stream_id,  kernel_params )
 
      return result,t
 
-def zpoly_mad_cuda(pysnark, vectors, fidx):  
+def zpoly_mad_cuda(pysnark, vectors, fidx, gpu_id=0, stream_id=0):  
 
      kernel_config={}
      kernel_params={}
@@ -1254,3 +1523,47 @@ def get_gpu_affinity_cuda():
       gpu_affinity[str(r)].append(core)
 
    return gpu_affinity
+
+def get_ngpu(max_used_percent=20.):
+   return len(nvgpu.available_gpus(max_used_percent))
+
+def get_nstreams():
+    return (N_STREAMS_PER_GPU)
+
+
+def buildDispatchTable(nbatches, nP, ngpu, nstreams, step, start_idx, end_idx,
+                           start_pidx=0, start_gpu_idx=0, start_stream_idx=1, ec_lable=None):
+      dispatch_table = np.zeros( (nP * nbatches, 5), dtype=object)
+
+      # Add EC point : Column 0
+      if ec_lable is None:
+          dispatch_table[:,0] = (np.arange(nP * nbatches) % nP) + start_pidx
+      else:
+          dispatch_table[:,0] = ec_lable[(np.arange(nP * nbatches) % nP) + start_pidx]
+
+      # Add GPU : Column 3
+      if ngpu > 1:
+         dispatch_table[:,3] = (np.arange(nP * nbatches) + start_gpu_idx )% ngpu
+
+      # Add Stream : Colum 4
+      nvalid_streams = max(nstreams-1,1)
+      dispatch_table[:,4] = \
+               np.reshape(
+                       np.tile(
+                          np.reshape(
+                             np.tile(
+                                 (np.arange(nvalid_streams) + start_stream_idx) % nstreams, 
+                                 (ngpu,1)).T,
+                             -1),
+                          (math.ceil(nP*nbatches/(ngpu*nvalid_streams)),1)),
+                       -1)[:dispatch_table.shape[0]]
+
+      # Add starting and ending batch indexes -> Colum 1 and 2
+      idx = np.reshape(np.tile(np.arange(start_idx, end_idx+step, step) ,(nP,1)).T,-1)
+      idx [-nP:] = end_idx
+      dispatch_table[:,1] = idx[:-nP]
+      dispatch_table[:,2] = idx[nP:]
+
+      return dispatch_table
+
+

@@ -33,6 +33,8 @@
 
 #CC=gcc
 MAKE=make
+NPM=npm i
+CARGO=cargo build --release
 SHELL=/bin/sh
 
 #####
@@ -50,10 +52,16 @@ CTEST_PATH = $(CUSNARKS_PATH)/test/c
 CONFIG_PATH= $(CUSNARKS_PATH)/config
 
 AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
+
 PCG_PATH = $(AUX_PATH)/pcg-cpp/test-high
 PCG_REPO = https://github.com/imneme/pcg-cpp.git
 PCG_INCLUDE = $(AUX_PATH)/pcg-cpp/include
 
+SNARKJS_PATH = $(AUX_PATH)/snarkjs
+SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
+
+RUST_CIRCOM_PATH = $(AUX_PATH)/rust-circom-experimental
+RUST_CIRCOM_REPO = http://github.com/adria0/rust-circom-experimental.git
 
 CUSNARKS_LIB = libcusnarks.so
 CUBIN_NAME = cusnarks.cubin
@@ -61,13 +69,17 @@ CUBIN_NAME = cusnarks.cubin
 dirs= $(CUSRC_PATH) \
       $(CTSRC_PATH) 
 
-aux_dirs = $(PCG_PATH)
+aux_cdirs  = $(PCG_PATH) 
+aux_jsdirs = $(SNARKJS_PATH)
+aux_rdirs  = $(RUST_CIRCOM_PATH)
 
 test_dirs = $(CTEST_PATH) \
           $(PYTST_PATH) 
             
 
-aux_repos = $(PCG_REPO)
+aux_repos = $(PCG_REPO) \
+            $(SNARKJS_REPO) \
+            $(RUST_CIRCOM_REPO)
 
 config_dirs = $(CONFIG_PATH)
 
@@ -76,7 +88,9 @@ AUX_INCLUDES = $(PCG_INCLUDE)
 SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
 CONFIG_SUBDIRS := $(config_dirs)
-AUX_SUBDIRS := $(aux_dirs)
+AUX_CSUBDIRS := $(aux_cdirs)
+AUX_JSSUBDIRS := $(aux_jsdirs)
+AUX_RSUBDIRS := $(aux_rdirs)
 AUX_REPOS := $(aux_repos)
 
 #####
@@ -113,27 +127,26 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'AUX_INCLUDES=$(AUX_INCLUDES)'  \
               'DEFINES=$(DEFINES)'  
   
-
-
-#all:    
-	#@for i in $(SUBDIRS); do \
-	#echo "make all in $$i ..."; \
-	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) all); done
-
-#depend:
-	#@for i in $(SUBDIRS) $(TEST_SUBDIRS); do \
-	#echo "make depend in $$i..."; \
-	#(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) depend); done
-
 build:
-	echo "checking third pary libs...";
-	if ! test -d $(AUX_PATH); \
-		then mkdir $(AUX_PATH); cd $(AUX_PATH);  for j in $(AUX_REPOS); do git clone $$j; done; fi
-	@for i in $(AUX_SUBDIRS); do \
-		(cd $$i; $(MAKE)); done
 	@for i in $(SUBDIRS); do \
 		echo "make build in $$i..."; \
 		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+
+
+all:
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH);  for j in $(AUX_REPOS); do git clone $$j; done; fi
+	@for i in $(AUX_CSUBDIRS); do \
+		(cd $$i; $(MAKE)); done
+	@for i in $(AUX_JSSUBDIRS); do \
+		(cd $$i; $(NPM)); done
+	@for i in $(AUX_RSUBDIRS); do \
+		(cd $$i; $(CARGO)); done
+	@for i in $(SUBDIRS); do \
+		echo "make build in $$i..."; \
+		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+
 
 test:   
 	@for i in $(TEST_SUBDIRS); do \
@@ -153,4 +166,4 @@ clean:
 cubin:
 	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
 
-.PHONY:	config test build clean
+.PHONY:	config test build clean all
