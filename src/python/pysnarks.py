@@ -364,11 +364,13 @@ def run(opt, parser):
           start = time.time()
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], start_server=opt['start_server'])
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
           end = time.time() - start
           print("GP init : "+str(end))
 
-          if opt['start_server'] == 0:
+          if opt['start_server']:
+              GP.startGPServer()
+          else:
              GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], batch_size=opt['batch_size'], verify_en=opt['verify'],
                       n_gpus=opt['max_gpus'], n_streams=opt['max_streams'])
 
