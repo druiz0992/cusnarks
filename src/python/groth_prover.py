@@ -50,7 +50,7 @@ import numpy as np
 import time
 from subprocess import call
 import logging
-from multiprocessing import RawArray
+from multiprocessing import RawArray, Process, Pipe
 from ctypes import c_uint32
 
 from zutils import ZUtils
@@ -81,7 +81,7 @@ class GrothProver(object):
     
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None, 
-                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, start_server=0):
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None):
 
         # Check valid folder exists
         if keep_f is None:
@@ -107,6 +107,7 @@ class GrothProver(object):
         logging.info('Initializing memories...')
         self.roots_f = cfg.get_roots_file()
         self.n_bits_roots = cfg.get_n_roots()
+
         self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
         self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
         np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
@@ -114,7 +115,7 @@ class GrothProver(object):
         self.batch_size = None
         batch_size = 1<< 20
         self.ecbn128 = ECBN128(batch_size,   seed=self.seed)
-        self.ec2bn128 = EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS)* batch_size), seed=self.seed)
+        self.ec2bn128 = EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * batch_size), seed=self.seed)
         self.cuzpoly = ZCUPoly(5*batch_size  + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
@@ -182,6 +183,48 @@ class GrothProver(object):
         logging.info('Reading Proving Key...')
         self.load_pkdata()
 
+        # convert data to array of bytes so that it can be easily transfered to shared mem
+        if self.test_f :
+           # if snarkjs is to be launched to compare results, I am assuming circuit is small, so i keep 
+           # a version to be able to generate json. Else, results will overwrite input data
+           self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
+
+        # Creating shared memories
+        pk_bin = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
+        self.pk_sh = RawArray(c_uint32, pk_bin.shape[0])
+        self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
+        np.copyto(self.pk, pk_bin)
+        del pk_bin
+             
+        pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
+        nVars = int(pkbin_vars[0][0])
+        domainSize = int(pkbin_vars[1][0])
+
+        self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
+        self.scl_array = np.frombuffer(
+                     self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
+        # Size is domainSize To store polH + three additional coeffs
+        self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
+        self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
+          
+        self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
+        self.sorted_scl_array = np.frombuffer(
+                             self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
+
+        self.pA_T_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)
+        self.pA_T = np.frombuffer(
+                     self.pA_T_sh, dtype=np.uint32).reshape((domainSize, NWORDS_256BIT))
+        np.copyto(
+                self.pA_T,
+                np.zeros((domainSize, NWORDS_256BIT), dtype=np.uint32))
+
+        self.pB_T_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)
+        self.pB_T = np.frombuffer(
+                     self.pB_T_sh, dtype=np.uint32).reshape((domainSize, NWORDS_256BIT))
+        np.copyto(
+                self.pB_T,
+                np.zeros((domainSize, NWORDS_256BIT), dtype=np.uint32))
+
         if self.out_proving_key_f is not None:
              if self.out_proving_key_f.endswith('.json'):
                pk_dict =pkvars_to_json(self.out_proving_key_format, EC_T_AFFINE, self.pk)
@@ -205,35 +248,47 @@ class GrothProver(object):
                              nvars = self.pk['nVars'], npublic=self.pk['nPublic'], domain_bits=self.pk['domainBits'],
                              domain_size = self.pk['domainSize'])
 
-        # convert data to array of bytes so that it can be easily transfered to shared mem
-        if self.test_f :
-           # if snarkjs is to be launched to compare results, I am assuming circuit is small, so i keep 
-           # a version to be able to generate json. Else, results will overwrite input data
-           self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
 
-        pk_bin = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
-        self.pk_sh = RawArray(c_uint32, int(pk_bin[0]))
-        self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
-        np.copyto(self.pk, pk_bin)
-        del pk_bin
-             
-        pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
-        nVars = int(pkbin_vars[0][0])
-        domainSize = int(pkbin_vars[1][0])
+        #Launch pysnark_process_server 
+        self.launch_p = True
+        if self.launch_p:
+           self.parent_conn, child_conn = Pipe()
+           self.p = Process(target=self.pysnarkProcessServer, args = (child_conn, self.pk_sh, self.pk.shape, 
+                                                                   self.scl_array_sh, self.scl_array.shape,
+                                                                   self.pA_T_sh,self.pA_T.shape,
+                                                                   self.pB_T_sh, self.pB_T.shape))
 
-        self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
-        self.scl_array = np.frombuffer(
-                     self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
-        # Size is domainSize To store polH + three additional coeffs
-        self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
-        self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
-          
-        self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
-        self.sorted_scl_array = np.frombuffer(
-                             self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
+    def pysnarkProcessServer(self, conn, pk_sh, pk_shape, witness_sh, witness_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape):
+        logging.info(' Launching Poly Process Server')
+        pk = np.frombuffer(pk_sh, dtype=np.uint32).reshape(pk_shape)
+        w = np.frombuffer(witness_sh, dtype=np.uint32).reshape(witness_shape)
+        pA_T = np.frombuffer(pA_T_sh, dtype=np.uint32).reshape(pA_T_shape)
+        pB_T = np.frombuffer(pB_T_sh, dtype=np.uint32).reshape(pB_T_shape)
+        #print("ProcessServer : "+str(pk.shape[0]))
+        start = time.time()
 
+        #ZField.set_field(MOD_FIELD)
+        pk_bin = pkbin_get(pk,['nVars', 'domainSize', 'polsA', 'polsB'])
+        nVars = pk_bin[0][0]
+        m = pk_bin[1][0]
+        pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
+        pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
 
-        if start_server:
+        logging.info(' Process server - Evaluating Poly A...')
+        np.copyto(pA_T,self.evalPoly(w, pA, nVars, m, MOD_FIELD))
+        logging.info(' Process server - Evaluating Poly B...')
+        np.copyto(pB_T,self.evalPoly(w, pB, nVars, m, MOD_FIELD))
+        logging.info(' Process server - Completed')
+
+        end = time.time()
+        if self.launch_p:
+          conn.send([end-start ])
+          conn.close()
+        else:
+          self.t_GP['Eval'] = end-start
+
+    def startGPServer(self):    
+           logging.info('Launching GP Server')
            jsocket = json_socket.jsonSocket()
 
            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -256,12 +311,13 @@ class GrothProver(object):
                  self.proof(parsed_dict['witness_f'], parsed_dict['proof_f'], parsed_dict['public_data_f'],
                          batch_size=int(parsed_dict['batch_size']), verify_en=int(parsed_dict['verify_en']),
                          n_gpus=int(parsed_dict['n_gpus']), n_streams=int(parsed_dict['n_streams']))
-                 if verify_en:
+                 if self.verify_en:
                    new_msg = dict(self.t_GP)
                    new_msg['status'] = self.verify
                  else:
                    new_msg = dict(self.t_GP)
-                   new_msg['status'] =  1
+                   new_msg['status'] =  2
+                 print(self.verify)
    
                  jsocket.send_message(new_msg, conn)
                  conn.close()
@@ -441,7 +497,7 @@ class GrothProver(object):
       logging.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + ' %)')
       logging.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + ' %)')
       logging.info('------ Time Multi-exp.         : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + ' %)')
-      logging.info('------ Time Lagrange Poly Eval : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + ' %)')
+      logging.info('------ Time Poly Calculation   : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + ' %)')
       logging.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + ' %)')
       logging.info('#################################### ')
       logging.info('')
@@ -497,7 +553,7 @@ class GrothProver(object):
 
       self.t_GP['Proof'] = time.time() - start
 
-      logging.info("Proof completed" )
+      logging.info(" Proof completed" )
       logging.info('#################################### ')
       
       self.logTimeResults()
@@ -551,6 +607,7 @@ class GrothProver(object):
         else:
           logging.info("Verification FAILED")
           self.verify = 0
+        print(self.verify)
         logging.info('#################################### ')
 
       return
@@ -672,7 +729,12 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Read_W'] = end - start
-        
+        print("Read_W : "+str(self.t_GP['Read_W']))
+       
+        start = time.time()
+        if self.launch_p:
+          self.p.start()
+          self.t_GP['Eval'] = time.time()-start
         ######################
         # Beginning of P2 
         #   - Get witness batch, sort and EC Multiexp
@@ -707,7 +769,15 @@ class GrothProver(object):
 
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
 
-        nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
+        nbatches1 = math.ceil((nVars - (nPublic+1))/(self.batch_size-1)) + 1
+        nbatches2 = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
+
+        if nbatches1 != nbatches2:
+          nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-2)) + 1
+          batch_size = self.batch_size-1
+        else:
+          nbatches = nbatches1
+          batch_size = self.batch_size
 
         next_gpu_idx = 0
         first_stream_idx = min(self.n_streams-1,1)
@@ -718,7 +788,7 @@ class GrothProver(object):
         # EC reduce A, B2, B1 and C from nPublic+1 to end	
         dispatch_table = buildDispatchTable( nbatches-1,
                                          self.ec_type_dict['C'][2]+1,
-                                         self.n_gpu, self.n_streams, self.batch_size-1,
+                                         self.n_gpu, self.n_streams, batch_size-1,
                                          nPublic+1, nVars,
                                          start_pidx=self.ec_type_dict['A'][2],
                                          start_gpu_idx=next_gpu_idx,
@@ -727,7 +797,7 @@ class GrothProver(object):
 
         self.findECPointsDispatch(
                                   dispatch_table,
-                                  self.batch_size,
+                                  batch_size,
                                   dispatch_table.shape[0]-(self.ec_type_dict['C'][2]+1),
                                   change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
@@ -756,6 +826,7 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Mexp'] = (end - start)
+        print("Mexp 1 : "+str(self.t_GP['Mexp']))
         ######################
         # Beginning of P3 and P4
         #  P3 - Poly Eval
@@ -772,10 +843,11 @@ class GrothProver(object):
 
         logging.info(' Starting Last Mexp...')
         #Theck that last batch includes last three samples 
+        batch_size = self.batch_size
         while True:
-           nbatches = math.ceil((domainSize - 1)/(self.batch_size - 1))
-           if domainSize -1 - (nbatches-1)*(self.batch_size - 1)  < 3:
-              self.batch_size -= 1
+           nbatches = math.ceil((domainSize - 1)/(batch_size - 1))
+           if domainSize -1 - max(1,(nbatches-1))*(batch_size - 1)  < 3:
+              batch_size -= 3
            else :
              break
 
@@ -783,14 +855,14 @@ class GrothProver(object):
 
         # EC reduce hExps
         dispatch_table = buildDispatchTable( nbatches, 1,
-                                         self.n_gpu, self.n_streams, self.batch_size-1,
+                                         self.n_gpu, self.n_streams, batch_size-1,
                                          0, domainSize-1,
                                          start_pidx=self.ec_type_dict['hExps'][2],
                                          ec_lable = self.ec_lable)
 
         self.findECPointsDispatch(
                                   dispatch_table,
-                                  self.batch_size,
+                                  batch_size,
                                   dispatch_table.shape[0]-1,
                                   sort_idx = self.ec_type_dict['hExps'][2],
                                   change_rs_scl_idx = [self.ec_type_dict['hExps'][2]],
@@ -800,6 +872,7 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Mexp'] += (end - start)
+        print("Mexp  : "+str(self.t_GP['Mexp']))
      
         return 
  
@@ -1111,30 +1184,38 @@ class GrothProver(object):
                     self.pi_c_eccf1))
            writeU256DataFile_h(proof_bin, self.out_public_f.encode("UTF-8"))
                
-
-    def evalPoly(self, pX, nVars, m):
+    def evalPoly(self,w, pX, nVars, m, pidx):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-        pidx = ZField.get_field()
         reduce_coeff = 0  
-        polX_T = mpoly_eval_h(self.scl_array[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
+        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
         return polX_T
 
-
     def calculateH(self):
-
-        start = time.time()
 
         ZField.set_field(MOD_FIELD)
         pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
+        """
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-
+        """
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
 
+        if self.launch_p:
+          self.t_GP['Eval'] += self.parent_conn.recv()[0]
+          start = time.time()
+          self.p.join()
+        else:
+           self.pysnarkProcessServer(None, self.pk_sh, self.pk.shape, 
+                                             self.scl_array_sh, self.scl_array.shape,
+                                                                   self.pA_T_sh,self.pA_T.shape,
+                                                                   self.pB_T_sh, self.pB_T.shape)
+        print ("T Eval : "+str(self.t_GP['Eval']))
+
+        """
         logging.info(' Evaluating Poly A...')
         pA_T = self.evalPoly(pA, nVars, m)
         logging.info(' Evaluating Poly B...')
@@ -1142,12 +1223,13 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Eval'] = end-start
+        """
    
-        start = time.time()
 
+        start = time.time()
         logging.info(' Calculating H...')
 
-        ifft_params = ntt_build_h(pA_T.shape[0])
+        ifft_params = ntt_build_h(self.pA_T.shape[0])
 
         if self.n_bits_roots < ifft_params['levels']:
           logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
@@ -1158,12 +1240,13 @@ class GrothProver(object):
         #pB_T = readU256DataFile_h("../../test/c/aux_data/zpoly_samples_tmp2.bin".encode("UTF-8"), 1<<17 , 1<<17 )
         pH,t1 = zpoly_interp_and_mul_cuda(
                                               self.cuzpoly,
-                                              np.concatenate((pA_T,pB_T)),
+                                              np.concatenate((self.pA_T,self.pB_T)),
                                               ifft_params, 
                                               ZField.get_field(), 
                                               self.roots_rdc_u256,
                                               self.batch_size, n_gpu=self.n_gpu)
 
         self.t_GP['H'] = time.time()-start
+        print ("T H : "+str(self.t_GP['H']))
 
         return pH[m:-1]

@@ -38,6 +38,7 @@
 
 import numpy as np
 cimport numpy as np
+import os
 
 cimport _types as ct
 cimport _utils_host as uh
@@ -548,7 +549,8 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
     return idx_flat
 
 def writeU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
-    uh.cwriteU256DataFile_h(&vin[0], <char *>fname, vin.shape[0])
+    cdef unsigned long long nWords = np.uint64(vin.shape[0])
+    uh.cwriteU256DataFile_h(&vin[0], <char *>fname, nWords)
 
 def writeWitnessFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     cdef unsigned long long vlen = vin.shape[0]/NWORDS_256BIT
@@ -586,17 +588,19 @@ def readU256CircuitFileHeader_h(bytes fname):
 
 def readU256CircuitFile_h(bytes fname):
     header_d = readU256CircuitFileHeader_h(<char *>fname)
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] cir_data = np.zeros(header_d['nWords'],dtype=np.uint32)
+    cdef unsigned long long nWords = np.uint64(os.path.getsize(fname)/4)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] cir_data = np.zeros(nWords,dtype=np.uint32)
    
-    uh.creadU256CircuitFile_h(&cir_data[0], <char *>fname, header_d['nWords'])
+    uh.creadU256CircuitFile_h(&cir_data[0], <char *>fname, nWords)
 
     return cir_data
 
 def readU256PKFile_h(bytes fname):
     header_d = readU256PKFileHeader_h(<char *>fname)
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pk_data = np.zeros(header_d['nWords'],dtype=np.uint32)
+    cdef unsigned long long nWords = np.uint64(os.path.getsize(fname)/4)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pk_data = np.zeros(nWords,dtype=np.uint32)
    
-    uh.creadU256PKFile_h(&pk_data[0], <char *>fname, header_d['nWords'])
+    uh.creadU256PKFile_h(&pk_data[0], <char *>fname, nWords)
 
     return pk_data
 
@@ -726,6 +730,12 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
            uh.cmontmult_h(&out_vec[j,0], &out_vec[j,0], &one[0], pidx)
            v_offset += NWORDS_256BIT
            c_offset = v_offset
+        #TODO I could add n constraints here and not affect previous calculation
+        """
+        for j in xrange(nVars-1):
+            in_veca[j+2]+= in_veca[j+1]
+        """
+
         return out_vec
 
 def evalLagrangePoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_t,

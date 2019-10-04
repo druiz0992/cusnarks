@@ -329,6 +329,7 @@ def cirbin_to_vars(ciru256_data):
                        np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
 
         cir = getCircuit()
+
         cir['nWords']        =  np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET])
         cir['nPubInputs']    =  np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET])
         cir['nOutputs']      =  np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET])
@@ -667,6 +668,7 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
                       np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1)
                                    )
             C_ext = np.zeros(0,dtype=np.uint32)
+            #TODO Change understand why i cooy hExps again in hExps_ext
             hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
             hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
 

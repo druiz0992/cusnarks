@@ -481,7 +481,10 @@ void *mpoly_eval_h(void *vargs)
   printf("Zcoeff D Offset : %d\n",zcoeff_d_offset);
   */
    //printf("Thread id: %d, Start idx : %d, Last idx : %d\n", args->thread_id, args->start_idx, args->last_idx);
-    
+  //TODO Change : If coeffs are accumulated, I don't need to do the accumulation
+  /*
+   accum_n_zcoeff = args->pin[i+1];
+  */  
   for (i=0; i<args->start_idx; i++){
     accum_n_zcoeff += args->pin[i+1];
   }
@@ -675,10 +678,10 @@ void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename)
   Read circuit binary file
        
 */
-void readU256CircuitFile_h(uint32_t *samples, const char *filename, uint32_t nwords=0)
+void readU256CircuitFile_h(uint32_t *samples, const char *filename, unsigned long long nwords=0)
 {
   FILE *ifp = fopen(filename,"rb");
-  uint32_t i=0;
+  unsigned long long i=0;
   if (!nwords){
     while (!feof(ifp)){
       fread(&samples[i++], sizeof(uint32_t), 1, ifp); 
@@ -817,7 +820,7 @@ void readU256PKFileHeader_h(pkbin_hfile_t *hfile, const char *filename)
   Read PK binary file
        
 */
-void readU256PKFile_h(uint32_t *samples, const char *filename, uint32_t nwords=0)
+void readU256PKFile_h(uint32_t *samples, const char *filename, unsigned long long nwords=0)
 {
   readU256CircuitFile_h(samples, filename, nwords);
 }
@@ -831,7 +834,7 @@ void readU256PKFile_h(uint32_t *samples, const char *filename, uint32_t nwords=0
   char * filename      : location of file to be written
   uint32_t nwords      : Number of samples to write.
 */
-void writeU256DataFile_h(uint32_t *samples, const char *filename, uint32_t nwords)
+void writeU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords)
 {
   FILE *ifp = fopen(filename,"wb");
   fwrite(samples, sizeof(uint32_t), nwords, ifp); 

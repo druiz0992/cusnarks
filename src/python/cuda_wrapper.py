@@ -1593,6 +1593,7 @@ def buildDispatchTable(nbatches, nP, ngpu, nstreams, step, start_idx, end_idx,
       # Add starting and ending batch indexes -> Colum 1 and 2
       idx = np.reshape(np.tile(np.arange(start_idx, end_idx+step, step) ,(nP,1)).T,-1)
       idx [-nP:] = end_idx
+      
       dispatch_table[:,1] = idx[:-nP]
       dispatch_table[:,2] = idx[nP:]
 

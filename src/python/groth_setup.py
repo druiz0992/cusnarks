@@ -150,7 +150,7 @@ class GrothSetup(object):
         copy_input_files([in_circuit_f], self.keep_f)
 
         logging.info('#################################### ')
-        logging.info('Staring Groth setupr with the follwing arguments :')
+        logging.info('Staring Groth setup with the follwing arguments :')
         logging.info(' - curve : %s',curve)
         logging.info(' - in_circuit_f : %s', in_circuit_f)
         logging.info(' - out_circuit_f : %s', out_circuit_f)
@@ -399,41 +399,22 @@ class GrothSetup(object):
         logging.info(' Starting calculatePoly')
         self.computeHeader()
 
-
-        worker = mp.Pool(processes=min(3,mp.cpu_count()))
-
-        r1 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1))
-        r2 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSB'], self.cir_header,self.cir['cirformat'], 0))
-        r3 = worker.apply_async(cirr1cs_to_mpoly, args=(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'],0))
-
-        logging.info(' Releasing R1CS from memory')
-        self.pk['polsA'] = r1.get()
-        self.pk['polsA_nWords'] = self.pk['polsA'].shape[0]
+        logging.info(' Starting polsA')
+        self.pk['polsA'] = cirr1cs_to_mpoly(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1)
+        self.pk['polsA_nWords'] = np.uint32(self.pk['polsA'].shape[0])
         del self.cir['R1CSA']
-        self.pk['polsB'] = r2.get()
-        self.pk['polsB_nWords'] = self.pk['polsB'].shape[0]
+
+        logging.info(' Starting polsB')
+        self.pk['polsB'] = cirr1cs_to_mpoly(self.cir['R1CSB'], self.cir_header, self.cir['cirformat'], 0)
+        self.pk['polsB_nWords'] = np.uint32(self.pk['polsB'].shape[0])
         del self.cir['R1CSB']
-        self.pk['polsC'] = r3.get()
-        self.pk['polsC_nWords'] = self.pk['polsC'].shape[0]
-        del self.cir['R1CSC'] 
-        logging.info(' Releasing circuit from memory')
+
+        logging.info(' Starting polsC')
+        self.pk['polsC'] = cirr1cs_to_mpoly(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'], 0)
+        self.pk['polsC_nWords'] = np.uint32(self.pk['polsC'].shape[0])
         del self.cir
 
-        worker.terminate()
-
         return
-
-    def r1cs_to_mpoly(self, r1cs, fmat, extend):
-        to_mont = 0
-        ZField.set_field(MOD_FIELD)
-        pidx = ZField.get_field()
-        if fmat == ZUtils.FEXT:
-           to_mont = 1
-
-        poly_len = r1cs_to_mpoly_len_h(r1cs, self.cir_header, extend)
-        pols = r1cs_to_mpoly_h(poly_len, r1cs, self.cir_header, to_mont, pidx, extend)
-        
-        return pols
 
     def evalLagrangePoly(self, bits):
        """
@@ -462,7 +443,7 @@ class GrothSetup(object):
        pidx = ZField.get_field()
        u_u256 = evalLagrangePoly_h(trdc_u256,lrdc_u256, self.roots_rdc_u256, pidx)
 
-       logging.info(' Releasing roots from memory')
+       logging.info(' Deleting roots from memory')
        del self.roots_rdc_u256
 
        return z.as_uint256(), u_u256
@@ -528,7 +509,8 @@ class GrothSetup(object):
       logging.info(' Converting EC Point A to Affine coordinates')
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
       logging.info(' Checking EC Point A belongs to curve')
-      self.assert_isoncurve('A', samples= ecbn128_samples)
+      if self.test_f is not None:
+        self.assert_isoncurve('A', samples= ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
@@ -549,7 +531,8 @@ class GrothSetup(object):
       logging.info(' Converting EC Point B1 to Affine coordinates')
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
       logging.info(' Checking EC Point B1 belongs to curve')
-      self.assert_isoncurve('B1', samples=ecbn128_samples)
+      if self.test_f is not None:
+        self.assert_isoncurve('B1', samples=ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
@@ -568,7 +551,8 @@ class GrothSetup(object):
       logging.info(' Converting EC Point B2 to Affine coordinates')
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
       logging.info(' Checking EC Point B2 belongs to curve')
-      self.assert_isoncurve('B2', samples = ec2bn128_samples)
+      if self.test_f is not None:
+        self.assert_isoncurve('B2', samples = ec2bn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
       #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
@@ -597,7 +581,8 @@ class GrothSetup(object):
       logging.info(' Converting EC Point C to Affine coordinates')
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
       logging.info(' Checking EC Point C belongs to curve')
-      self.assert_isoncurve('C', samples=ecbn128_samples)
+      if self.test_f is not None:
+        self.assert_isoncurve('C', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
@@ -628,7 +613,8 @@ class GrothSetup(object):
       logging.info(' Converting EC Point hExps to Affine coordinates')
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
       logging.info(' Checking EC Point hExps belongs to curve')
-      self.assert_isoncurve('hExps', samples=ecbn128_samples)
+      if self.test_f is not None:
+        self.assert_isoncurve('hExps', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
@@ -655,7 +641,8 @@ class GrothSetup(object):
       logging.info(' Converting EC Point IC to Affine coordinates')
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
       logging.info(' Checking EC Point IC belongs to curve')
-      self.assert_isoncurve('IC', samples = ecbn128_samples)
+      if self.test_f is not None:
+        self.assert_isoncurve('IC', samples = ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
@@ -695,21 +682,15 @@ class GrothSetup(object):
        logging.info(' Starting mpoly_madd_h')
        pidx = ZField.get_field()
 
-       worker = mp.Pool(processes=min(3,mp.cpu_count()))
+       logging.info(' Starting computing a_t_u256')
+       a_t_u256 = mpoly_madd_h(self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx)
+       logging.info(' Starting computing b_t_u256')
+       b_t_u256 = mpoly_madd_h(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx)
+       logging.info(' Starting computing c_t_u256')
+       c_t_u256 = mpoly_madd_h(self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx)
 
-       r1 = worker.apply_async(mpoly_madd_h, args = (self.pk['polsA'], u.reshape(-1), self.pk['nVars'], pidx))
-       r2 = worker.apply_async(mpoly_madd_h, args =(self.pk['polsB'], u.reshape(-1), self.pk['nVars'], pidx))
-       r3 = worker.apply_async(mpoly_madd_h, args = (self.pk['polsC'], u.reshape(-1), self.pk['nVars'], pidx))
-
-       a_t_u256 = r1.get()
-       b_t_u256 = r2.get()
-       c_t_u256 = r3.get()
-
-       worker.terminate()
-       
        # a,b,c are Ext
        return a_t_u256, b_t_u256, c_t_u256, z_t_u256
-
 
 
     def computeHeader(self):
@@ -723,8 +704,6 @@ class GrothSetup(object):
                   'R1CSA_nWords' : self.cir['R1CSA_nWords'],
                   'R1CSB_nWords' : self.cir['R1CSB_nWords'],
                   'R1CSC_nWords' : self.cir['R1CSC_nWords']}
-
-
 
     def write_pk(self):
 
@@ -743,7 +722,6 @@ class GrothSetup(object):
        elif self.out_pk_f.endswith('bin') :
          pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk)
          writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
-         logging.info(' Releasing values from proving key')
 
        else :
          logging.info ("No valid proving key file  %s provided", self.out_pk_f)
@@ -870,6 +848,7 @@ class GrothSetup(object):
       logging.info('- %s', self.t_S)
       logging.info('')
       logging.info('#################################### ')
+
 if __name__ == "__main__":
     in_circuit_f = '../../data/prove-kyc.json'
     out_circuit_f = '../../data/prove-kyc.bin'
