@@ -317,7 +317,6 @@ class GrothProver(object):
                  else:
                    new_msg = dict(self.t_GP)
                    new_msg['status'] =  2
-                 print(self.verify)
    
                  jsocket.send_message(new_msg, conn)
                  conn.close()
@@ -607,7 +606,6 @@ class GrothProver(object):
         else:
           logging.info("Verification FAILED")
           self.verify = 0
-        print(self.verify)
         logging.info('#################################### ')
 
       return
@@ -729,7 +727,6 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Read_W'] = end - start
-        print("Read_W : "+str(self.t_GP['Read_W']))
        
         start = time.time()
         if self.launch_p:
@@ -826,7 +823,7 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Mexp'] = (end - start)
-        print("Mexp 1 : "+str(self.t_GP['Mexp']))
+
         ######################
         # Beginning of P3 and P4
         #  P3 - Poly Eval
@@ -872,7 +869,6 @@ class GrothProver(object):
 
         end = time.time()
         self.t_GP['Mexp'] += (end - start)
-        print("Mexp  : "+str(self.t_GP['Mexp']))
      
         return 
  
@@ -1213,18 +1209,6 @@ class GrothProver(object):
                                              self.scl_array_sh, self.scl_array.shape,
                                                                    self.pA_T_sh,self.pA_T.shape,
                                                                    self.pB_T_sh, self.pB_T.shape)
-        print ("T Eval : "+str(self.t_GP['Eval']))
-
-        """
-        logging.info(' Evaluating Poly A...')
-        pA_T = self.evalPoly(pA, nVars, m)
-        logging.info(' Evaluating Poly B...')
-        pB_T = self.evalPoly(pB, nVars, m)
-
-        end = time.time()
-        self.t_GP['Eval'] = end-start
-        """
-   
 
         start = time.time()
         logging.info(' Calculating H...')
@@ -1247,6 +1231,5 @@ class GrothProver(object):
                                               self.batch_size, n_gpu=self.n_gpu)
 
         self.t_GP['H'] = time.time()-start
-        print ("T H : "+str(self.t_GP['H']))
 
         return pH[m:-1]

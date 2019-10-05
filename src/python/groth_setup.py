@@ -179,7 +179,7 @@ class GrothSetup(object):
            self.n_bits_roots = cfg.get_n_roots()
 
            if self.n_bits_roots < self.nbits:
-             logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< self.nbits))
+             logging.error('Insufficient number of roots in ' + self.roots_f + '. Required number of roots is '+ str(1<< self.nbits))
              sys.exit(1)
            
            self.roots_rdc_u256_sh = RawArray(c_uint32,  int((1 << self.nbits) * NWORDS_256BIT))
@@ -188,7 +188,6 @@ class GrothSetup(object):
                     dtype=np.uint32).reshape((1 << self.nbits, NWORDS_256BIT))
            np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.nbits) )
 
-           #roots_rdc_u256 = field_roots_compute_h(bits)
         else:
            logging.error ("Required input circuit")
            sys.exit(1)
@@ -508,7 +507,6 @@ class GrothSetup(object):
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point A to Affine coordinates')
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
-      logging.info(' Checking EC Point A belongs to curve')
       if self.test_f is not None:
         self.assert_isoncurve('A', samples= ecbn128_samples)
 
@@ -530,7 +528,6 @@ class GrothSetup(object):
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point B1 to Affine coordinates')
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
-      logging.info(' Checking EC Point B1 belongs to curve')
       if self.test_f is not None:
         self.assert_isoncurve('B1', samples=ecbn128_samples)
 
@@ -550,7 +547,6 @@ class GrothSetup(object):
       self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True, batch_size=self.batch_size)
       logging.info(' Converting EC Point B2 to Affine coordinates')
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
-      logging.info(' Checking EC Point B2 belongs to curve')
       if self.test_f is not None:
         self.assert_isoncurve('B2', samples = ec2bn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
@@ -580,13 +576,12 @@ class GrothSetup(object):
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point C to Affine coordinates')
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
-      logging.info(' Checking EC Point C belongs to curve')
       if self.test_f is not None:
         self.assert_isoncurve('C', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
-      self.pk['C']=np.concatenate((np.zeros(((self.pk['nPublic']+1)*2,NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
+      self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
 
       del ps_u256
@@ -612,7 +607,6 @@ class GrothSetup(object):
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point hExps to Affine coordinates')
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
-      logging.info(' Checking EC Point hExps belongs to curve')
       if self.test_f is not None:
         self.assert_isoncurve('hExps', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
@@ -640,7 +634,6 @@ class GrothSetup(object):
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point IC to Affine coordinates')
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
-      logging.info(' Checking EC Point IC belongs to curve')
       if self.test_f is not None:
         self.assert_isoncurve('IC', samples = ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
@@ -658,6 +651,7 @@ class GrothSetup(object):
          dim2=4
          ec2=1
 
+      logging.info(' Checking EC Point belongs to curve')
       pok = np.asarray([ec_isoncurve_h(np.reshape(x,-1), 1, ec2, 
                     ZField.get_field()) for x in np.reshape(self.pk[ec_str],(-1,dim2,NWORDS_256BIT))])
       if not all(pok > 0):
