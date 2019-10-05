@@ -583,7 +583,7 @@ def readU256CircuitFileHeader_h(bytes fname):
                 'R1CSA_nWords' : header.R1CSA_nWords,
                 'R1CSB_nWords' : header.R1CSB_nWords,
                 'R1CSC_nWords' : header.R1CSC_nWords }
-    
+
     return header_d
 
 def readU256CircuitFile_h(bytes fname):
@@ -617,7 +617,7 @@ def readU256PKFileHeader_h(bytes fname):
                 'nVars' : header.nVars,
                 'nPublic' : header.nPublic,
                 'domainSize' : header.domainSize }
-    
+
     return header_d
 
 def readR1CSFile_h(bytes filename):
@@ -694,7 +694,7 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     header_c.R1CSB_nWords = header['R1CSB_nWords']
     header_c.R1CSC_nWords = header['R1CSC_nWords']
 
-    pout[0] = header_c.nVars
+    pout[0] = (header_c.nVars) & 0xFFFFFFFF;
     pout[1:header_c.nVars+1] = plen
 
     uh.cr1cs_to_mpoly_h(&pout[0], &r1cs[0], header_c, to_mont, pidx, extend)

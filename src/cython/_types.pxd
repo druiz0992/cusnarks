@@ -120,21 +120,22 @@ cdef extern from "types.h":
    CB_ZPOLY_DIVSNARKS, CB_ZPOLY_N
 
   ctypedef struct cirbin_hfile_t:
-     uint32_t nWords
-     uint32_t nPubInputs
-     uint32_t nOutputs
-     uint32_t nVars
-     uint32_t nConstraints
-     uint32_t cirformat
-     uint32_t R1CSA_nWords
-     uint32_t R1CSB_nWords
-     uint32_t R1CSC_nWords
+     unsigned long long nWords
+     unsigned long long nPubInputs
+     unsigned long long nOutputs
+     unsigned long long nVars
+     unsigned long long nConstraints
+     unsigned long long cirformat
+     unsigned long long R1CSA_nWords
+     unsigned long long R1CSB_nWords
+     unsigned long long R1CSC_nWords
   
 
   ctypedef enum cirbin_hfile_offset_t:
-      CIRBIN_H_NWORDS_OFFSET = 0, CIRBIN_H_NPUBINPUTS_OFFSET, CIRBIN_H_NOUTPUTS_OFFSET, 
-      CIRBIN_H_NVARS_OFFSET, CIRBIN_H_NCONSTRAINTS_OFFSET, CIRBIN_H_FORMAT_OFFSET, CIRBIN_H_CONSTA_NWORDS_OFFSET,
-      CIRBIN_H_CONSTB_NWORDS_OFFSET, CIRBIN_H_CONSTC_NWORDS_OFFSET, CIRBIN_H_N_OFFSET
+      CIRBIN_H_NWORDS_OFFSET = 0, CIRBIN_H_NPUBINPUTS_OFFSET=2, CIRBIN_H_NOUTPUTS_OFFSET=4, 
+      CIRBIN_H_NVARS_OFFSET=6, CIRBIN_H_NCONSTRAINTS_OFFSET=8, CIRBIN_H_FORMAT_OFFSET=10,
+      CIRBIN_H_CONSTA_NWORDS_OFFSET=12, CIRBIN_H_CONSTB_NWORDS_OFFSET=14,
+      CIRBIN_H_CONSTC_NWORDS_OFFSET=16, CIRBIN_H_N_OFFSET=18
 
   ctypedef struct pkbin_hfile_t:
      uint32_t nWords

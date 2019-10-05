@@ -216,15 +216,15 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
             Val[N-1,CN_1-1] constraint 1, value CN_1-1 ---- 256 bits 
 
           Binary file format
-            nWords : File size in 32 bit workds --------------- 32 bits
-            nPubInputs : -------------------------------------- 32 bits
-            nOutputs   : -------------------------------------- 32 bits
-            nVars      : -------------------------------------- 32 bits
-            nConstraints : Number of constraints--------------- 32 bits
-            cirformat : Extended[0]/Montgomery[1]----------------- 32 bits
-            R1CSA_nWords : R1CSA size in 32 bit words --------- 32 bits
-            R1CSB_nWords : R1CSB size in 32 bit words --------- 32 bits
-            R1CSC_nWords : R1CSC size in 32 bit words --------- 32 bits
+            nWords : File size in 32 bit workds --------------- 64 bits
+            nPubInputs : -------------------------------------- 64 bits
+            nOutputs   : -------------------------------------- 64 bits
+            nVars      : -------------------------------------- 64 bits
+            nConstraints : Number of constraints--------------- 64 bits
+            cirformat : Extended[0]/Montgomery[1]----------------- 64 bits
+            R1CSA_nWords : R1CSA size in 32 bit words --------- 64 bits
+            R1CSB_nWords : R1CSB size in 32 bit words --------- 64 bits
+            R1CSC_nWords : R1CSC size in 32 bit words --------- 64 bits
             R1CSA        :  R1CS  format 
             R1CSB        :  R1CS format
             R1CSC        : R1Cs format
@@ -253,28 +253,28 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
 
         worker.terminate()
 
-        fsize = CIRBIN_H_N_OFFSET + R1CSA_len + R1CSB_len + R1CSC_len
+        fsize = np.uint64(CIRBIN_H_N_OFFSET + R1CSA_len + R1CSB_len + R1CSC_len)
 
         # Init circuit fields
         cir = getCircuit()
 
-        cir['nWords']       =  np.uint32(fsize)
-        cir['protocol']     = np.uint32(PROTOCOL_T_GROTH)  # Groth
-        cir['nPubInputs']   =  np.uint32(cir_data['nPubInputs'])
+        cir['nWords']       =  np.uint64(fsize)
+        cir['protocol']     = np.uint64(PROTOCOL_T_GROTH)  # Groth
+        cir['nPubInputs']   =  np.uint64(cir_data['nPubInputs'])
         cir['Rbitlen']        = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
-        cir['cirformat']       =  np.uint32(out_circuit_format)
-        cir['nVars']        =  np.uint32(cir_data['nVars'])
-        cir['nOutputs']     =  np.uint32(cir_data['nOutputs'])
-        cir['nConstraints'] =  np.uint32(len(cir_data['constraints']))
+        cir['cirformat']       =  np.uint64(out_circuit_format)
+        cir['nVars']        =  np.uint64(cir_data['nVars'])
+        cir['nOutputs']     =  np.uint64(cir_data['nOutputs'])
+        cir['nConstraints'] =  np.uint64(len(cir_data['constraints']))
         pidx = ZField.get_field()
         ZField.set_field(MOD_FIELD)
         cir['field_r']        = ZField.get_extended_p().as_uint256()
         ZField.set_field(MOD_GROUP)
         cir['group_q']       = ZField.get_extended_p().as_uint256()
         ZField.set_field(pidx)
-        cir['R1CSA_nWords'] =  np.uint32(R1CSA_len)
-        cir['R1CSB_nWords'] =  np.uint32(R1CSB_len)
-        cir['R1CSC_nWords'] =  np.uint32(R1CSC_len)
+        cir['R1CSA_nWords'] =  np.uint64(R1CSA_len)
+        cir['R1CSB_nWords'] =  np.uint64(R1CSB_len)
+        cir['R1CSC_nWords'] =  np.uint64(R1CSC_len)
         cir['R1CSA']        =  R1CSA_u256
         cir['R1CSB']        =  R1CSB_u256
         cir['R1CSC']        =  R1CSC_u256 
@@ -299,7 +299,7 @@ def cirjson_to_r1cs(idx, in_circuit_format, out_circuit_format, cir_data):
                                                  (np.cumsum(R1CS_l), 
                                                   np.concatenate(R1CS_p))))),
                                                   dtype=np.uint32)
-        R1CS_len = R1CS_u256.shape[0]
+        R1CS_len = np.uint64(R1CS_u256.shape[0])
 
         return  R1CS_len, R1CS_u256 
 
@@ -319,29 +319,36 @@ def cirvars_to_bin(cir):
                         cir['R1CSB'],
                         cir['R1CSC']))
 
+def _32b264b(word32b):
+    dword64b = np.uint64(word32b[0] + (word32b[1] << 32))
+    return dword64b
+
+def _64b232b(word64b):
+    word32b = np.asarray([int(word64b) & 0xFFFFFFFF, int(word64b) >> 32],dtype=np.uint32)
+    return word32b
 
 def cirbin_to_vars(ciru256_data):
-        R1CSA_offset = CIRBIN_H_N_OFFSET
-        R1CSB_offset = CIRBIN_H_N_OFFSET +  \
-                       np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
-        R1CSC_offset = CIRBIN_H_N_OFFSET + \
-                       np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET]) + \
-                       np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
+        R1CSA_offset = np.uint64(CIRBIN_H_N_OFFSET)
+        R1CSB_offset = np.uint64(CIRBIN_H_N_OFFSET +  _32b264b(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET:
+                                                                  CIRBIN_H_CONSTA_NWORDS_OFFSET+2]))
+        R1CSC_offset = np.uint64(R1CSB_offset + _32b264b(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET:
+                                                            CIRBIN_H_CONSTB_NWORDS_OFFSET+2]))
 
         cir = getCircuit()
 
-        cir['nWords']        =  np.uint32(ciru256_data[CIRBIN_H_NWORDS_OFFSET])
-        cir['nPubInputs']    =  np.uint32(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET])
-        cir['nOutputs']      =  np.uint32(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET])
-        cir['nVars']         =  np.uint32(ciru256_data[CIRBIN_H_NVARS_OFFSET])
-        cir['nConstraints']  =  np.uint32(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET])
-        cir['cirformat']       =  np.uint32(ciru256_data[CIRBIN_H_FORMAT_OFFSET])
-        cir['R1CSA_nWords'] =  np.uint32(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET])
-        cir['R1CSB_nWords'] =  np.uint32(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET])
-        cir['R1CSC_nWords'] =  np.uint32(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET])
-        cir['R1CSA']        =  ciru256_data[R1CSA_offset:R1CSB_offset] 
-        cir['R1CSB']       =  ciru256_data[R1CSB_offset:R1CSC_offset]
-        cir['R1CSC']        =  ciru256_data[R1CSC_offset:] 
+        cir['nWords']        =  _32b264b(ciru256_data[CIRBIN_H_NWORDS_OFFSET:CIRBIN_H_NWORDS_OFFSET+2])
+        cir['nPubInputs']    =  _32b264b(ciru256_data[CIRBIN_H_NPUBINPUTS_OFFSET:CIRBIN_H_NPUBINPUTS_OFFSET+2])
+        cir['nOutputs']      =  _32b264b(ciru256_data[CIRBIN_H_NOUTPUTS_OFFSET:CIRBIN_H_NOUTPUTS_OFFSET+2])
+        cir['nVars']         =  _32b264b(ciru256_data[CIRBIN_H_NVARS_OFFSET:CIRBIN_H_NVARS_OFFSET+2])
+        cir['nConstraints']  =  _32b264b(ciru256_data[CIRBIN_H_NCONSTRAINTS_OFFSET:CIRBIN_H_NCONSTRAINTS_OFFSET+2])
+        cir['cirformat']     =  _32b264b(ciru256_data[CIRBIN_H_FORMAT_OFFSET:CIRBIN_H_FORMAT_OFFSET+2])
+        cir['R1CSA_nWords']  =  _32b264b(ciru256_data[CIRBIN_H_CONSTA_NWORDS_OFFSET:CIRBIN_H_CONSTA_NWORDS_OFFSET+2])
+        cir['R1CSB_nWords']  =  _32b264b(ciru256_data[CIRBIN_H_CONSTB_NWORDS_OFFSET:CIRBIN_H_CONSTB_NWORDS_OFFSET+2])
+        cir['R1CSC_nWords']  =  _32b264b(ciru256_data[CIRBIN_H_CONSTC_NWORDS_OFFSET:CIRBIN_H_CONSTC_NWORDS_OFFSET+2])
+
+        cir['R1CSA']         =  ciru256_data[R1CSA_offset:R1CSB_offset] 
+        cir['R1CSB']         =  ciru256_data[R1CSB_offset:R1CSC_offset]
+        cir['R1CSC']         =  ciru256_data[R1CSC_offset:] 
 
         return cir
 
@@ -349,18 +356,18 @@ def cirbin_to_vars(ciru256_data):
 def cirr1cs_to_vars(header, r1csA, r1csB, r1csC ):
         cir = getCircuit()
 
-        cir['nWords']        =  np.uint32()
-        cir['nPubInputs']    =  np.uint32(header['nPubInputs'])
-        cir['nOutputs']      =  np.uint32(header['nPubOutputs'])
-        cir['nVars']         =  np.uint32(header['nVars'])
-        cir['nConstraints']  =  np.uint32(header['nConstraints'])
-        cir['cirformat']     =  np.uint32(ZUtils.FEXT)
-        cir['R1CSA_nWords'] =  np.uint32(r1csA.shape[0])
-        cir['R1CSB_nWords'] =  np.uint32(r1csB.shape[0])
-        cir['R1CSC_nWords'] =  np.uint32(r1csC.shape[0])
-        cir['R1CSA']        =  r1csA
-        cir['R1CSB']       =  r1csB
-        cir['R1CSC']        =  r1csC
+        cir['nWords']        =  np.uint64()
+        cir['nPubInputs']    =  np.uint64(header['nPubInputs'])
+        cir['nOutputs']      =  np.uint64(header['nPubOutputs'])
+        cir['nVars']         =  np.uint64(header['nVars'])
+        cir['nConstraints']  =  np.uint64(header['nConstraints'])
+        cir['cirformat']     =  np.uint64(ZUtils.FEXT)
+        cir['R1CSA_nWords']  =  np.uint64(r1csA.shape[0])
+        cir['R1CSB_nWords']  =  np.uint64(r1csB.shape[0])
+        cir['R1CSC_nWords']  =  np.uint64(r1csC.shape[0])
+        cir['R1CSA']         =  r1csA
+        cir['R1CSB']         =  r1csB
+        cir['R1CSC']         =  r1csC
    
         return cir 
 
@@ -541,16 +548,23 @@ def pkvars_to_json(out_bin, out_ec, pk):
 
 def pkbin_get(pk_bin, labels):
     #Header + field p + group g + X_nWords
-    offset_data = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 8
-    polsA_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT]
-    polsB_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 1]
-    polsC_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 2]
-    #polsH_nWords = (pk_bin[PKBIN_H_DOMAINSIZE_OFFSET]*2-1)*NWORDS_256BIT 
-    A_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 3]
-    B1_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 4]
-    B2_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 5]
-    C_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 6]
-    hExps_nWords = pk_bin[PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 7]
+    offset_data = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 16
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT
+    polsA_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 2
+    polsB_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 4
+    polsC_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 6
+    A_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 8
+    B1_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 10
+    B2_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 12
+    C_nWords = int(_32b264b(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + 2 * NWORDS_256BIT + 14
+    hExps_nWords =int(_32b264b(pk_bin[offset:offset+2]))
 
     offset_ec_data = offset_data + polsA_nWords + polsB_nWords + polsC_nWords
     
@@ -688,14 +702,14 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
 
         pk_bin = np.concatenate( (
                       pk_bin,
-                      np.asarray([polsA_extnWords],dtype=np.uint32),
-                      np.asarray([polsB_extnWords],dtype=np.uint32),
-                      np.asarray([polsC_extnWords],dtype=np.uint32),
-                      np.asarray([A_extnWords],dtype=np.uint32),
-                      np.asarray([B1_extnWords],dtype=np.uint32),
-                      np.asarray([B2_extnWords],dtype=np.uint32),
-                      np.asarray([C_extnWords],dtype=np.uint32),
-                      np.asarray([hExps_extnWords],dtype=np.uint32)) )
+                      _64b232b(polsA_extnWords),
+                      _64b232b(polsB_extnWords),
+                      _64b232b(polsC_extnWords),
+                      _64b232b(A_extnWords),
+                      _64b232b(B1_extnWords),
+                      _64b232b(B2_extnWords),
+                      _64b232b(C_extnWords),
+                      _64b232b(hExps_extnWords)) )
 
         if out_bin == FMT_EXT:
            mpoly_from_montgomery_h(pk['polsA'], MOD_FIELD)
@@ -763,6 +777,7 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
            del hExps_ext
 
         pk_bin[0] = pk_bin.shape[0]
+
         return pk_bin
 
 def pkjson_to_pyec(inv,b_reduce, ec2):
@@ -968,24 +983,23 @@ def pkbin_to_vars(pk_bin):
           pk['group_q'] = pk_bin[offset_data:offset_data+NWORDS_256BIT]
           offset_data += NWORDS_256BIT
 
-          pk['polsA_nWords'] = pk_bin[offset_data]
-          offset_data += 1
-          pk['polsB_nWords'] = pk_bin[offset_data]
-          offset_data += 1
-          pk['polsC_nWords'] = pk_bin[offset_data]
-          offset_data += 1
-          pk['A_nWords'] =  pk_bin[offset_data]
-          offset_data += 1
-          pk['B1_nWords'] = pk_bin[offset_data]
-          offset_data += 1
-          pk['B2_nWords'] = pk_bin[offset_data]
-          offset_data += 1
-          pk['C_nWords']  = pk_bin[offset_data]
-          offset_data += 1
-          pk['hExps_nWords'] = pk_bin[offset_data]
-          offset_data += 1
-
-
+          pk['polsA_nWords'] = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['polsB_nWords'] = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['polsC_nWords'] = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['A_nWords'] =  np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['B1_nWords'] = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['B2_nWords'] = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['C_nWords']  = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          pk['hExps_nWords'] = np.uint64(_32b264b(pk_bin[offset_data:offset_data+2]))
+          offset_data += 2
+          
           offset_ec_data = offset_data + \
                            pk['polsA_nWords'] + \
                            pk['polsB_nWords'] + \
@@ -1000,12 +1014,12 @@ def pkbin_to_vars(pk_bin):
               tmp_offset_data += pk['polsC_nWords']
              #to_montgomeryN_h(pk_bin[offset_data:offset_ec_data], MOD_FIELD)
 
-          pk['polsA'] = pk_bin[offset_data:offset_data+pk['polsA_nWords']]
-          offset_data += pk['polsA_nWords']
-          pk['polsB'] = pk_bin[offset_data:offset_data+pk['polsB_nWords']]
-          offset_data += pk['polsB_nWords']
-          pk['polsC'] =  pk_bin[offset_data:offset_data+pk['polsC_nWords']]
-          offset_data += pk['polsC_nWords']
+          pk['polsA'] = pk_bin[offset_data:int(offset_data+pk['polsA_nWords'])]
+          offset_data += int(pk['polsA_nWords'])
+          pk['polsB'] = pk_bin[offset_data:int(offset_data+pk['polsB_nWords'])]
+          offset_data += int(pk['polsB_nWords'])
+          pk['polsC'] =  pk_bin[offset_data:int(offset_data+pk['polsC_nWords'])]
+          offset_data += int(pk['polsC_nWords'])
          
           if pk['k_binformat'] == FMT_EXT:
              pk_bin[offset_ec_data:] = np.reshape(to_montgomeryN_h(pk_bin[offset_ec_data:], MOD_GROUP),-1)
@@ -1022,16 +1036,16 @@ def pkbin_to_vars(pk_bin):
           offset_data += 4*NWORDS_256BIT
 
 
-          pk['A'] =  pk_bin[offset_data:offset_data+pk['A_nWords']]
-          offset_data += pk['A_nWords']
-          pk['B1'] = pk_bin[offset_data:offset_data+pk['B1_nWords']]
-          offset_data += pk['B1_nWords']
-          pk['B2'] =  pk_bin[offset_data:offset_data+pk['B2_nWords']]
-          offset_data +=  pk['B2_nWords']
-          pk['C']  = pk_bin[offset_data:offset_data+pk['C_nWords']]
-          offset_data +=  pk['C_nWords']
-          pk['hExps'] = pk_bin[offset_data:offset_data+pk['hExps_nWords']]
-          offset_data +=  pk['hExps_nWords']
+          pk['A'] =  pk_bin[offset_data:int(offset_data+pk['A_nWords'])]
+          offset_data += int(pk['A_nWords'])
+          pk['B1'] = pk_bin[offset_data:int(offset_data+pk['B1_nWords'])]
+          offset_data += int(pk['B1_nWords'])
+          pk['B2'] =  pk_bin[offset_data:int(offset_data+pk['B2_nWords'])]
+          offset_data +=  int(pk['B2_nWords'])
+          pk['C']  = pk_bin[offset_data:int(offset_data+pk['C_nWords'])]
+          offset_data +=  int(pk['C_nWords'])
+          pk['hExps'] = pk_bin[offset_data:int(offset_data+pk['hExps_nWords'])]
+          offset_data +=  int(pk['hExps_nWords'])
 
           return pk
 

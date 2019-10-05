@@ -662,15 +662,15 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
 void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename)
 {
   FILE *ifp = fopen(filename,"rb");
-  fread(&hfile->nWords, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->nPubInputs, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->nOutputs, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->nVars, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->nConstraints, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->cirformat, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->R1CSA_nWords, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->R1CSB_nWords, sizeof(uint32_t), 1, ifp); 
-  fread(&hfile->R1CSC_nWords, sizeof(uint32_t), 1, ifp); 
+  fread(&hfile->nWords, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->nPubInputs, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->nOutputs, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->nVars, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->nConstraints, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->cirformat, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->R1CSA_nWords, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->R1CSB_nWords, sizeof(unsigned long long), 1, ifp); 
+  fread(&hfile->R1CSC_nWords, sizeof(unsigned long long), 1, ifp); 
   fclose(ifp);
 
 }
