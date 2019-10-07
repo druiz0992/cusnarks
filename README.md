@@ -17,8 +17,8 @@ can be found [Architecture][here].
 Elliptic curve scalar multiplication and polynomial multiplication (via FFT), the heaviest functionality in terms of 
 computation requirements, have been implemented to run on the GPU side.
 
-The partition of GPU vs. CPU functionality is shown in {@fig:prover_block_diagram}
-![Overview](doc/block_diagram.png){#fig:prover_block_diagram}
+The partition of GPU vs. CPU functionality is shown in {@fig:Overview-prover_block_diagram}
+![Overview prove_block_diagram](doc/block_diagram.png){#fig:overview-prover_block_diagram}
 
 
 
@@ -154,6 +154,9 @@ Modules are divided into 4 categories depending on functionality:
 ## Modules
 
 ## Some Results
+
+![Some Results-block](doc/cusnarks_block_performance.png)
+![Some Results-performance](doc/cusnarks_performance.png)
 
 ## File Formats
 CUSNARKs requires and generates different files. The picture below XXX TODO Add reference to picture XXX shows a block diagram containing the three main actors (Setup, Proof Server and Prover) and how they relate to the 
@@ -443,5 +446,6 @@ things are done in parallel.
 [r1cs]:https://hackmd.io/3epPqH4tSYqZbph2R9C5Mw 
 [bn128]:https://github.com/ethereum/py_ecc/tree/master/py_ecc/bn128
 [Overview]: #Overview
+[Some Results]: #Some-Results
 
 
