@@ -228,10 +228,10 @@ Additionally, there are some additional Python modules:
 This section provides some performance results generated with Dell T640 server with 2xIntel Xeon Silver 4110@2.1GHz (32 cores), 128GB of memory and 2XGPU GTX 1080.
 Maximum number of constraints achieved is 2^26 and took 1100 seconds. Proof performance for different number of constraints is shown below.
 
-![Some Results-block](doc/cusnarks_block_performance.png)
+![Some Results-performance](doc/cusnarks_performance.png)
 
 Below it is displayed the relative performance per functional block (Mexp, FFT, Witness Read and Initialization).
-![Some Results-performance](doc/cusnarks_performance.png)
+![Some Results-block](doc/cusnarks_block_performance.png)
 
 ## File Formats
 CUSNARKs requires and generates different files. The picture below XXX TODO Add reference to picture XXX shows a block diagram containing the three main actors (Setup, Proof Server and Prover) and how they relate to the 
