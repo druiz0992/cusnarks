@@ -90,7 +90,9 @@ class GrothProver(object):
 
         self.keep_f = gen_reponame(keep_f, sufix="_PROVER")
 
-        logging.basicConfig(filename=self.keep_f + '/log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+        logging.basicConfig(filename=self.keep_f + '/log', filemode='w',
+                format='%(asctime)s - %(levelname)s - %(message)s',
+                level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
 
         if not use_pycusnarks :
           logging.error('PyCUSnarks shared library not found. Exiting...')
@@ -109,13 +111,21 @@ class GrothProver(object):
         self.n_bits_roots = cfg.get_n_roots()
 
         self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
-        self.roots_rdc_u256 = np.frombuffer(self.roots_rdc_u256_sh, dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
-        np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.n_bits_roots) )
+        self.roots_rdc_u256 =\
+                np.frombuffer(
+                        self.roots_rdc_u256_sh,
+                        dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
+        np.copyto(
+                self.roots_rdc_u256,
+                readU256DataFile_h(
+                    self.roots_f.encode("UTF-8"),
+                    1<<self.n_bits_roots, 1<<self.n_bits_roots) )
 
         self.batch_size = None
         batch_size = 1<< 20
-        self.ecbn128 = ECBN128(batch_size,   seed=self.seed)
-        self.ec2bn128 = EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * batch_size), seed=self.seed)
+        self.ecbn128  = ECBN128(batch_size,   seed=self.seed)
+        self.ec2bn128 =\
+                EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * batch_size), seed=self.seed)
         self.cuzpoly = ZCUPoly(5*batch_size  + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
@@ -141,8 +151,10 @@ class GrothProver(object):
         if self.n_gpu == 0:
           logging.error('No available GPUs')
           sys.exit(1)
-          
+        self.affinity = get_affinity()
+        print(self.affinity)
 
+        self.parent_conn, self.child_conn = Pipe()
         self.public_signals = None
         self.witness_f = None
         self.snarkjs = snarkjs
@@ -185,31 +197,48 @@ class GrothProver(object):
 
         # convert data to array of bytes so that it can be easily transfered to shared mem
         if self.test_f :
-           # if snarkjs is to be launched to compare results, I am assuming circuit is small, so i keep 
-           # a version to be able to generate json. Else, results will overwrite input data
+           # if snarkjs is to be launched to compare results,
+           #  I am assuming circuit is small, so i keep 
+           #   a version to be able to generate json. Else, results will overwrite input data
            self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
 
         # Creating shared memories
+        # Read pkvars and extend it. In order to save memory, save it to disk
         pk_bin = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
-        self.pk_sh = RawArray(c_uint32, pk_bin.shape[0])
-        self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
-        np.copyto(self.pk, pk_bin)
+        ext_pkbin_file = self.proving_key_f+"e"
+        writeU256DataFile_h(pk_bin, ext_pkbin_file.encode('UTF-8'))
+        pkbin_nWords = pk_bin.shape[0]
         del pk_bin
+
+        self.pk_sh = RawArray(c_uint32, pkbin_nWords)
+        self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
+        readU256PKFileTo_h(ext_pkbin_file.encode('UTF-8'), self.pk)
+        os.remove(ext_pkbin_file)
              
         pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
         nVars = int(pkbin_vars[0][0])
         domainSize = int(pkbin_vars[1][0])
 
-        self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)     
+        #TODO Change
+        self.scl_array_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)     
+        self.scl_array = np.frombuffer(
+                     self.scl_array_sh, dtype=np.uint32).reshape((domainSize, NWORDS_256BIT))
+        """
+        self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)   
         self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
+        """
         # Size is domainSize To store polH + three additional coeffs
         self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
-        self.sorted_scl_array_idx = np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
-          
-        self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  # sorted witness + [one] + r/s or sorted polH
-        self.sorted_scl_array = np.frombuffer(
-                             self.sorted_scl_array_sh, dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
+        self.sorted_scl_array_idx =\
+                np.frombuffer(self.sorted_scl_array_idx_sh, dtype=np.uint32)
+
+        # sorted witness + [one] + r/s or sorted polH
+        self.sorted_scl_array_sh = RawArray(c_uint32, (domainSize + 4) * NWORDS_256BIT)  
+        self.sorted_scl_array    =\
+                np.frombuffer(
+                             self.sorted_scl_array_sh,
+                             dtype=np.uint32).reshape((domainSize+4, NWORDS_256BIT))
 
         self.pA_T_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)
         self.pA_T = np.frombuffer(
@@ -239,29 +268,25 @@ class GrothProver(object):
                writeU256DataFile_h(pk_bin, self.out_proving_key_f.encode("UTF-8"))
                del pk_bin
              elif self.out_proving_key_f.endswith('.npz'):
-                np.savez_compressed(proving_key_fnpz, alfa_1_u256 =  self.pk['alfa_1'],
-                             beta_1_u256 = self.pk['beta_1'], delta_1_u256 = self.pk['delta_1'],
-                             beta_2_u256 = self.pk['beta_2'], delta_2_u256 = self.pk['delta_2'],
-                             A_u256 = self.pk['A'], B1_u256=self.pk['B1'], B2_u256 = self.pk['B2'],
-                             C_u256 = self.pk['C'], hExps_u256 =self.pk['hExps'],
-                             polsA_u256 = self.pk['polsA'], polsB_u256 = self.pk['polsB'], polsC_u256 = self.pk['polsC'],
-                             nvars = self.pk['nVars'], npublic=self.pk['nPublic'], domain_bits=self.pk['domainBits'],
-                             domain_size = self.pk['domainSize'])
+                np.savez_compressed(proving_key_fnpz, alfa_1_u256 =\
+                        self.pk['alfa_1'],
+                        beta_1_u256 = self.pk['beta_1'], delta_1_u256 = self.pk['delta_1'],
+                        beta_2_u256 = self.pk['beta_2'], delta_2_u256 = self.pk['delta_2'],
+                        A_u256 = self.pk['A'], B1_u256=self.pk['B1'], B2_u256 = self.pk['B2'],
+                        C_u256 = self.pk['C'], hExps_u256 =self.pk['hExps'],
+                        polsA_u256 = self.pk['polsA'],
+                        polsB_u256 = self.pk['polsB'], polsC_u256 = self.pk['polsC'],
+                        nvars = self.pk['nVars'], npublic=self.pk['nPublic'],
+                        domain_bits=self.pk['domainBits'],
+                        domain_size = self.pk['domainSize'])
 
 
-        #Launch pysnark_process_server 
-        self.launch_p = True
-        if self.launch_p:
-           self.parent_conn, child_conn = Pipe()
-           self.p = Process(target=self.pysnarkProcessServer, args = (child_conn, self.pk_sh, self.pk.shape, 
-                                                                   self.scl_array_sh, self.scl_array.shape,
-                                                                   self.pA_T_sh,self.pA_T.shape,
-                                                                   self.pB_T_sh, self.pB_T.shape))
 
-    def pysnarkProcessServer(self, conn, pk_sh, pk_shape, witness_sh, witness_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape):
+    def pysnarkProcessServer(self, conn, pk_sh, pk_shape, witness_sh, witness_shape,
+                             wnElems,pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape):
         logging.info(' Launching Poly Process Server')
         pk = np.frombuffer(pk_sh, dtype=np.uint32).reshape(pk_shape)
-        w = np.frombuffer(witness_sh, dtype=np.uint32).reshape(witness_shape)
+        w = np.frombuffer(witness_sh, dtype=np.uint32).reshape(witness_shape)[:wnElems]
         pA_T = np.frombuffer(pA_T_sh, dtype=np.uint32).reshape(pA_T_shape)
         pB_T = np.frombuffer(pB_T_sh, dtype=np.uint32).reshape(pB_T_shape)
         #print("ProcessServer : "+str(pk.shape[0]))
@@ -288,6 +313,8 @@ class GrothProver(object):
           self.t_GP['Eval'] = end-start
 
     def startGPServer(self):    
+           pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
+           nVars = int(pkbin_vars[0][0])
            logging.info('Launching GP Server')
            jsocket = json_socket.jsonSocket()
 
@@ -307,10 +334,28 @@ class GrothProver(object):
                  if 'stop_server' in parsed_dict and parsed_dict['stop_server'] == 1:
                     logging.info('Stopping server')
                     sys.exit(1)
-                
-                 self.proof(parsed_dict['witness_f'], parsed_dict['proof_f'], parsed_dict['public_data_f'],
-                         batch_size=int(parsed_dict['batch_size']), verify_en=int(parsed_dict['verify_en']),
-                         n_gpus=int(parsed_dict['n_gpus']), n_streams=int(parsed_dict['n_streams']))
+
+                 #Launch pysnark_process_server 
+                 self.launch_p = True
+                 if self.launch_p:
+                     self.p = \
+                             Process(
+                                     target=self.pysnarkProcessServer,
+                                     args = (
+                                         self.child_conn,
+                                         self.pk_sh, self.pk.shape,
+                                         self.scl_array_sh, self.scl_array.shape,
+                                         nVars,
+                                         self.pA_T_sh,self.pA_T.shape,
+                                         self.pB_T_sh, self.pB_T.shape))
+
+                 self.proof(
+                         parsed_dict['witness_f'],
+                         parsed_dict['proof_f'], parsed_dict['public_data_f'],
+                         batch_size=int(parsed_dict['batch_size']),
+                         verify_en=int(parsed_dict['verify_en']),
+                         n_gpus=int(parsed_dict['n_gpus']),
+                         n_streams=int(parsed_dict['n_streams']))
                  if self.verify_en:
                    new_msg = dict(self.t_GP)
                    new_msg['status'] = self.verify
@@ -466,6 +511,7 @@ class GrothProver(object):
            del tmp_data
 
        elif self.proving_key_f.endswith('.bin'):
+          #TODO : do function pkbin_toextended_vars to avoid transferring and duplicating memory
           pk_bin = readU256PKFile_h(self.proving_key_f.encode("UTF-8"))
           self.pk = pkbin_to_vars(pk_bin)
           del pk_bin
@@ -848,7 +894,9 @@ class GrothProver(object):
            else :
              break
 
-        self.scl_array = polH
+       
+        np.copyto(self.scl_array[:domainSize-1], polH)
+        #self.scl_array= polH
 
         # EC reduce hExps
         dispatch_table = buildDispatchTable( nbatches, 1,
@@ -1203,12 +1251,14 @@ class GrothProver(object):
         if self.launch_p:
           self.t_GP['Eval'] += self.parent_conn.recv()[0]
           start = time.time()
+          self.p.terminate()
           self.p.join()
         else:
            self.pysnarkProcessServer(None, self.pk_sh, self.pk.shape, 
                                              self.scl_array_sh, self.scl_array.shape,
-                                                                   self.pA_T_sh,self.pA_T.shape,
-                                                                   self.pB_T_sh, self.pB_T.shape)
+                                             nVars,
+                                             self.pA_T_sh,self.pA_T.shape,
+                                             self.pB_T_sh, self.pB_T.shape)
 
         start = time.time()
         logging.info(' Calculating H...')

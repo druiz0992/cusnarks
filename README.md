@@ -1,31 +1,37 @@
 # CUSNARKS Overview
-Optimized CUDA implementation of SNARK setup and prover based on [snarkjs][] implementation from *Groth16*, designed with the objective of computing proofs for up to 2^27 constraints very fast. CUsnarks is expected to work with [circom][] for the generation and compilation
-of circuits, and with [snarkjs][] for the computation of parts ofr the trusted setup, witnesses and verification of the proof.
+CUSNARKS is an optimized CUDA implementation of ZK-SNARK setup and prover based on *Groth16* over curve BN128 XXX TODO Add link to curve XXX. It has been 
+designed with the objective of computing proofs for up to 2^27 constraints in less than 10 minutes 
+(we are not quite there though). CUSNARKS is expected to work with [circom][] for the generation and 
+compilation of circuits, and with [snarkjs][] for the computation witnesses, proof verification and parts of the trusted setup.
+Additionally, CUSNARKS works with [rust-circom][], an optimized version of [circom][] that allows to compile very large circuits.
 
-Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and setup scripts are launched. Computation intensive functionality on the host side has been written in C/C++. Cython is used to build wrappers around C functions so that they can be
-called from Python.
+Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and setup scripts are launched.
+ Computation intensive functionality on the host side has been written in C/C++. Computation intensive functionality on the the device (GPU)
+side has been writtedn in CUDA. Cython is used to build wrappers around C functions so that they can be called from Python.
 
-Elliptic curve scalar multiplicationm multi-exponentiation and polynomial multiplication, the heaviest functionality in terms of 
+Elliptic curve scalar multiplication and polynomial multiplication (via FFT), the heaviest functionality in terms of 
 computation requirements, have been implemented to run on the GPU side.
 
 Two libraries are generated :
 1. *libcusnarks.so* : Cusnarks shared library
 2. *pycusnarks.so* : Cusnarks shared library wrapped with Cython wrapper so that it can be used from Python
 
+To launch CUSNARKS just make sure that your LD_LIBRARY_PATH includes cusnarks/lib directory.
+
 ## Outline
 * [Installation][]
 * [Launching Cusnarks](#Launching-Cusnarks)
+* [File Formats][]
 * [Architecture][]
 * [Modules][]
-* [Installation][]
-* [Using Cusnarks][]
+* [Some Results][]
 * [Other Info](#Other-Info)
   
 ## Installation
 1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called $CUSNARKS_HOME
 
 2. Ensure that all [dependencies][] are installed. 
-    - Python2.x/Python3.x
+    - Python3.6+
         - Cython (0.26.1)
         - numpy (1.16.4)
         - future (0.17.1)
@@ -33,29 +39,30 @@ Two libraries are generated :
     - g++ compiler
     - nvcc compiler (Optional)
     - openmp
-    - snarkjs : https://github.com/iden3/snarkjs
     - nodejs
+    - Rust compiler
 
-
-3. Build Cusnarks to generate shared libraries in $CUSNARKS_HOME/lib.
-
-```sh
-make build
-```
-
-4. Add $CUSNARKS_HOME/lib to LD_LIBRARY_PATH
+3. Add $CUSNARKS_HOME/lib to LD_LIBRARY_PATH
 
 ```sh
 export LD_LIBRARY_PATH=$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH
 ```
 
-5. Generate required metadata
+4. Build Cusnarks to generate shared libraries in $CUSNARKS_HOME/lib.
 
 ```sh
-make config
+make all
 ```
 
-6. Launch units tests (optional) -> Currently, most not working, but don't worry. Bugs are in the test :-))
+5. Generate some metadata required for CUSNARKS, including :
+- Roots of unity for curve BN128 xxx TODO Add link to curve description XXX. default option generates 2^20, which allows processing circuits of 
+up to 2^19 contraints. When prompted, provide the desired number of roots to generate (maximum is 2^28).
+- Location of folder to place input/output data. By default, location is $CUSNARKS_HOME/circuits
+
+```shmake config
+```
+
+6. Launch units tests (optional) -> Currently, not working, but don't worry. Bugs are in the test :-))
 
 ```sh
 make test
@@ -66,30 +73,121 @@ Launch setup and proof generation by running pysnarks.py.
 
 ```sh
 cd src/python
-python pysnarks.py -h
+python3 pysnarks.py -h
 ```
 
-For example, to generate a trusted setup from a .json/.bin compiled circuit:
+To generate a trusted setup from a .json/.bin compiled circuit, type:
 
 ```sh
-python pysnarks.py -m s -in_c <INPUT_CIRCUIT file> -pk <OUT_PROVING_KEY file> -vk <OUT_VERIFICATION_KEY file> -snarkjs <SNARKJS location>
+CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m s -in_c <INPUT_CIRCUIT file> -pk <OUT_PROVING_KEY file> -vk <OUT_VERIFICATION_KEY file> -seed <RANDOM SEED> 
 ```
-Running the trusted setup, requires snarkjs being installed to compute parts of the verification key. By default, Cusnarks assumes that snarkjs is installed in $CUSNARKS_HOME/../snarkjs/. If this the case, you don't need to provide snarjks location in the command line.
+
+Mandatory arguments:
+- INPUT_CIRCUIT file : location of file containing set of constraints generated by compiler. input file is expected to be in Extenion needs to be .json, .bin or .r1cs. 
+   Desription of the formats will be provided later. XXX TODO : Add link XXX
+- OUT_PROVING_KEY file : Output Proving Key file generated during trusted setup. Extension needs to be .json or .bin. Description of the file formats will be provided later XXXX TODO : Add link XXXX
+- OUT_VERIFICATION_KEY file : Output Verification Key file generated by trusted setup. Extension needs to be .json. Description of the file format will be prrovided later XXX TODO : Add Link XXX
+
+As a general rule for providing input/output file names, if input or output files are places in the location preconfigured  during step [5] XXX TODO Add link XXX, just provide file name. CUSNARKS wil automatically search
+in this directory
+
+Running the trusted setup requires [snarkjs][] being installed to compute parts of the verification key. CUSNARKS automatically downloads it into $CUSNARKS_HOME/third_party_libs/snarkjs
+
+There are two mechanisms to generate a proof:
+- Server mode : Launches a server that accepts requests to generate proofs for a given trusted setup by providing a witness file. This is the default and recommended mechanism (Prover initialization is slow)
+- One off : Launches a single Prover
 
 
-To generate a proof:
+To launch Proof Server:
 ```sh
-python pysnarks.py -m -pk <INPUT_PROVING_KEY file> -w <INPUT_WITNESS file file> -p >OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file>
+CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m -pk <INPUT_PROVING_KEY file> 
 ```
 
-Furthermore, if you want to generate a proof and verify the proof using snarkjs:
-```sh
-python pysnarks.py -m -pk <INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p >OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -v 1 -snarkjs <SNARKJS location>
-```
+Mandatory arguments:
+- INPUT_PROVING_KEY file : Input Proving Key file generated by trusted setup. Extension needs to be .json or .bin. Description of the file formats will be provided later XXXX TODO : Add link XXXX
+
+To request a proof: 
 
 ```sh
-python3 pysnarks.py -m p -pk r1cs400k_pk.bin -vk r1cs400k_vk.json  -w r1cs400k_w.bin -p r1cs400k_proof.json -pd r1cs400k_pd.json -v 1 -seed 12346 -bs 16
+CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
 ```
+Mandatory arguments:
+- INPUT_WITNESS file : Input Witness file. Extension needs to be .bin or .dat.  Description of the file format will be prrovided later XXX TODO : Add Link XXX
+- OUTPU_PROOF file :   Output file containing proof. Extension needs to be .json.  Description of the file format will be prrovided later XXX TODO : Add Link XXX
+- OUTPU_PUBLIC_DATA file : OUtput file containing public data. Extension needs to be .json. Description of the file format will be prrovided later XXX TODO : Add Link XXX
+
+Optional arguments
+- -v : Enable verification. If value is 1, proof verification is enabled. After proof is generated, CUSNARKS will call [snarkjs][] to verifty proof. CUSNARKS will return the output 
+- INPUT_VERIFICATION_KEY file: If verification is required, location of verification file generated during trusted setup needs to be provided. Extension is .json. XXX Add link XXX
+
+To request a proof in non server mode (assumes server is not launched. If it has been launched, it will run on Server Mode):
+
+```sh
+CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
+```
+
+## File Formats
+CUSNARKs requires and generates different files. The picture below XXX TODO Add reference to picture XXX shows a block diagram containing the three main actors (Setup, Proof Server and Prover) and how they relate to the 
+different files. In this section we will describe the different files and their formats
+
+XXX TODO Add Table XXXX
+
+File type   | Extensions
+Constraints | .bin, .json, .rics
+Proving Key | .json, .bin
+Verification Key | .json
+Witness | .txt, .json, .dat, .bin
+Rpoof | .json
+Public Data | .json
+Results |
+
+
+![File Formats](doc/block.png)
+
+### Constraints
+Constraint files are generated by a SNARK compiler and consumed by CUSNARKS trusted setup.
+
+#### .json
+Constraint system generated by [circom][]
+
+#### .bin
+Constraint system generated by [rust-circom][]
+
+#### .r1cs
+Constraint system generated by [circom][]. See https://hackmd.io/3epPqH4tSYqZbph2R9C5Mw for a detailed description.
+
+### Proving Key
+
+#### .json
+
+
+#### .bin
+
+### Verification Key
+
+#### .json
+
+### Witness
+
+#### .txt
+
+#### .json
+
+#### .bin
+
+
+#### .data
+
+### Proof
+
+#### .json
+
+### Public Data
+
+
+#### .json
+
+### Results
 
 ## Architecture
 
@@ -106,12 +204,7 @@ Modules are divided into 4 categories depending on functionality:
 ![Architecture](doc/architecture.png)
 
 
-## Using-Cusnarks
-
-### C
-
-### Python
-
+## Some Results
 
 ## Other Info
 ### Directory Structure
@@ -142,6 +235,7 @@ Modules are divided into 4 categories depending on functionality:
 [dependencies]: #Requirements 
 [snarkjs]: https://www.github.com/iden3/snarkjs
 [circom]: https://www.github.com/iden3/circom
+[rust-circom]:https://www.github.com/adria0/rust-circom-experimental
 [PCG-Random website]: http://www.pcg-random.org
 [unittest]: https://python.org/3/library/unittest.html
 [Architecture]: #Architecture
@@ -149,4 +243,6 @@ Modules are divided into 4 categories depending on functionality:
 [Installation]: #Installation
 [Using Cusnarks]: #Using-Cusnarks
 [Other Info]: #Other
+[File Formats]: ##File-Formats
+
 

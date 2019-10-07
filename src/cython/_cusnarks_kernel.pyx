@@ -604,6 +604,10 @@ def readU256PKFile_h(bytes fname):
 
     return pk_data
 
+def readU256PKFileTo_h(bytes fname, np.ndarray[ndim=1, dtype=np.uint32_t] pk_data):
+   
+    uh.creadU256PKFile_h(&pk_data[0], <char *>fname, pk_data.shape[0])
+
 def readU256PKFileHeader_h(bytes fname):
     cdef ct.pkbin_hfile_t header
     uh.creadU256PKFileHeader_h(&header, <char *>fname)
