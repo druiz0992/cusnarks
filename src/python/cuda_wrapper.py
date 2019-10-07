@@ -48,7 +48,7 @@ import os.path
 import numpy as np
 import time
 import math
-from subprocess import call
+from subprocess import call, Popen, PIPE
 import multiprocessing as mp
 import nvgpu
 
@@ -1562,6 +1562,23 @@ def get_ngpu(max_used_percent=20.):
 def get_nstreams():
     return (N_STREAMS_PER_GPU)
 
+def get_affinity():
+    n_cores = mp.cpu_count()
+    n_gpu = get_ngpu(max_used_percent=95.)
+    affinity = {}
+    for i in xrange(n_gpu):
+        affinity[str(i)] = []
+    for i in xrange(n_cores):
+        tmp = Popen('nvidia-smi topo -c '+str(i),
+                shell=True,
+                stdout=PIPE).stdout.read().decode('utf-8')
+        tmp = tmp.split('\n')
+        for gpu_idx in xrange(len(tmp)-1):
+            if len(tmp[gpu_idx+1]) and gpu_idx < n_gpu:
+                for j in tmp[gpu_idx+1].split(','):
+                  affinity[str(int(j))].append(i)
+
+    return affinity
 
 def buildDispatchTable(nbatches, nP, ngpu, nstreams, step, start_idx, end_idx,
                            start_pidx=0, start_gpu_idx=0, start_stream_idx=1, ec_lable=None):
