@@ -3,23 +3,24 @@ CUSNARKS is an optimized CUDA implementation of ZK-SNARK setup and prover based 
 It has been designed with the objective of computing proofs for up to 2^27 constraints in less than 10 minutes 
 (we are not quite there though). CUSNARKS is expected to work with [circom][] for the generation and 
 compilation of circuits, and with [snarkjs][] for the computation witnesses, proof verification and parts of
- the trusted setup.  Additionally, CUSNARKS works with [rust-circom][], an optimized version of [circom][] that allows to compile very large circuits.
+ the trusted setup.  Additionally, CUSNARKS works with [rust-circom][], an optimized version of [circom][] that allows to compile and generate
+witnesses for very large circuits.
+
+
 
 Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and 
 setup scripts are launched.  Computation intensive functionality on the host side has been written in C/C++.
  Computation intensive functionality on the the device (GPU) side has been writtedn in CUDA. Cython is used 
-to build wrappers around C functions so that they can be called from Python.
+to build wrappers around C functions so that they can be called from Python. An overfiew of the software architecture
+can be found [Architecture][here].
 
 Elliptic curve scalar multiplication and polynomial multiplication (via FFT), the heaviest functionality in terms of 
 computation requirements, have been implemented to run on the GPU side.
 
-Two libraries are generated :
-1. *libcusnarks.so* : Cusnarks shared library
-2. *pycusnarks.so* : Cusnarks shared library wrapped with Cython wrapper so that it can be used from Python
+The partition of GPU vs. CPU functionality is shown in {@fig:prover_block_diagram}
+![Overview](doc/block_diagram.png){#fig:prover_block_diagram}
 
-To launch CUSNARKS just make sure that your LD_LIBRARY_PATH includes cusnarks/lib directory.
 
-![File Formats](doc/block_diagram.png)
 
 ## Outline
 * [Installation][]
@@ -31,7 +32,7 @@ To launch CUSNARKS just make sure that your LD_LIBRARY_PATH includes cusnarks/li
 * [Other Info](#Other-Info)
   
 ## Installation
-1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called $CUSNARKS_HOME
+1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called *$CUSNARKS_HOME*
 
 2. Ensure that all [dependencies][] are installed. 
     - Python3.6+
@@ -45,24 +46,28 @@ To launch CUSNARKS just make sure that your LD_LIBRARY_PATH includes cusnarks/li
     - nodejs
     - Rust compiler
 
-3. Add $CUSNARKS_HOME/lib to LD_LIBRARY_PATH
+3. Add *$CUSNARKS_HOME/lib* to LD_LIBRARY_PATH
 
 ```sh
 export LD_LIBRARY_PATH=$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH
 ```
 
-4. Build Cusnarks to generate shared libraries in $CUSNARKS_HOME/lib.
+4. Build Cusnarks to generate shared libraries in *$CUSNARKS_HOME/lib*.
 
 ```sh
 make all
 ```
+Two libraries are generated upon compilation of CUSNARKs
+- *libcusnarks.so* : Cusnarks shared library
+- *pycusnarks.so* : Cusnarks shared library wrapped with Cython wrapper so that it can be used from Python
 
 5. Generate some metadata required for CUSNARKS, including :
 - Roots of unity for curve [bn128][BN128]. default option generates 2^20, which allows processing circuits of 
 up to 2^19 contraints. When prompted, provide the desired number of roots to generate (maximum is 2^28).
-- Location of folder to place input/output data. By default, location is $CUSNARKS_HOME/circuits
+- Location of folder to place input/output data. By default, location is *$CUSNARKS_HOME/circuits*
 
-```shmake config
+```sh
+make config
 ```
 
 6. Launch units tests (optional) -> Currently, not working, but don't worry. Bugs are in the test :-))
@@ -95,7 +100,7 @@ A detailed description of different file formats can be found [File Formats][her
 As a general rule for providing input/output file names, if input or output files are places in the location preconfigured  during step [5] XXX TODO Add link XXX, just provide file name. CUSNARKS wil automatically search
 in this directory
 
-Running the trusted setup requires [snarkjs][] being installed to compute parts of the verification key. CUSNARKS automatically downloads it into $CUSNARKS_HOME/third_party_libs/snarkjs
+Running the trusted setup requires [snarkjs][] being installed to compute parts of the verification key. CUSNARKS automatically downloads it into *$CUSNARKS_HOME/third_party_libs/snarkjs*
 
 There are two mechanisms to generate a proof:
 - Server mode : Launches a server that accepts requests to generate proofs for a given trusted setup by providing a witness file. This is the default and recommended mechanism (Prover initialization is slow)
@@ -437,5 +442,6 @@ things are done in parallel.
 [File Formats]: ##File-Formats
 [r1cs]:https://hackmd.io/3epPqH4tSYqZbph2R9C5Mw 
 [bn128]:https://github.com/ethereum/py_ecc/tree/master/py_ecc/bn128
+[Overview]: #Overview
 
 
