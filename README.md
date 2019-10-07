@@ -19,8 +19,8 @@ computation requirements ave been implemented to run on the GPU side. CPU is use
 from jacobian to affine cordinates and during QAP reduction in the proover. In next versions we will use CPUs as an additional
 resource in the FFT and multi-exponentiation stages as a way to reduce proof time.
 
-The current partition of GPU vs. CPU functionality on the prover side is shown in \label{mylabel}
-![proof_block_diagram\label{mylabel}](doc/block_diagram.png)
+The current partition of GPU vs. CPU functionality on the prover side is shown in [proof_block_diagram]
+![proof_block_diagram](doc/block_diagram.png)
 
 The trusted setup is currently very slow. Implementation has been done using a single CPU except for the multi-exponentiation
 stage where we use non-optimized algorithms for a single GPU.
