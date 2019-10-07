@@ -19,8 +19,8 @@ computation requirements ave been implemented to run on the GPU side. CPU is use
 from jacobian to affine cordinates and during QAP reduction in the proover. In next versions we will use CPUs as an additional
 resource in the FFT and multi-exponentiation stages as a way to reduce proof time.
 
-The current partition of GPU vs. CPU functionality on the prover side is shown [proof_block_diagram][below]
-![proof_block_diagram](doc/block_diagram.png)
+The current partition of GPU vs. CPU functionality on the prover side is shown in \label{mylabel}
+![proof_block_diagram\label{mylabel}](doc/block_diagram.png)
 
 The trusted setup is currently very slow. Implementation has been done using a single CPU except for the multi-exponentiation
 stage where we use non-optimized algorithms for a single GPU.
@@ -180,11 +180,8 @@ Below you can see a block diagram of the software arhictecture.
 
 | Module Name | Executed on | Description |
 |-------------|-------------|-------------|
-| utils_host  | CPU         | Implementation of several field and elliptic curve operations. Most 
-of them are warpped in Cython (*$CUSNARKS_HOME/src/cython/_cusnarks_kernel.pyx*) so that they
-can be called from Python |
-
-| cusnarks_kernel | CPU | CUDA resource manager (memory allocation, kernel launcing,...)
+| utils_host  | CPU         | Implementation of several field and elliptic curve operations. Most of them are warpped in Cython (*$CUSNARKS_HOME/src/cython/_cusnarks_kernel.pyx*) so that they can be called from Python |
+| cusnarks_kernel | CPU | CUDA resource manager (memory allocation, kernel launching,...) |
 | u256     | CPU | Initialization of object U256 (256 bit integer) |
 |u256_device  | GPU | Implementation of u256 finite field arithmetic, including mod, addm, subm, montgomery multiplicationm... |
 | zpoly    | CPU | Initialization of object Field Polynomial |
@@ -199,7 +196,7 @@ Additionally, there are some additional Python modules:
 
 | Module Name | Executed on | Description |
 |-------------|-------------|-------------|
-| bigint      | CPU         | Implementation of big integer functionaliy!
+| bigint      | CPU         | Implementation of big integer functionaliy |
 | zutils      | CPU         | Several utilities for field and group arithmetic |
 | zfield      | CPU         | Finitie field arithmetic |
 | z2field_element     | CPU    | Extended finite field arithmentic | 
@@ -215,7 +212,7 @@ Additionally, there are some additional Python modules:
 | json_socket    | CPU      | Communication library to establish a server and a client |
 | cuda_wrapper   | CPU      | Python wrapper to be able to launch CUDA kernels from Python |
 | rng   | CPU  | Encapsulation of Random Number Generator pcg |
-| log   | CPU/GPU  | logging functionality. See [logging][logging] for more details on how logging works |
+| log   | CPU/GPU  | Logging functionality. See [Logging][logging] for more details on how logging works |
 
 
 ### Infrastucture
@@ -504,7 +501,7 @@ things are done in parallel.
 * c++/gcc
 * CUDA toolkit
 
-### logging
+### Logging
 There are two types of logging.
 From Python side, logs during trusted setup are recorded in *$CUSNARKS_HOME/circuits/_SETUP/log*, and during proof in 
 *$CUSNARKS_HOME/circuits/_PROOF/log*
@@ -518,7 +515,7 @@ output. These functions are only to be used in CPU side.
 functions LogXXXBigNumberTid or LogX XXTid, where XXX is Error, Warning, Info or Debug depending on the severity. 
 LogXXXBigNumberTid displays a U256 integer. LogXXXTid can be used to display other types. Its use is similar to printf.
 
-When you modify *log.h*, you will need to do a *make clean build* to recompile with the new changes.
+After modifying *log.h* you will need to do a *make clean build* to recompile with the new changes.
 
 [dependencies]: #Requirements 
 [snarkjs]: https://www.github.com/iden3/snarkjs
@@ -536,5 +533,5 @@ When you modify *log.h*, you will need to do a *make clean build* to recompile w
 [bn128]:https://github.com/ethereum/py_ecc/tree/master/py_ecc/bn128
 [Overview]: #Overview
 [Some Results]: #Some-Results
-[logging]: ###logging
+[Logging]: ###Logging
 
