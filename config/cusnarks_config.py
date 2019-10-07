@@ -72,7 +72,7 @@ rust_circom = {
 
 roots = {
   'nbits' : 20,
-  'folder' : CUSNARKS_ROOTS + 'zpoly_roots_1M.bin'
+  'folder' : CUSNARKS_ROOTS + 'zpoly_roots.bin'
 }
 
 config = {
@@ -93,6 +93,7 @@ def run():
     generate_config_f()
 
 def generate_circuit_folder():
+    """
     sys.stdout.write('####################################\n')
     sys.stdout.write('Generating circuit folder....\n\n')
     sys.stdout.write('Type directory location where you want to save your circuits.\n')
@@ -109,6 +110,9 @@ def generate_circuit_folder():
         os.makedirs(b_folder)
     elif b_folder == "":
         sys.stdout.write(b_folder+'\n')
+    """
+    if not os.path.exists(circuits['folder']):
+        os.makedirs(circuits['folder'])
 
 def generate_config_f():
     sys.stdout.write('####################################\n')
@@ -184,19 +188,22 @@ def generate_roots():
 
     roots['nbits'] = int(b_root)
 
-    sys.stdout.write('Default file to store roots is ' + roots['folder'] + '.\n')
-    sys.stdout.write('Do you want to configure a new destination file [N/<file_name>]-N?\n')
-    sys.stdout.flush()
-    b_root = sys.stdin.readline().rstrip()
+    #sys.stdout.write('Default file to store roots is ' + roots['folder'] + '.\n')
+    #sys.stdout.write('Do you want to configure a new destination file [N/<file_name>]-N?\n')
+    #sys.stdout.flush()
+    #b_root = sys.stdin.readline().rstrip()
 
     # if not default filename
+    """
     if b_root != 'N' and b_root != 'n' and b_root != '':
           fname = b_root.split('/')[-1]
           folder = b_root.replace(fname,'')
           if not os.path.exists(folder):
             os.makedirs(folder)
           roots['folder'] = b_root
-
+     """
+     if not os.path.exists(CUSNARKS_ROOTS):
+          os.makedirs(CUSNARKS_ROOTS)
     sys.stdout.write('Generating 2^'+str(roots['nbits']) + ' roots of unity in ' +roots['folder']+'\n')
     command = "./gen_roots " + str(roots['nbits']) + " " + roots['folder']
     os.system(command)
