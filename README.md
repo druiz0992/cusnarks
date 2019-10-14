@@ -1,6 +1,6 @@
 # CUSNARKS Overview
 CUSNARKS is an optimized CUDA implementation of ZK-SNARK setup and prover based on *Groth16* over curve [bn128][BN128].
-It has been designed with the objective of computing proofs for up to 2^27 constraints in less than 10 minutes in a pltform consisting of
+It has been designed with the objective of computing proofs for up to 2^27 constraints in less than 10 minutes in a platform consisting of
 4xGPUs and 32xCPU cores (we are not quite there though).
 CUSNARKS is expected to work with [circom][] for the generation and compilation of circuits, and with [snarkjs][] 
 for the computation witnesses, proof verification and parts of
@@ -9,22 +9,21 @@ witnesses for very large circuits.
 
 
 Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and 
-setup scripts are launched.  Computation intensive functionality on the host side has been written in C/C++.
+setup scripts are launched.  Computation intensive functionality on the host (CPU) side has been written in C/C++.
  Computation intensive functionality on the the device (GPU) side has been writted in CUDA. Cython is used 
 to build wrappers around C functions so that they can be called from Python and executed on CPU or GPU.
  An overview of the software architecture can be found [Architecture][here].
 
-Elliptic curve scalar multiplication and polynomial multiplication (via FFT), the heaviest in terms of 
-computation requirements ave been implemented to run on the GPU side. CPU is used during the conversion of Elliptic Curve points
-from jacobian to affine cordinates and during QAP reduction in the proover. In next versions we will use CPUs as an additional
+Elliptic curve scalar multiplication and polynomial multiplication (via FFT), the heaviest blocks in terms of 
+computation requirements have been implemented to run on the GPU side. CPU is used during the conversion of Elliptic Curve points
+from jacobian to affine cordinates and during QAP reduction in the proover. In upcomming versions we will use CPUs as an additional
 resource in the FFT and multi-exponentiation stages as a way to reduce proof time.
 
 The current partition of GPU vs. CPU functionality on the prover side is shown in below.
 
 ![proof_block_diagram](doc/block_diagram.png)
 
-The trusted setup is currently very slow. Implementation has been done using a single CPU except for the multi-exponentiation
-stage where we use non-optimized algorithms for a single GPU.
+The trusted setup is currently very slow. Implementation has been done using a single CPU and 32-bit arithmetic, except for the multi-exponentiation stage where we use a non-optimized algorithm for a single GPU.
 
 
 ## Outline
@@ -42,14 +41,16 @@ stage where we use non-optimized algorithms for a single GPU.
 2. Ensure that all [dependencies][] are installed. 
     - Python3.6+
         - Cython (0.26.1)
-        - numpy (1.16.4)
+        - numpy (1.17.1)
         - future (0.17.1)
         - nvgpu (0.8.0)
-    - g++ compiler
-    - CUDA toolkit
+    - g++ compiler (7.4.0)
+    - CUDA toolkit (10.1)
     - openmp
-    - node
+    - node (10.16.0)
     - rust compiler
+
+*NOTE* Current version of CUSNARKs has been tested on x86_64 Linux with Ubuntu 16.04.06 and 18.04.2 Linux distributions.
 
 3. Add *$CUSNARKS_HOME/lib* to *LD_LIBRARY_PATH*
 
@@ -525,6 +526,10 @@ things are done in parallel.
    - *pcg-cpp\*  : implementation of PCG family of random number generators. Full details can be found at the [PCG-Random website].
    - *snarkjs\*  : snarkjs repository
    - *rust-circom\*: rust circom repository
+* *circuits\*   : Default location where circuits are processed by CUSNARKS.
+   - *_SETUP\*    : Default location where Trusted setup files are copied.
+   - *_PROOF\*    : Default location where Proof fils are copied.
+* *config\*     : Location of initial configuration scripts.
 
 ### Logging
 There are two types of logging.
