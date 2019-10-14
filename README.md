@@ -238,7 +238,6 @@ Below it is displayed the relative performance per functional block (Mexp, FFT, 
 CUSNARKs requires and generates different files. The picture below shows a block diagram containing the three main actors (Setup, Proof Server and Prover) and how they relate to the 
 different files. 
 
-
 ![File Formats](doc/file_formats.png)
 
 In this section we will describe the different files and their formats. Below you can see a table summarizing the different 
