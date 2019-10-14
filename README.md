@@ -508,28 +508,28 @@ things are done in parallel.
 
 ## Other Info
 ### Directory Structure
-* *build\*    : Object files
-* *data\*     : Auxiliary files (precomputed roots of unity,...)
-* *lib\*      : Generated dynamic libraries
-* *src\*
-  - *cuda\*     : C/C++/CUDA sources (.cpp, .c, .cu, .h)
-  - *cython\*   : Cython files (.pyx, .pxd)
-  - *python\*   : Python source files (.py)
-* *test\*
-  - *python\*   : Python unit test. They mainly test Python library using [unittest][] unit testing framework. 
+* **build\***    : Object files
+* **data\***     : Auxiliary files (precomputed roots of unity,...)
+* **lib\***      : Generated dynamic libraries
+* **src\***
+  - *cuda\**     : C/C++/CUDA sources (.cpp, .c, .cu, .h)
+  - *cython\**   : Cython files (.pyx, .pxd)
+  - *python\**   : Python source files (.py)
+* **test\***
+  - *python\**   : Python unit test. They mainly test Python library using [unittest][] unit testing framework. 
    However, there are some files (*xxx_cu_xxx.py*) that test CUDA functions as well.
-  - *c\*        : C unit tests for host side functionality.
-  - *ideas\*    : Folder containing small scripts testing some ideas to be implmented in main code
-* *profiling\* : Profiling information
-   - *python\*   : Collection of scripts to measure time of CUDA functions 
-* *third_party_libs\* : Exteral libraries used will be automatically downloaded here
-   - *pcg-cpp\*  : implementation of PCG family of random number generators. Full details can be found at the [PCG-Random website].
-   - *snarkjs\*  : snarkjs repository
-   - *rust-circom\*: rust circom repository
-* *circuits\*   : Default location where circuits are processed by CUSNARKS.
-   - *_SETUP\*    : Default location where Trusted setup files are copied.
+  - *c\**        : C unit tests for host side functionality.
+  - *ideas\**    : Folder containing small scripts testing some ideas to be implmented in main code
+* **profiling\*** : Profiling information
+   - *python\**   : Collection of scripts to measure time of CUDA functions 
+* **third_party_libs\*** : Exteral libraries used will be automatically downloaded here
+   - *pcg-cpp\**  : implementation of PCG family of random number generators. Full details can be found at the [PCG-Random website].
+   - *snarkjs\**  : snarkjs repository
+   - *rust-circom\**: rust circom repository
+* **circuits\***   : Default location where circuits are processed by CUSNARKS.
+   - *_SETUP\***    : Default location where Trusted setup files are copied.
    - *_PROOF\*    : Default location where Proof fils are copied.
-* *config\*     : Location of initial configuration scripts.
+* **config\***     : Location of initial configuration scripts.
 
 ### Logging
 There are two types of logging.
