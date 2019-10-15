@@ -152,13 +152,13 @@ class GrothProver(object):
           logging.error('No available GPUs')
           sys.exit(1)
         self.affinity = get_affinity()
-        print(self.affinity)
 
         self.parent_conn, self.child_conn = Pipe()
         self.public_signals = None
         self.witness_f = None
         self.snarkjs = snarkjs
         self.verify_en = None
+        self.launch_p = False
 
         ZField.set_field(MOD_FIELD)
         self.t_GP = {}
@@ -192,42 +192,27 @@ class GrothProver(object):
         logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info('#################################### ')
   
-        logging.info('Reading Proving Key...')
-        self.load_pkdata()
-
         # convert data to array of bytes so that it can be easily transfered to shared mem
         if self.test_f :
+           self.load_pkdata()
            # if snarkjs is to be launched to compare results,
            #  I am assuming circuit is small, so i keep 
            #   a version to be able to generate json. Else, results will overwrite input data
            self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
 
-        # Creating shared memories
-        # Read pkvars and extend it. In order to save memory, save it to disk
-        pk_bin = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=True)
-        ext_pkbin_file = self.proving_key_f+"e"
-        writeU256DataFile_h(pk_bin, ext_pkbin_file.encode('UTF-8'))
-        pkbin_nWords = pk_bin.shape[0]
-        del pk_bin
-
+        pkbin_nWords = int(os.path.getsize(self.proving_key_f)/4)
         self.pk_sh = RawArray(c_uint32, pkbin_nWords)
         self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
-        readU256PKFileTo_h(ext_pkbin_file.encode('UTF-8'), self.pk)
-        os.remove(ext_pkbin_file)
+        logging.info('Reading Proving Key...')
+        readU256PKFileTo_h(self.proving_key_f.encode("UTF-8"), self.pk)
              
         pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
         nVars = int(pkbin_vars[0][0])
         domainSize = int(pkbin_vars[1][0])
 
-        #TODO Change
         self.scl_array_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)     
         self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((domainSize, NWORDS_256BIT))
-        """
-        self.scl_array_sh = RawArray(c_uint32, nVars * NWORDS_256BIT)   
-        self.scl_array = np.frombuffer(
-                     self.scl_array_sh, dtype=np.uint32).reshape((nVars, NWORDS_256BIT))
-        """
         # Size is domainSize To store polH + three additional coeffs
         self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
         self.sorted_scl_array_idx =\
@@ -511,7 +496,6 @@ class GrothProver(object):
            del tmp_data
 
        elif self.proving_key_f.endswith('.bin'):
-          #TODO : do function pkbin_toextended_vars to avoid transferring and duplicating memory
           pk_bin = readU256PKFile_h(self.proving_key_f.encode("UTF-8"))
           self.pk = pkbin_to_vars(pk_bin)
           del pk_bin

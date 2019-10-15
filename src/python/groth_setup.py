@@ -714,7 +714,8 @@ class GrothSetup(object):
          f.close()
 
        elif self.out_pk_f.endswith('bin') :
-         pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk)
+         #pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk)
+         pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk, ext=True)
          writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
 
        else :

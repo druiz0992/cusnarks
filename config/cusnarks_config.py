@@ -202,7 +202,7 @@ def generate_roots():
             os.makedirs(folder)
           roots['folder'] = b_root
      """
-     if not os.path.exists(CUSNARKS_ROOTS):
+    if not os.path.exists(CUSNARKS_ROOTS):
           os.makedirs(CUSNARKS_ROOTS)
     sys.stdout.write('Generating 2^'+str(roots['nbits']) + ' roots of unity in ' +roots['folder']+'\n')
     command = "./gen_roots " + str(roots['nbits']) + " " + roots['folder']
