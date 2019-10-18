@@ -78,7 +78,7 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0):
  
         # Check valid folder exists
         if keep_f is None:
@@ -295,6 +295,10 @@ class GrothSetup(object):
 
         self.write_pk()
         self.write_vk()
+        # TODO : The idea is to do some precalculations to compute multiexp later during
+        # proof. However, the way is is laid out it takes to much space. I comment this part
+        # for now until I come up with a better way
+        #self.write_auxdata()
         copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
         self.test_results()
 
@@ -395,20 +399,20 @@ class GrothSetup(object):
 
 
     def calculatePoly(self):
-        logging.info(' Starting evaluation R1CS -> QAP')
+        logging.info(' Starting calculatePoly')
         self.computeHeader()
 
-        logging.info(' Starting R1CS A')
+        logging.info(' Starting polsA')
         self.pk['polsA'] = cirr1cs_to_mpoly(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1)
         self.pk['polsA_nWords'] = np.uint32(self.pk['polsA'].shape[0])
         del self.cir['R1CSA']
 
-        logging.info(' Starting R1CS B')
+        logging.info(' Starting polsB')
         self.pk['polsB'] = cirr1cs_to_mpoly(self.cir['R1CSB'], self.cir_header, self.cir['cirformat'], 0)
         self.pk['polsB_nWords'] = np.uint32(self.pk['polsB'].shape[0])
         del self.cir['R1CSB']
 
-        logging.info(' Starting R1CS C')
+        logging.info(' Starting polsC')
         self.pk['polsC'] = cirr1cs_to_mpoly(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'], 0)
         self.pk['polsC_nWords'] = np.uint32(self.pk['polsC'].shape[0])
         del self.cir
@@ -515,6 +519,8 @@ class GrothSetup(object):
       self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
       self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
 
+      #self.pk['A_table'] = ec_inittable_h(np.reshape(self.pk['A'],-1), U256_BSELM, MOD_GROUP, 1)
+
       end = time.time()
       self.t_S['A'] = end - start
 
@@ -535,6 +541,7 @@ class GrothSetup(object):
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
+      #self.pk['B1_table'] = ec_inittable_h(np.reshape(self.pk['B1'],-1), U256_BSELM, MOD_GROUP, 1)
 
       end= time.time()
       self.t_S['B1 gpu'] = t1
@@ -583,6 +590,7 @@ class GrothSetup(object):
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
       self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
+      #self.pk['C_table'] = ec_inittable_h(np.reshape(self.pk['C'],-1), U256_BSELM, MOD_GROUP, 1)
 
       del ps_u256
 
@@ -698,6 +706,24 @@ class GrothSetup(object):
                   'R1CSA_nWords' : self.cir['R1CSA_nWords'],
                   'R1CSB_nWords' : self.cir['R1CSB_nWords'],
                   'R1CSC_nWords' : self.cir['R1CSC_nWords']}
+
+    def write_auxdata(self):
+        out_pk_aux_f =  self.out_pk_f.replace('.bin','dat') 
+        nWords = _64b232b(
+                    (pk_bin['A_table'].shape[0]  + pk_bin['B1_table'].shape[0] + pk_bin['C_table'].shape[0]) * NWORDS_256BIT)
+
+        nWords_A = _64b232b(pk_bin['A_table'].shape[0] * NWORDS_256BIT)
+        nWords_B1 = _64b232b(pk_bin['B1_table'].shape[0] * NWORDS_256BIT)
+        nWords_C = _64b232b(pk_bin['C_table'].shape[0] * NWORDS_256BIT)
+
+        writeU256DataFile_h(nWords, out_pk_aux_f.encode("UTF-8"))
+
+        appendU256DataFile_h(nWords_A, out_pk_aux_f.encode("UTF-8"))
+        appendU256DataFile_h(np.reshape(pk_bin['A_table'],-1), out_pk_aux_f.encode("UTF-8"))
+        appendU256DataFile_h(nWords_B1, out_pk_aux_f.encode("UTF-8"))
+        appendU256DataFile_h(np.reshape(pk_bin['B1_table'],-1), out_pk_aux_f.encode("UTF-8"))
+        appendU256DataFile_h(nWords_C, out_pk_aux_f.encode("UTF-8"))
+        appendU256DataFile_h(np.reshape(pk_bin['C_table'],-1), out_pk_aux_f.encode("UTF-8"))
 
     def write_pk(self):
 
