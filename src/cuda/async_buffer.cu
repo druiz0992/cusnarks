@@ -41,8 +41,8 @@
 
 AsyncBuf::AsyncBuf(uint32_t nelems, uint32_t elsize):max_nelems(nelems), el_size(elsize)
 {
-    CCHECK(cudaMallocHost((void **)&buffer, nelems*el_size));
     logInfo("Nelems : %d, Elsize : %d, Buffer : %x\n",nelems, elsize, buffer);	
+    CCHECK(cudaMallocHost((void **)&buffer, nelems*el_size));
 }        
 
 AsyncBuf::~AsyncBuf()
@@ -63,6 +63,7 @@ uint32_t AsyncBuf::getNelems(void)
 
 uint32_t AsyncBuf::setBuf(void *in_data, uint32_t nelems) 
 {  
+     logInfo("Set buffer: in_data : %x, n_elenms : %d, max_nelems : %d\n", in_data, nelems, max_nelems);
      if (nelems > max_nelems){
          return 1;
      }

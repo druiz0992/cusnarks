@@ -1562,13 +1562,17 @@ def get_ngpu(max_used_percent=20.):
 def get_nstreams():
     return (N_STREAMS_PER_GPU)
 
-def get_affinity():
+def get_affinity(r_cpu=0, add_single_cpu=1):
     n_cores = mp.cpu_count()
     n_gpu = get_ngpu(max_used_percent=95.)
     affinity = {}
+    _stop = False
     for i in xrange(n_gpu):
         affinity[str(i)] = []
     for i in xrange(n_cores):
+        _stop = False
+        if i < r_cpu: 
+            continue
         tmp = Popen('nvidia-smi topo -c '+str(i),
                 shell=True,
                 stdout=PIPE).stdout.read().decode('utf-8')
@@ -1576,7 +1580,15 @@ def get_affinity():
         for gpu_idx in xrange(len(tmp)-1):
             if len(tmp[gpu_idx+1]) and gpu_idx < n_gpu:
                 for j in tmp[gpu_idx+1].split(','):
+                  if add_single_cpu and len(affinity[str(int(j))]) :
+                    break
                   affinity[str(int(j))].append(i)
+                  if add_single_cpu:
+                    _stop = True
+                    break
+            if _stop:
+              _stop = False
+              break
 
     return affinity
 

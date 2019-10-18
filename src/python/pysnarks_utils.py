@@ -615,7 +615,7 @@ def pkbin_get(pk_bin, labels):
          sys.exit(1)
 
     return ret_val
-    
+   
 def pkvars_to_bin(out_bin, out_ec, pk, ext=False): 
         pk_bin = np.concatenate( (
                    np.asarray([pk['nWords']], dtype=np.uint32),
@@ -782,6 +782,7 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
         pk_bin[0] = pk_bin.shape[0]
 
         return pk_bin
+
 def pkvars_to_file(out_bin, out_ec, pk, fname, ext=False): 
         pk_bin = np.concatenate( (
                    np.asarray([pk['nWords']], dtype=np.uint32),
