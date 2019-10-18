@@ -86,6 +86,7 @@ void printU256Number(const uint32_t *x);
 void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
 void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt, const unsigned long long insize);
 void writeU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);
+void appendU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);
 void writeWitnessFile_h(uint32_t *samples, const char *filename, const unsigned long long nwords);
 void readU256CircuitFileHeader_h(cirbin_hfile_t *hfile, const char *filename);
 void readU256CircuitFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);

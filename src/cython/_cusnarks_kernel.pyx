@@ -552,6 +552,11 @@ def writeU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     cdef unsigned long long nWords = np.uint64(vin.shape[0])
     uh.cwriteU256DataFile_h(&vin[0], <char *>fname, nWords)
 
+def appendU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
+    cdef unsigned long long nWords = np.uint64(vin.shape[0])
+    uh.cappendU256DataFile_h(&vin[0], <char *>fname, nWords)
+
+
 def writeWitnessFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     cdef unsigned long long vlen = vin.shape[0]/NWORDS_256BIT
     uh.cwriteWitnessFile_h(&vin[0], <char *>fname, vlen)
@@ -798,12 +803,12 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
      return out_vec
 
 def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
-     cdef ct.uint32_t out_len
+     cdef ct.uint32_t lenv = <unsigned int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
+     cdef unsigned long long out_len
      if strip_last == 0:
-         out_len = <int>len(in_v)
+         out_len = <unsigned long long int>len(in_v)
      else:
-         out_len = <int> (lenv * 2 * NWORDS_256BIT)
+         out_len = <unsigned long long int> (lenv * 2 * NWORDS_256BIT)
 
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
     
@@ -813,12 +818,12 @@ def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, c
      return out_vec.reshape((-1,NWORDS_256BIT))
 
 def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
-     cdef ct.uint32_t out_len
+     cdef ct.uint32_t lenv = <unsigned int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
+     cdef unsigned long long out_len
      if strip_last == 0:
-         out_len = <int>len(in_v)
+         out_len = <unsigned long long int>len(in_v)
      else:
-         out_len = <int> (lenv * 4 * NWORDS_256BIT)
+         out_len = <unsigned long long int> (lenv * 4 * NWORDS_256BIT)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
    
      with nogil: 

@@ -842,6 +842,15 @@ void writeU256DataFile_h(uint32_t *samples, const char *filename, unsigned long 
 
 }
 
+void appendU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords)
+{
+  FILE *ifp = fopen(filename,"ab");
+  fseek(ifp, 0, SEEK_END);
+  fwrite(samples, sizeof(uint32_t), nwords, ifp); 
+  fclose(ifp);
+
+}
+
 /*
   Read u256 data binary file and optionally decimate samples
 
