@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cmath>
+#include <sys/stat.h>
 #include "types.h"
 #include "constants.h"
 #include "utils_host.h"
@@ -313,6 +314,11 @@ static char inputyx_65K_filename[]= "./aux_data/zpoly_input_datayx_65K.bin";
 static char inputyy_65K_filename[]= "./aux_data/zpoly_input_datayy_65K.bin";
 
 static char input_test_scmul_filename[] = "./aux_data/test_scmul_samples.bin";
+static char input_test_scmul_soln_filename[] = "./aux_data/test_scmul_soln.bin";
+static char input_test_scmul_reduction_soln_filename[] = "./aux_data/test_scmul_reduction_soln.bin";
+static char input2_test_scmul_filename[] = "./aux_data/test2_scmul_samples.bin";
+static char input2_test_scmul_soln_filename[] = "./aux_data/test2_scmul_soln.bin";
+static char input2_test_scmul_reduction_soln_filename[] = "./aux_data/test2_scmul_reduction_soln.bin";
 
 static uint32_t roots_128_test[] = {
 1342177275, 2895524892, 2673921321,  922515093, 2021213742,
@@ -9100,84 +9106,204 @@ void test_mulu256()
   printf("N errors(Test_Mulu) : %d/%d\n",n_errors, N/2);
 }
 
-void  test_ec_jacaddreduce(uint32_t ec2)
+void  test_ec_jacscmul(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
-   if (ec2){
+   if (ec2) {
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
    }
 
-   uint32_t *samples = (uint32_t *) malloc( N_STREAMS_PER_GPU * indims * NWORDS_256BIT * sizeof(uint32_t)) ;
-   uint32_t *ecp = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t));
-
-   uint32_t pidx = 0;
-   uint32_t to_aff = 1;
-   uint32_t add_in = 1;
-   uint32_t strip_last = 1;
+   struct stat st;
 
    if (ec2){
-     readU256DataFile_h(samples, ec2p_jacaddreduce_filename, 
-                       N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
-     ec2_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+     stat(input2_test_scmul_filename, &st);
    } else {
-     readU256DataFile_h(samples, ecp_jacaddreduce_filename, 
-                       N_STREAMS_PER_GPU * indims, N_STREAMS_PER_GPU * ECP_JAC_INDIMS);
+     stat(input_test_scmul_filename, &st);
+   }
+	    
+   uint32_t  nec_points = st.st_size/(NWORDS_256BIT*sizeof(uint32_t)*(indims+1));
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2,*samples, *r, *r_aff;
+   uint32_t i;
+   uint32_t n_errors=0;
 
-     ec_jacaddreduce_h(ecp, samples, N_STREAMS_PER_GPU, pidx, to_aff, add_in, strip_last);
+   samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp1 = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp2 = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   r =  (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   r_aff =  (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+
+   if (ec2){
+     readU256DataFile_h(samples, input2_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r, input2_test_scmul_soln_filename,
+                       nec_points * outdims, nec_points * outdims);
+     ec2_jac2aff_h(r_aff, r,nec_points, 0, 0);
+   } else {
+     readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r, input_test_scmul_soln_filename,
+                       nec_points * outdims, nec_points * outdims);
+     ec_jac2aff_h(r_aff, r,nec_points, 0, 0);
    }
 
+   scl = samples;
+   in_ecp = &samples[nec_points * NWORDS_256BIT];
+
+   if (ec2){ 
+     // Multiply points
+     ec2_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
+     ec2_jac2aff_h(out_ecp2, out_ecp1,nec_points, 0, 0);
+   } else{
+     // Multiply points
+     ec_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
+     ec_jac2aff_h(out_ecp2, out_ecp1,nec_points, 0, 0);
+   }
+   for (i=0; i< nec_points; i++){
+      if (memcmp(&r_aff[i*outdims*NWORDS_256BIT],
+              &out_ecp2[i*outdims*NWORDS_256BIT],
+              outdims*NWORDS_256BIT*sizeof(uint32_t)) ){
+        n_errors++;
+      }
+   }
+
+   printf("N errors(JACSCMUL %d) : %d/%d\n",ec2,n_errors,nec_points);
+
    free(samples);
-   free(ecp);
+   free(out_ecp1);
+   free(out_ecp2);
+   free(r);
+   free(r_aff);
 }
 
-void  test_ec_jacscmul_opt(void)
+void  test_ec_jacreduce(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
-   uint32_t nec_points = 1024;
-   uint32_t order = 8;
-   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2, *out_ecp3, *out_ecp4, *samples;
+   if (ec2) {
+        indims = ECP2_JAC_INDIMS;
+        outdims = ECP2_JAC_OUTDIMS;
+   }
+
+   struct stat st;
+
+   if (ec2){
+     stat(input2_test_scmul_filename, &st);
+   } else {
+     stat(input_test_scmul_filename, &st);
+   }
+	    
+   uint32_t  nec_points = st.st_size/(NWORDS_256BIT*sizeof(uint32_t)*(indims+1));
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2,*samples,  *r_aff;
+   uint32_t i;
+   uint32_t n_errors=0;
+
+   samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp1 = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp2 = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   r_aff =  (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+
+   if (ec2){
+     readU256DataFile_h(samples, input2_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r_aff, input2_test_scmul_reduction_soln_filename,
+                       indims, indims);
+   } else {
+     readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r_aff, input_test_scmul_reduction_soln_filename,
+                       indims, indims);
+   }
+
+   scl = samples;
+   in_ecp = &samples[nec_points * NWORDS_256BIT];
+
+   if (ec2){ 
+     // Multiply points
+     ec2_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
+     ec2_jacaddreduce_h( out_ecp2, out_ecp1, nec_points, 0, 1, 0,1);
+   } else{
+     // Multiply points
+     ec_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
+     ec_jacaddreduce_h( out_ecp2, out_ecp1, nec_points, 0, 1, 0,1);
+   }
+   if (memcmp(r_aff, out_ecp2,
+              indims*NWORDS_256BIT*sizeof(uint32_t)) ){
+        n_errors++;
+   }
+
+   printf("N errors(JACADDREDUCE %d) : %d\n",ec2,n_errors);
+
+   free(samples);
+   free(out_ecp1);
+   free(out_ecp2);
+   free(r_aff);
+}
+
+void  test_ec_jacscmul_opt(uint32_t ec2)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
+   if (ec2) {
+        indims = ECP2_JAC_INDIMS;
+        outdims = ECP2_JAC_OUTDIMS;
+   }
+
+   struct stat st;
+
+   if (ec2){
+     stat(input2_test_scmul_filename, &st);
+   } else {
+     stat(input_test_scmul_filename, &st);
+   }
+	    
+   uint32_t  nec_points = st.st_size/(NWORDS_256BIT*sizeof(uint32_t)*(indims+1));
+   uint32_t order = U256_BSELM;
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2, *r_aff, *samples;
    uint32_t i;
    uint32_t n_tables = (order + nec_points - 1)/order;
    uint32_t n_errors=0;
 
    samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
    out_ecp1 = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
-   out_ecp2 = (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
-   out_ecp3 = (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
-   out_ecp4= (uint32_t *) malloc( n_tables * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp2 = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   r_aff = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
 
-   readU256DataFile_h(samples, input_test_scmul_filename,
+   if (ec2){
+     readU256DataFile_h(samples, input2_test_scmul_filename,
                        nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r_aff, input2_test_scmul_reduction_soln_filename,
+                       indims, indims);
+
+   } else {
+     readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r_aff, input_test_scmul_reduction_soln_filename,
+                       indims,indims);
+   }
 
    scl = samples;
    in_ecp = &samples[nec_points * NWORDS_256BIT];
-   ec_jacscmul_opt_h(out_ecp2, scl, in_ecp, nec_points, order, 0,1); 
-   ec_jac2aff_h(out_ecp3, out_ecp2,n_tables, 0, 0);
 
-   // Multiply points
-   ec_jacscmul_h( out_ecp1, scl, in_ecp, nec_points, 0, 1);
-
-   for (i=0; i< n_tables-1; i++){
-     ec_jacaddreduce_h(&out_ecp4[i*ECP_JAC_OUTDIMS*NWORDS_256BIT], 
-                       &out_ecp1[i*order*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-                       order, 0, 1, 0, 0);
-     if (memcmp(&out_ecp3[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-               &out_ecp4[i*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-               ECP_JAC_OUTDIMS*NWORDS_256BIT*sizeof(uint32_t)) ){
-        n_errors++;
-     }
+   if (ec2){ 
+     ec2_jacscmul_opt_h(out_ecp1, scl, in_ecp, nec_points, order, 0,1); 
+     ec2_jacaddreduce_h(out_ecp2, out_ecp1, n_tables , 0, 1, 0, 1);
+   } else {
+     ec_jacscmul_opt_h(out_ecp1, scl, in_ecp, nec_points, order, 0,1); 
+     ec_jacaddreduce_h(out_ecp2, out_ecp1, n_tables , 0, 1, 0, 1);
    }
 
-   printf("N errors(JACSCMUL_OPT) : %d/%d\n",n_errors,n_tables);
+   if (memcmp(r_aff, out_ecp2, indims*NWORDS_256BIT*sizeof(uint32_t)) ){
+        n_errors++;
+   }
+
+   printf("N errors(JACSCMUL_OPT %d) : %d/%d\n",ec2, n_errors, nec_points);
 
    free(samples);
    free(out_ecp1);
    free(out_ecp2);
-   free(out_ecp3);
-   free(out_ecp4);
+   free(r_aff);
 }
 
 
@@ -9230,10 +9356,15 @@ int main()
   test_inv_ext2();
   test_mulu256();
 
-  test_ec_jacaddreduce(0);    // EC1
-  test_ec_jacaddreduce(1);    // EC2
+  test_ec_jacscmul(0);    // EC1
 
-  test_ec_jacscmul_opt();
+  test_ec_jacscmul(1);    // EC2
+   
+  test_ec_jacreduce(0);     // EC1
+  test_ec_jacreduce(1);     // EC2
+
+  test_ec_jacscmul_opt(0);    // EC1
+  test_ec_jacscmul_opt(1);    // EC2
   
   return 1;
 }
