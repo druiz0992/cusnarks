@@ -395,20 +395,20 @@ class GrothSetup(object):
 
 
     def calculatePoly(self):
-        logging.info(' Starting calculatePoly')
+        logging.info(' Starting evaluation R1CS -> QAP')
         self.computeHeader()
 
-        logging.info(' Starting polsA')
+        logging.info(' Starting R1CS A')
         self.pk['polsA'] = cirr1cs_to_mpoly(self.cir['R1CSA'], self.cir_header, self.cir['cirformat'], 1)
         self.pk['polsA_nWords'] = np.uint32(self.pk['polsA'].shape[0])
         del self.cir['R1CSA']
 
-        logging.info(' Starting polsB')
+        logging.info(' Starting R1CS B')
         self.pk['polsB'] = cirr1cs_to_mpoly(self.cir['R1CSB'], self.cir_header, self.cir['cirformat'], 0)
         self.pk['polsB_nWords'] = np.uint32(self.pk['polsB'].shape[0])
         del self.cir['R1CSB']
 
-        logging.info(' Starting polsC')
+        logging.info(' Starting R1CS C')
         self.pk['polsC'] = cirr1cs_to_mpoly(self.cir['R1CSC'], self.cir_header, self.cir['cirformat'], 0)
         self.pk['polsC_nWords'] = np.uint32(self.pk['polsC'].shape[0])
         del self.cir
@@ -714,9 +714,7 @@ class GrothSetup(object):
          f.close()
 
        elif self.out_pk_f.endswith('bin') :
-         #pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk)
-         pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk, ext=True)
-         writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
+         pkvars_to_file(self.out_k_binformat, self.out_k_ecformat, self.pk, self.out_pk_f, ext=True)
 
        else :
          logging.info ("No valid proving key file  %s provided", self.out_pk_f)

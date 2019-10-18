@@ -782,6 +782,183 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
         pk_bin[0] = pk_bin.shape[0]
 
         return pk_bin
+def pkvars_to_file(out_bin, out_ec, pk, fname, ext=False): 
+        pk_bin = np.concatenate( (
+                   np.asarray([pk['nWords']], dtype=np.uint32),
+                   np.asarray([SNARKSFILE_T_PK], dtype=np.uint32),
+                   np.asarray([PROTOCOL_T_GROTH], dtype=np.uint32),
+                   np.asarray([pk['Rbitlen']], dtype=np.uint32),
+                   np.asarray([out_bin], dtype=np.uint32),
+                   np.asarray([pk['k_ecformat']], dtype=np.uint32),
+                   np.asarray([pk['nVars']], dtype=np.uint32),
+                   np.asarray([pk['nPublic']], dtype=np.uint32),
+                   np.asarray([pk['domainBits']], dtype=np.uint32),
+                   np.asarray([pk['domainSize']], dtype=np.uint32),
+                   np.asarray(pk['field_r'], dtype=np.uint32),
+                   np.asarray(pk['group_q'], dtype=np.uint32)) )
+
+        writeU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+        polsA_extnWords = pk['polsA_nWords']
+        polsB_extnWords = pk['polsB_nWords']
+
+        A_extnWords = pk['A_nWords']
+        B1_extnWords = pk['B1_nWords']
+        B2_extnWords = pk['B2_nWords']
+        C_extnWords = pk['C_nWords']
+        hExps_extnWords = pk['hExps_nWords']
+
+        A_ext = np.zeros(0,dtype=np.uint32)
+        B1_ext = np.zeros(0,dtype=np.uint32)
+        B2_ext = np.zeros(0,dtype=np.uint32)
+        C_ext = np.zeros(0,dtype=np.uint32)
+        hExps_ext = np.zeros(0,dtype=np.uint32)
+
+        if ext:
+          polsA_extnWords = max(pk['polsA_nWords'], pk['domainSize']*NWORDS_256BIT)
+          polsB_extnWords = max(pk['polsB_nWords'], pk['domainSize']*NWORDS_256BIT)
+
+          A_extnWords = pk['A_nWords'] + 4 * NWORDS_256BIT  # A + alfa_1 + delta_1
+          B1_extnWords = pk['B1_nWords'] + 4 * NWORDS_256BIT  # B1 + beta_1 + delta_1
+          B2_extnWords = pk['B2_nWords'] + 8 * NWORDS_256BIT  # B2 + beta_2 + delta_2
+          C_extnWords = pk['C_nWords'] 
+          hExps_extnWords = pk['hExps_nWords']  + 12 * NWORDS_256BIT # hExps + pi_c + pi_a + pib1 + delta_1 + pi_b
+         
+          if out_bin == FMT_EXT:
+            A_ext = np.concatenate(
+                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                                  )
+            B1_ext = np.concatenate(
+                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                                  )
+            B2_ext = np.concatenate(
+                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_GROUP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1)
+                                   )
+            C_ext = np.zeros(0,dtype=np.uint32)
+            hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
+            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+
+          else:
+            A_ext = np.concatenate( (pk['alfa_1'], pk['delta_1']) )
+            B1_ext = np.concatenate( (pk['beta_1'], pk['delta_1']) )
+            B2_ext = np.concatenate( (pk['beta_2'], pk['delta_2']) )
+            C_ext = np.zeros(0,dtype=np.uint32)
+            hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
+            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(pk['delta_1'],-1)
+
+
+        polsA_ext = np.zeros(polsA_extnWords - pk['polsA_nWords'],dtype=np.uint32)
+        polsB_ext = np.zeros(polsB_extnWords - pk['polsB_nWords'],dtype=np.uint32)
+
+        pk_bin = np.concatenate( (
+                      _64b232b(polsA_extnWords),
+                      _64b232b(polsB_extnWords),
+                      _64b232b(A_extnWords),
+                      _64b232b(B1_extnWords),
+                      _64b232b(B2_extnWords),
+                      _64b232b(C_extnWords),
+                      _64b232b(hExps_extnWords)) )
+
+        appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+        if out_bin == FMT_EXT:
+           mpoly_from_montgomery_h(pk['polsA'], MOD_FIELD)
+           mpoly_from_montgomery_h(pk['polsB'], MOD_FIELD)
+           pk_bin = np.concatenate( (
+                      pk['polsA'],
+                      polsA_ext) )
+           del pk['polsA']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate( (
+                      pk['polsB'],
+                      polsB_ext ))
+           del pk['polsB']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate( (
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_GROUP,0),-1),
+                      A_ext ))
+           del pk['A']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate( (
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_GROUP,0),-1),
+                      B1_ext))
+           del pk['B1']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate( (
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['B2'],-1), MOD_GROUP,0),-1),
+                      B2_ext ))
+           del pk['B2']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate( (
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['C'],-1), MOD_GROUP,0),-1),
+                      C_ext))
+           del pk['C']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate( (
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_GROUP,0),-1),
+                      hExps_ext))
+           del pk['hExps']
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           #mpoly_to_montgomery_h(pk['polsA'], MOD_FIELD)
+           #mpoly_to_montgomery_h(pk['polsB'], MOD_FIELD)
+        else:
+           pk_bin = np.concatenate((pk['polsA'], polsA_ext))
+           del pk['polsA']
+           del polsA_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate((pk['polsB'], polsB_ext))
+           del pk['polsB']
+           del polsB_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+ 
+           pk_bin = np.concatenate((
+                  np.reshape(pk['alfa_1'],-1),
+                  np.reshape(pk['beta_1'],-1),
+                  np.reshape(pk['delta_1'],-1),
+                  np.reshape(pk['beta_2'],-1),
+                  np.reshape(pk['delta_2'],-1)))
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate((np.reshape(pk['A'],-1), np.reshape(A_ext,-1)))
+           del pk['A']
+           del A_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate((np.reshape(pk['B1'],-1), np.reshape(B1_ext,-1)))
+           del pk['B1']
+           del B1_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate((np.reshape(pk['B2'],-1), np.reshape(B2_ext,-1)))
+           del pk['B2']
+           del B2_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate((np.reshape(pk['C'],-1), np.reshape(C_ext,-1)))
+           del pk['C']
+           del C_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
+
+           pk_bin = np.concatenate((np.reshape(pk['hExps'],-1), np.reshape(hExps_ext,-1)))
+           del pk['hExps']
+           del hExps_ext
+           appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
 def pkjson_to_pyec(inv,b_reduce, ec2):
   if ec2:

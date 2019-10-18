@@ -51,6 +51,7 @@ cdef extern from "../cuda/utils_host.h" nogil:
     void creadU256DataFile_h "readU256DataFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t insize, ct.uint32_t outsize)
     void creadWitnessFile_h "readWitnessFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t fmt, const unsigned long long inlen)
     void cwriteU256DataFile_h "writeU256DataFile_h"(ct.uint32_t *samples, const char *filename, unsigned long long nwords)
+    void cappendU256DataFile_h "appendU256DataFile_h"(ct.uint32_t *samples, const char *filename, unsigned long long nwords)
     void cwriteWitnessFile_h "writeWitnessFile_h"(ct.uint32_t *samples, const char *filename, const unsigned long longnwords)
     void creadU256CircuitFile_h "readU256CircuitFile_h"(ct.uint32_t *samples, const char *filename, unsigned long long nwords)
     void creadU256CircuitFileHeader_h "readU256CircuitFileHeader_h"( ct.cirbin_hfile_t *hfile, const char *filename)
