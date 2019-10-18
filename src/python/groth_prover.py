@@ -1219,6 +1219,7 @@ class GrothProver(object):
                            (-1,step,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx+extra_samples]],
                         (-1, NWORDS_256BIT)
                     )
+
           # Copy last batch EC point sum
           EC_P[ecidx][-step:] = init_ec_val
                     
@@ -1227,6 +1228,7 @@ class GrothProver(object):
                                        cuda_ec128,
                                        EC_P[ecidx],
                                        step==4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
+
           if stream_id == 0:
              self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
              try:

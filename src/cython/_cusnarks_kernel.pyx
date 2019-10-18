@@ -859,6 +859,52 @@ def ec_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
+def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     if add_last:
+        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_INDIMS) )
+     else:
+        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_OUTDIMS) )
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec2_jacscmul_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+
+     cdef ct.uint32_t n, out_n
+     if add_last:
+        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_INDIMS) )
+     else:
+        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_OUTDIMS) )
+     
+     out_n = <int> ((n + U256_BSELM -1)/U256_BSELM)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(out_n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, <ct.uint32_t> U256_BSELM, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec2_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+
+     cdef ct.uint32_t n, out_n
+     if add_last:
+        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_INDIMS) )
+     else:
+        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_OUTDIMS) )
+     
+     out_n = <int> ((n + U256_BSELM -1)/U256_BSELM)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(out_n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec2_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, <ct.uint32_t> U256_BSELM, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+ 
+
 def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_affine, ct.uint32_t ec2, ct.uint32_t pidx):
      if ec2:
        return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
