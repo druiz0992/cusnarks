@@ -33,12 +33,151 @@
 #ifndef _UTILS_HOST_H_
 #define _UTILS_HOST_H_
 
+#define NEG(X) (~(X))
+
+/* 
+   Substract 256 bit integers X and Y.
+
+   uint32_t *x : 256 bit integer x
+   uint32_t *y : 256 bit integer y
+   returns x - y
+*/
+inline void subu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
+{
+  uint32_t carry=0;
+  const t_uint64 *dA = (t_uint64 *)a;
+  const t_uint64 *dB = (t_uint64 *)b;
+  t_uint64 *dC = (t_uint64 *)c;
+  t_uint64 tmp;
+
+
+  tmp = NEG(dB[0])+1;
+  carry = (tmp < 1);
+  dC[0] = dA[0] + tmp;
+  carry += (dC[0] < tmp);
+
+  tmp = NEG(dB[1]);
+  dC[1] = dA[1] + carry;
+  carry = (dC[1] < carry);
+  dC[1] += tmp;
+  carry += (dC[1] < tmp);
+
+  tmp = NEG(dB[2]);
+  dC[2] = dA[2] + carry;
+  carry = (dC[2] < carry);
+  dC[2] += tmp;
+  carry += (dC[2] < tmp);
+
+  tmp = NEG(dB[3]);
+  dC[3] = dA[3] + carry;
+  carry = (dC[3] < carry);
+  dC[3] += tmp;
+  carry += (dC[3] < tmp);
+
+}
+inline void subu256_h(uint32_t *x, const uint32_t *y)
+{
+   subu256_h(x, x, y);
+} 
+  
+
+/* 
+   Add 256 bit integers X and Y.
+
+   uint32_t *x : 256 bit integer x
+   uint32_t *y : 256 bit integer y
+   returns x + y
+*/
+inline void addu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
+{
+  uint32_t carry=0;
+  const t_uint64 *dA = (t_uint64 *)a;
+  const t_uint64 *dB = (t_uint64 *)b;
+  t_uint64 *dC = (t_uint64 *)c;
+  t_uint64 tmp = dA[0];
+
+  dC[0] = dA[0] + dB[0];
+  carry = (dC[0] < tmp);
+
+  tmp = dB[1];
+  dC[1] = dA[1] + carry;
+  carry = (dC[1] < carry);
+  dC[1] += tmp;
+  carry += (dC[1] < tmp);
+
+  tmp = dB[2];
+  dC[2] = dA[2] + carry;
+  carry = (dC[2] < carry);
+  dC[2] += tmp;
+  carry += (dC[2] < tmp);
+
+  tmp = dB[3];
+  dC[3] = dA[3] + carry;
+  carry = (dC[3] < carry);
+  dC[3] += tmp;
+  carry += (dC[3] < tmp);
+
+}
+inline void addu256_h(uint32_t *x, const uint32_t *y)
+{
+   addu256_h(x, x, y);
+}   
+
+/* 
+   Compare 256 bit integers X and Y.
+
+   uint32_t *x : 256 bit integer x
+   uint32_t *y : 256 bit integer y
+   returns 
+      0          : x == y
+      pos number : x > y
+      neg number : x < y
+*/
+inline int32_t compu256_h(const uint32_t *a, const uint32_t *b)
+{
+  uint32_t gt=0, lt=0;
+  uint32_t idx = NWORDS_256BIT/2-1;
+
+  const t_uint64 *dA = (const t_uint64 *)a;
+  const t_uint64 *dB = (const t_uint64 *)b;
+  // idx = 3
+  gt = (dA[idx] > dB[idx]);
+  lt = (dA[idx] < dB[idx]);
+  if (gt) return 1;
+  if (lt) return -1;
+
+  // idx = 2
+  idx--;
+  gt = (dA[idx] > dB[idx]);
+  lt = (dA[idx] < dB[idx]);
+  if (gt) return 1;
+  if (lt) return -1;
+
+  // idx = 1
+  idx--;
+  gt = (dA[idx] > dB[idx]);
+  lt = (dA[idx] < dB[idx]);
+  if (gt) return 1;
+  if (lt) return -1;
+
+  // idx =0
+  idx--;
+  gt = (dA[idx] > dB[idx]);
+  lt = (dA[idx] < dB[idx]);
+  if (gt) return 1;
+  if (lt) return -1;
+
+  return 0;
+
+}
+
+
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void mulN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void montmult_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
-void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
+//void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
 void montsquare__ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t L, uint32_t pidx);
@@ -52,8 +191,7 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
 void intt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t N_fftx, uint32_t N_ffty, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx);
 void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
-int compu256_h(const uint32_t *x, const uint32_t *y);
-bool ltu256_h(const uint32_t *x, const uint32_t *y);
+int32_t ltu256_h(const uint32_t *x, const uint32_t *y);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
 void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len);
@@ -86,6 +224,7 @@ void subm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void printU256Number(const uint32_t *x);
+void printU256Number(const char *, const uint32_t *x);
 void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
 void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt, const unsigned long long insize);
 void writeU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);
@@ -105,10 +244,6 @@ void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *hea
 uint32_t shlru256_h(uint32_t *y, uint32_t *x, uint32_t count);
 uint32_t shllu256_h(uint32_t *y, uint32_t *x, uint32_t count);
 uint32_t msbu256_h(uint32_t *x);
-void subu256_h(uint32_t *x, const uint32_t *y);
-void addu256_h(uint32_t *x, const uint32_t *y);
-void subu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
-void addu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
 void mulu256_h(uint32_t *z, uint32_t *x, uint32_t *y);
 void setbitu256_h(uint32_t *x, uint32_t n);
 uint32_t getbitu256_h(uint32_t *x, uint32_t n);;
