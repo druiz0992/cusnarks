@@ -9061,26 +9061,6 @@ void  test_inv_ext2()
      
 }
 
-void test_mulu256()
-{
-  uint32_t i, N=sizeof(muluX_test)/(NWORDS_256BIT * sizeof(uint32_t));
-  uint32_t *x, *y, z[NWORDS_256BIT];
-  uint32_t *r;
-  uint32_t n_errors=0;
-
-  for (i=0; i< N; i+=2){
-    x = &muluX_test[i*NWORDS_256BIT];
-    y = &muluX_test[(i+1)*NWORDS_256BIT];
-    r = &muluY_test[(i/2)*NWORDS_256BIT];
-    mulu256_h(z,x,y);
- 
-    if (compu256_h(r,z)){
-        n_errors++;
-    }
-  }
-  printf("N errors(Test_Mulu) : %d/%d\n",n_errors, N/2);
-}
-
 void  test_ec_jacscmul(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
@@ -9329,7 +9309,6 @@ int main()
   test_mul_ext();
   test_inv_ext1();
   test_inv_ext2();
-  //test_mulu256();
 
   test_ec_jacscmul(0);    // EC1
 
