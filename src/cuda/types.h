@@ -111,6 +111,7 @@
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
+typedef unsigned long long int t_uint64;
 
 typedef unsigned int uint256_t[NWORDS_256BIT];
 typedef unsigned int uint512_t[2*NWORDS_256BIT];

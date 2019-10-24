@@ -89,6 +89,7 @@
 #include <pthread.h>
 #include <unistd.h> 
 #include <omp.h>
+#include <x86intrin.h>
 
 #include "types.h"
 #include "constants.h"
@@ -119,14 +120,8 @@ static  uint32_t parallelism_enabled =  1;
 static  uint32_t parallelism_enabled =  0;
 #endif
 
+
 // Internal functions
-// single/multiple precision
-void mpAddWithCarryProp(uint32_t *A, uint32_t C, int SDigit, int max_digit);
-uint32_t mpAdd(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t ndigits);
-int spMultiply(uint32_t p[2], uint32_t x, uint32_t y);
-int mpMultiply(uint32_t p[3], uint32_t x[2], uint32_t y);
-int mpCompare(const uint32_t a[], const uint32_t b[], size_t ndigits);
-uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t ndigits);
 void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx);
 
 // FFT helper functions
@@ -136,184 +131,27 @@ inline void swap(uint32_t *x, uint32_t *y);
 // Mproc
 void mproc_init_h(void);
 
+inline void mulu64_h(t_uint64 p[2], const t_uint64 *x, const t_uint64 *y)
+{
+ p[0] = _mulx_u64(x[0],y[0],&p[1]);
+}
+
+inline t_uint64 addu64_h(t_uint64 *c, t_uint64 *a, t_uint64 *b)
+{
+  t_uint64 carry=0;
+
+  const t_uint64 *dA = (t_uint64 *)a;
+  const t_uint64 *dB = (t_uint64 *)b;
+  t_uint64 *dC = (t_uint64 *)c;
+  t_uint64 tmp = dA[0];
+
+  dC[0] = dA[0] + dB[0];
+  carry = (dC[0] < tmp);
+
+ return carry;
+}
+
 //////
-
-/****************************************************************************/
-/**  [1]
-*
-* This function performs a carry propagation adding C to the input
-* array A of size NDigits, given by the first argument starting from
-* the first element SDigit, and propagates it until no further carry
-* is generated.
-*
-* ADD(A[i],C)
-*
-* Reference:
-* Analyzing and Comparing Montgomery Multiplication Algorithms
-* IEEE Micro, 16(3):26-33,June 1996
-* By: Cetin Koc, Tolga Acar, and Burton Kaliski
-*
-* @param A is an input array of size NDigits
-* @param C is the value being added to the input A
-* @param SDigit is the start digit
-* @param NDigits is the integer precision of the arguments (A)
-*
-* @return None.
-*
-* @note  None.
-*****************************************************************************/
-void mpAddWithCarryProp(uint32_t *A, uint32_t C, int SDigit, int max_digit)
-{
- int i;
- int j=0;
-
- for(i=SDigit; i<max_digit; i++) {
-   C = mpAdd(A+i, A+i, &C, 1);
-
-   if(C == 0) {
-     //if (j > 0) {
-           //printf("%d\n",j);
-     //}
-     return;
-   }
-   j++;
- }
- //if (j > 0) { printf("%d\n",j);}
-}
-
-/* [1]
-  Calculates w = u + v
-  where w, u, v are multiprecision integers of ndigits each
-  Returns carry if overflow. Carry = 0 or 1.
-  Ref: Knuth Vol 2 Ch 4.3.1 p 266 Algorithm A.
-*/
-uint32_t mpAdd(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t ndigits)
-{
-
- uint32_t k;
- size_t j;
-
- /* Step A1. Initialise */
- k = 0;
-
- for (j = 0; j < ndigits; j++) {
-  /* Step A2. Add digits w_j = (u_j + v_j + k)
-   Set k = 1 if carry (overflow) occurs
-  */
-  w[j] = u[j] + k;
-  if (w[j] < k) k = 1; 
-  else k = 0;
-
-  w[j] += v[j];
-  if (w[j] < v[j]) k++;
-
- } /* Step A3. Loop on j */
-
- return k; /* w_n = k */
-}
-
-/* [1]
-  
-  Computes multiplication of 2 32 bit numbers x and y and stores it in 2x32 bit array p
-
-  uint32_t p[2] : output result
-  uint32_t x    : input factor 1
-  uint32_t y    : input factor 2
-*/
-int spMultiply(uint32_t p[2], uint32_t x, uint32_t y)
-{
- /* Use a 64-bit temp for product */
- uint64_t t = (uint64_t)x * (uint64_t)y;
- /* then split into two parts */
- p[1] = (uint32_t)(t >> 32);
- p[0] = (uint32_t)(t & 0xFFFFFFFF);
-
- return 0;
-}
-
-/* [1]
-  
-  Computes multiplication of one 32 bit numbers y times a 64 bit number x and stores it in 3x32 bit array p
-  uint32_t p[3] : output result
-  uint32_t x[2]  : 64 bit input factor 1
-  uint32_t y    : 32 bit input factor 2
-*/
-
-int mpMultiply(uint32_t p[3], uint32_t x[2], uint32_t y)
-{
- uint64_t t1 = (uint64_t)x[0] * (uint64_t)y;
- uint64_t t2 = (uint64_t)x[1] * (uint64_t)y;
- uint32_t c;
-
- /* then split into two parts */
- p[0] = (uint32_t)(t1 & 0xFFFFFFFF);
- p[1] = (uint32_t)(t1 >> 32) + (uint32_t)(t2 & 0xFFFFFFFF);
- c = p[1] < (uint32_t)(t2 & 0xFFFFFFFF);
- p[2] = (uint32_t)(t2 >> 32) + c;
-
- return 0;
-}
-
-/* 
-   Compare multi precision  integers X and Y.
-
-   uint32_t a[] : integer x
-   uint32_t b[] : integer y
-   size_t ndigits : number of 32-bit words in x and y
-   returns 
-      0          : x == y
-      pos number : x > y
-      neg number : x < y
-*/
-int mpCompare(const uint32_t a[], const uint32_t b[], size_t ndigits)
-{
- /* All these vars are either 0 or 1 */
- unsigned int gt = 0;
- unsigned int lt = 0;
- unsigned int mask = 1; /* Set to zero once first inequality found */
- unsigned int c;
-
- while (ndigits--) {
-  gt |= (a[ndigits] > b[ndigits]) & mask;
-  lt |= (a[ndigits] < b[ndigits]) & mask;
-  c = (gt | lt);
-  mask &= (c-1); /* Unchanged if c==0 or mask==0, else mask=0 */
- }
-
- return (int)gt - (int)lt; /* EQ=0 GT=+1 LT=-1 */
-}
-
-/*  [1]
-  Calculates w = u - v where u >= v
-  w, u, v are multiprecision integers of ndigits each
-  Returns 0 if OK, or 1 if v > u.
-  Ref: Knuth Vol 2 Ch 4.3.1 p 267 Algorithm S.
-*/
-uint32_t mpSubtract(uint32_t w[], const uint32_t u[], const uint32_t v[], size_t ndigits)
-{
-
- uint32_t k;
- size_t j;
-
- /* Step S1. Initialise */
- k = 0;
-
- for (j = 0; j < ndigits; j++)
- {
-  /* Step S2. Subtract digits w_j = (u_j - v_j - k)
-   Set k = 1 if borrow occurs.
-  */
-  w[j] = u[j] - k;
-  if (w[j] > MAX_DIGIT - k) k = 1;
-  else k = 0;
-
-  w[j] -= v[j];
-  if (w[j] > MAX_DIGIT - v[j]) k++;
-
- } /* Step S3. Loop on j */
-
- return k; /* Should be zero if u >= v */
-}
 
 /*
   Bit reverse 32 bit number
@@ -931,6 +769,15 @@ void printU256Number(const uint32_t *x)
   printf ("\n");
 }
 
+void printU256Number(const char *s, const uint32_t *x)
+{
+  printf("%s",s);
+  for (uint32_t i=0; i < NWORDS_256BIT; i++){
+    printf("%x ",x[i]);
+  }
+  printf ("\n");
+}
+
 /*
    Generate N 32 bit random samples
 
@@ -988,29 +835,14 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
 
    uint32_t *x : 256 bit integer x
    uint32_t *y : 256 bit integer y
-   returns 
-      0          : x == y
-      pos number : x > y
-      neg number : x < y
-*/
-int compu256_h(const uint32_t *x, const uint32_t *y)
-{
-  return mpCompare(x, y, NWORDS_256BIT);
-}
-
-/* 
-   Compare 256 bit integers X and Y.
-
-   uint32_t *x : 256 bit integer x
-   uint32_t *y : 256 bit integer y
 
    returns 
       true          : x < y
       false         : x >= y
 */
-bool ltu256_h(const uint32_t *x, const uint32_t *y)
+int32_t ltu256_h(const uint32_t *x, const uint32_t *y)
 {
-  return (mpCompare(x, y, NWORDS_256BIT) < 0);
+  return (compu256_h(x, y) < 0);
 }
 
 /*
@@ -1031,7 +863,7 @@ void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, u
    memcpy(samples,start,sizeof(uint32_t)*NWORDS_256BIT);
 
    for (i=1; i < nsamples; i++){
-     mpAdd(&samples[i*NWORDS_256BIT], &samples[(i-1)*NWORDS_256BIT], _inc, NWORDS_256BIT);
+     addu256_h(&samples[i*NWORDS_256BIT], &samples[(i-1)*NWORDS_256BIT], _inc);
      if ((mod != NULL) && (compu256_h(&samples[i*NWORDS_256BIT], mod) >= 0)){
          do{
            subu256_h(&samples[i*NWORDS_256BIT], mod);
@@ -1054,6 +886,7 @@ void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
   const uint32_t *R2 = CusnarksR2Get((mod_t)pidx);
   montmult_h(z,x,R2, pidx);
 }
+
 void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
 {
   uint32_t i;
@@ -1145,6 +978,7 @@ void ec2_stripc_h(uint32_t *z, uint32_t *x, uint32_t n)
      memmove(&z[i*4*NWORDS_256BIT],&x[i*6*NWORDS_256BIT], 4 * NWORDS_256BIT * sizeof(uint32_t));
   }
 }
+
 /*
     Removes higher order coefficient equal to 0
 
@@ -1157,7 +991,7 @@ uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff)
 {
   const uint32_t *Zero = CusnarksZeroGet();
   for (int i=n_coeff-1; i>=0; i--){ 
-    if (mpCompare(&pin[i*NWORDS_256BIT],Zero,NWORDS_256BIT)){
+    if (compu256_h(&pin[i*NWORDS_256BIT],Zero)){
        return (uint32_t) i+1;    
     }
   }
@@ -1190,29 +1024,6 @@ void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len)
          return (ltu256_h((const uint32_t*)&v[i1*NWORDS_256BIT],(const uint32_t *)&v[i2*NWORDS_256BIT]));});
 }
 
-/*
-   Substract two 256 bit samples. x -= y
-  
-   uint32_t *x : vector x
-   uint32_t *y : vector y
-   
-*/
-
-void subu256_h(uint32_t *x, const uint32_t *y)
-{
-   uint32_t z[NWORDS_256BIT];
-
-   mpSubtract(z, x, y, NWORDS_256BIT);
-   memcpy(x,z,sizeof(uint32_t)*NWORDS_256BIT);
-} 
-  
-void addu256_h(uint32_t *x, const uint32_t *y)
-{
-   uint32_t z[NWORDS_256BIT];
-
-   mpAdd(z, x, y, NWORDS_256BIT);
-   memcpy(x,z,sizeof(uint32_t)*NWORDS_256BIT);
-}   
 
 /****************************************************************************/
 /****************************************************************************/
@@ -1243,92 +1054,157 @@ void addu256_h(uint32_t *x, const uint32_t *y)
 *****************************************************************************/
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
 {
-  montmult_h2(U,A,B,pidx);
-  #if 0
   int i, j;
-  uint32_t S, C, C1, C2, M[2], X[2];
-  uint32_t T[NWORDS_256BIT_FIOS];
-  const uint32_t *N = CusnarksPGet((mod_t)pidx);
+  t_uint64 S, C, C1, C2, C3=0, M[2], X[2], carry;
+  uint32_t T[NWORDS_256BIT_FIOS+1];
   const uint32_t *NPrime = CusnarksNPGet((mod_t)pidx);
+  const uint32_t *N = CusnarksPGet((mod_t)pidx);
 
-  memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
+  const t_uint64 *dA = (t_uint64 *)A;
+  const t_uint64 *dB = (t_uint64 *)B;
+  t_uint64 *dU = (t_uint64 *)U;
+  const t_uint64 *dNP = (t_uint64 *)NPrime;
+  const t_uint64 *dN = (t_uint64 *)N;
+  t_uint64 *dT = (t_uint64 *)T;
 
-  //printf("A\n");
-  //printU256Number(A);
-  //printf("B\n");
-  //printU256Number(B);
-  for(i=0; i<NWORDS_256BIT; i++) {
+  memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS+1));
+
+  /*
+  printf("A\n");
+  printU256Number(A);
+  printf("B\n");
+  printU256Number(B);
+
+  printf("N\n");
+  printU256Number(N);
+
+  printf("NPrime[0] : %u\n",NPrime[0]);
+  */
+
+  for(i=0; i<NWORDS_256BIT/2; i++) {
     // (C,S) = t[0] + a[0]*b[i], worst case 2 words
-    spMultiply(X, A[0], B[i]); // X[Upper,Lower] = a[0]*b[i]
-    C = mpAdd(&S, T+0, X+0, 1); // [C,S] = t[0] + X[Lower]
-    mpAdd(&C, &C, X+1, 1);// [~,C] = C + X[Upper], No carry
+    mulu64_h(X, &dA[0], &dB[i]); // X[Upper,Lower] = a[0]*b[i]
+    C = addu64_h(&S, dT+0, X+0); // [C,S] = t[0] + X[Lower]
+    addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper], No carry
+    //printf("1[%d]: C: %llx S: %llx\n",i,(uint64_t)C, (uint64_t)S); 
 
-    //printf("0 - C : %u, S: %u\n",C,S);
-    //printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
+    /*
+    printf("0 - C : %u, S: %u\n",C,S);
+    printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
+    */
     // ADD(t[1],C)
-    mpAddWithCarryProp(T, C, 1, NWORDS_256BIT_FIOS);
-    //printf("T\n");
-    //printU256Number(T);
+    //mpAddWithCarryProp(T, C, 1);
+    carry = addu64_h(&dT[1], &dT[1], &C); 
+    //printf("a[%d]: C: %llx T[1]: %llx\n",i,(uint64_t)carry, (uint64_t)dT[1]); 
+    /*
+    printf("C3: %u\n",carry);
+    printf("T\n");
+    printU256Number(T);
+    */
 
     // m = S*n'[0] mod W, where W=2^32
     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-    spMultiply(M, S, NPrime[0]);
-    //printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
+    mulu64_h(M, &S, dNP);
+    //printf("b[%d]: M: %llx, N: %llx\n",i,(uint64_t)(M[0]),(uint64_t)dN[0]);
+    /*
+    printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
+    */
 
     // (C,S) = S + m*n[0], worst case 2 words
-    spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
-    C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
-    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-    //printf("1 - C : %u, S: %u\n",C,S);
+    mulu64_h(X, &M[0], dN); // X[Upper,Lower] = m*n[0]
+    /*
+    printf("1 - X[1] %u, X[0] : %u\n",X[1], X[0]);
+    */
+    C = addu64_h(&S, &S, X+0); // [C,S] = S + X[Lower]
+    addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper]
+    /*
+    printf("1 - C : %u, S: %u, X[1] %u, X[0] : %u\n\n",C,S, X[1], X[0]);
+    */
+    //printf("2[%d]: C: %llx S: %llx, carry: %llx\n",i,(uint64_t)C, (uint64_t)S, (uint64_t)carry); 
 
-    for(j=1; j<NWORDS_256BIT; j++) {
+    for(j=1; j<NWORDS_256BIT/2; j++) {
       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-      spMultiply(X, A[j], B[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
-      C1 = mpAdd(&S, T+j, &C, 1);  // (C1,S) = t[j] + C
-      //printf("2 - C1 : %u, S: %u\n",C1,S);
-      C2 = mpAdd(&S, &S, X+0, 1);  // (C2,S) = S + X[Lower]
-      //printf("3 - C2 : %u, S: %u\n",C1,S);
-      //printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
-      mpAdd(&C, &C1, X+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
-      //printf("4 - C : %u\n",C);
-      mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, doesn't produce carry
-      //printf("5 - C : %u\n",C);
-
+      mulu64_h(X,&dA[j], &dB[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
+      C1 = addu64_h(&S, dT+j, &C);  // (C1,S) = t[j] + C
+      /*
+      printf("2 - C1 : %u, S: %u\n",C1,S);
+      */
+      C2 = addu64_h(&S, &S, X+0);  // (C2,S) = S + X[Lower]
+      /*
+      printf("3 - C2 : %u, S: %u\n",C2,S);
+      printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
+      */
+      addu64_h(&C, &C1, X+1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
+      /*
+      printf("4 - C : %u\n",C);
+      */
+      C3 = addu64_h(&C, &C, &C2);    // (~,C)  = C + C2, it DOES produce carry
+      /*
+      printf("5 - C : %u, C3 : %u\n",C, C3);
+      */
+       
+      /*
+      // Fix this!!!! TODO
+      if (C3 > 0){
+        printf("Te pille\n");
+      }
+      */
       // ADD(t[j+1],C)
-      mpAddWithCarryProp(T, C, j+1, NWORDS_256BIT_FIOS);
-      //printf("T\n");
-      //printU256Number(T);
+      //C += carry;
+      //printf("3[%d-%d]: C1: %llx C: %llx S: %llx\n",i,j,(uint64_t)C3,(uint64_t) C, (uint64_t)S); 
+      C3 += addu64_h(&C, &C, &carry);    // (~,C)  = C + C2, It DOES produce carry
+      /*
+      if (C3 > 0){
+        printf("Te pille v2\n");
+      }
+      */
 
+      //printf("c[%d-%d]: C1: %llu C: %llx T[j+1]: %llx\n",i,j,(uint64_t) C3,(uint64_t)C, (uint64_t)dT[j+1]); 
+      carry = addu64_h(&dT[j+1], &dT[j+1], &C) + C3; 
+      //printf("4[%d-%d]: C1: %llx C: %llx S: %llx, carry: %llx\n",i,j,(uint64_t) C3,(uint64_t)C, (uint64_t)dT[j+1],(uint64_t)carry); 
+      //mpAddWithCarryProp(T, C, j+1);
+      /*
+      printf("T(%u)\n", carry);
+      printU256Number(T);
+     */
+   
       // (C,S) = S + m*n[j]
-      spMultiply(X, M[0], N[j]); // X[Upper,Lower] = m*n[j]
-      C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
-      mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-      //printf("6 - C : %u, S: %u\n",C,S);
-
+      mulu64_h(X, M, &dN[j]); // X[Upper,Lower] = m*n[j]
+      C = addu64_h(&S, &S, X+0); // [C,S] = S + X[Lower]
+      addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper]
+   
       // t[j-1] = S
-      T[j-1] = S;
-      //printf("T\n");
-      //printU256Number(T);
+      dT[j-1] = S;
+      /*
+      printf("T[%d]\n", j-1);
+      printU256Number(T);
+      */
+      //printU256Number("T1 : \n",T);
     }
 
+    //mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
     // (C,S) = t[s] + C
-    C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
-    //printf("6 - C : %u, S: %u\n",C,S);
+    C = addu64_h(&S, dT+NWORDS_256BIT/2, &C);
+    /*
+    printf("6 - C : %u, S: %u\n",C,S);
+    */
     // t[s-1] = S
-    T[NWORDS_256BIT-1] = S;
+    dT[NWORDS_256BIT/2-1] = S;
     // t[s] = t[s+1] + C
-    mpAdd(T+NWORDS_256BIT, T+NWORDS_256BIT+1, &C, 1);
+    addu64_h(dT+NWORDS_256BIT/2, dT+NWORDS_256BIT/2+1, &C);
     // t[s+1] = 0
-    T[NWORDS_256BIT+1] = 0;
+    dT[NWORDS_256BIT/2+1] = 0;
+    //printU256Number("T2 : \n",T);
   }
 
+  //printU256Number("T : \n",T);
   /* Step 3: if(u>=n) return u-n else return u */
-  if(mpCompare(T, N, NWORDS_256BIT) >= 0) {
-    mpSubtract(T, T, N, NWORDS_256BIT);
+  if(compu256_h(T, N) >= 0) {
+    subu256_h(T, (const uint32_t *)T, N);
   }
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
-  #endif
+  //printU256Number("U : \n",U);
 }
 
 void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
@@ -1351,251 +1227,15 @@ void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t 
 // I am leaving this as a separate function to test both implementations are equal
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
-  #if 1
-  montmult_h2(U,A,A,pidx);
-  #else
-  int i, j;
-  uint32_t S, C, C1, C2, M[2], X[2], X1[2], carry;
-  uint32_t T[NWORDS_256BIT_FIOS];
-  const uint32_t *N = CusnarksPGet((mod_t)pidx);
-  const uint32_t *NPrime = CusnarksNPGet((mod_t)pidx);
-
-  memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
-
-  for(i=0; i<NWORDS_256BIT; i++) {
-    // (C,S) = t[i] + a[i]*a[i], worst case 2 words
-    spMultiply(X, A[i], A[i]); // X[Upper,Lower] = a[0]*b[i]
-    C = mpAdd(&S, &T[i], X+0, 1); // [C,S] = t[0] + X[Lower]
-    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper], No carry
- 
-    T[i] = S;
-    C1 = C;
-    
-    // q = T[0]*n'[0] mod W, where W=2^32
-    spMultiply(M, T[0], NPrime[0]);
-
-    // (C,S) = T[0] + q*n[0], worst case 2 words
-    spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
-    C = mpAdd(&S, &T, X+0, 1); // [C,S] = S + X[Lower]
-    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-    
-    for (j=1; j < i+1; j++){
-    // (C,S) =  M*N[j]+T[j] + C, worst case 2 words
-    spMultiply(X1, M[0], N[j]);
-    C1 = mpAdd(&S, &T[j], &C, 1);  // (C1,S) = t[i+1] + C
-    C2 = mpAdd(&S, &S, X1+0, 1);  // (C2,S) = S + X[Lower]
-    mpAdd(&C, &C1, X1+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
-    }
-    
-    // (C,S) = t[j] + a[i+1]*a[i+1] + C, worst case 2 words
-    spMultiply(X1, A[i+1], A[i]);
-    C1 = mpAdd(&S, &T[i+1], &C, 1);  // (C1,S) = t[i+1] + C
-    C2 = mpAdd(&S, &S, X1+0, 1);  // (C2,S) = S + X[Lower]
-    mpAdd(&C, &C1, X1+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
-    mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, doesn't produce carry
-   
-    // ADD(t[i+2],C)
-    mpAddWithCarryProp(T, C, i+2, NWORDS_256BIT_FIOS);
-   
-    // (C,S) = S + m*n[j]
-    spMultiply(X, M[0], N[1]); // X[Upper,Lower] = m*n[j]
-    C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
-    C1 = mpAdd(&S, &S, X1+0, 1); // [C,S] = S + X[Lower]
-    C+=C1;
-    C1=mpAdd(&S, &X1[1], X+1, 1);  // [~,C] = C + X[Upper]
-    C+=C1;
-    mpAdd(&C, &C, &S, 1);  // [~,C] = C + X[Upper]
-   
-    // t[j-1] = S
-    T[0] = S;
-
-    C2=0;
-    for(j=2; j<NWORDS_256BIT; j++) {
-      // (C,S) = t[j] + 2*a[j]*a[i] + C, worst case 2 words
-      spMultiply(X, A[j], A[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
-      C1 = (X[0] >> 31)+C2;
-      X[0] <<= 1;
-      C2 = X[1] >> 31;
-      X[1] = (X[1] << 1) + C1;
-      C1 = mpAdd(&X[0], &X[0], &C, 1);
-      C = mpAdd(&S, &T[j], &X[0], 1);
-      C += C1;
-      mpAdd(&C, &C, X+1, 1);  
-
-      // ADD(t[j+1],C)
-      mpAddWithCarryProp(T, C, j+1, NWORDS_256BIT_FIOS);
-   
-      // (C,S) = S + m*n[j]
-      spMultiply(X, M[0], N[j]); // X[Upper,Lower] = m*n[j]
-      C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
-      mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-   
-      T[j-1] = S;
-    }
-    // (C,S) = t[s] + C
-    C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
-    //printf("6 - C : %u, S: %u\n",C,S);
-    // t[s-1] = S
-    T[NWORDS_256BIT-1] = S;
-    // t[s] = t[s+1] + C
-    mpAdd(T+NWORDS_256BIT, T+NWORDS_256BIT+1, &C, 1);
-    // t[s+1] = 0
-    T[NWORDS_256BIT+1] = 0;
-  }
-
-  /* Step 3: if(u>=n) return u-n else return u */
-  if(compu256_h(T, N) >= 0) {
-    mpSubtract(T, T, N, NWORDS_256BIT);
-  }
-
-  memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
-  #endif
+  montmult_h(U,A,A,pidx);
 }
 
 void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
   montmult_ext_h(U,A,A,pidx);
 }
-// Improved speed (in Cuda at least) by substituting mpAddWithCarryProp by mpAdd
-// I am leaving this as a separate function to test both implementations are equal
-void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
-{
-  int i, j;
-  uint32_t S, C, C1, C2, C3=0, M[2], X[2], carry;
-  uint32_t T[NWORDS_256BIT_FIOS];
-  const uint32_t *NPrime = CusnarksNPGet((mod_t)pidx);
-  const uint32_t *N = CusnarksPGet((mod_t)pidx);
 
-  memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS));
-
-  /*
-  printf("A\n");
-  printU256Number(A);
-  printf("B\n");
-  printU256Number(B);
-
-  printf("N\n");
-  printU256Number(N);
-
-  printf("NPrime[0] : %u\n",NPrime[0]);
-  */
-
-  for(i=0; i<NWORDS_256BIT; i++) {
-    // (C,S) = t[0] + a[0]*b[i], worst case 2 words
-    spMultiply(X, A[0], B[i]); // X[Upper,Lower] = a[0]*b[i]
-    C = mpAdd(&S, T+0, X+0, 1); // [C,S] = t[0] + X[Lower]
-    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper], No carry
-
-    /*
-    printf("0 - C : %u, S: %u\n",C,S);
-    printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
-    */
-    // ADD(t[1],C)
-    //mpAddWithCarryProp(T, C, 1);
-    carry = mpAdd(&T[1], &T[1], &C, 1); 
-    /*
-    printf("C3: %u\n",carry);
-    printf("T\n");
-    printU256Number(T);
-    */
-
-    // m = S*n'[0] mod W, where W=2^32
-    // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-    spMultiply(M, S, NPrime[0]);
-    /*
-    printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
-    */
-
-    // (C,S) = S + m*n[0], worst case 2 words
-    spMultiply(X, M[0], N[0]); // X[Upper,Lower] = m*n[0]
-    /*
-    printf("1 - X[1] %u, X[0] : %u\n",X[1], X[0]);
-    */
-    C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
-    mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-    /*
-    printf("1 - C : %u, S: %u, X[1] %u, X[0] : %u\n\n",C,S, X[1], X[0]);
-    */
-
-    for(j=1; j<NWORDS_256BIT; j++) {
-      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-      spMultiply(X, A[j], B[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
-      C1 = mpAdd(&S, T+j, &C, 1);  // (C1,S) = t[j] + C
-      /*
-      printf("2 - C1 : %u, S: %u\n",C1,S);
-      */
-      C2 = mpAdd(&S, &S, X+0, 1);  // (C2,S) = S + X[Lower]
-      /*
-      printf("3 - C2 : %u, S: %u\n",C2,S);
-      printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
-      */
-      mpAdd(&C, &C1, X+1, 1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
-      /*
-      printf("4 - C : %u\n",C);
-      */
-      C3 = mpAdd(&C, &C, &C2, 1);    // (~,C)  = C + C2, it DOES produce carry
-      /*
-      printf("5 - C : %u, C3 : %u\n",C, C3);
-      */
-       
-      /*
-      // Fix this!!!! TODO
-      if (C3 > 0){
-        printf("Te pille\n");
-      }
-      */
-      // ADD(t[j+1],C)
-      //C += carry;
-      C3 += mpAdd(&C, &C, &carry, 1);    // (~,C)  = C + C2, It DOES produce carry
-      /*
-      if (C3 > 0){
-        printf("Te pille v2\n");
-      }
-      */
-
-      carry = mpAdd(&T[j+1], &T[j+1], &C, 1) + C3; 
-      //mpAddWithCarryProp(T, C, j+1);
-      /*
-      printf("T(%u)\n", carry);
-      printU256Number(T);
-     */
-   
-      // (C,S) = S + m*n[j]
-      spMultiply(X, M[0], N[j]); // X[Upper,Lower] = m*n[j]
-      C = mpAdd(&S, &S, X+0, 1); // [C,S] = S + X[Lower]
-      mpAdd(&C, &C, X+1, 1);  // [~,C] = C + X[Upper]
-   
-      // t[j-1] = S
-      T[j-1] = S;
-      /*
-      printf("T[%d]\n", j-1);
-      printU256Number(T);
-      */
-    }
-
-    //mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
-    // (C,S) = t[s] + C
-    C = mpAdd(&S, T+NWORDS_256BIT, &C, 1);
-    /*
-    printf("6 - C : %u, S: %u\n",C,S);
-    */
-    // t[s-1] = S
-    T[NWORDS_256BIT-1] = S;
-    // t[s] = t[s+1] + C
-    mpAdd(T+NWORDS_256BIT, T+NWORDS_256BIT+1, &C, 1);
-    // t[s+1] = 0
-    T[NWORDS_256BIT+1] = 0;
-  }
-
-  /* Step 3: if(u>=n) return u-n else return u */
-  if(compu256_h(T, N) >= 0) {
-    mpSubtract(T, T, N, NWORDS_256BIT);
-  }
-
-  memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
-}
-
-
+#if 0
 /****************************************************************************/
 /** [1]
 *
@@ -1698,10 +1338,11 @@ void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t 
 
  /* Step 3: if(u>=n) return u-n else return u */
  if(compu256_h(U, N) >= 0) {
-    mpSubtract(U, U, N, NWORDS_256BIT);
+    subu256_h(U, U, N);
  }
 
 }
+#endif
 
 
 /*
@@ -2119,9 +1760,9 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
    uint32_t tmp[NWORDS_256BIT];
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
-   mpAdd(tmp, x, y, NWORDS_256BIT);
-   if(mpCompare(tmp, N, NWORDS_256BIT) >= 0) {
-      mpSubtract(tmp, tmp, N, NWORDS_256BIT);
+   addu256_h(tmp, x, y);
+   if(compu256_h(tmp, N) >= 0) {
+      subu256_h(tmp, tmp, N);
    }
 
    memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
@@ -2145,9 +1786,9 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
    uint32_t tmp[NWORDS_256BIT];
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
 
-   mpSubtract(tmp, x, y, NWORDS_256BIT);
-   if(mpCompare(tmp, N, NWORDS_256BIT) >= 0) {
-       mpAdd(tmp, tmp, N, NWORDS_256BIT);
+   subu256_h(tmp, x, y);
+   if(compu256_h(tmp, N) >= 0) {
+       addu256_h(tmp, tmp, N);
    }
 
    memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
@@ -2256,15 +1897,6 @@ uint32_t shlru256_h(uint32_t *y, uint32_t *x, uint32_t count)
 
   }
   return out; 
-}
-
-void subu256_h(uint32_t *z, uint32_t *x, uint32_t *y)
-{
-  mpSubtract(z, x, y, NWORDS_256BIT);
-}
-void addu256_h(uint32_t *z, uint32_t *x, uint32_t *y)
-{
-  mpAdd(z, x, y, NWORDS_256BIT);
 }
 
 void setbitu256_h(uint32_t *x, uint32_t n)
@@ -2432,7 +2064,7 @@ void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
   if (!memcmp(U1, U2, NWORDS_256BIT * sizeof(uint32_t))){
      if (memcmp(S1, S2, NWORDS_256BIT * sizeof(uint32_t))){
               memmove(
-                  &z,
+                  z,
                   &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
                   sizeof(uint32_t)*ECP_JAC_OUTDIMS * NWORDS_256BIT);
                return;
@@ -2516,7 +2148,7 @@ void ec2_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
   if (!memcmp(U1, U2, 2*NWORDS_256BIT * sizeof(uint32_t))){
      if (memcmp(S1, S2, 2*NWORDS_256BIT * sizeof(uint32_t))){
               memmove(
-                  &z,
+                  z,
                   &ECInf[(pidx * MISC_K_N+MISC_K_INF2) * NWORDS_256BIT],
                   sizeof(uint32_t)*ECP2_JAC_OUTDIMS * NWORDS_256BIT);
                return;

@@ -8008,11 +8008,15 @@ void test_mul(void)
      montmult_h(r, a, b, pidx);
 
      if (compu256_h(r,c)){
-        //printf("Error in mult %d\n",i);
-        //printf("Expected\n");
-        //printU256Number(c);
-        //printf("Obtained\n");
-        //printU256Number(r);
+        printf("A\n");
+        printU256Number(a);
+        printf("B\n");
+        printU256Number(b);
+        printf("Error in mult %d\n",i);
+        printf("Expected\n");
+        printU256Number(c);
+        printf("Obtained\n");
+        printU256Number(r);
         n_errors++;
      }
   }
@@ -8020,36 +8024,7 @@ void test_mul(void)
 
 }
 
-void test_mul2(void)
-{
-   uint32_t r[NWORDS_256BIT]; 
-
-   int i;
-   int pidx=1;
-   int n_errors=0;
-   const uint32_t *N = CusnarksPGet((mod_t)pidx);
-   uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
-
-   for (i=0; i < MAX_ITER*1000; i++){
-     setRandom256(a,1, N);
-     setRandom256(b,1, N);
-    
-     montmult_h(r, a, b, pidx);
-     montmult_h2(c, a, b, pidx);
-
-     if (compu256_h(r,c)){
-        printf("Error in mult %d\n",i);
-        printf("Expected\n");
-        printU256Number(r);
-        printf("Obtained\n");
-        printU256Number(c);
-        n_errors++;
-        break;
-     }
-   }
-   printf("N errors(Test_Mul FIOS opt.) : %d/%d\n",n_errors, i);
-}
-
+#if 0
 void test_mul3(void)
 {
    uint32_t r[NWORDS_256BIT]; 
@@ -8109,7 +8084,7 @@ void test_mul4(void)
    }
    printf("N errors(Test_Squaring SOS) : %d/%d\n",n_errors, i);
 }
-
+#endif
 void test_mul5(void)
 {
    uint32_t r[NWORDS_256BIT]; 
@@ -9310,12 +9285,12 @@ void  test_ec_jacscmul_opt(uint32_t ec2)
 int main()
 {
   test_mul();  // test montgomery mul with predefined results
-  test_mul2(); // test optimized impl of montgomery mul
-  test_mul3(); // test SOS impl of montgomery mul
-  test_mul4(); // test SOS impl of montgomery squaring
+  //test_mul3(); // test SOS impl of montgomery mul
+  //test_mul4(); // test SOS impl of montgomery squaring
 
   //test_mul5(); // test FIOS impl of montgomery squaring
   test_findroots();
+  /*
   test_ntt(1);
   test_ntt(0);
   test_ntt_parallel();
@@ -9344,7 +9319,7 @@ int main()
   test_nttmul_parallel2D_65K();
 
   test_nttmul_randomsize();
-
+  */
   test_sort();
 
   test_shlr();
@@ -9354,7 +9329,7 @@ int main()
   test_mul_ext();
   test_inv_ext1();
   test_inv_ext2();
-  test_mulu256();
+  //test_mulu256();
 
   test_ec_jacscmul(0);    // EC1
 
@@ -9365,7 +9340,7 @@ int main()
 
   test_ec_jacscmul_opt(0);    // EC1
   test_ec_jacscmul_opt(1);    // EC2
-  
+
   return 1;
 }
 
