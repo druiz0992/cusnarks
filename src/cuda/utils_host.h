@@ -171,6 +171,58 @@ inline int32_t compu256_h(const uint32_t *a, const uint32_t *b)
 
 }
 
+/* 
+   Compare 256 bit integers X and Y.
+
+   uint32_t *x : 256 bit integer x
+   uint32_t *y : 256 bit integer y
+
+   returns 
+      1          : x < y
+      0         : x >= y
+*/
+inline int32_t ltu256_h(const uint32_t *x, const uint32_t *y)
+{
+  return (compu256_h(x, y) < 0);
+}
+
+/* 
+   Compare 256 bit integers X and Y.
+
+   uint32_t *x : 256 bit integer x
+   uint32_t *y : 256 bit integer y
+
+   returns 
+      1          : x == y
+      0         : x != y
+*/
+inline int32_t equ256_h(const uint32_t *x, const uint32_t *y)
+{
+  return (compu256_h(x, y) == 0);
+}
+
+/* 
+   Compare ECP affine 256 bit integers X and Y. (two coordinates)
+
+   uint32_t *x : 256 bit ECP x
+   uint32_t *y : 256 bit ECP y
+
+   returns 
+      1          : x == y
+      0         : x != y
+*/
+inline int32_t ec_iseq_h(const uint32_t *x, const uint32_t *y)
+{
+  return ( (compu256_h(x, y) == 0) &&
+	   (compu256_h(&x[NWORDS_256BIT], &y[NWORDS_256BIT])==0) );
+}
+inline int32_t ec2_iseq_h(const uint32_t *x, const uint32_t *y)
+{
+  return ( (compu256_h(x, y) == 0) &&
+	   (compu256_h(&x[NWORDS_256BIT], &y[NWORDS_256BIT])==0) &&
+	   (compu256_h(&x[2*NWORDS_256BIT], &y[2*NWORDS_256BIT])==0) &&
+	   (compu256_h(&x[3*NWORDS_256BIT], &y[3*NWORDS_256BIT])==0) );
+}
 
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
@@ -191,7 +243,6 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
 void intt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t N_fftx, uint32_t N_ffty, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx);
 void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
-int32_t ltu256_h(const uint32_t *x, const uint32_t *y);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
 void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len);
@@ -202,7 +253,9 @@ void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
 void ec_stripc_h(uint32_t *z, uint32_t *x, uint32_t n);
 void ec2_stripc_h(uint32_t *z, uint32_t *x, uint32_t n);
 void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
+void ec_jacaddmixed_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
 void ec2_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
+void ec2_jacaddmixed_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
 void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec2_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);

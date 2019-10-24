@@ -1008,7 +1008,7 @@ __forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1
 	  return;  
         } 
         //logInfoTid("R4=D %d\n", midx);
-        doublecjac<T1, T2>(zxr,zxr, midx);
+        doublecjac<T1, T2>(zxr,zx2, midx);
         return;
   }
   subz(&tmp1, &x2, &tmp_z, midx);     // H = tmp1 = u2 - u1
