@@ -1154,11 +1154,11 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
    
       // (C,S) = S + m*n[j]
       mulu64_h(X, M, &dN[j]); // X[Upper,Lower] = m*n[j]
-      C = addu64_h(&S, &S, X+0); // [C,S] = S + X[Lower]
+      C = addu64_h(&dT[j-1], &S, X+0); // [C,S] = S + X[Lower]
       addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper]
    
       // t[j-1] = S
-      dT[j-1] = S;
+      //dT[j-1] = S;
       /*
       printf("T[%d]\n", j-1);
       printU256Number(T);
@@ -1168,12 +1168,12 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 
     //mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
     // (C,S) = t[s] + C
-    C = addu64_h(&S, dT+NWORDS_256BIT/2, &C);
+    C = addu64_h(&dT[NWORDS_256BIT/2-1], dT+NWORDS_256BIT/2, &C);
     /*
     printf("6 - C : %u, S: %u\n",C,S);
     */
     // t[s-1] = S
-    dT[NWORDS_256BIT/2-1] = S;
+    //dT[NWORDS_256BIT/2-1] = S;
     // t[s] = t[s+1] + C
     addu64_h(dT+NWORDS_256BIT/2, dT+NWORDS_256BIT/2+1, &C);
     // t[s+1] = 0
