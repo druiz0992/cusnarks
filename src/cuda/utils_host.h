@@ -224,6 +224,7 @@ inline int32_t ec2_iseq_h(const uint32_t *x, const uint32_t *y)
 	   (compu256_h(&x[3*NWORDS_256BIT], &y[3*NWORDS_256BIT])==0) );
 }
 
+
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void mulN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
@@ -245,7 +246,7 @@ void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
-void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len);
+void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t sort_en);
 void setRandom(uint32_t *x, const uint32_t);
 void setRandom256(uint32_t *x, uint32_t nsamples, const uint32_t *p);
 void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
@@ -260,16 +261,27 @@ void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec2_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
 void ec2_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
-void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t order,  uint32_t pidx, uint32_t add_last);
-void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t order,  uint32_t pidx, uint32_t add_last);
-uint32_t * ec_inittable(uint32_t *x, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last);
-uint32_t * ec2_inittable(uint32_t *x, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last);
+void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable,uint32_t n, uint32_t order,
+	      	uint32_t pidx, uint32_t add_last);
+void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable,
+	       	uint32_t n, uint32_t order,  uint32_t pidx, uint32_t add_last);
+uint32_t * ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last);
+uint32_t * ec2_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last);
 void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last);
 void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last);
 void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last);
 void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last);
 uint32_t ec_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx);
 uint32_t ec2_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx);
+uint32_t ec_isinf(const uint32_t *x, const uint32_t pidx);
+uint32_t ec2_isinf(const uint32_t *x, const uint32_t pidx);
+void ec_isinf(uint32_t *z, const uint32_t *x, const uint32_t n, const uint32_t pidx);
+void ec2_isinf(uint32_t *z, const uint32_t *x, const uint32_t n, const uint32_t pidx);
+uint32_t ec_jacreduce_init_h(uint32_t **ectable, uint32_t **scmul, uint32_t n, uint32_t order);
+uint32_t ec2_jacreduce_init_h(uint32_t **ectable, uint32_t **scmul, uint32_t n, uint32_t order);
+void ec_jacreduce_del_h(uint32_t *ectable, uint32_t *scmul);
+void ec_jacreduce_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last);
+void ec2_jacreduce_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last);
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last);
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);

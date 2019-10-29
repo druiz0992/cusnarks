@@ -72,7 +72,7 @@ cdef extern from "../cuda/utils_host.h" nogil:
 
     ct.uint32_t czpoly_norm_h "zpoly_norm_h" (ct.uint32_t *pin, ct.uint32_t cidx)
 
-    void csortu256_idx_h "sortu256_idx_h" (ct.uint32_t *idx, ct.uint32_t *v, ct.uint32_t l)
+    void csortu256_idx_h "sortu256_idx_h" (ct.uint32_t *idx, ct.uint32_t *v, ct.uint32_t l, ct.uint32_t sort_en)
 
     void creadU256DataFile_h "readU256DataFile_h"(ct.uint32_t *samples, 
                                                   const char *filename, ct.uint32_t insize,
@@ -145,12 +145,14 @@ cdef extern from "../cuda/utils_host.h" nogil:
                                            ct.uint32_t add_last)
 
     void cec_jacscmul_opt_h "ec_jacscmul_opt_h"(ct.uint32_t *z, ct.uint32_t *scl, 
-                                                 ct.uint32_t *x, ct.uint32_t n,
+                                                 ct.uint32_t *x, ct.uint32_t *ectable, 
+                                                 ct.uint32_t n,
                                                  ct.uint32_t order,  ct.uint32_t pidx,
                                                  ct.uint32_t add_last)
 
     void cec2_jacscmul_opt_h "ec2_jacscmul_opt_h"(ct.uint32_t *z, ct.uint32_t *scl,
-                                                   ct.uint32_t *x, ct.uint32_t n,
+                                                   ct.uint32_t *x, ct.uint32_t *ectable,
+                                                   ct.uint32_t n,
                                                    ct.uint32_t order,  ct.uint32_t pidx,
                                                    ct.uint32_t add_last)
 
@@ -170,6 +172,16 @@ cdef extern from "../cuda/utils_host.h" nogil:
                                                    ct.uint32_t to_aff, ct.uint32_t add_in,
                                                    ct.uint32_t strip_last);
 
+    void cec_jacreduce_h "ec_jacreduce_h" (ct.uint32_t *z, ct.uint32_t *scl,
+                                              ct.uint32_t *x, ct.uint32_t n, 
+                                              ct.uint32_t pidx, ct.uint32_t to_aff,
+                                              ct.uint32_t add_in, ct.uint32_t strip_last)
+
+    void cec2_jacreduce_h "ec2_jacreduce_h" (ct.uint32_t *z, ct.uint32_t *scl,
+                                              ct.uint32_t *x, ct.uint32_t n, 
+                                              ct.uint32_t pidx, ct.uint32_t to_aff,
+                                              ct.uint32_t add_in, ct.uint32_t strip_last)
+
     void cto_montgomeryN_h "to_montgomeryN_h"(ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n,
                                               ct.uint32_t pidx)
 
@@ -180,6 +192,10 @@ cdef extern from "../cuda/utils_host.h" nogil:
     void cec_stripc_h "ec_stripc_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n)
 
     void cec2_stripc_h "ec2_stripc_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t n)
+
+    void cec_isinf "ec_isinf" (ct.uint32_t *z, const ct.uint32_t *x, const ct.uint32_t n, const ct.uint32_t pidx)
+
+    void cec2_isinf "ec2_isinf" (ct.uint32_t *z, const ct.uint32_t *x, const ct.uint32_t n, const ct.uint32_t pidx)
 
     void cfield_roots_compute_h "field_roots_compute_h" (ct.uint32_t *roots, ct.uint32_t nbits)
 
