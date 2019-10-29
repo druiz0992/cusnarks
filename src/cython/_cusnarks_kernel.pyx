@@ -533,7 +533,7 @@ def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
 
     return idx
 
-def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
+def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin, ct.uint32_t sort_en):
     if len(vin)==0:
       return np.asarray([],dtype=np.uint32)
 
@@ -544,7 +544,7 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
     vin_flat = np.reshape(vin,-1)
 
     with nogil:
-      uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
+      uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0], sort_en)
 
     return idx_flat
 
@@ -739,11 +739,6 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
            uh.cmontmult_h(&out_vec[j,0], &out_vec[j,0], &one[0], pidx)
            v_offset += NWORDS_256BIT
            c_offset = v_offset
-        #TODO I could add n constraints here and not affect previous calculation
-        """
-        for j in xrange(nVars-1):
-            in_veca[j+2]+= in_veca[j+1]
-        """
 
         return out_vec
 
@@ -884,7 +879,7 @@ def ec_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
      out_n = <int> ((n + U256_BSELM -1)/U256_BSELM)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(out_n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
 
-     uh.cec_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, <ct.uint32_t> U256_BSELM, pidx, add_last)
+     uh.cec_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], <ct.uint32_t *> 0,n, <ct.uint32_t> U256_BSELM, pidx, add_last)
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
@@ -900,7 +895,7 @@ def ec2_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
      out_n = <int> ((n + U256_BSELM -1)/U256_BSELM)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(out_n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
 
-     uh.cec2_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, <ct.uint32_t> U256_BSELM, pidx, add_last)
+     uh.cec2_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], <ct.uint32_t *>0, n, <ct.uint32_t> U256_BSELM, pidx, add_last)
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
  
@@ -954,6 +949,40 @@ def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
 
   return np.reshape(outv,(-1, NWORDS_256BIT))
 
+
+def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+
+  uh.cec_jacreduce_h(&outv[0], &inscl[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec2_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP2_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+
+  uh.cec2_jacreduce_h(&outv[0], &inscl[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
 
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
@@ -1021,6 +1050,22 @@ def ec2_stripc_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v):
      uh.cec2_stripc_h(&out_v[0], &in_v[0], <int>(n/(4*NWORDS_256BIT)))
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
+
+def ec_isinf(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx):
+    cdef ct.uint32_t n = <unsigned int>len(in_v)/(ECP_JAC_INDIMS *NWORDS_256BIT)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
+
+    uh.cec_isinf(&out_v[0], &in_v[0], n, pidx)
+
+    return (out_v)
+
+def ec2_isinf(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx):
+    cdef ct.uint32_t n = <unsigned int>len(in_v)/(ECP2_JAC_INDIMS *NWORDS_256BIT)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
+
+    uh.cec2_isinf(&out_v[0], &in_v[0], n, pidx)
+
+    return (out_v)
 
 def field_roots_compute_h(ct.uint32_t nbits):
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros((1<<nbits) * NWORDS_256BIT, dtype=np.uint32)

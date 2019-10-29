@@ -8879,7 +8879,7 @@ void test_sort(void)
 
   setRandom256(samples, LEN,NULL);
 
-  sortu256_idx_h(idx_v,samples,LEN);
+  sortu256_idx_h(idx_v,samples,LEN,1);
   for (uint32_t i=0; i< LEN-1; i++){
     if(compu256_h(&samples[idx_v[i]*NWORDS_256BIT],&samples[idx_v[i+1]*NWORDS_256BIT]) > 0) {
        n_errors++;
@@ -9242,10 +9242,10 @@ void  test_ec_jacscmul_opt(uint32_t ec2)
    in_ecp = &samples[nec_points * NWORDS_256BIT];
 
    if (ec2){ 
-     ec2_jacscmul_opt_h(out_ecp1, scl, in_ecp, nec_points, order, 0,1); 
+     ec2_jacscmul_opt_h(out_ecp1, scl, in_ecp, NULL,nec_points, order, 0,1); 
      ec2_jacaddreduce_h(out_ecp2, out_ecp1, n_tables , 0, 1, 0, 1);
    } else {
-     ec_jacscmul_opt_h(out_ecp1, scl, in_ecp, nec_points, order, 0,1); 
+     ec_jacscmul_opt_h(out_ecp1, scl, in_ecp, NULL, nec_points, order, 0,1); 
      ec_jacaddreduce_h(out_ecp2, out_ecp1, n_tables , 0, 1, 0, 1);
    }
 
@@ -9258,6 +9258,67 @@ void  test_ec_jacscmul_opt(uint32_t ec2)
    free(samples);
    free(out_ecp1);
    free(out_ecp2);
+   free(r_aff);
+}
+
+
+void  test_ec_jacreduce_opt(uint32_t ec2)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
+   if (ec2) {
+        indims = ECP2_JAC_INDIMS;
+        outdims = ECP2_JAC_OUTDIMS;
+   }
+
+   struct stat st;
+
+   if (ec2){
+     stat(input2_test_scmul_filename, &st);
+   } else {
+     stat(input_test_scmul_filename, &st);
+   }
+	    
+   uint32_t  nec_points = st.st_size/(NWORDS_256BIT*sizeof(uint32_t)*(indims+1));
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2,*samples,  *r_aff;
+   uint32_t i;
+   uint32_t n_errors=0;
+
+   samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp1 = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   r_aff =  (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+
+   if (ec2){
+     readU256DataFile_h(samples, input2_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r_aff, input2_test_scmul_reduction_soln_filename,
+                       indims, indims);
+   } else {
+     readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+     readU256DataFile_h(r_aff, input_test_scmul_reduction_soln_filename,
+                       indims, indims);
+   }
+
+   scl = samples;
+   in_ecp = &samples[nec_points * NWORDS_256BIT];
+
+   if (ec2){ 
+     // Multiply points
+     ec2_jacreduce_h(out_ecp1, scl, in_ecp, nec_points, 0, 1, 1, 1);
+   } else{
+     // Multiply points
+     ec_jacreduce_h(out_ecp1, scl, in_ecp, nec_points, 0, 1, 1, 1);
+   }
+   if (memcmp(r_aff, out_ecp1,
+              indims*NWORDS_256BIT*sizeof(uint32_t)) ){
+        n_errors++;
+   }
+
+   printf("N errors(JACREDUCE_OPT %d) : %d\n",ec2,n_errors);
+
+   free(samples);
+   free(out_ecp1);
    free(r_aff);
 }
 
@@ -9319,6 +9380,9 @@ int main()
 
   test_ec_jacscmul_opt(0);    // EC1
   test_ec_jacscmul_opt(1);    // EC2
+
+  test_ec_jacreduce_opt(0);
+  test_ec_jacreduce_opt(1);
 
   return 1;
 }
