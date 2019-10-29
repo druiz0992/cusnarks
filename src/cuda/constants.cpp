@@ -383,6 +383,8 @@ const uint32_t * CusnarksMiscKGet(void)
 {
   return misc_const_init;
 }
+
+
 const uint32_t * CusnarksW32RootsGet(void)
 {
   //TODO Retrieve root file name and number of roots from config file
@@ -456,3 +458,30 @@ const uint32_t *CusnarksPrimitiveRootsFieldGet(uint32_t nbits)
   return &proots_field[nbits*NWORDS_256BIT];
 }
 
+uint32_t CusnarksGetNRoots(void)
+{
+  FILE *ifp;
+  char n_roots_c[1000];
+  uint32_t n_roots;
+  char *end;
+
+  ifp = fopen(config_nroots_filename,"r");
+  fgets(n_roots_c, sizeof(n_roots_c), ifp);
+  n_roots = strtol(n_roots_c, &end, 10);
+  fclose(ifp);
+
+  return n_roots;
+}
+void CusnarksGetFRoots(char *filename, uint32_t sizeof_f)
+{
+  FILE *ifp;
+  char *end;
+
+  ifp = fopen(config_roots_filename,"r");
+  fgets(filename, sizeof_f, ifp);
+  fclose(ifp);
+
+  if( (end = strchr(filename, '\n')) != NULL)
+    *end = '\0';
+
+}
