@@ -35,6 +35,7 @@
 #define _TYPES_H_
 
 #define NWORDS_256BIT           (8)
+#define NWORDS_256BIT_SHIFT     (3)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
 #define PRIME_BASE           (30)

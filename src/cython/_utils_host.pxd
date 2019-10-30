@@ -48,22 +48,22 @@ cdef extern from "../cuda/utils_host.h" nogil:
 
     void csubm_h "subm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
 
-    void cntt_h "ntt_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t L, ct.uint32_t rstride, ct.uint32_t pidx)
+    void cntt_h "ntt_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t L, ct.t_uint64 astride,  ct.t_uint64 rstride, ct.uint32_t pidx)
 
     void cintt_h "intt_h" (ct.uint32_t *A, ct.uint32_t *roots, ct.uint32_t fmat, ct.uint32_t L, 
-                           ct.uint32_t rstride, ct.uint32_t pidx)
+                           ct.t_uint64 rstride, ct.uint32_t pidx)
 
     void cfind_roots_h "find_roots_h" (ct.uint32_t *roots, ct.uint32_t *primitive_root,
                                        ct.uint32_t nroots, ct.uint32_t pidx)
 
     void cntt_parallel_h "ntt_parallel_h" (ct.uint32_t *A, ct.uint32_t *roots, 
                                            ct.uint32_t Nrows, ct.uint32_t Ncols,
-                                           ct.uint32_t rstride, ct.uint32_t pidx)
+                                           ct.t_uint64 rstride, ct.uint32_t pidx)
 
     void cntt_parallel2D_h "ntt_parallel2D_h" (ct.uint32_t *A, ct.uint32_t *roots,
                                                ct.uint32_t Nrows, ct.uint32_t fft_Ny,  
                                                ct.uint32_t Ncols, ct.uint32_t fft_Nx,
-                                               ct.uint32_t rstride, ct.uint32_t pidx)
+                                               ct.t_uint64 rstride, ct.uint32_t pidx)
 
     void cntt_build_h "ntt_build_h" (ct.fft_params_t *ntt_params, ct.uint32_t nsamples)
 
