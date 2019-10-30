@@ -149,6 +149,8 @@ class GrothSetup(object):
 
         copy_input_files([in_circuit_f], self.keep_f)
 
+        self.sort_en = 1
+
         logging.info('#################################### ')
         logging.info('Staring Groth setup with the follwing arguments :')
         logging.info(' - curve : %s',curve)
@@ -165,6 +167,7 @@ class GrothSetup(object):
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
         logging.info(' - bs : %s', batch_size)
+        logging.info(' - sort enable : %s', self.sort_en)
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
@@ -283,6 +286,17 @@ class GrothSetup(object):
         end_s = time.time()
         self.t_S['total'] = end_s - start_s
         self.t_S['cal Crypto'] = end_s - start
+
+        logging.info('')
+        logging.info('#################################### ')
+        logging.info('')
+        logging.info('EC P Density')
+        logging.info('A  : %s',round(self.pk['A_density'],2))
+        logging.info('B1 : %s',round(self.pk['B1_density'],2))
+        logging.info('B2 : %s',round(self.pk['B2_density'],2))
+        logging.info('C  : %s',round(self.pk['C_density'],2))
+        logging.info('')
+        logging.info('#################################### ')
 
         logging.info('')
         logging.info('Setup completed')
@@ -506,7 +520,7 @@ class GrothSetup(object):
       self.t_S['init k'] = end - start
       start = time.time()
       # a_t, b_t and c_t are in ext
-      sorted_idx = sortu256_idx_h(a_t_u256)
+      sorted_idx = sortu256_idx_h(a_t_u256,self.sort_en)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point A to Affine coordinates')
@@ -518,6 +532,8 @@ class GrothSetup(object):
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
       self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
+      infv = ec_isinf(np.reshape(self.pk['A'],-1), ZField.get_field())
+      self.pk['A_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
       #self.pk['A_table'] = ec_inittable_h(np.reshape(self.pk['A'],-1), U256_BSELM, MOD_GROUP, 1)
 
@@ -529,7 +545,7 @@ class GrothSetup(object):
 
     
       logging.info(' Computing EC Point B1')
-      sorted_idx = sortu256_idx_h(b_t_u256)
+      sorted_idx = sortu256_idx_h(b_t_u256,self.sort_en)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point B1 to Affine coordinates')
@@ -542,6 +558,8 @@ class GrothSetup(object):
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
       #self.pk['B1_table'] = ec_inittable_h(np.reshape(self.pk['B1'],-1), U256_BSELM, MOD_GROUP, 1)
+      infv = ec_isinf(np.reshape(self.pk['B1'],-1), ZField.get_field())
+      self.pk['B1_density'] = 100.0  - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
       end= time.time()
       self.t_S['B1 gpu'] = t1
@@ -562,6 +580,8 @@ class GrothSetup(object):
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
       self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
+      infv = ec2_isinf(np.reshape(self.pk['B2'],-1), ZField.get_field())
+      self.pk['B2_density'] = 100.0 - 100 * np.count_nonzero(infv == 1) / len(infv)
 
       self.t_S['B2 gpu'] = t1
       end= time.time()
@@ -578,7 +598,7 @@ class GrothSetup(object):
                                       a_t_u256, b_t_u256, c_t_u256, self.pk['nPublic']+1, self.pk['nVars'], pidx )
 
       ZField.set_field(MOD_GROUP)
-      sorted_idx = sortu256_idx_h(ps_u256)
+      sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point C to Affine coordinates')
@@ -591,6 +611,8 @@ class GrothSetup(object):
       self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
       #self.pk['C_table'] = ec_inittable_h(np.reshape(self.pk['C'],-1), U256_BSELM, MOD_GROUP, 1)
+      infv = ec_isinf(np.reshape(self.pk['C'],-1), ZField.get_field())
+      self.pk['C_density'] = 100.0 - 100.0 * np.count_nonzero(infv == 1) / len(infv)
 
       del ps_u256
 
@@ -610,7 +632,7 @@ class GrothSetup(object):
       eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), np.reshape(zod_u256,-1), maxH, pidx)
 
       ZField.set_field(MOD_GROUP)
-      sorted_idx = sortu256_idx_h(eT_u256)
+      sorted_idx = sortu256_idx_h(eT_u256,self.sort_en)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point hExps to Affine coordinates')
@@ -637,7 +659,7 @@ class GrothSetup(object):
                                       toxic_invGamma.reduce().as_uint256(),
                                       a_t_u256, b_t_u256, c_t_u256, 0, self.pk['nPublic']+1, pidx )
       ZField.set_field(MOD_GROUP)
-      sorted_idx = sortu256_idx_h(ps_u256)
+      sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point IC to Affine coordinates')

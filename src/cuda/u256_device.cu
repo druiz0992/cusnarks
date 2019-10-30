@@ -733,13 +733,12 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
    * www.microsoft.com/en-us/research/wp-content/uploads/1998/06/97Acar.pdf
 
 */
-#if 1
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     uint32_t i,j;
-    uint32_t S, C=0, C1, C2,C3,Ar[NWORDS_256BIT],Br[NWORDS_256BIT];
-    uint32_t __restrict__ M[2], X[2];
-    uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t S, C=0, C1, C2,C3;
+    uint32_t __restrict__ M, X[2];
+    uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0};
     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 
@@ -747,7 +746,6 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
     //movu256(Br,(uint32_t *)B);
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    LOG_TID;
     //logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
     //logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
     #pragma unroll
@@ -764,65 +762,152 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
       //logInfoTid("C3: %u\n",C3);
       //logInfoBigNumberTid(1,"T\n",T);
 
-       // m = S*n'[0] mod W, where W=2^32
-       // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-       mulu32(M, S, PN_u256[0]);
-       //logInfoTid("M[0]: %u\n", M[0]);
-       //logInfoTid("M[1]: %u\n", M[1]);
+      // m = S*n'[0] mod W, where W=2^32
+      // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
+      mulu32lo(&M, S, PN_u256[0]);
+      //logInfoTid("M[0]: %u\n", M);
 
-       // (C,S) = S + m*n[0], worst case 2 words
-       madcu32(&C,&S,M[0],P_u256[0],S);
-       //logInfoTid("1 - C: %u\n",C );
-       //logInfoTid("1 - S: %u\n", S);
+      // (C,S) = S + m*n[0], worst case 2 words
+      madcu32(&C,&S,M,P_u256[0],S);
+      //logInfoTid("1 - C: %u\n",C );
+      //logInfoTid("1 - S: %u\n", S);
   
-       #pragma unroll
-       for(j=1; j<NWORDS_256BIT; j++)
-       {
-         // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-         mulu32(X, A[j], B[i]);
-         addcu32(&C1, &S, T[j], C);
-         //logInfoTid("2 - C1: %u\n",C1 );
-         //logInfoTid("2 - S: %u\n",S );
-         addcu32(&C2, &S, S, X[0]);
-         //logInfoTid("3 - C2: %u\n",C2 );
-         //logInfoTid("3 - S: %u\n",S );
-         //logInfoTid("X[0]: %u\n",X[0] );
-         //logInfoTid("X[1]: %u\n",X[1] );
-         addcu32(&X[0], &C, C1, X[1]);
-         //logInfoTid("4 - C: %u\n",C );
-         addcu32(&C1, &C, C, C2);
-         //logInfoTid("5 - C: %u, C4: %d\n",C, C4 );
-  
-         // ADD(t[j+1],C)
-         //C +=C3;
-         addcu32(&C2, &C, C, C3);
-         C1 +=C2;
-         addcu32(&C2, &T[j+1], T[j+1], C);
-         C3 =C2 + C1;
-         //propcu32(T,C,j+1);
-         //logInfoBigNumberTid(1,"T\n",T);
-  
-         // (C,S) = S + m*n[j]
-         madcu32(&C,&S,M[0], P_u256[j],S);
-         //logInfoTid("6 - C: %u\n",C );
-         //logInfoTid("6 - S: %u\n",S );
-  
-         // t[j-1] = S
-         T[j-1] = S;
-         //logInfoBigNumberTid(1,"T\n",T);
-       }
+      // FIRST IT
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[1], B[i]);
+      addcu32(&C1, &S, T[1], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
 
-       //propcu32_extend(T,C3);
-       // (C,S) = t[s] + C
-       addcu32(&C,&S, T[NWORDS_256BIT], C);
-       //logInfoTid("6 - C: %u\n",C );
-       //logInfoTid("6 - S: %u\n",S );
-       // t[s-1] = S
-       T[NWORDS_256BIT-1] = S;
-       // t[s] = t[s+1] + C
-       addcu32(&X[0],&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
-       // t[s+1] = 0
-       T[NWORDS_256BIT+1] = 0;
+      // ADD(t[2],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[2], T[2], C);
+      C3 =C2 + C1;
+
+      // (C,S) = S + m*n[1]
+      madcu32(&C,&T[0],M, P_u256[1],S);
+
+      //j=2
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[2], B[i]);
+      addcu32(&C1, &S, T[2], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
+ 
+      // ADD(t[j+1],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[3], T[3], C);
+      C3 =C2 + C1;
+ 
+      // (C,S) = S + m*n[j]
+      madcu32(&C,&T[1],M, P_u256[2],S);
+ 
+      // j = 3
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[3], B[i]);
+      addcu32(&C1, &S, T[3], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
+
+      // ADD(t[j+1],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[4], T[4], C);
+      C3 =C2 + C1;
+
+      // (C,S) = S + m*n[j]
+      madcu32(&C,&T[2],M, P_u256[3],S);
+
+      // j = 4
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[4], B[i]);
+      addcu32(&C1, &S, T[4], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
+
+      // ADD(t[j+1],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[5], T[5], C);
+      C3 =C2 + C1;
+
+      // (C,S) = S + m*n[j]
+      madcu32(&C,&T[3],M, P_u256[4],S);
+
+      // j = 5
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[5], B[i]);
+      addcu32(&C1, &S, T[5], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
+
+      // ADD(t[j+1],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[6], T[6], C);
+      C3 =C2 + C1;
+
+      // (C,S) = S + m*n[j]
+      madcu32(&C,&T[4],M, P_u256[5],S);
+
+      // j = 6
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[6], B[i]);
+      addcu32(&C1, &S, T[6], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
+
+      // ADD(t[j+1],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[7], T[7], C);
+      C3 =C2 + C1;
+
+      // (C,S) = S + m*n[j]
+      madcu32(&C,&T[5],M, P_u256[6],S);
+
+      // j = 7
+      // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
+      mulu32(X, A[7], B[i]);
+      addcu32(&C1, &S, T[7], C);
+      addcu32(&C2, &S, S, X[0]);
+      addcu32(&X[0], &C, C1, X[1]);
+      addcu32(&C1, &C, C, C2);
+
+      // ADD(t[j+1],C)
+      //C +=C3;
+      addcu32(&C2, &C, C, C3);
+      C1 +=C2;
+      addcu32(&C2, &T[8], T[8], C);
+      C3 =C2 + C1;
+
+      // (C,S) = S + m*n[j]
+      madcu32(&C,&T[6],M, P_u256[7],S);
+
+      //propcu32_extend(T,C3);
+      // (C,S) = t[s] + C
+      addcu32(&C,&T[7], T[NWORDS_256BIT], C);
+      //logInfoTid("6 - C: %u\n",C );
+      //logInfoTid("6 - S: %u\n",S );
+      // t[s-1] = S
+      // t[s] = t[s+1] + C
+      addcu32(&X[0],&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
+      // t[s+1] = 0
+      T[NWORDS_256BIT+1] = 0;
    }
 
    /* Step 3: if(u>=n) return u-n else return u */
@@ -834,215 +919,7 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    }
    return;
 }
-#else
-__device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
-{ 
-    uint32_t i,j;
-    uint32_t S, C=0, C1, C2,C3,Ar[NWORDS_256BIT],Br[NWORDS_256BIT];
-    uint32_t __restrict__ M[2], X[2];
-    uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0,0};
-    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 
-    movu256(Ar,(uint32_t *)A);
-    movu256(Br,(uint32_t *)B);
-
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    LOG_TID;
-    //logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
-    //logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
-    #pragma unroll
-    for(i=0; i<NWORDS_256BIT; i++)
-    {
-       // (C,S) = t[0] + a[0]*b[i], worst case 2 words
-       madcu32(&C,&S,Ar[0],Br[i],T[0]);
-
-       // ADD(t[1],C)
-       //propcu32(T, C, 1);
-       addcu32(&C3, &T[1], T[1], C);
-       //logInfoTid("C3: %u\n",C3);
-       //logInfoBigNumberTid(1,"T\n",T);
-
-       // m = S*n'[0] mod W, where W=2^32
-       // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-       mulu32(M, S, PN_u256[0]);
-       //logInfoTid("M[0]: %u\n", M[0]);
-       //logInfoTid("M[1]: %u\n", M[1]);
-
-       // (C,S) = S + m*n[0], worst case 2 words
-       madcu32(&C,&S,M[0],P_u256[0],S);
-       //logInfoTid("1 - C: %u\n",C );
-       //logInfoTid("1 - S: %u\n", S);
-  
-       // j = 1
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[1], Br[i]);
-       addcu32(&C1, &S, T[1], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
-  
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[2], T[2], C);
-       C3 =C2 + C1;
-  
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[i],S);
-  
-       // t[j-1] = S
-       T[0] = S;
-       /////////////////
-       //j=2
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[2], Br[i]);
-       addcu32(&C1, &S, T[2], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
-  
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[3], T[3], C);
-       C3 =C2 + C1;
-
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[2],S);
- 
-       // t[j-1] = S
-       T[1] = S;
-
-       //////////
-       //j = 3
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[3], Br[i]);
-       addcu32(&C1, &S, T[3], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
-  
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[4], T[4], C);
-       C3 =C2 + C1;
-  
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[3],S);
-  
-       // t[j-1] = S
-       T[2] = S;
-
-       ///////////
-       //j = 4
-       
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[4], Br[i]);
-       addcu32(&C1, &S, T[4], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
-  
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[5], T[5], C);
-       C3 =C2 + C1;
-  
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[4],S);
-  
-       // t[j-1] = S
-       T[3] = S;
-
-       ///////////
-       // j = 5
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[5], Br[i]);
-       addcu32(&C1, &S, T[5], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
-  
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[6], T[6], C);
-       C3 =C2 + C1;
-  
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[5],S);
-  
-       // t[j-1] = S
-       T[4] = S;
-
-       /////////
-       //j = 6
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[6], Br[i]);
-       addcu32(&C1, &S, T[6], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
- 
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[7], T[7], C);
-       C3 =C2 + C1;
-
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[6],S);
-  
-       // t[j-1] = S
-       T[5] = S;
-
-       /////////////
-       // j = 7
-       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
-       mulu32(X, Ar[7], Br[i]);
-       addcu32(&C1, &S, T[7], C);
-       addcu32(&C2, &S, S, X[0]);
-       addcu32(&X[0], &C, C1, X[1]);
-       addcu32(&C1, &C, C, C2);
-  
-       // ADD(t[j+1],C)
-       addcu32(&C2, &C, C, C3);
-       C1 +=C2;
-       addcu32(&C2, &T[8], T[8], C);
-       C3 =C2 + C1;
-  
-       // (C,S) = S + m*n[j]
-       madcu32(&C,&S,M[0], P_u256[7],S);
-  
-       // t[j-1] = S
-       T[6] = S;
-
-       //propcu32_extend(T,C3);
-       // (C,S) = t[s] + C
-       addcu32(&C,&S, T[NWORDS_256BIT], C);
-       //logInfoTid("6 - C: %u\n",C );
-       //logInfoTid("6 - S: %u\n",S );
-       // t[s-1] = S
-       T[NWORDS_256BIT-1] = S;
-       // t[s] = t[s+1] + C
-       addcu32(&X[0],&T[NWORDS_256BIT], T[NWORDS_256BIT+1], C);
-       // t[s+1] = 0
-       T[NWORDS_256BIT+1] = 0;
-   }
-
-   /* Step 3: if(u>=n) return u-n else return u */
-   if (ltu256(P_u256,T)){
-   //if (P_u256[NWORDS_256BIT-1] < T[NWORDS_256BIT-1]){
-      subu256(U,T,P_u256);
-   } else {
-       movu256(U,T);
-   }
-   return;
-}
-#endif
 #if 0
 // SOS Version is commented out because FIOS performs better (even squaring). I leave it here in case
 // i decide to optimized

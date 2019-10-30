@@ -87,6 +87,18 @@ __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uin
       : "=r"(z[0]), "=r"(z[1])
       : "r"(x), "r"(y));
 }
+/*
+   x * y for 32 bit number. Returns low 32 bit number
+ */
+__forceinline__ __device__ void mulu32lo(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
+{
+  // z[i] = x * y for 32 bit words
+  asm("{                                    \n\t"
+      "mul.lo.u32             %0, %1,    %2;\n\t"           
+      "}                                    \n\t"
+      : "=r"(z[0])
+      : "r"(x), "r"(y));
+}
 
 
 /*
