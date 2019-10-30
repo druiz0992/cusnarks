@@ -178,6 +178,8 @@ class GrothProver(object):
         else:
            self.test_f= self.keep_f + '/' + test_f
 
+        self.sort_en = 0
+
         logging.info('#################################### ')
         logging.info('Initializing Groth prover with the follwing parameters :')
         logging.info(' - curve : %s',curve)
@@ -191,6 +193,7 @@ class GrothProver(object):
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
         logging.info(' - n available GPUs : %s', self.n_gpu)
+        logging.info(' - sort enable : %s', self.sort_en)
         logging.info('#################################### ')
   
         # convert data to array of bytes so that it can be easily transfered to shared mem
@@ -940,13 +943,15 @@ class GrothProver(object):
                                   self.batch_size_mexp_phase1,
                                   self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]+1), pk_bin,
                                   change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
-                                  change_r_scl_idx = [self.ec_type_dict['A'][2]])
+                                  change_r_scl_idx = [self.ec_type_dict['A'][2]],
+                                  sort_en=self.sort_en)
 
 
         self.findECPointsDispatch(
                              self.dispatch_table_phase2,
                              nPublic+2,
-                             self.dispatch_table_phase2.shape[0]+1, pk_bin)
+                             self.dispatch_table_phase2.shape[0]+1, pk_bin,
+                             sort_en = self.sort_en)
 
         # Assign collected values to pi's
         self.assignECPvalues(compute_ECP=False)
@@ -977,7 +982,8 @@ class GrothProver(object):
                                   self.batch_size_mexp_phase3,
                                   self.dispatch_table_phase3.shape[0]-1, pk_bin,
                                   sort_idx = self.ec_type_dict['hExps'][2],
-                                  change_rs_scl_idx = [self.ec_type_dict['hExps'][2]])
+                                  change_rs_scl_idx = [self.ec_type_dict['hExps'][2]],
+                                  sort_en=self.sort_en)
 
         self.assignECPvalues(compute_ECP=True)
 
@@ -1135,7 +1141,7 @@ class GrothProver(object):
 
 
     def findECPointsDispatch(self, dispatch_table, batch_size, last_batch_idx, pk_bin,
-                             sort_idx=0, change_s_scl_idx=[-1], change_r_scl_idx=[-1], change_rs_scl_idx=[-1]):
+                             sort_idx=0, change_s_scl_idx=[-1], change_r_scl_idx=[-1], change_rs_scl_idx=[-1], sort_en=0):
 
        ZField.set_field(MOD_GROUP)
        nsamples, EC_P, scl_start_idx, ec_start_idx = self.init_EC_P(batch_size)
@@ -1204,7 +1210,7 @@ class GrothProver(object):
           if EPidx==sort_idx:
               # Sort scl batch
               self.sorted_scl_array_idx[start_idx:end_idx] = \
-                   sortu256_idx_h(self.scl_array[start_idx:end_idx])
+                   sortu256_idx_h(self.scl_array[start_idx:end_idx], 0)
               self.sorted_scl_array[start_idx:end_idx] = \
                    self.scl_array[start_idx:end_idx][self.sorted_scl_array_idx[start_idx:end_idx]]
               # Copy sorted scl batch
@@ -1229,6 +1235,10 @@ class GrothProver(object):
                                        EC_P[ecidx],
                                        step==4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
 
+          """
+          result = ec_jacreduce_h(np.reshape(EC_P[ecidx][:nsamples],-1),
+                  np.reshape(EC_P[ecidx][nsamples:],-1), MOD_GROUP, 1, 1, 1)
+          """
           if stream_id == 0:
              self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
              try:
