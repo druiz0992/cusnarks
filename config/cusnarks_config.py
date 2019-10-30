@@ -40,7 +40,7 @@ import re
 
 CUSNARKS_CONFIG = os.path.dirname(os.path.realpath(__file__))+'/'
 CUSNARKS_HOME = CUSNARKS_CONFIG.replace('config/','')
-CUSNARKS_REPO = CUSNARKS_HOME.replace('cusnarks/','')
+CUSNARKS_REPO = CUSNARKS_HOME
 CUSNARKS_ROOTS = CUSNARKS_HOME + 'data/'
 CUSNARKS_CIRCUITS = CUSNARKS_HOME + 'circuits/'
 
