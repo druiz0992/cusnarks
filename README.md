@@ -46,9 +46,13 @@ The trusted setup is currently very slow. Implementation has been done using a s
         - nvgpu (0.8.0)
     - g++ compiler (7.4.0)
     - CUDA toolkit (10.1)
-    - openmp
+    - openmp (201511)
     - node (10.16.0)
-    - rust compiler
+    - npm (6.9.0)
+    - rustup (1.20.2)
+    - clang (6.0.0)
+    - build-essential (12.4)
+    - libssl-dev (1.1.1)
 
 *NOTE* Current version of CUSNARKs has been tested on x86_64 Linux with Ubuntu 16.04.06 and 18.04.2 Linux distributions.
 
