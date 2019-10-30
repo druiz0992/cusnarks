@@ -40,6 +40,7 @@ cdef extern from "types.h":
   # Types
   ctypedef unsigned int uint32_t
   ctypedef int int32_t
+  ctypedef unsigned long long int t_uint64
 
   #Constants 
   cdef uint32_t NWORDS_256BIT

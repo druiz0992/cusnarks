@@ -340,7 +340,6 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
        free(w_args);
        exit(1);
      }
-
   }
 
   for (i=0; i < nthreads; i++){
@@ -1417,7 +1416,7 @@ void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t 
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
 
-void intt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t rstride, uint32_t pidx)
+void intt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, t_uint64 rstride, uint32_t pidx)
 {
   uint32_t i;
   const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
@@ -1467,20 +1466,18 @@ void intt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint
    uint32_t rstride : Root stride
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t rstride, uint32_t pidx)
+void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, t_uint64 rstride, uint32_t pidx)
 {
   uint32_t Anrows = (1<<Nrows);
   uint32_t Ancols = (1<<Ncols);
   uint32_t Mnrows = Ancols;
   uint32_t Mncols = Anrows;
   uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NWORDS_256BIT * sizeof(uint32_t));
-  //uint32_t i,j;
-  
 
   transpose_h(M,A,Anrows, Ancols);
 
   for (uint32_t i=0;i < Mnrows; i++){
-    ntt_parallel_h(&M[i*NWORDS_256BIT*Mncols], roots, Nrows - fft_Nyx, fft_Nyx, Mnrows*rstride, pidx);
+    ntt_parallel_h(&M[i*NWORDS_256BIT*Mncols], roots, Nrows - fft_Nyx, fft_Nyx, rstride*Mnrows, pidx);
     for (uint32_t j=0;j < Mncols; j++){   
         montmult_h(&M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &roots[rstride*i*j*NWORDS_256BIT], pidx);
     }
@@ -1489,7 +1486,7 @@ void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32
   transpose_h(A,M,Mnrows, Mncols);
 
   for (uint32_t i=0;i < Anrows; i++){
-    ntt_parallel_h(&A[i*NWORDS_256BIT*Ancols], roots, Ncols - fft_Nxx, fft_Nxx, Mncols*rstride, pidx);
+    ntt_parallel_h(&A[i*NWORDS_256BIT*Ancols], roots, Ncols - fft_Nxx, fft_Nxx, rstride*Mncols, pidx);
   }
 
   transpose_h(M,A,Anrows, Ancols);
@@ -1514,7 +1511,6 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
     for (j=0;j < Mncols; j++){   
         montmult_h(&M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &roots[i*j*NWORDS_256BIT], pidx);
     }
-   
   }
   
   transpose_h(A,M,Mnrows, Mncols);
@@ -1547,39 +1543,43 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
    uint32_t rstride : roots stride
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void ntt_parallel_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t Nrows, uint32_t rstride, uint32_t pidx)
+void ntt_parallel_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t Nrows, t_uint64 rstride, uint32_t pidx)
+{
+  uint32_t *M = (uint32_t *) malloc ( (1 << (Nrows + Ncols)) * NWORDS_256BIT * sizeof(uint32_t));
+
+  ntt_parallel_T_h(A, roots, Ncols, Nrows, rstride, pidx);
+
+  transpose_h(M,A,1<<Nrows, 1<<Ncols);
+  memcpy(A,M, (1 << (Nrows + Ncols)) * NWORDS_256BIT * sizeof(uint32_t));
+
+  free(M);
+}
+
+void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t Nrows, t_uint64 rstride, uint32_t pidx)
 {
   uint32_t Anrows = (1<<Nrows);
   uint32_t Ancols = (1<<Ncols);
-  uint32_t Mnrows = Ancols;
-  uint32_t Mncols = Anrows;
-  uint32_t *M = (uint32_t *) malloc (Anrows * Ancols * NWORDS_256BIT * sizeof(uint32_t));
-
-  transpose_h(M,A,Anrows, Ancols);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
-  for (uint32_t i=0;i < Mnrows; i++){
-    ntt_h(&M[i*NWORDS_256BIT*Mncols], roots, Nrows, Mnrows*rstride, pidx);
-    for (uint32_t j=0;j < Mncols; j++){  
-      montmult_h(&M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &roots[rstride*i*j*NWORDS_256BIT], pidx);
-    }
+  for (uint32_t i=0;i < Ancols; i++){
+    ntt_h(&A[i<<NWORDS_256BIT_SHIFT], roots, Nrows,Ancols, rstride<<Ncols, pidx);
   }
 
-  transpose_h(A,M,Mnrows, Mncols);
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
+    montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[(rstride<<NWORDS_256BIT_SHIFT)*(i>>Ncols)*(i&(Ancols-1))], pidx);
+  }
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < Anrows; i++){
-    ntt_h(&A[i*NWORDS_256BIT*Ancols], roots, Ncols, Mncols*rstride, pidx);
+    ntt_h(&A[i<<Ncols+NWORDS_256BIT_SHIFT], roots, Ncols,1, rstride<<Nrows, pidx);
   }
-
-  transpose_h(M,A,Anrows, Ancols);
-  memcpy(A,M,Ancols * Anrows * NWORDS_256BIT * sizeof(uint32_t));
-
-  free(M);
 }
 
 /*
@@ -1600,7 +1600,7 @@ void ntt_parallel_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t
    uint32_t Ncols  : Number of columns in starting matrix (N2)
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_t Nrows, uint32_t Ncols, uint32_t rstride, uint32_t pidx)
+void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
 {
   uint32_t i;
   const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
@@ -1631,7 +1631,7 @@ void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_
    uint32_t rstride : roots stride
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t rstride, uint32_t pidx)
+void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, uint32_t pidx)
 {
    uint32_t n = 1 << levels;
    uint32_t i,j,k,l,size, halfsize, tablestep;
@@ -1649,7 +1649,7 @@ void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t rstride
    for (i=0; i < n ; i++){
       j = reverse_ptr(i, levels);
       if (j > i){
-         swap(&A[i*NWORDS_256BIT],&A[j*NWORDS_256BIT]);
+         swap(&A[(astride*i)<<NWORDS_256BIT_SHIFT],&A[(astride*j)<<NWORDS_256BIT_SHIFT]);
       }
    }
 
@@ -1660,15 +1660,55 @@ void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t rstride
         k = 0;
         for (j=i; j<i+halfsize; j++){
            l = j + halfsize;
-           montmult_h(right,&A[l*NWORDS_256BIT], &roots[rstride*k*NWORDS_256BIT], pidx);
-           subm_h(&A[l*NWORDS_256BIT], &A[j*NWORDS_256BIT], right, pidx);
-           addm_h(&A[j*NWORDS_256BIT], &A[j*NWORDS_256BIT], right, pidx);
+           montmult_h(right,&A[(astride*l)<<NWORDS_256BIT_SHIFT], &roots[(rstride*k)<<NWORDS_256BIT_SHIFT], pidx);
+           subm_h(&A[(astride*l)<<NWORDS_256BIT_SHIFT], &A[(astride*j)<<NWORDS_256BIT_SHIFT], right, pidx);
+           addm_h(&A[(astride*j)<<NWORDS_256BIT_SHIFT], &A[(astride*j)<<NWORDS_256BIT_SHIFT], right, pidx);
            k += tablestep;
         }
      }
   }
 }
 
+void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, uint32_t pidx)
+{
+   uint32_t i,j,k ,s, t;
+   uint32_t right[NWORDS_256BIT];
+   uint32_t (*reverse_ptr) (uint32_t, uint32_t);
+
+   for (i=0; i<levels; i++){
+     for (j=0; j < 1<< i; j++) {
+       for (k=0; k < 1 << (levels - i - 1); k++){
+          s = j * (1 << (levels - i)) + k;
+          t = s + (1 << (levels - i - 1));
+          subm_h(right,
+                 &A[astride*s*NWORDS_256BIT],
+                 &A[astride*t*NWORDS_256BIT],
+                 pidx);
+          addm_h(&A[astride*s*NWORDS_256BIT],
+                 &A[astride*s*NWORDS_256BIT],
+                 &A[astride*t*NWORDS_256BIT], pidx);
+          montmult_h(&A[astride*t*NWORDS_256BIT],
+                     right,
+                     &roots[rstride*(1<<i)*k*NWORDS_256BIT], pidx);
+       }
+     }
+   }
+
+   if (levels <= 8){
+      reverse_ptr = reverse8;
+   } else if (levels <= 16) {
+      reverse_ptr = reverse16;
+   } else {
+      reverse_ptr = reverse32;
+   }
+
+   for (i=0; i < 1 << levels ; i++){
+      j = reverse_ptr(i, levels);
+      if (j > i){
+         swap(&A[astride*i*NWORDS_256BIT],&A[astride*j*NWORDS_256BIT]);
+      }
+   }
+}
 
 /*
    Computes the inverse number-theoretic transform of the given vector in place,
@@ -1684,12 +1724,27 @@ void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t rstride
    uint32_t levels : 1<<levels is the number of samples in the FFT
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, uint32_t rstride,  uint32_t pidx)
+void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx)
 {
   uint32_t i;
   const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
   
-  ntt_h(A, roots, levels, rstride, pidx);
+  ntt_h(A, roots, levels, 1,rstride, pidx);
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (i=0; i< (1<<levels); i++){
+     montmult_h(&A[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &scaler[levels * NWORDS_256BIT], pidx);
+  }
+  
+}
+void intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx)
+{
+  uint32_t i;
+  const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
+  
+  ntt_dif_h(A, roots, levels, 1,rstride, pidx);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
