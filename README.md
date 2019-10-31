@@ -1,10 +1,10 @@
-# CUSNARKS Overview
-CUSNARKS is an optimized CUDA implementation of ZK-SNARK setup and prover based on *Groth16* over curve [bn128][BN128].
+# Cusnarks Overview
+Cusnarks is an optimized CUDA implementation of ZK-SNARK setup and prover based on *Groth16* over curve [bn128][BN128].
 It has been designed with the objective of computing proofs for up to 2^27 constraints in less than 10 minutes in a platform consisting of
 4xGPUs and 32xCPU cores (we are not quite there though).
 CUSNARKS is expected to work with [circom][] for the generation and compilation of circuits, and with [snarkjs][] 
 for the computation witnesses, proof verification and parts of
- the trusted setup.  Additionally, CUSNARKS works with [rust-circom][], an optimized version of [circom][] that allows to compile and generate
+ the trusted setup.  Additionally, cusnarks works with [rust-circom][], an optimized version of [circom][] that allows to compile and generate
 witnesses for very large circuits.
 
 
@@ -35,11 +35,16 @@ The trusted setup is currently very slow. Implementation has been done using a s
 * [Some Results][]
 * [File Formats][]
 * [Other Info](#Other-Info)
+* [Documentation][]
+* [Next Steps][]
   
 ## Installation
 1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called *$CUSNARKS_HOME*
 
 2. Ensure that all [dependencies][] are installed. 
+
+Tested library versions provided for reference.
+
     - Python3.6+
         - Cython (0.26.1)
         - numpy (1.17.1)
@@ -55,7 +60,7 @@ The trusted setup is currently very slow. Implementation has been done using a s
     - build-essential (12.4)
     - libssl-dev (1.1.1)
 
-*NOTE* Current version of CUSNARKs has been tested on x86_64 Linux with Ubuntu 16.04.06 and 18.04.2 Linux distributions.
+**NOTE:** Current version of cusnarks has been tested on x86_64 Linux with Ubuntu 16.04.06 and 18.04.2 distributions.
 
 3. Add *$CUSNARKS_HOME/lib* to *LD_LIBRARY_PATH*
 
@@ -63,16 +68,16 @@ The trusted setup is currently very slow. Implementation has been done using a s
 export LD_LIBRARY_PATH=$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH
 ```
 
-4. Build Cusnarks to generate shared libraries in *$CUSNARKS_HOME/lib*.
+4. Build cusnarks to generate shared libraries in *$CUSNARKS_HOME/lib*.
 
 ```sh
 make all
 ```
-Two libraries are generated upon compilation of CUSNARKs
+Two libraries are generated upon compilation of cusnarks
 - *libcusnarks.so* : Cusnarks shared library
 - *pycusnarks.so* : Cusnarks shared library wrapped with Cython wrapper so that it can be used from Python
 
-5. Generate some metadata required for CUSNARKS, including :
+5. Generate some metadata required for cusnarks, including :
 - Roots of unity for curve [bn128][BN128]. Default option generates 2^20, which allows processing circuits of 
 up to 2^19 constraints. When prompted, provide the desired number of roots to generate (maximum is 2^28).
 - Location of folder to place input/output data. By default, location is *$CUSNARKS_HOME/data*
@@ -109,9 +114,9 @@ Mandatory arguments:
 
 A detailed description of different file formats can be found [File Formats][here].
 
-Note : if input or output files are placed in the *$CUSNARKS_HOME/circuits* directory, just provide file name. CUSNARKS wil automatically search in this directory
+Note : if input or output files are placed in the *$CUSNARKS_HOME/circuits* directory, just provide file name. Cusnarks wil automatically search in this directory
 
-Running the trusted setup requires [snarkjs][] being installed to compute parts of the verification key. CUSNARKS automatically downloads it into *$CUSNARKS_HOME/third_party_libs/snarkjs*
+Running the trusted setup requires [snarkjs][] being installed to compute parts of the verification key. Cusnarks automatically downloads it into *$CUSNARKS_HOME/third_party_libs/snarkjs*
 
 
 ### Prover
@@ -142,7 +147,7 @@ Mandatory arguments:
 A detailed description of different file formats can be found [File Formats][here].
 
 Optional arguments
-- **-v** : Enable verification. If value is 1, proof verification is enabled. After proof is generated, CUSNARKS will call [snarkjs][] to verifty proof. CUSNARKS will return the output 
+- **-v** : Enable verification. If value is 1, proof verification is enabled. After proof is generated, cusnarks will call [snarkjs][] to verifty proof. Cusnarks will return the output 
 - **INPUT_VERIFICATION_KEY file**: If verification is required, location of verification file generated during trusted setup needs to be provided. Extension is .json. 
 
 #### Non-Server Mode
@@ -153,7 +158,7 @@ CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PROVING
 ```
 
 ## Example
-In this section we will go through an example on how to compile a circuit using [rust-circom][] to obtain a valid set of R1CS constraints and a valid witness, and how to call Cusnarks to compute the Trusted Setup and the Proof.
+In this section we will go through an example on how to compile a circuit using [rust-circom][] to obtain a valid set of R1CS constraints and a valid witness, and how to call cusnarks to compute the Trusted Setup and the Proof.
 
 ### Circuit Compilation
 Cusnarks provides a compiler [rust-circom][] to generate R1CS constraints and witness from a given circuit. [rust-circom][] is located in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/*. 
@@ -176,7 +181,7 @@ From *$CUSNARKS_HOME/* type:
 make all
 ```
 
-After this step is completed, Cusnarks and [rust-circom][] are ready to use.
+After this step is completed, cusnarks and [rust-circom][] are ready to use.
 
 3. Review circuit
 
@@ -372,7 +377,7 @@ Additionally, there are some additional Python modules:
 
 | Module Name | Executed on | Description |
 |-------------|-------------|-------------|
-| pysnarks_utils | CPU      | Utilities for conversion of file formats used all around CUSNARKS |
+| pysnarks_utils | CPU      | Utilities for conversion of file formats used all around cusnarks |
 | json_socket    | CPU      | Communication library to establish a server and a client |
 | cuda_wrapper   | CPU      | Python wrapper to be able to launch CUDA kernels from Python |
 | rng   | CPU  | Encapsulation of Random Number Generator pcg |
@@ -416,7 +421,7 @@ formats.
 |Results | stdout |
 
 ### Constraints
-Constraint files are generated by a SNARK compiler and consumed by CUSNARKS trusted setup.
+Constraint files are generated by a SNARK compiler and consumed by cusnarks trusted setup.
 
 #### .json
 Constraint system generated by [circom][].  JSON file includes the following keys:
@@ -482,7 +487,7 @@ R1CS constraints are represented as follows:
 Constraint system generated by [circom][]. See [r1cs][specification] for a detailed description.
 
 ### Proving Key
-Trusted setup generated by CUSNARKS Trusted Setup and consumed by CUSNARKS Prover. 
+Trusted setup generated by cusnarks Trusted Setup and consumed by cusnarks Prover. 
 
 #### .json
 JSON includes the following keys:
@@ -603,7 +608,7 @@ JSON contains the following keys:
 
 
 ### Witness
-Witness is required for CUSNARKs prover. There are four possible formats (.txt, .json, .bin, .dat). There are two binary
+Witness is required for cusnarks prover. There are four possible formats (.txt, .json, .bin, .dat). There are two binary
 represenations (.bin and .dat) because different applications generate different formats.
 
 #### .txt
@@ -639,7 +644,7 @@ Generated by [rust-circom][]. Format is :
 | witness_N-1[n bit] : Witness N-1 |
 
 ### Proof
-Output from CUSNARKs Prover and consumed by verifier [snarkjs][]. 
+Output from cusnarks Prover and consumed by verifier [snarkjs][]. 
 
 #### .json
 JSON file contains the following keys:
@@ -686,6 +691,7 @@ things are done in parallel.
   - *python*\   : Python unit test. They mainly test Python library using [unittest][] unit testing framework. 
    However, there are some files (*xxx_cu_xxx.py*) that test CUDA functions as well.
   - *c*\        : C unit tests for host side functionality.
+     -*aux_data*\ : Files used during tests.
   - *ideas*\    : Folder containing small scripts testing some ideas to be implmented in main code
 * **profiling**\ : Profiling information
    - *python*\   : Collection of scripts to measure time of CUDA functions 
@@ -693,7 +699,7 @@ things are done in parallel.
    - *pcg-cpp*\  : implementation of PCG family of random number generators. Full details can be found at the [PCG-Random website].
    - *snarkjs*\  : snarkjs repository
    - *rust-circom*\ : rust circom repository
-* **circuits**\   : Default location where circuits are processed by CUSNARKS.
+* **circuits**\   : Default location where circuits are processed by cusnarks.
    - *_SETUP*\    : Default location where Trusted setup files are copied.
    - *_PROOF*\    : Default location where Proof fils are copied.
 * **config**\     : Location of initial configuration scripts.
@@ -705,14 +711,32 @@ From Python side, logs during trusted setup are recorded in *$CUSNARKS_HOME/circ
 
 From C/CUDA side, logs are available as well, but are disabled by default. To enable logs, edit *$CUSNARKS_HOME/src/cuda/log.h* file.
 There are two constants defined :
-- *LOG_LEVEL* : There are 5 levels of logging (nolog, error, warning, info, debug). To enable logs, define *LOG_LEVEL* constant as 
-one of these types. Use function LogError(), LogWarning(), LogInfo(), LogDebug() to log a message. Message is displyed in standard 
+- **LOG_LEVEL** : There are 5 levels of logging (nolog, error, warning, info, debug). To enable logs, define *LOG_LEVEL* constant as 
+one of these types. Use function *LogError()*, *LogWarning()*, *LogInfo()*, *LogDebug()* to log a message. Message is displayed in standard 
 output. These functions are only to be used in CPU side.
-- *LOG_TID* : Define the kernel thread id that you want to display the message. To log a message for a particular TID, use 
-functions LogXXXBigNumberTid or LogX XXTid, where XXX is Error, Warning, Info or Debug depending on the severity. 
-LogXXXBigNumberTid displays a U256 integer. LogXXXTid can be used to display other types. Its use is similar to printf.
+- **LOG_TID** : Define the kernel thread id that you want to display the message. To log a message for a particular TID, use 
+functions *LogXXXBigNumberTid* or *LogXXXTid*, where XXX is Error, Warning, Info or Debug depending on the severity. 
+*LogXXXBigNumberTid* displays a U256 integer. *LogXXXTid* can be used to display other data types. Its use is similar to printf. Both functions are only to be used in GPU side.
 
 After modifying *log.h* you will need to do a *make clean build* to recompile with the new changes.
+
+**NOTE:** if logging is disabled, logging function calls are not compiled and thus add no overhead.
+
+## Documentation
+The following a non-comprehensive list of interesting material:
+* [DIZK][] : Paper on distributed snarks
+* [Elliptic curve primer][] : elliptic curve crypto primer book
+* [snarkjs][]  : javascript implementation of zksnarks
+* [bellman][]  : bellman rust implemenation of zksnarks
+* [libsnark][] : libsnark library
+* [belle_cuda][] : Alternative CUDA implementation of Snarks
+
+
+## Next Steps
+Future direction of cusnarks will include:
+1. Increase speed. Target is to be able to compute 2^27 constraints under 10 minutes in a single PC
+2. Increase curve coverage. Currently, only curve [bn128][] is supported. Next versions will include BLS12-381, MNT4 and MNT6.
+3. Adapt cusnarks to multi-server architecture so that multiple PCs can be used to compute a proof.
 
 [dependencies]: #Requirements 
 [snarkjs]: https://www.github.com/iden3/snarkjs
@@ -733,4 +757,11 @@ After modifying *log.h* you will need to do a *make clean build* to recompile wi
 [Logging]: ###Logging
 [constraints-circom-format]: ###Constraints
 [witness-format]: ###Witness
-
+[Example]: #Example
+[Next Steps]: #Next-Steps
+[Documentation]: #Documentation
+[DIZK]: https://eprint.iacr.org/2018/691.pdf 
+[Elliptic curve primer]: http://tomlr.free.fr/Math%E9matiques/Math%20Complete/Cryptography/Guide%20to%20Elliptic%20Curve%20Cryptography%20-%20D.%20Hankerson,%20A.%20Menezes,%20S.%20Vanstone.pdf 
+[bellman]: https://github.com/zkcrypto/bellman
+[libsnark]:  https://github.com/scipr-lab/libsnark 
+[belle_cuda]: https://github.com/matter-labs/belle_cuda

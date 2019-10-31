@@ -255,7 +255,33 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
     }
   }
 }
+static uint32_t tt[] = {8,24,40,56,72,88,104,120,25,41,57,89,105,121,90,122,59,123};
+// input matrix mxn
+void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols)
+{
+   uint32_t m = sizeof(uint32_t) * NBITS_BYTE - __builtin_clz(in_nrows) - 1;
+   uint32_t n = sizeof(uint32_t) * NBITS_BYTE - __builtin_clz(in_ncols) - 1;
 
+   uint32_t idx = 0;
+   const uint32_t nelems = m + n;
+   const uint32_t ncycles = ((1 << (m+n)) - 2) / nelems;
+   const uint32_t N_1 = (1 << n) - 1;
+
+   uint32_t val[NWORDS_256BIT];
+   uint32_t cur_pos = in_ncols, trans_pos;
+
+   for (uint32_t ccount=0; ccount < ncycles; ccount++){
+     for (uint32_t elcount=0; elcount < nelems; elcount+=2){
+        memcpy(val, &min[cur_pos * NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
+        trans_pos = (cur_pos >> n) + ((cur_pos & N_1) << m);
+        swap(&min[trans_pos * NWORDS_256BIT], val);
+        
+        cur_pos = (trans_pos >> n ) + ((trans_pos & N_1) << m);
+     }
+     cur_pos = tt[++idx];
+
+   }
+}
 
 /*
    Initalize multiprocessing components
