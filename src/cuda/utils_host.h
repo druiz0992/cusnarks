@@ -248,6 +248,7 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
 void intt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t N_fftx, uint32_t N_ffty, uint32_t Nrows, uint32_t fft_Nyx,  uint32_t Ncols, uint32_t fft_Nxx, uint32_t pidx);
 void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
+void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
 void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t sort_en);
