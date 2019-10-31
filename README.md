@@ -29,6 +29,7 @@ The trusted setup is currently very slow. Implementation has been done using a s
 ## Outline
 * [Installation][]
 * [Launching Cusnarks](#Launching-Cusnarks)
+* [Example] (#Computing constraints,-Trusted-Setup-and-Proof)
 * [Architecture][]
 * [Modules][]
 * [Some Results][]
@@ -149,6 +150,152 @@ To request a proof in non-server mode (assumes server is not launched. If it has
 
 ```sh
 CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
+```
+
+## Computing constraints,-Trusted-Setup-and-Proof
+In this section we will go through an example how to compile a circuit using [rust-circom][] to obtain a valid set of R1CS constraints and a valid witness, and how to call Cusnarks to compute the Trusted Setup and the Proof.
+
+### Circuit Compilation
+Cusnarks provides a compiler [rust-circom][] to generate R1CS constraints and witness from a given circuit. [rust-circom][] is located in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/*. 
+
+Steps to follow :
+
+1. Install rust compiler 
+
+```sh
+curl https://sh.rustup.rs -sSf | sh
+sudo apt-get install clang build-essential libssl-dev
+source $HOME/.cargo/env
+```
+
+2. Compile [rust-circom][]
+
+```sh
+make all
+```
+
+After this step, Cusnarks and [rust-circom][] are ready to use.
+
+3. Review circuit
+
+[rust-circom][] provide a test circuit that we can use to generate test proofs. The circuit can be found in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/interop/circuits/cuda/circuit.circom*. The circuit is shown below.
+
+	template T(N) {
+		signal private input p;
+		signal output q;
+
+		signal tmp[N];	
+	
+		tmp[0] <== p;
+		tmp[1] <== p + 1;
+		tmp[2] <== p + 2;
+		
+		for (var i=0;i<N-3;i+=1) {
+			tmp[i+3] <== (tmp[i] + tmp[i+1]) * (tmp[i+1] + tmp[i+2]);
+		}
+	
+		q <== tmp[N-1];
+	}
+	
+	#[test]
+	template test1() {
+		component main = T(10000);
+		#[w] {
+			main.p <== 2;
+		}
+	}
+	
+	component main = T(10000);
+
+*circuit.circom* is a very simple circuit that generates *N+3* constraints from a single input *p* and a single output *q*.
+
+In this particular circuit, *N* is equal to 10000.
+
+To modify the number of constraints, set the number *N* in T(N) to the desired number of constraints. In our example we will set *N* to be 4000000 by changing both occurrences to **component main = T(400000)**
+
+**NOTE:** Modified circuit name needs to be *circuit.circom*
+
+4. Generate constraints
+From the same directory where *circuit.circom* is placed, type:
+
+```sh
+../../../target/release/circom2 compile --cuda=r1cs4M_c.bin
+```
+
+Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin* located in the same folder as *circuit.circom*
+
+5. Generate witness
+From the same directory where *circuit.circom* is placed, type:
+
+```sh
+../../../target/release/circom2 test --skipcompile --outputwitness
+```
+Wait a few minutes and the output will be a witness file called *test1.binwitness*. Unfortunately, this witness file is in big-endian format and we need to convert it to little-endian.
+
+```sh
+objcopy -I binary -O binary --reverse-bytes=4 test1.binwitness r1cs4M_w.dat
+```
+
+Move *r1cs4M_c.bin* and *r1cs4M_w.dat* to *$CUSNARKS_HOME/circuits/* folder
+
+After this last step is completed, you have generated a constraint file and a valid witness. Next step is to generate the Trusted Setup.
+
+### Trusted-Setup
+Once constraint and witness file have been generated and place in *$CUSNARKS_HOME/circuits/*, run the cusnarks to compute the Trusted Setup.
+
+```sh
+CUDA_DEVICE_LIST=1,2 python3 pysnarks.py -m s -in_c r1cs4M_c.bin -pk r1cs4M_pk.bin -vk r1cs4M_vk.json 
+```
+
+Wait a few minutes until cusnarks has finished computing the Trusted Setup. When it is done the proving key and verification key files will be computed and placed in *$CUSNARKS_HOME/circuits/* folder.
+
+To check Trusted-Setup progress type:
+
+```sh
+tail -f $CUSNARKS_HOME/circuits/_SETUP/log
+```
+
+### Proof 
+Once the Trusted Setup step has been computed, it is time to compute the proof. Computing the proof is a two step process.
+Even though in this specific case it is not very useful to launch the prover in server/client mode as there is only a single witness created, we will show how you should proceed to launch prover in server/client mode as it is the normal operation mode.
+
+1. Launch Proof server
+
+```sh
+CUDA_DEVICE_LIST=1,2 python3 pysnarks.py -m p -pk r1cs4M_pk.bin -vk r1cs4M_vk.json
+```
+
+Wait a few seconds until *Server ready* message appears on the screen.
+
+To check Proof server progress type:
+
+```sh
+tail -f $CUSNARKS_HOME/circuits/_PROOF/log
+```
+During this stage prover is being initialized with the contents of the proving key. 
+
+2. Launch Proof client
+
+```sh
+CUDA_DEVICE_LIST=1,2 python3 pysnarks.py -m p -w r1cs100k_w.dat -p r1cs100k_proof.json -pd r1cs100k_pd.json -v 1
+```
+Wait a few seconds until final completion message appears on screen. At the end of the process the proof and the public data files will be written to *$CUSNARKS_HOME/circuits/* folder.
+
+To check Proof server progress type:
+
+```sh
+tail -f $CUSNARKS_HOME/circuits/_PROOF/log
+```
+
+When the proof is generated, you can launch another Proof client following the same steps as described in this section.
+
+3. Stop Proof server
+If you want to launch a new Proof server with a different proving/verification key, you need to first stop the Proof server, and then follow the steps outlined above to generate a new set of constraints, witness and Trusted Setup.
+
+To stop the server:
+
+```sh
+python3 pysnarks.py -stop_server 1
 ```
 
 ## Architecture
