@@ -203,6 +203,10 @@ def init():
     parser.add_argument(
        '-stop_server', '--stop_server', required=False)  
 
+    help_str = 'Is proog server alive' 
+    parser.add_argument(
+       '-alive', '--is_alive', required=False)  
+
     help_str = 'Reserved N CPUs' + str(opt['reserved_cpus'])
     parser.add_argument(
        '-r_cpus', '--reserved_cpus', type=int, help=help_str, required=False)  
@@ -250,6 +254,17 @@ def run(opt, parser):
           result = jsocket.send_message(query)
           print("Stopping proof server")
       return
+
+    if args.is_alive is not None :
+      if is_port_in_use(PORT):
+          query = { 'is_alive' : 1 }
+          jsocket = jsonSocket()
+          result = jsocket.send_message(query)
+          print(result)
+          return 1
+      else: 
+        return 0
+
 
     if args.mode != "s" and args.mode != 'setup' and \
         args.mode != 'p' and args.mode != 'proof' :
