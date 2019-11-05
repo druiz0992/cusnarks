@@ -464,6 +464,12 @@ class GrothProver(object):
                  if 'stop_server' in parsed_dict and parsed_dict['stop_server'] == 1:
                     logging.info('Stopping server')
                     sys.exit(1)
+                 elif 'is_alive' in parsed_dict:
+                    new_msg = {}
+                    new_msg['status']=1
+                    jsocket.send_message(new_msg, conn)
+                    conn.close()
+                    continue
 
                  # Initialize QAP Process
                  self.startProcesses(nVars)

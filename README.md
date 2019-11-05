@@ -104,7 +104,7 @@ python3 pysnarks.py -h
 To generate a trusted setup from a .json/.bin compiled circuit, type:
 
 ```sh
-CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m s -in_c <INPUT_CIRCUIT file> -pk <OUT_PROVING_KEY file> -vk <OUT_VERIFICATION_KEY file> -seed <RANDOM SEED> 
+CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m s -in_c <INPUT_CIRCUIT file> -pk <OUT_PROVING_KEY file> -vk <OUT_VERIFICATION_KEY file> -seed <RANDOM SEED> 
 ```
 
 Mandatory arguments:
@@ -128,7 +128,7 @@ There are two mechanisms to generate a proof:
 #### Server Mode
 To launch Proof Server:
 ```sh
-CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m p -pk <INPUT_PROVING_KEY file> 
+CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -pk <INPUT_PROVING_KEY file> 
 ```
 
 Mandatory arguments:
@@ -137,7 +137,7 @@ Mandatory arguments:
 To request a proof: 
 
 ```sh
-CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m p -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
+CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
 ```
 Mandatory arguments:
 - **INPUT_WITNESS file** : Input Witness file. Extension needs to be .bin or .dat.  
@@ -154,7 +154,7 @@ Optional arguments
 To request a proof in non-server mode (assumes server is not launched. If it has been launched, it will run on Server Mode):
 
 ```sh
-CUDA_DEVICE_LIST=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
+CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
 ```
 
 ## Example
@@ -226,7 +226,7 @@ To modify the number of constraints, set the number *N* in T(N) to the desired n
 From the same directory where *circuit.circom* is placed, type:
 
 ```sh
-../../../target/release/circom2 compile --cuda=r1cs4M_c.bin
+../../../target/release/za compile --cuda=r1cs4M_c.bin
 ```
 
 Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin* located in the same folder as *circuit.circom*. The format of *r1cs4M_c.bin* is described in [constraints-circom-format][].
@@ -235,7 +235,7 @@ Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin
 From the same directory where *circuit.circom* is placed, type:
 
 ```sh
-../../../target/release/circom2 test --skipcompile --outputwitness
+../../../target/release/za test --skipcompile --outputwitness
 ```
 Wait a few minutes and the output will be a witness file called *test1.binwitness*. Unfortunately, this witness file is in big-endian format and we need to convert it to little-endian.
 
@@ -255,7 +255,7 @@ Once constraint and witness file have been generated and place in *$CUSNARKS_HOM
 Go to directory *$CUSNARKS_HOME/src/python/* to launch Trusted-Setup.
 
 ```sh
-CUDA_DEVICE_LIST=1,2 python3 pysnarks.py -m s -in_c r1cs4M_c.bin -pk r1cs4M_pk.bin -vk r1cs4M_vk.json 
+CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m s -in_c r1cs4M_c.bin -pk r1cs4M_pk.bin -vk r1cs4M_vk.json 
 ```
 
 Wait a few minutes until cusnarks has finished computing the Trusted Setup. When it is done the proving key and verification key files will be computed and placed in *$CUSNARKS_HOME/circuits/* folder.
@@ -266,7 +266,7 @@ To check Trusted-Setup progress type:
 tail -f $CUSNARKS_HOME/circuits/_SETUP/log
 ```
 
-**NOTE:** Throughout this example we are using GPUs 1 and 2 and that is why we are setting CUDA_DEVICE_LIST. This will likely change in your particular environment.
+**NOTE:** Throughout this example we are using GPUs 1 and 2 and that is why we are setting CUDA_VISIBLE_DEVICES. This will likely change in your particular environment.
 
 ### Proof 
 Once the Trusted Setup step has been computed, it is time to compute the proof. Computing the proof is a two step process.
@@ -277,7 +277,7 @@ Even though in this specific case it is not very useful to launch the prover in 
 Go to directory *$CUSNARKS_HOME/src/python/* to launch Proof server
 
 ```sh
-CUDA_DEVICE_LIST=1,2 python3 pysnarks.py -m p -pk r1cs4M_pk.bin -vk r1cs4M_vk.json
+CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -pk r1cs4M_pk.bin -vk r1cs4M_vk.json
 ```
 
 Wait a few seconds until *Server ready* message appears on the screen.
@@ -292,7 +292,7 @@ During this stage prover is being initialized with the contents of the proving k
 2. Launch Proof client
 
 ```sh
-CUDA_DEVICE_LIST=1,2 python3 pysnarks.py -m p -w r1cs100k_w.dat -p r1cs100k_proof.json -pd r1cs100k_pd.json -v 1
+CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -w r1cs100k_w.dat -p r1cs100k_proof.json -pd r1cs100k_pd.json -v 1
 ```
 Wait a few seconds until final completion message appears on screen. At the end of the process the proof and the public data files will be written to *$CUSNARKS_HOME/circuits/* folder.
 
