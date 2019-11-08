@@ -401,7 +401,7 @@ def subm_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dty
         return out_vec
 
 def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.t_uint64 astride, ct.t_uint64 rstride, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.t_uint64 astride, ct.t_uint64 rstride, ct.int32_t direction, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef ct.uint32_t L = int(np.log2(len(in_roots)))
@@ -412,7 +412,7 @@ def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_h(&in_A_flat[0], &in_roots_flat[0], L, astride, rstride, pidx)
+      uh.cntt_h(&in_A_flat[0], &in_roots_flat[0], L, astride, rstride, direction,pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
@@ -440,7 +440,7 @@ def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nr
       return np.reshape(out_roots_flat,(-1, len(in_proot)), 0)
 
 def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.t_uint64 rstride, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.t_uint64 rstride, ct.int32_t direction, ct.fft_mode_t fft_mode, ct.uint32_t pidx):
           
 
       cdef ct.uint32_t n = in_A.shape[1]
@@ -450,12 +450,12 @@ def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, rstride, pidx)
+      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, rstride, direction, fft_mode, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
 def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.t_uint64 rstride, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.t_uint64 rstride, ct.int32_t direction, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
@@ -464,7 +464,7 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, rstride, pidx)
+      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, rstride, direction, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 

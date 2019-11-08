@@ -67,6 +67,9 @@ cdef extern from "types.h":
   ctypedef enum mod_t:
       MOD_FIELD, MOD_GROUP, MOD_N 
 
+  ctypedef enum fft_mode_t:
+      FFT_T_DIT, FFT_T_DIF, FFT_T_MODE_N
+
   ctypedef enum fft_size_t:
      FFT_SIZE_2 = 1, FFT_SIZE_4, FFT_SIZE_8, FFT_SIZE_16, FFT_SIZE_32, FFT_SIZE_1024, FFT_SIZE_1M, FFT_SIZE_N
 

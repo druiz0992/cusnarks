@@ -8,7 +8,7 @@
 //  Created by : Alexandre Drouin
 //  Date : 2013-09-30
 //
-//  Make with : g++ itranspose_tests.cpp -o tests -O3 -lboost_unit_test_framework-mt
+//  Make with : g++ itranspose_tests.cpp -o tests -O3 -lboost_unit_test_framework -larmadillo
 
 #define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE "C++ Unit Tests for in-place transposition of rectangular matrices"
@@ -42,7 +42,10 @@ void itranspose(Mat<TYPE>& A)
         A.set_size(A.n_cols, A.n_rows);
         
         vector<bool> visited(A.n_cols * A.n_rows);
-        
+        unsigned int *r = (unsigned int *)malloc(A.n_cols * A.n_rows * sizeof(unsigned int));
+        unsigned int *r1 = (unsigned int *)malloc(A.n_cols * A.n_rows * sizeof(unsigned int));
+        unsigned int idx=0;
+        unsigned int nel=0;
         for (int row = 0; row < n; row++) {
             for (unsigned int col = 0; col < m; col++) {
                 
@@ -53,8 +56,11 @@ void itranspose(Mat<TYPE>& A)
                     
                     TYPE val = A(row, col);
                     
+                    r[idx++] = curr_pos;
+                    //printf("%d ", curr_pos);
                     while (!visited[curr_pos]) {
-                        printf("%d ", curr_pos);
+                        r1[idx-1] = ++nel;
+                        //printf("%d ", curr_pos);
                         visited[curr_pos] = true;
                         
                         unsigned int A_j = curr_pos / m;
@@ -66,10 +72,31 @@ void itranspose(Mat<TYPE>& A)
                         
                         curr_pos = A_i*n + A_j;
                     }
-                    printf("\n");
+                    //printf("\n");
+                } else {
+                  nel=0;
                 } 
             }
         }
+        unsigned int step = r[2] - r[1], first_el=r[1], group=1, ncyc=0, nit=0;
+        for(unsigned int col=1; col < idx-1; col++){
+          if(r[col+1] - r[col] == step) {
+             group++;
+          } else {
+            ncyc +=4;
+            nit++;
+            printf("%d, %d, %d, %d,", first_el, step, group, r1[col]);
+            group=1;
+            first_el = r[col+1];
+            step = r[col+2] - r[col+1];
+            if (nit % 4 == 0){
+             printf("\n");
+            }
+          }
+          
+        }
+        free(r);
+        printf("\n%d\n",ncyc);
     }
 }
 
@@ -116,31 +143,40 @@ void itranspose2(Mat<TYPE>& A,const unsigned int m1, const unsigned int n1)
 
 BOOST_AUTO_TEST_CASE( transpose_column_matrix )
 {
-    const unsigned int m1 = 3; 
-    const unsigned int n1 = 4;
-    const unsigned int m = 1<<m1;
-    const unsigned int n = 1<<n1;
     double start, end;
+
+    unsigned int min_m = 10;
+    unsigned int max_m = 11;
+    unsigned int i;
+
+    for(i=min_m; i< max_m; i++){
     
-    fmat A(m, n);
-    A.randu();
+      unsigned int m1 = i; 
+      unsigned int n1 = i+1;
+      unsigned int m = 1<<m1;
+      unsigned int n = 1<<n1;
     
-    start = (double)clock()/CLOCKS_PER_SEC;
-    fmat B = A.t();
-    end = (double)clock()/CLOCKS_PER_SEC;
-    printf("Arma : %f\n", end-start);
-    
-    start = (double)clock()/CLOCKS_PER_SEC;
-    //itranspose2(A,m1, n1);
-    itranspose(A);
-    end = (double)clock()/CLOCKS_PER_SEC;
-    printf("Ix : %f\n", end-start);
-    
-    for (unsigned int i = 0; i < n; i++) {
-        for (unsigned int j = 0; j < m; j++) {
-            BOOST_CHECK_CLOSE(B(i,j), A(i,j), 0.0001);
-        }
-    }
+      fmat A(m, n);
+      A.randu();
+      
+      start = (double)clock()/CLOCKS_PER_SEC;
+      fmat B = A.t();
+      end = (double)clock()/CLOCKS_PER_SEC;
+      printf("Arma : %f\n", end-start);
+      
+      printf("--- %d --- \n",i);
+      start = (double)clock()/CLOCKS_PER_SEC;
+      //itranspose2(A,m1, n1);
+      itranspose(A);
+      end = (double)clock()/CLOCKS_PER_SEC;
+      printf("Ix : %f\n", end-start);
+      
+      for (unsigned int i = 0; i < n; i++) {
+          for (unsigned int j = 0; j < m; j++) {
+              BOOST_CHECK_CLOSE(B(i,j), A(i,j), 0.0001);
+          }
+      }
+   }
 }
 
 #if 0
