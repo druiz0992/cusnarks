@@ -196,6 +196,13 @@ typedef enum{
 }mod_t;
 
 typedef enum{
+   FFT_T_DIT,
+   FFT_T_DIF,
+   FFT_T_MODE_N
+
+}fft_mode_t;
+
+typedef enum{
   MOD_INFO_P,
   MOD_INFO_P_,
   MOD_INFO_R_,
