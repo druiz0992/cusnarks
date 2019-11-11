@@ -1939,7 +1939,7 @@ void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
   ntt_parallel_h(A, roots, Nrows, Ncols, rstride, 1, FFT_T_DIT,  pidx);
 }
 
-uint32_t *nttmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
+uint32_t *ntt_interpolandmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
 {
   t_uint64 size = (t_uint64) (1 << (Nrows + Ncols + 1)) * NWORDS_256BIT;
   uint32_t mNrows = Nrows, mNcols = Ncols;
