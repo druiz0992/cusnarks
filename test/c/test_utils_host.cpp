@@ -8065,7 +8065,7 @@ void test_interpol_mul_randomsize(void)
 
      Nrows = k/2;
      Ncols = k - Nrows;
-     R = nttmul_parallel_h(X1,Y1, roots, Nrows, Ncols-1,2, pidx);
+     R = ntt_interpolandmul_parallel_h(X1,Y1, roots, Nrows, Ncols-1,2, pidx);
 
      ntt_h(X2, roots, fft_params.levels,1, 1,1, pidx);
      ntt_h(Y2, roots, fft_params.levels,1, 1,1, pidx);

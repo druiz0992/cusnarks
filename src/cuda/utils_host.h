@@ -250,7 +250,7 @@ void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
 void M_init_h(uint32_t nroots);
 void M_free_h(void);
 void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples);
-uint32_t * nttmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx);
+uint32_t * ntt_interpolandmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 void transpose_square_h(uint32_t *min, uint32_t in_nrows);
