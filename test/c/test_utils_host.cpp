@@ -7362,8 +7362,8 @@ void test_ntt_parallel(void)
 
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
 
-  ntt_parallel_h(samples, roots, Ncols, Nrows,1,1, FFT_T_DIT, pidx);
-  intt_parallel_h(samples, roots,1, Ncols, Nrows,1, FFT_T_DIT,pidx);
+  ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
+  intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
 
   for (j=0;j<nroots; j++){
       if (compu256_h(&samples[j*NWORDS_256BIT],&result[j*NWORDS_256BIT])){
@@ -7372,8 +7372,8 @@ void test_ntt_parallel(void)
   }
   printf("N errors(Parallel FFT-DIT) : %d/%d\n",n_errors, j);
 
-  ntt_parallel_h(samples, roots, Ncols, Nrows,1,1, FFT_T_DIF, pidx);
-  intt_parallel_h(samples, roots,1, Ncols, Nrows,1, FFT_T_DIF,pidx);
+  ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIF, pidx);
+  intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIF,pidx);
 
   n_errors = 0;
   for (j=0;j<nroots; j++){
@@ -7456,8 +7456,8 @@ void test_ntt_parallel_65K(void)
 
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
 
-  ntt_parallel_h(samples, roots, Ncols, Nrows,1,1, FFT_T_DIT, pidx);
-  intt_parallel_h(samples, roots,1, Ncols, Nrows,1, FFT_T_DIT,pidx);
+  ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
+  intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
 
   for (j=0;j<nroots; j++){
       if (compu256_h(&samples[j*NWORDS_256BIT],&result[j*NWORDS_256BIT])){
@@ -7466,8 +7466,8 @@ void test_ntt_parallel_65K(void)
   }
   printf("N errors(Parallel FFT-DIT-65K) : %d/%d\n",n_errors, j);
 
-  ntt_parallel_h(samples, roots, Ncols, Nrows,1,1, FFT_T_DIF, pidx);
-  intt_parallel_h(samples, roots,1, Ncols, Nrows,1, FFT_T_DIF,pidx);
+  ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIF, pidx);
+  intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIF,pidx);
 
   n_errors=0;
   for (j=0;j<nroots; j++){
@@ -7541,19 +7541,18 @@ void test_interpol_500K()
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
   uint32_t *samples = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
-  uint32_t *result = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *result = (uint32_t *)malloc(2*nroots * NWORDS_256BIT * sizeof(uint32_t));
   uint32_t *roots = (uint32_t *)malloc(2*nroots * NWORDS_256BIT * sizeof(uint32_t));
 
   setRandom256(samples,nroots, N);
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,2*nroots);
 
-  intt_h(samples, roots, 1, levels,2, pidx);
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
-  for (j=0;j<nroots; j++){
-    montmult_h(&samples[j*NWORDS_256BIT], &samples[j*NWORDS_256BIT], &roots[j*NWORDS_256BIT], pidx);
-  }
-  ntt_h(samples, roots, levels,1, 2,1, pidx);
-  ntt_h(result, roots, 2*levels,1, 2,1, pidx);
+  memset(&result[nroots * NWORDS_256BIT],0,nroots*NWORDS_256BIT*sizeof(uint32_t));
+  intt_h(result, roots, 1, levels,2, pidx);
+  ntt_h(result, roots, levels+1,1, 1,1, pidx);
+
+  interpol_odd_h(samples, roots,levels, 2, pidx); 
 
   for (j=0;j<nroots; j++){
       if (compu256_h(&samples[j*NWORDS_256BIT],&result[(2*j+1)*NWORDS_256BIT])){
@@ -7561,6 +7560,49 @@ void test_interpol_500K()
        }
   }
   printf("N errors(Interpol-1M) : %d/%d\n",n_errors, j);
+
+  free(samples);
+  free(result);
+  free(roots);
+}
+
+void test_interpol_parallel_500K()
+{
+  int i,j;
+  int pidx=1;
+  int n_errors=0;
+  int Nrows = NROWS_1M, Ncols = NCOLS_1M-1;
+  int cusnarks_nroots = 1 << CusnarksGetNRoots();
+  int nroots = 1 << (Nrows + Ncols);
+  char roots_f[1000];
+  int levels=Nrows + Ncols;
+  const uint32_t *N = CusnarksPGet((mod_t)pidx);
+
+  CusnarksGetFRoots(roots_f, sizeof(roots_f));
+
+  uint32_t *samples = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *result = (uint32_t *)malloc(2*nroots * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *roots = (uint32_t *)malloc(2*nroots * NWORDS_256BIT * sizeof(uint32_t));
+
+  setRandom256(samples,nroots, N);
+  readU256DataFile_h(roots,roots_f,cusnarks_nroots,2*nroots);
+
+  memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
+  memset(&result[nroots * NWORDS_256BIT],0,nroots*NWORDS_256BIT*sizeof(uint32_t));
+
+  intt_h(result, roots, 1, levels,2, pidx);
+  ntt_h(result, roots, levels+1,1, 1,1, pidx);
+
+  M_init_h(nroots);
+  interpol_parallel_odd_h(samples, roots,Nrows, Ncols, 2, pidx); 
+  M_free_h();
+
+  for (j=0;j<nroots; j++){
+      if (compu256_h(&samples[j*NWORDS_256BIT],&result[(2*j+1)*NWORDS_256BIT])){
+          n_errors++;
+       }
+  }
+  printf("N errors(Interpol-parallel-1M) : %d/%d\n",n_errors, j);
 
   free(samples);
   free(result);
@@ -7591,8 +7633,8 @@ void test_ntt_parallel_1M(void)
 
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
 
-  ntt_parallel_h(samples, roots, Ncols, Nrows,1,1, FFT_T_DIT,pidx);
-  intt_parallel_h(samples, roots,1, Ncols, Nrows,1, FFT_T_DIT,pidx);
+  ntt_parallel_h(samples, roots, Nrows,Ncols,1,1, FFT_T_DIT,pidx);
+  intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
 
   for (j=0;j<nroots; j++){
       if (compu256_h(&samples[j*NWORDS_256BIT],&result[j*NWORDS_256BIT])){
@@ -7601,8 +7643,8 @@ void test_ntt_parallel_1M(void)
   } 
   printf("N errors(Parallel FFT-DIT-1M) : %d/%d\n",n_errors, j);
 
-  ntt_parallel_h(samples, roots, Ncols, Nrows,1,1, FFT_T_DIF,pidx);
-  intt_parallel_h(samples, roots,1, Ncols, Nrows,1, FFT_T_DIF,pidx);
+  ntt_parallel_h(samples, roots, Nrows,Ncols,1,1, FFT_T_DIF,pidx);
+  intt_parallel_h(samples, roots,1, Nrows,Ncols,1, FFT_T_DIF,pidx);
 
   n_errors=0;
   for (j=0;j<nroots; j++){
@@ -7927,8 +7969,8 @@ void test_nttmul_randomsize(void)
      if (fft_params.fft_type == FFT_T_2D){
         Nrows = fft_params.fft_N[(1<<FFT_T_2D)-1];
         Ncols = fft_params.fft_N[(1<<FFT_T_2D)-2];
-        ntt_parallel_h(X1, roots, Ncols, Nrows,1,1, FFT_T_DIT, pidx);
-        ntt_parallel_h(Y1, roots, Ncols, Nrows,1,1, FFT_T_DIT, pidx);
+        ntt_parallel_h(X1, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
+        ntt_parallel_h(Y1, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
      } else if (fft_params.fft_type == FFT_T_3D){
         Nrows = fft_params.fft_N[(1<<FFT_T_3D)-1];
         Ncols = fft_params.fft_N[(1<<FFT_T_3D)-2];
@@ -7950,7 +7992,7 @@ void test_nttmul_randomsize(void)
      }
 
      if (fft_params.fft_type == FFT_T_2D){
-       intt_parallel_h(Y1, iroots,1, Ncols, Nrows, 1, FFT_T_DIT,pidx);
+       intt_parallel_h(Y1, iroots,1, Nrows, Ncols, 1, FFT_T_DIT,pidx);
      } else {
        intt_parallel2D_h(Y1, iroots, 1,Nrows, fft_Nyx, Ncols, fft_Nxx,1, pidx);
      }
@@ -7976,6 +8018,81 @@ void test_nttmul_randomsize(void)
       free(roots);
       free(iroots);
     }
+
+}
+void test_interpol_mul_randomsize(void)
+{
+     int i,j,k;
+   int pidx=1;
+   int n_errors=0;
+   fft_params_t fft_params;
+   int Nrows,Ncols,fft_Nyx,fft_Nxx;
+   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t *X1;
+   uint32_t *Y1;
+   uint32_t *X2;
+   uint32_t *Y2;
+   uint32_t *R;
+   uint32_t *roots, *iroots;
+   char roots_f[1000];
+   int cusnarks_nroots = 1 << CusnarksGetNRoots();
+   uint32_t npoints_raw, npoints, nroots;
+
+   CusnarksGetFRoots(roots_f, sizeof(roots_f));
+
+   M_init_h(1<<20);
+   X1 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+   Y1 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+   X2 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+   Y2 = (uint32_t *)malloc((1<<20)* NWORDS_256BIT * sizeof(uint32_t));
+   roots = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+
+   for (k=6; k < 21; k++){
+     npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
+     
+     ntt_build_h(&fft_params, npoints_raw);
+     npoints = npoints_raw + fft_params.padding;
+     nroots = npoints;
+
+     readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
+
+     memset(X1,0, NWORDS_256BIT * sizeof(uint32_t) * npoints); 
+     memset(Y1,0, NWORDS_256BIT * sizeof(uint32_t) * npoints); 
+     setRandom256(X1, npoints/2, N);
+     setRandom256(Y1, npoints/2, N);
+     memcpy(X2, X1, npoints * NWORDS_256BIT * sizeof(uint32_t));
+     memcpy(Y2, Y1, npoints * NWORDS_256BIT * sizeof(uint32_t));
+
+     Nrows = k/2;
+     Ncols = k - Nrows;
+     R = nttmul_parallel_h(X1,Y1, roots, Nrows, Ncols-1,2, pidx);
+
+     ntt_h(X2, roots, fft_params.levels,1, 1,1, pidx);
+     ntt_h(Y2, roots, fft_params.levels,1, 1,1, pidx);
+     
+     for (j=0; j < npoints; j++){
+       montmult_h(&Y2[j*NWORDS_256BIT], &Y2[j*NWORDS_256BIT], &X2[j*NWORDS_256BIT], pidx);
+     }
+
+     //intt_h(Y2, roots,1, fft_params.levels,1, pidx);
+
+     n_errors = 0;
+     for (j=0;j<npoints_raw; j++){
+         if (compu256_h(&R[j*NWORDS_256BIT],&Y2[j*NWORDS_256BIT])){
+             n_errors++;
+          } 
+      }
+
+      printf("N errors(FFTMUL-PARALLEL - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
+
+    }
+    free(X1);
+    free(X2);
+    free(Y1);
+    free(Y2);
+    free(roots);
+
+    M_free_h();
 
 }
 
@@ -8509,6 +8626,7 @@ void test_transpose_square(void)
 
 int main()
 {
+/*
   test_mul();  // test montgomery mul with predefined results
   //test_mul3(); // test SOS impl of montgomery mul
   //test_mul4(); // test SOS impl of montgomery squaring
@@ -8530,8 +8648,12 @@ int main()
   test_nttmul_randomsize();
 
   test_interpol_500K();
-  //test_interpol2D_500K();
+  test_interpol_parallel_500K();
+*/
 
+  test_interpol_mul_randomsize();
+
+/*
   test_transpose_square();
   test_transpose();
 
@@ -8556,7 +8678,7 @@ int main()
 
   test_ec_jacreduce_opt(0);   // EC1
   test_ec_jacreduce_opt(1);   // EC2
-
+*/
   return 1;
 }
 
