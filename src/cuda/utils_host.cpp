@@ -112,6 +112,9 @@ static uint32_t utils_zinv[2 * MAX_NCORES_OMP * NWORDS_256BIT];
 static uint32_t utils_zinv_sq[2 * MAX_NCORES_OMP * NWORDS_256BIT];
 
 
+static uint32_t *M_transpose;
+static uint32_t *M_mul;
+
 #ifdef PARALLEL_EN
 static  uint32_t parallelism_enabled =  1;
 #else
@@ -144,6 +147,16 @@ inline t_uint64 addu64_h(t_uint64 *c, t_uint64 *a, t_uint64 *b)
 
  return carry;
 }
+
+static void _ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
+static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
+static void _intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx);
+static void _intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx);
+static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride);
+static void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx);
+static void _ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx);
+static void montmult_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t pidx);
+static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t rstride, uint32_t direction, uint32_t pidx);
 
 //////
 
@@ -1521,7 +1534,7 @@ void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32
   transpose_h(M,A,Anrows, Ancols);
 
   for (uint32_t i=0;i < Mnrows; i++){
-    ntt_parallel_h(&M[i*NWORDS_256BIT*Mncols], roots, Nrows - fft_Nyx, fft_Nyx, rstride*Mnrows, direction, FFT_T_DIT,pidx);
+    ntt_parallel_h(&M[i*NWORDS_256BIT*Mncols], roots, fft_Nyx, Nrows - fft_Nyx, rstride*Mnrows, direction, FFT_T_DIT,pidx);
     for (uint32_t j=0;j < Mncols; j++){   
         montmult_h(&M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &M[i*NWORDS_256BIT*Mncols+j*NWORDS_256BIT], &roots[rstride*i*j*NWORDS_256BIT], pidx);
     }
@@ -1530,7 +1543,7 @@ void ntt_parallel2D_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32
   transpose_h(A,M,Mnrows, Mncols);
 
   for (uint32_t i=0;i < Anrows; i++){
-    ntt_parallel_h(&A[i*NWORDS_256BIT*Ancols], roots, Ncols - fft_Nxx, fft_Nxx, rstride*Mncols, direction, FFT_T_DIT, pidx);
+    ntt_parallel_h(&A[i*NWORDS_256BIT*Ancols], roots, fft_Nxx,Ncols - fft_Nxx, rstride*Mncols, direction, FFT_T_DIT, pidx);
   }
 
   transpose_h(M,A,Anrows, Ancols);
@@ -1569,8 +1582,6 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
   free(M);
 }
 
-
-
 /*
   4 step N 256 bit sample FFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
    1) Get input samples in a N=N1xN2 matrix, filling the matrix by columns. Compute N1 N2 point FFT (FFT of every row)
@@ -1587,21 +1598,19 @@ void ntt_parallel3D_h(uint32_t *A, const uint32_t *roots, uint32_t Nfft_x, uint3
    uint32_t rstride : roots stride
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void ntt_parallel_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t Nrows, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode,  uint32_t pidx)
+void ntt_parallel_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode,  uint32_t pidx)
 {
   uint32_t *M = (uint32_t *) malloc ( (1 << (Nrows + Ncols)) * NWORDS_256BIT * sizeof(uint32_t));
-  uint32_t *M2 = (uint32_t *) malloc ( (1 << (Nrows + Ncols)) * NWORDS_256BIT * sizeof(uint32_t));
 
-  ntt_parallel_T_h(A, roots, Ncols, Nrows, rstride, direction, fft_mode, pidx);
+  ntt_parallel_T_h(A, roots, Nrows, Ncols, rstride, direction, fft_mode, pidx);
 
   transpose_h(M,A,1<<Nrows, 1<<Ncols);
   memcpy(A,M, (1 << (Nrows + Ncols)) * NWORDS_256BIT * sizeof(uint32_t));
 
   free(M);
-  free(M2);
 }
 
-void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32_t Nrows, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx)
+static void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx)
 {
   uint32_t Anrows = (1<<Nrows);
   uint32_t Ancols = (1<<Ncols);
@@ -1615,7 +1624,7 @@ void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < Ancols; i++){
-    ntt_h(&A[i<<NWORDS_256BIT_SHIFT], roots, Nrows,Ancols, rstride<<Ncols, direction,  pidx);
+    fft_ptr(&A[i<<NWORDS_256BIT_SHIFT], roots, Nrows,Ancols, rstride<<Ncols, direction,  pidx);
   }
 
 
@@ -1633,9 +1642,34 @@ void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Ncols, uint32
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < Anrows; i++){
-    ntt_h(&A[i<<Ncols+NWORDS_256BIT_SHIFT], roots, Ncols,1, rstride<<Nrows, direction, pidx);
+    fft_ptr(&A[i<<Ncols+NWORDS_256BIT_SHIFT], roots, Ncols,1, rstride<<Nrows, direction, pidx);
   }
 }
+
+static void _ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx)
+{
+  void (*fft_ptr)(uint32_t *, const uint32_t *, uint32_t , t_uint64 , t_uint64 , int32_t , uint32_t ) = _ntt_h;
+  if (fft_mode == FFT_T_DIF){
+      fft_ptr = _ntt_dif_h;
+  }
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i < 1 << Ncols; i++){
+    fft_ptr(&A[i<<NWORDS_256BIT_SHIFT], roots, Nrows,1 << Ncols, rstride<<Ncols, direction,  pidx);
+  }
+
+  montmult_parallel_reorder_h(A, roots, Nrows, Ncols, rstride, direction, pidx);
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i < 1 << Nrows; i++){
+    fft_ptr(&A[i<<(Ncols+NWORDS_256BIT_SHIFT)], roots, Ncols,1, rstride<<Nrows, direction, pidx);
+  }
+}
+
 
 /*
   4 step N 256 bit sample IFFT. Read https://www.davidhbailey.com/dhbpapers/fftq.pdf for more info
@@ -1660,7 +1694,7 @@ void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_
   uint32_t i;
   const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
 
-  ntt_parallel_h(A, roots, Ncols, Nrows, rstride, -1, fft_mode, pidx);
+  ntt_parallel_h(A, roots, Nrows, Ncols, rstride, -1, fft_mode, pidx);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
@@ -1686,28 +1720,12 @@ void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_
    uint32_t rstride : roots stride
    uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
-void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
+static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
 {
    int32_t n = 1 << levels;
    uint32_t i,j,l, halfsize;
    int32_t k, tablestep, size, ridx;
    uint32_t right[NWORDS_256BIT];
-   uint32_t (*reverse_ptr) (uint32_t, uint32_t);
-
-   if (levels <= 8){
-      reverse_ptr = reverse8;
-   } else if (levels <= 16) {
-      reverse_ptr = reverse16;
-   } else {
-      reverse_ptr = reverse32;
-   }
-
-   for (i=0; i < n ; i++){
-      j = reverse_ptr(i, levels);
-      if (j > i){
-         swapu256_h(&A[(astride*i)<<NWORDS_256BIT_SHIFT],&A[(astride*j)<<NWORDS_256BIT_SHIFT]);
-      }
-   }
 
    for(size=2; size <= n; size *=2){
      halfsize = size >> 1; 
@@ -1725,12 +1743,16 @@ void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride
      }
   }
 }
+void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
+{
+   ntt_reorder_h(A, levels, astride);
+   _ntt_h(A, roots, levels, astride, rstride, direction, pidx);
+}
 
-void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
+static void _ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
 {
    uint32_t i,j,k ,s, t;
    uint32_t right[NWORDS_256BIT];
-   uint32_t (*reverse_ptr) (uint32_t, uint32_t);
 
    for (i=0; i<levels; i++){
      for (j=0; j < 1<< i; j++) {
@@ -1750,7 +1772,12 @@ void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 ast
        }
      }
    }
+}
 
+static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride)
+{
+  uint32_t (*reverse_ptr) (uint32_t, uint32_t);
+  
    if (levels <= 8){
       reverse_ptr = reverse8;
    } else if (levels <= 16) {
@@ -1759,12 +1786,71 @@ void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 ast
       reverse_ptr = reverse32;
    }
 
-   for (i=0; i < 1 << levels ; i++){
-      j = reverse_ptr(i, levels);
+   #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+   #endif
+   for (uint32_t i=0; i < 1 << levels ; i++){
+      uint32_t j = reverse_ptr(i, levels);
       if (j > i){
-         swapu256_h(&A[astride*i*NWORDS_256BIT],&A[astride*j*NWORDS_256BIT]);
+         swapu256_h(&A[astride*i<<NWORDS_256BIT_SHIFT],&A[astride*j<<NWORDS_256BIT_SHIFT]);
       }
    }
+}
+
+static void montmult_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t pidx)
+{
+  uint32_t (*reverse_ptr) (uint32_t, uint32_t);
+
+  if (levels <= 8){
+      reverse_ptr = reverse8;
+   } else if (levels <= 16) {
+      reverse_ptr = reverse16;
+   } else {
+      reverse_ptr = reverse32;
+  }
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i<1 << levels; i++){
+    uint32_t j = reverse_ptr(i, levels);
+    if (j > i){
+      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[j<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&A[j<<NWORDS_256BIT_SHIFT], &A[j<<NWORDS_256BIT_SHIFT], &roots[i<<NWORDS_256BIT_SHIFT], pidx);
+    } else if (j == i) {
+      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[i<<NWORDS_256BIT_SHIFT], pidx);
+    } 
+  }
+}
+
+static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t rstride, uint32_t direction, uint32_t pidx)
+{
+  uint32_t (*reverse_ptr) (uint32_t, uint32_t);
+  uint32_t levels = Nrows + Ncols;
+
+  if ((levels+1) <= 8){
+      reverse_ptr = reverse8;
+   } else if ((levels+1) <= 16) {
+      reverse_ptr = reverse16;
+   } else {
+      reverse_ptr = reverse32;
+  }
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (t_uint64 i=0;i<1 << levels; i++){
+    int32_t ridx = (rstride * (i >> Ncols) * (i & ( (1 << Ncols) - 1)) * direction ) & ( (rstride  << (Nrows + Ncols)) - 1);
+    t_uint64 j = reverse_ptr(ridx, levels+1);
+    montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[j<<NWORDS_256BIT_SHIFT], pidx);
+  }
+}
+
+
+void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
+{
+   _ntt_dif_h(A, roots, levels, astride, rstride, direction, pidx);
+   ntt_reorder_h(A, levels, astride);
 }
 
 /*
@@ -1783,36 +1869,112 @@ void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 ast
 */
 void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx)
 {
+  ntt_reorder_h(A, levels, 1);
+  _intt_h(A, roots, format, levels, rstride, pidx);
+}
+
+static void _intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx)
+{
   uint32_t i;
   const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
   
-  ntt_h(A, roots, levels, 1,rstride, -1, pidx);
+  _ntt_h(A, roots, levels, 1,rstride, -1, pidx);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0; i< (1<<levels); i++){
-     montmult_h(&A[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &scaler[levels * NWORDS_256BIT], pidx);
+     montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &scaler[levels << NWORDS_256BIT_SHIFT], pidx);
   }
   
 }
 void intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx)
 {
+  _intt_dif_h(A, roots, format, levels, rstride, pidx);
+  ntt_reorder_h(A, levels, 1);
+}
+
+static void _intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx)
+{
   uint32_t i;
   const uint32_t *scaler = CusnarksIScalerGet((fmt_t)format);
-  
-  ntt_dif_h(A, roots, levels, 1,rstride,-1, pidx);
 
+  _ntt_dif_h(A, roots, levels, 1,rstride,-1, pidx);
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0; i< (1<<levels); i++){
-     montmult_h(&A[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &scaler[levels * NWORDS_256BIT], pidx);
+     montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &scaler[levels << NWORDS_256BIT_SHIFT], pidx);
   }
-  
+}
+
+void interpol_odd_h(uint32_t *A, const uint32_t *roots, uint32_t levels,t_uint64 rstride, uint32_t pidx)
+{ 
+  _intt_dif_h(A, roots, 1, levels,rstride, pidx);
+  montmult_reorder_h(A,roots,levels, pidx);
+  _ntt_h(A, roots, levels,1, rstride,1, pidx);
+}
+
+void M_init_h(uint32_t nroots)
+{
+  M_transpose = (uint32_t *) malloc ( (t_uint64) nroots * NWORDS_256BIT * sizeof(uint32_t));
+  M_mul = (uint32_t *) malloc ( (t_uint64)(nroots+1) * NWORDS_256BIT * sizeof(uint32_t));
+}
+
+void M_free_h(void)
+{
+  free (M_transpose);
+  free (M_mul);
+}
+
+void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
+{
+  intt_parallel_h(A, roots, 1, Nrows, Ncols, rstride, FFT_T_DIF, pidx);
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
+      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[i<<NWORDS_256BIT_SHIFT], pidx);
+  }
+  ntt_parallel_h(A, roots, Nrows, Ncols, rstride, 1, FFT_T_DIT,  pidx);
+}
+
+uint32_t *nttmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
+{
+  t_uint64 size = (t_uint64) (1 << (Nrows + Ncols + 1)) * NWORDS_256BIT;
+  uint32_t mNrows = Nrows, mNcols = Ncols;
+  if (Nrows < Ncols){
+    mNrows++;
+  } else {
+    mNcols++;
+  }
+  memcpy(M_mul, A, size/2 * sizeof(uint32_t));
+  memcpy(&M_mul[size/2], B, size/2 * sizeof(uint32_t));
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
+      montmult_h(&M_mul[(2*i)<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &B[i<<NWORDS_256BIT_SHIFT], pidx);
+  }
+
+  interpol_parallel_odd_h(A, roots, Nrows, Ncols, rstride, pidx);
+  interpol_parallel_odd_h(B, roots, Nrows, Ncols, rstride, pidx);
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
+      montmult_h(&M_mul[(2*i+1)<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &B[i<<NWORDS_256BIT_SHIFT], pidx);
+  }
+  return M_mul;
+
+  intt_parallel_h(M_mul, roots, 0, mNrows, mNcols, 1, FFT_T_DIF, pidx);
+  return M_mul;
 }
 
 /*
+
   Generate format of FFT from number of samples. Parameters include 1D FFT/2D FFT/ 3D FFT/ 4D FFT, size of 
    matrix for multi D FFT,...
 
