@@ -1,0 +1,644 @@
+---
+swagger: "2.0"
+info:
+  description: "API specification for the proof generation service of the rollup."
+  version: "0.0.1"
+  title: "Rollup Proof Generator"
+host: "localhost:8080"
+schemes:
+- "http"
+paths:
+  /input:
+    post:
+      tags:
+      - "Proof Generator"
+      summary: "Send inputs to generate a proof"
+      description: "Send a petition of proo generation based on inputs. Note that\
+        \ this endpoint will just schedule the proof generation, not return it."
+      operationId: "postInput"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "Input"
+        description: "Input for the proof generation circuit."
+        required: true
+        schema:
+          $ref: "#/definitions/input"
+      responses:
+        200:
+          description: "successful operation"
+        401:
+          description: "Input validation error"
+          schema:
+            $ref: "#/definitions/Unauthorized"
+        500:
+          description: "Internal server"
+          schema:
+            $ref: "#/definitions/Error"
+        501:
+          description: "Not implemented"
+          schema:
+            $ref: "#/definitions/NotImplemented"
+      x-swagger-router-controller: "ProofGenerator"
+  /status:
+    get:
+      tags:
+      - "Proof Generator"
+      summary: "Get the status of the proof generator."
+      description: "Returns the status of the proof generator."
+      operationId: "getStatus"
+      produces:
+      - "application/json"
+      parameters: []
+      responses:
+        200:
+          description: "successful operation"
+          schema:
+            $ref: "#/definitions/status"
+        401:
+          description: "Input validation error"
+          schema:
+            $ref: "#/definitions/Unauthorized"
+        500:
+          description: "Internal server"
+          schema:
+            $ref: "#/definitions/Error"
+        501:
+          description: "Not implemented"
+          schema:
+            $ref: "#/definitions/NotImplemented"
+      x-swagger-router-controller: "ProofGenerator"
+  /cancel:
+    post:
+      tags:
+      - "Proof Generator"
+      summary: "Abort the proof that is currentl being generated"
+      description: "Send a petition to abort the creation process of a proof"
+      operationId: "postCancel"
+      parameters: []
+      responses:
+        200:
+          description: "successful operation"
+        401:
+          description: "Input validation error"
+          schema:
+            $ref: "#/definitions/Unauthorized"
+        500:
+          description: "Internal server"
+          schema:
+            $ref: "#/definitions/Error"
+        501:
+          description: "Not implemented"
+          schema:
+            $ref: "#/definitions/NotImplemented"
+      x-swagger-router-controller: "ProofGenerator"
+definitions:
+  input:
+    type: "object"
+    properties:
+      oldStRoot:
+        type: "string"
+        example: "12345678123456781234567812345678"
+        description: "Root of the old state tree hashed, encoded as a string representing\
+          \ a 256 bits unsigned integer"
+        pattern: "^\\d{1,78}$"
+      feePlanCoins:
+        type: "integer"
+        example: 0
+        description: "??????, encoded as a string representing a 256 bits unsigned\
+          \ integer"
+        minimum: 0
+      feePlanFees:
+        type: "integer"
+        example: 0
+        description: "???????, encoded as a string representing a 256 bits unsigned\
+          \ integer"
+        minimum: 0
+      txData:
+        type: "array"
+        description: "???????, encoded as a string representing a 256 bits unsigned\
+          \ integer"
+        items:
+          type: "string"
+          example: "12345678123456781234567812345678"
+          pattern: "^\\d{1,78}$"
+      rqTxData:
+        type: "array"
+        description: "???????"
+        items:
+          type: "integer"
+          example: 0
+          minimum: 0
+      s:
+        type: "array"
+        description: "???????"
+        items:
+          type: "integer"
+          example: 0
+          minimum: 0
+      r8x:
+        type: "array"
+        description: "???????"
+        items:
+          type: "integer"
+          example: 0
+          minimum: 0
+      r8y:
+        type: "array"
+        description: "???????"
+        items:
+          type: "integer"
+          example: 0
+          minimum: 0
+      loadAmount:
+        type: "array"
+        description: "???????"
+        items:
+          type: "integer"
+          example: 0
+          minimum: 0
+      ethAddr:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - "564285745605685379469803228198653436451829107432"
+        - "564285745605685379469803228198653436451829107432"
+        description: "???????, encoded as uint or bigInt"
+        items: {}
+      ax:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - "19978187010499430245869538435991859273974821401831892378333645864391780110865"
+        - "19978187010499430245869538435991859273974821401831892378333645864391780110865"
+        description: "???????"
+        items: {}
+      ay:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - "8221948295571505153368741349618427496143137236526643398342942827546824861670"
+        - "8221948295571505153368741349618427496143137236526643398342942827546824861670"
+        description: "???????"
+        items: {}
+      ax1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 4660
+        - "19978187010499430245869538435991859273974821401831892378333645864391780110865"
+        description: "???????"
+        items: {}
+      ay1:
+        type: "array"
+        example: {}
+        description: "???????"
+        items: {}
+      ammount1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 4660
+        - "1000"
+        description: "???????"
+        items: {}
+      nonce1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 4660
+        - 0
+        description: "???????"
+        items: {}
+      ethAddr1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - "564285745605685379469803228198653436451829107432"
+        - "564285745605685379469803228198653436451829107432"
+        description: "???????"
+        items: {}
+      siblings1:
+        type: "array"
+        description: "???????"
+        items:
+          type: "array"
+          example:
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          items: {}
+      isOld0_1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 1
+        - 0
+        description: "???????"
+        items: {}
+      oldKey1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 4660
+        description: "???????"
+        items: {}
+      oldValue1:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 4660
+        description: "???????"
+        items: {}
+      ax2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 4660
+        description: "???????"
+        items: {}
+      ay2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 4660
+        description: "???????"
+        items: {}
+      ammount2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 4660
+        description: "???????"
+        items: {}
+      nonce2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 4660
+        description: "???????"
+        items: {}
+      ethAddr2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - "564285745605685379469803228198653436451829107432"
+        description: "???????"
+        items: {}
+      siblings2:
+        type: "array"
+        description: "???????"
+        items:
+          type: "array"
+          example:
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          items: {}
+      isOld0_2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 1
+        description: "???????"
+        items:
+          type: "integer"
+          minimum: 0
+          maximum: 1
+      oldKey2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 0
+        description: "???????"
+        items: {}
+      oldValue2:
+        type: "array"
+        example:
+        - 0
+        - 0
+        - 0
+        - 0
+        description: "???????"
+        items: {}
+    description: "Set of input signals required to generate a proof"
+    example:
+      oldStRoot: "0"
+      feePlanCoins: 0
+      feePlanFees: 0
+      txData:
+      - "0"
+      - "0"
+      - "0"
+      - "0"
+      rqTxData:
+      - 0
+      - 0
+      - 0
+      - 0
+      s:
+      - 0
+      - 0
+      - 0
+      - 0
+      r8x:
+      - 0
+      - 0
+      - 0
+      - 0
+      r8y:
+      - 0
+      - 0
+      - 0
+      - 0
+      loadAmount:
+      - 0
+      - 0
+      - 0
+      - 0
+      ethAddr:
+      - 0
+      - 0
+      - 0
+      - 0
+      ax:
+      - 0
+      - 0
+      - 0
+      - 0
+      ay:
+      - 0
+      - 0
+      - 0
+      - 0
+      step:
+      - 0
+      - 0
+      - 0
+      - 0
+      ax1:
+      - 0
+      - 0
+      - 0
+      - 0
+      ay1:
+      - 0
+      - 0
+      - 0
+      - 0
+      amount1:
+      - 0
+      - 0
+      - 0
+      - 0
+      nonce1:
+      - 0
+      - 0
+      - 0
+      - 0
+      ethAddr1:
+      - 0
+      - 0
+      - 0
+      - 0
+      siblings1:
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      isOld0_1:
+      - 0
+      - 0
+      - 0
+      - 0
+      oldKey1:
+      - 0
+      - 0
+      - 0
+      - 0
+      oldValue1:
+      - 0
+      - 0
+      - 0
+      - 0
+      ax2:
+      - 0
+      - 0
+      - 0
+      - 0
+      ay2:
+      - 0
+      - 0
+      - 0
+      - 0
+      amount2:
+      - 0
+      - 0
+      - 0
+      - 0
+      nonce2:
+      - 0
+      - 0
+      - 0
+      - 0
+      ethAddr2:
+      - 0
+      - 0
+      - 0
+      - 0
+      siblings2:
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      - - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+      isOld0_2:
+      - 0
+      - 0
+      - 0
+      - 0
+      oldKey2:
+      - 0
+      - 0
+      - 0
+      - 0
+      oldValue2:
+      - 0
+      - 0
+      - 0
+      - 0
+  status:
+    type: "object"
+    required:
+    - "status"
+    properties:
+      status:
+        type: "string"
+        description: "Possible states of the proof service:\n * `Idle` - waiting for\
+          \ input\n * `Error` - if witness is not correct\n * `Pending` - if proof\
+          \ is being generated\n * `Finished` - if proof has been generated, in that\
+          \ case proof will be returned\n"
+        enum:
+        - "Idle"
+        - "Error"
+        - "Pending"
+        - "Finished"
+      proof:
+        type: "string"
+        description: "successfully generated proof. When this field is included in\
+          \ the response the value of status will always be `Finished`"
+      pubData:
+        type: "string"
+        description: "public data used in the proof generation. When this field is\
+          \ included in the response the value of status will always be `Finished`"
+    example:
+      status: "Finished"
+      proof: "add propper example"
+      pubData: "add propper example here as well"
+  Error:
+    type: "object"
+    required:
+    - "code"
+    - "message"
+    properties:
+      code:
+        type: "string"
+        example: "UNKNOWN_ERROR"
+      message:
+        type: "string"
+        example: "This is emabarrasing, something went wrong while processing your\
+          \ request. Try again later, if the rror persist please contact support."
+    description: "Internal server error"
+  Unauthorized:
+    type: "object"
+    required:
+    - "code"
+    - "message"
+    properties:
+      code:
+        type: "string"
+        example: "INPUT_VALIDATION_ERROR"
+      message:
+        type: "string"
+        example: "Incorrect value for \\\"id\\\" at paths,/transaction/{id},get,parameters,0,schema."
+    description: "Unauthorized"
+  NotImplemented:
+    type: "object"
+    required:
+    - "code"
+    - "message"
+    properties:
+      code:
+        type: "string"
+        example: "FEATURE_NOT_IMPLEMENTED_YET"
+      message:
+        type: "string"
+        example: "This feature is not fully implemented yet. You can use the mockup\
+          \ data provided in this response but keep in mind that the values are reandomly\
+          \ generated."
+      mockup:
+        type: "object"
+        example:
+          thisObject: "Sould be equal to the 200 response object"
+        properties: {}
+    description: "Not Implemented"

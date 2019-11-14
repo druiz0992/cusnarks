@@ -1,0 +1,8 @@
+{
+    "circuitFile": "/home/tester/production/cusnarks/circuits/r1cs4M_circuit.json",
+    "proofFile": "/home/tester/production/cusnarks/circuits/r1cs4M_proof.json",
+    "publicDataFile": "/home/tester/production/cusnarks/circuits/r1cs4M_pd.json",
+    "witnessFile": "/home/tester/production/cusnarks/circuits/r1cs4M_w.dat",
+    "pysnarks": "/home/tester/production/cusnarks/src/python/pysnarks.py",
+    "cudaList": "1,2"
+}

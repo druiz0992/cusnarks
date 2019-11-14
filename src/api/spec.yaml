@@ -1,0 +1,675 @@
+swagger: "2.0"
+
+# TODOs:
+#   - Add authentication and authorization
+#   - Add meta: ToS, License, Contact info, ...
+
+
+
+info:
+  version: '0.0.1'
+  title: 'Rollup Proof Generator'
+  description: 'API specification for the proof generation service of the rollup.'
+schemes:
+- http
+host: localhost:8080
+
+paths:
+  /input:
+    post:
+      operationId: postInput
+      tags:
+      - Proof Generator
+      summary: Send inputs to generate a proof
+      description: Send a petition of proo generation based on inputs. Note that this endpoint will just schedule the proof generation, not return it.
+      parameters:
+      - in: body
+        required: true
+        name: Input
+        description: Input for the proof generation circuit.
+        schema:
+          $ref: '#/definitions/input'
+      produces:
+      - application/json
+      responses:
+        200:
+          description: successful operation
+        401:
+          description: Input validation error
+          schema:
+            $ref: '#/definitions/Unauthorized'
+        500:
+          description: Internal server
+          schema:
+            $ref: '#/definitions/Error'
+        501:
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/NotImplemented'
+  /status:
+    get:
+      operationId: getStatus
+      tags:
+      - Proof Generator
+      summary: Get the status of the proof generator.
+      description: Returns the status of the proof generator.
+      produces:
+      - application/json
+      responses:
+        200:
+          description: successful operation
+          schema:
+            $ref: '#/definitions/status'
+        401:
+          description: Input validation error
+          schema:
+            $ref: '#/definitions/Unauthorized'
+        500:
+          description: Internal server
+          schema:
+            $ref: '#/definitions/Error'
+        501:
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/NotImplemented'
+  /cancel:
+    post:
+      operationId: postCancel
+      tags:
+      - Proof Generator
+      summary: Abort the proof that is currentl being generated
+      description: Send a petition to abort the creation process of a proof
+      responses:
+        200:
+          description: successful operation
+        401:
+          description: Input validation error
+          schema:
+            $ref: '#/definitions/Unauthorized'
+        500:
+          description: Internal server
+          schema:
+            $ref: '#/definitions/Error'
+        501:
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/NotImplemented'
+          
+definitions:
+  input:
+    type: object
+    description: Set of input signals required to generate a proof
+    # properties:
+    #   oldStRoot:
+    #     type: string
+    #     description: Root of the old state tree hashed, encoded as a string representing a 256 bits unsigned integer
+    #     pattern: ^\d{1,78}$
+    #     example: "12345678123456781234567812345678"
+    #   feePlanCoins:
+    #     # TODO: check type validation and description
+    #     type: integer
+    #     description: ??????, encoded as a string representing a 256 bits unsigned integer
+    #     example: 0
+    #     minimum: 0
+    #   feePlanFees:
+    #     # TODO: check type validation and description
+    #     type: integer
+    #     description: ???????, encoded as a string representing a 256 bits unsigned integer
+    #     minimum: 0
+    #     example: 0
+    #   txData:
+    #     # TODO: check description, fixed length???
+    #     type: array
+    #     description: ???????, encoded as a string representing a 256 bits unsigned integer
+    #     items:
+    #       type: string
+    #       pattern: ^\d{1,78}$
+    #       example: "12345678123456781234567812345678"
+    #   rqTxData:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: integer
+    #       minimum: 0
+    #       example: 0
+    #   s:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: integer
+    #       minimum: 0
+    #       example: 0
+    #   r8x:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: integer
+    #       minimum: 0
+    #       example: 0
+    #   r8y:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: integer
+    #       minimum: 0
+    #       example: 0
+    #   loadAmount:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: integer
+    #       minimum: 0
+    #       example: 0
+    #   ethAddr:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????, encoded as uint or bigInt
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - "564285745605685379469803228198653436451829107432"
+    #     - "564285745605685379469803228198653436451829107432"
+    #   ax:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - "19978187010499430245869538435991859273974821401831892378333645864391780110865"
+    #     - "19978187010499430245869538435991859273974821401831892378333645864391780110865"
+    #   ay:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - "8221948295571505153368741349618427496143137236526643398342942827546824861670"
+    #     - "8221948295571505153368741349618427496143137236526643398342942827546824861670"
+    #   ax1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 4660
+    #     - "19978187010499430245869538435991859273974821401831892378333645864391780110865"
+    #   ay1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: {}
+    #   ammount1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 4660
+    #     - "1000"
+    #   nonce1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 4660
+    #     - 0
+    #   ethAddr1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - "564285745605685379469803228198653436451829107432"
+    #     - "564285745605685379469803228198653436451829107432"
+    #   siblings1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: array
+    #       items: {}
+    #       example: 
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0      
+    #   isOld0_1:
+    #     # TODO: IS THIS A BOOL!?!?!, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 1
+    #     - 0
+    #   oldKey1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 4660
+    #   oldValue1:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 4660
+    #   ax2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 4660    
+    #   ay2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 4660    
+    #   ammount2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 4660
+    #   nonce2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 4660      
+    #   ethAddr2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - "564285745605685379469803228198653436451829107432"
+    #   siblings2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: array
+    #       items: {}
+    #       example: 
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0
+    #       - 0      
+    #   isOld0_2:
+    #     # TODO: IS THIS A BOOL!?!?!, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items:
+    #       type: integer
+    #       minimum: 0
+    #       maximum: 1
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 1
+    #   oldKey2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 0
+    #   oldValue2:
+    #     # TODO: check description and validatioin, fixed length???
+    #     type: array
+    #     description: ???????
+    #     items: {}
+    #     example: 
+    #     - 0
+    #     - 0
+    #     - 0
+    #     - 0
+    # example: 
+    #   oldStRoot: '0'
+    #   feePlanCoins: 0
+    #   feePlanFees: 0
+    #   txData:
+    #    - '0'
+    #    - '0'
+    #    - '0'
+    #    - '0'
+    #   rqTxData:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   s:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   r8x:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   r8y:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   loadAmount:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ethAddr:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ax:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ay:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   step:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ax1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ay1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   amount1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   nonce1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ethAddr1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   siblings1:
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #   isOld0_1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   oldKey1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   oldValue1:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ax2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ay2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   amount2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   nonce2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   ethAddr2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   siblings2:
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #    - - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #      - 0
+    #   isOld0_2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   oldKey2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+    #   oldValue2:
+    #    - 0
+    #    - 0
+    #    - 0
+    #    - 0
+             
+  # TODO: check proof format add regex validation and redo example according to it
+  status:
+    type: object
+    properties:
+      status:
+        type: string
+        enum:
+        - Idle
+        - Error
+        - Pending
+        - Finished 
+        description: >
+          Possible states of the proof service:
+           * `Idle` - waiting for input
+           * `Error` - if witness is not correct
+           * `Pending` - if proof is being generated
+           * `Finished` - if proof has been generated, in that case proof will be returned
+      proof:
+        type: string
+        description: successfully generated proof. When this field is included in the response the value of status will always be `Finished`
+        # pattern: ^\d{1,78}$
+        # example: ...
+      pubData:
+        type: string
+        description: public data used in the proof generation. When this field is included in the response the value of status will always be `Finished`
+        # pattern: ^\d{1,78}$
+        # example: ...
+    example:
+      status: Finished
+      proof: add propper example
+      pubData: add propper example here as well
+    required:
+    - status
+    
+  Error:
+    description: Internal server error
+    type: object
+    properties:
+      code:
+        type: string
+        example: UNKNOWN_ERROR
+      message:
+        type: string
+        example: This is emabarrasing, something went wrong while processing your request. Try again later, if the rror persist please contact support.
+    required:
+    - code
+    - message
+  Unauthorized:
+    description: Unauthorized
+    type: object
+    properties:
+      code:
+        type: string
+        example: INPUT_VALIDATION_ERROR
+      message:
+        type: string
+        example: Incorrect value for \"id\" at paths,/transaction/{id},get,parameters,0,schema.
+    required:
+    - code
+    - message
+  NotImplemented:
+    description: Not Implemented
+    type: object
+    properties:
+      code:
+        type: string
+        example: FEATURE_NOT_IMPLEMENTED_YET
+      message:
+        type: string
+        example: This feature is not fully implemented yet. You can use the mockup data provided in this response but keep in mind that the values are reandomly generated.
+      mockup:
+        type: object
+        example: 
+          thisObject: 'Sould be equal to the 200 response object'
+                     
+    required:
+    - code
+    - message
