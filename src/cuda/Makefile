@@ -29,7 +29,8 @@ GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
 #CFLAGS=-c -g -O0 -DLINUXINTEL64  -DTEST_MODE -std=c++11 -I $(INCLUDE_PATH) -w
 CFLAGS=-c -O3 -DLINUXINTEL64  $(DEFINES) -std=c++11 -I $(INCLUDE_PATH) -w
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-EXTRA_CFLAGS2=-mbmi2 -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
+#EXTRA_CFLAGS2=-mbmi2 -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
+EXTRA_CFLAGS2=-march=native -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
 CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -lineinfo -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_61 --shared -o 

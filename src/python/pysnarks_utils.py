@@ -306,15 +306,15 @@ def cirjson_to_r1cs(idx, in_circuit_format, out_circuit_format, cir_data):
 
 def cirvars_to_bin(cir):
         return  np.concatenate((
-                       [cir['nWords'],
-                        cir['nPubInputs'],
-                        cir['nOutputs'],
-                        cir['nVars'],
-                        cir['nConstraints'],
-                        cir['cirformat'],
-                        cir['R1CSA_nWords'],
-                        cir['R1CSB_nWords'],
-                        cir['R1CSC_nWords']],
+                        _64b232b(cir['nWords']),
+                        _64b232b(cir['nPubInputs']),
+                        _64b232b(cir['nOutputs']),
+                        _64b232b(cir['nVars']),
+                        _64b232b(cir['nConstraints']),
+                        _64b232b(cir['cirformat']),
+                        _64b232b(cir['R1CSA_nWords']),
+                        _64b232b(cir['R1CSB_nWords']),
+                        _64b232b(cir['R1CSC_nWords']),
                         cir['R1CSA'],
                         cir['R1CSB'],
                         cir['R1CSC']))
