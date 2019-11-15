@@ -1095,6 +1095,7 @@ class GrothProver(object):
             if ec2:
               return ecp[0:6], t
             else:
+              #return ecp, t
               return ecp[0:3], t
 
     def getECResults(self, dispatch_table):
@@ -1216,7 +1217,7 @@ class GrothProver(object):
           if EPidx==sort_idx:
               # Sort scl batch
               self.sorted_scl_array_idx[start_idx:end_idx] = \
-                   sortu256_idx_h(self.scl_array[start_idx:end_idx], 0)
+                   sortu256_idx_h(self.scl_array[start_idx:end_idx], sort_en)
               self.sorted_scl_array[start_idx:end_idx] = \
                    self.scl_array[start_idx:end_idx][self.sorted_scl_array_idx[start_idx:end_idx]]
               # Copy sorted scl batch
@@ -1234,12 +1235,12 @@ class GrothProver(object):
 
           # Copy last batch EC point sum
           EC_P[ecidx][-step:] = init_ec_val
-                    
-          # Dispatch reduction to selected GPU
+
           result, t = self.compute_proof_ecp(
-                                       cuda_ec128,
-                                       EC_P[ecidx],
-                                       step==4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
+              cuda_ec128,
+              EC_P[ecidx],
+              step == 4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
+
 
           """
           result = ec_jacreduce_h(np.reshape(EC_P[ecidx][:nsamples],-1),

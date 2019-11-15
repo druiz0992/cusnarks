@@ -2850,7 +2850,7 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
 {
   const uint32_t *ECInf = CusnarksMiscKGet();
   uint32_t i;
-  int debug_tid = 5;
+  int debug_tid = 35;
   uint32_t ndims = ECP_JAC_OUTDIMS;
   if (add_last){
       ndims = ECP_JAC_INDIMS;
@@ -2860,13 +2860,16 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
 
   uint32_t * ec_table = ec_inittable(x, ectable, n, order, pidx, add_last);
 
-
   /*
   for(i=debug_tid * table_size; i< (debug_tid+1)*table_size; i++){
         printf("T[%d] :\n",i-debug_tid*table_size);
         printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
         printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
         printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
+  }
+  for(i=debug_tid * order ; i< (debug_tid+1)*order; i++){
+     printf("SCL :");
+     printU256Number(&scl[i*NWORDS_256BIT]);
   }
   */
 
@@ -2899,7 +2902,7 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
      if (i == debug_tid){
          printf("msb : %d\n",msb);
      }
-      */
+     */
      msb = 255 - msb;
      for (int j=msb; j>=0 ; j--){
         uint32_t b = getbitu256g_h(&scl[i*order * NWORDS_256BIT], j, order);
@@ -2914,12 +2917,15 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
                        &z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        pidx);
         }
+       
         /*
         if (i==debug_tid){ 
-          printf("offset : %d, b : %d\n",j, b);
+          printf("offset : %d, b : %d\n",255-j, b);
           printf("Q :\n");
           printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
+          printf("Q :\n");
           printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
+          printf("Q :\n");
           printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
         }
         */

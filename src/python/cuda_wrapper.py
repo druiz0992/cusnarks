@@ -227,8 +227,12 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
              (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
 
    kernel_params['out_length'] = 1 * outdims
-   #kernel_params['out_length'] = int(nsamples * outdims)
-   #kernel_params['out_length'] = int(nsamples/8 * outdims)
+   """
+   if not shamir_en:
+     kernel_params['out_length'] = int(nsamples * outdims)
+   else:
+     kernel_params['out_length'] = int(nsamples/8 * outdims)
+   """
    #kernel_params['out_length'] = np.product(kernel_config['blockD'][1:]) * outdims
    kernel_params['padding_idx'] = [shamir_en] * nkernels
    kernel_config['gridD'] = [0] * nkernels
