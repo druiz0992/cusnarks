@@ -734,7 +734,7 @@ __forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 
            scmulecjac_opt<T1, T2>(&sumX,0,
                                   &sumX2, 2*(idx*U256_BSELM - opt_ec_offset), 
                                   &scl[idx*NWORDS_256BIT *U256_BSELM],  params);
-           logInfoBigNumberTid(3*T1::getN(),"Final R : \n",&sumX);
+           //logInfoBigNumberTid(3*T1::getN(),"Final R : \n",&sumX);
         }
         
     } else {
@@ -909,7 +909,7 @@ __forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uin
           zxr->setu256(zoffset,&_inf,x1offset);
 	  return;  
       }
-      doublecjac<T1, T2>(zxr,zx1, midx);
+      doublecjac<T1, T2>(&xr,&x1, midx);
       return;
   }
 
@@ -1008,7 +1008,7 @@ __forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1
 	  return;  
         } 
         //logInfoTid("R4=D %d\n", midx);
-        doublecjac<T1, T2>(zxr,zx2, midx);
+        doublecjac<T1, T2>(&xr,&x2, midx);
         return;
   }
   subz(&tmp1, &x2, &tmp_z, midx);     // H = tmp1 = u2 - u1
@@ -1444,7 +1444,7 @@ __device__ void scmulecjac_step_l2r2(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset
    logInfoTid("b : %d\n",b);
    doublecjac<T1, T2>(Q,Q, midx);
    addecjac<T1, T2> (Q,0, N,b*3, Q,0, midx);
-   //logInfoBigNumberTid(3*T1::getN(),"Q : \n",Q);
+   logInfoBigNumberTid(3*T1::getN(),"Q : \n",Q);
    
 }
 template<typename T1, typename T2>
@@ -1497,8 +1497,11 @@ __device__ void build_ec_table(T1 *d_out,T1 *d_in, uint32_t din_offset, uint32_t
     T1 RR(R);
   for (j=0; j< (1<<U256_BSELM); j++){
       RR.setu256(0,d_out,T1::getN()*j*3);
-      logInfoTid("idx : %d \n",j);
+      logInfoTid("T[%d] :\n",j);
       logInfoBigNumberTid(3*T1::getN(),"",&RR);
+  }
+  for (j=0; j< 8; j++){
+     logInfoBigNumberTid(1,"SCL : ",&scl[j*NWORDS_256BIT]);
   }
   logInfoTid("din_offset : %d\n",din_offset);
   for (j=0; j< U256_BSELM; j++){
