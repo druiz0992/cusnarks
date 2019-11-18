@@ -7,8 +7,8 @@ const cu                    = require("./cusnarkCLI");
 
 const config = JSON.parse(fs.readFileSync(`${__dirname}/../../config.json`, "utf8"));
 // UNCOMMENT FOR REALNESS
-// const circuitDef  = JSON.parse(fs.readFileSync(config.circuitFile, "utf8"));
-// const circuit     = new zkSnark.Circuit(circuitDef);
+const circuitDef  = JSON.parse(fs.readFileSync(config.circuitFile, "utf8"));
+const circuit     = new zkSnark.Circuit(circuitDef);
 
 // Strings matching API doc
 const state = {
@@ -69,21 +69,21 @@ exports.postCancel = function() {
 exports.postInput = function(input) {
   return new Promise(function(resolve, reject) {
     // UNCOMMENT FOR REALNESS: 
-    // const witness = circuit.calculateWitness(input);
-    // writeWitnessBin(witness, config.witnessFile)
-    //   .then(() => {
-    //     genProof(true); // generate the proof, don't wait for it!
-    //     resolve();
-    //   })
-    //   .catch((e) => {
-    //     console.error("ERROR GENERATING WITNESS: ", e);
-    //     reject({
-    //       internal: true,
-    //       message: "An error has occured while preparing data for proof generation. Please check the corectness of the submited values"
-    //     });
-    //   });
-    genProof();
-    resolve();
+    const witness = circuit.calculateWitness(input);
+    writeWitnessBin(witness, config.witnessFile)
+      .then(() => {
+        genProof(); // generate the proof, don't wait for it!
+        resolve();
+      })
+      .catch((e) => {
+        console.error("ERROR GENERATING WITNESS: ", e);
+        reject({
+          internal: true,
+          message: "An error has occured while preparing data for proof generation. Please check the corectness of the submited values"
+        });
+      });
+    // genProof();
+    // resolve();
   });
 }
 
