@@ -474,6 +474,25 @@ typedef struct{
   
 }mpoly_eval_t;
 
+typedef struct{
+  uint32_t *A;
+  uint32_t *B;
+  uint32_t *roots;
+  uint32_t Nrows;
+  uint32_t Ncols;
+  uint32_t mNrows;
+  uint32_t mNcols;
+  uint32_t nroots;
+  uint32_t rstride;
+  uint32_t astride;
+  uint32_t pidx;
+  uint32_t max_threads;
+  uint32_t start_idx;
+  uint32_t last_idx;
+  uint32_t thread_id;
+
+}ntt_interpolandmul_t;
+
 typedef enum{
   KERNEL_T_ZPOLY = 0,
   KERNEL_T_ECBN128_T,

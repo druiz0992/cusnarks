@@ -37,6 +37,7 @@
 #include <string.h>
 #include <cmath>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <time.h>
 #include "types.h"
 #include "constants.h"
@@ -7257,11 +7258,6 @@ void test_mul5(void)
      montsquare_h(c, a, pidx);
 
      if (compu256_h(r,c)){
-        //printf("Error in mult %d\n",i);
-        //printf("Expected\n");
-        //printU256Number(r);
-        //printf("Obtained\n");
-        //printU256Number(c);
         n_errors++;
      }
    }
@@ -7361,6 +7357,7 @@ void test_ntt_parallel(void)
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
 
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
+  init_h();
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
@@ -7385,6 +7382,7 @@ void test_ntt_parallel(void)
   free(samples);
   free(result);
   free(roots);
+  release_h();
 }
 
 void test_ntt_65K()
@@ -7455,6 +7453,7 @@ void test_ntt_parallel_65K(void)
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
 
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
+  init_h();
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
@@ -7479,6 +7478,7 @@ void test_ntt_parallel_65K(void)
   free(samples);
   free(result);
   free(roots);
+  release_h();
 }
 
 void test_ntt_1M()
@@ -7593,9 +7593,9 @@ void test_interpol_parallel_500K()
   intt_h(result, roots, 1, levels,2, pidx);
   ntt_h(result, roots, levels+1,1, 1,1, pidx);
 
-  M_init_h(nroots);
+  init_h();
   interpol_parallel_odd_h(samples, roots,Nrows, Ncols, 2, pidx); 
-  M_free_h();
+  release_h();
 
   for (j=0;j<nroots; j++){
       if (compu256_h(&samples[j*NWORDS_256BIT],&result[(2*j+1)*NWORDS_256BIT])){
@@ -7632,6 +7632,7 @@ void test_ntt_parallel_1M(void)
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
 
   memcpy(result, samples, nroots * NWORDS_256BIT * sizeof(uint32_t));
+  init_h();
 
   ntt_parallel_h(samples, roots, Nrows,Ncols,1,1, FFT_T_DIT,pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
@@ -7657,6 +7658,7 @@ void test_ntt_parallel_1M(void)
   free(samples);
   free(result);
   free(roots);
+  release_h();
 }
 
 
@@ -7682,6 +7684,7 @@ void test_ntt_parallel2D_65K()
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
+   init_h();
 
    for (k=0; k < MAX_ITER_65K; k++){
      setRandom256(samples,nroots, N);
@@ -7703,6 +7706,7 @@ void test_ntt_parallel2D_65K()
     free(samples2);
     free(roots);
     free(iroots);
+    release_h();
 }
 
 void test_nttmul_parallel2D_65K(void)
@@ -7729,6 +7733,7 @@ void test_nttmul_parallel2D_65K(void)
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
+   init_h();
 
    for (k=0; k <MAX_ITER_65K; k++){
      memset(X1,0, NWORDS_256BIT * sizeof(uint32_t)); 
@@ -7767,6 +7772,7 @@ void test_nttmul_parallel2D_65K(void)
     free(Y2);
     free(roots);
     free(iroots);
+    release_h();
 }
 
 void test_ntt_parallel3D_131K()
@@ -7782,6 +7788,7 @@ void test_ntt_parallel3D_131K()
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
+   init_h();
 
    uint32_t *samples = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
    uint32_t *samples2 = (uint32_t *)malloc(nroots * NWORDS_256BIT * sizeof(uint32_t));
@@ -7811,6 +7818,7 @@ void test_ntt_parallel3D_131K()
     free(samples2);
     free(roots);
     free(iroots);
+    release_h();
 }
 
 
@@ -7836,6 +7844,7 @@ void test_ntt_parallel2D_1M()
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
+   init_h();
 
    for (k=0; k <MAX_ITER_1M; k++){
      setRandom256(samples, nroots, N);
@@ -7843,7 +7852,8 @@ void test_ntt_parallel2D_1M()
  
      intt_parallel2D_h(samples, roots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M,1, pidx);
      ntt_parallel2D_h(samples, iroots, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M,1,1, pidx);
-  
+ 
+     n_errors=0; 
      for (j=0;j<nroots; j++){
          if (compu256_h(&samples[j*NWORDS_256BIT],&samples2[j*NWORDS_256BIT])){
              n_errors++;
@@ -7857,6 +7867,7 @@ void test_ntt_parallel2D_1M()
     free(samples2);
     free(roots);
     free(iroots);
+    release_h();
 }
 
 void test_nttmul_parallel2D_1M(void)
@@ -7883,6 +7894,7 @@ void test_nttmul_parallel2D_1M(void)
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
+   init_h();
 
    for (k=0; k <MAX_ITER_1M; k++){
      memset(X1,0, NWORDS_256BIT * sizeof(uint32_t)); 
@@ -7906,6 +7918,7 @@ void test_nttmul_parallel2D_1M(void)
      intt_parallel2D_h(Y1, iroots,1, Nrows, FFT_SIZEYX_1M, Ncols, FFT_SIZEXX_1M, 1, pidx);
      intt_h(Y2, roots,1,levels,1, pidx);
 
+     n_errors=0;
      for (j=0;j<nroots; j++){
          if (compu256_h(&Y1[j*NWORDS_256BIT],&Y2[j*NWORDS_256BIT])){
              n_errors++;
@@ -7921,6 +7934,7 @@ void test_nttmul_parallel2D_1M(void)
     free(Y2);
     free(roots);
     free(iroots);
+    release_h();
 }
 
 void test_nttmul_randomsize(void)
@@ -7940,7 +7954,8 @@ void test_nttmul_randomsize(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
 
-   CusnarksGetFRoots(roots_f, sizeof(roots_f));
+   CusnarksGetFRoots(roots_f, sizeof(roots_f)); 
+   init_h();
 
    for (k=6; k < 21; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
@@ -8018,36 +8033,42 @@ void test_nttmul_randomsize(void)
       free(roots);
       free(iroots);
     }
+    release_h();
 
 }
 void test_interpol_mul_randomsize(void)
 {
-     int i,j,k;
+   int i,j,k;
    int pidx=1;
    int n_errors=0;
    fft_params_t fft_params;
    int Nrows,Ncols,fft_Nyx,fft_Nxx;
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
-   uint32_t *X1;
-   uint32_t *Y1;
-   uint32_t *X2;
-   uint32_t *Y2;
+   uint32_t *X1,*X2,*X3;
+   uint32_t *Y1,*Y2,*Y3;
    uint32_t *R;
    uint32_t *roots, *iroots;
+   ntt_interpolandmul_t *args;
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
-   M_init_h(1<<20);
+   init_h();
    X1 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
    Y1 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
    X2 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
    Y2 = (uint32_t *)malloc((1<<20)* NWORDS_256BIT * sizeof(uint32_t));
+   X3 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+   Y3 = (uint32_t *)malloc((1<<20)* NWORDS_256BIT * sizeof(uint32_t));
    roots = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+   args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
 
-   for (k=6; k < 21; k++){
+   args->A = X3; args->B = Y3; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
+   args->astride = 1; args->rstride=2;
+   //for (k=6; k < 21; k++){
+   for (k=6; k < 7; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
      
      ntt_build_h(&fft_params, npoints_raw);
@@ -8062,11 +8083,14 @@ void test_interpol_mul_randomsize(void)
      setRandom256(Y1, npoints/2, N);
      memcpy(X2, X1, npoints * NWORDS_256BIT * sizeof(uint32_t));
      memcpy(Y2, Y1, npoints * NWORDS_256BIT * sizeof(uint32_t));
+     memcpy(X3, X1, npoints * NWORDS_256BIT * sizeof(uint32_t));
+     memcpy(Y3, Y1, npoints * NWORDS_256BIT * sizeof(uint32_t));
 
      Nrows = k/2;
      Ncols = k - Nrows;
-     R = ntt_interpolandmul_parallel_h(X1,Y1, roots, Nrows, Ncols-1,2, pidx);
 
+     intt_h(X2, roots, 1, fft_params.levels-1,2, pidx);
+     intt_h(Y2, roots, 1, fft_params.levels-1,2, pidx);
      ntt_h(X2, roots, fft_params.levels,1, 1,1, pidx);
      ntt_h(Y2, roots, fft_params.levels,1, 1,1, pidx);
      
@@ -8074,8 +8098,9 @@ void test_interpol_mul_randomsize(void)
        montmult_h(&Y2[j*NWORDS_256BIT], &Y2[j*NWORDS_256BIT], &X2[j*NWORDS_256BIT], pidx);
      }
 
-     //intt_h(Y2, roots,1, fft_params.levels,1, pidx);
+     intt_h(Y2, roots,0, fft_params.levels,1, pidx);
 
+     R = ntt_interpolandmul_parallel_h(X1,Y1, roots, Nrows, Ncols-1,2, pidx);
      n_errors = 0;
      for (j=0;j<npoints_raw; j++){
          if (compu256_h(&R[j*NWORDS_256BIT],&Y2[j*NWORDS_256BIT])){
@@ -8083,16 +8108,29 @@ void test_interpol_mul_randomsize(void)
           } 
       }
 
-      printf("N errors(FFTMUL-PARALLEL - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
+     printf("N errors(FFTMUL-PARALLEL - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
 
+     args->Nrows = Nrows; args->Ncols=Ncols-1; args->nroots=1<<(Nrows+Ncols); 
+     R = ntt_interpolandmul_server_h(args);
+     n_errors = 0;
+     for (j=0;j<npoints_raw; j++){
+         if (compu256_h(&R[j*NWORDS_256BIT],&Y2[j*NWORDS_256BIT])){
+             n_errors++;
+          } 
+      }
+     printf("N errors(FFTMUL-PARALLEL-SERVER - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
     }
+
     free(X1);
     free(X2);
+    free(X3);
     free(Y1);
     free(Y2);
+    free(Y3);
     free(roots);
+    free(args);
 
-    M_free_h();
+    release_h();
 
 }
 
@@ -8184,6 +8222,7 @@ void  test_inv()
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
   uint32_t i;
   uint32_t n_errors=0;
+
 
   for (i=0; i < 1000; i++){
      setRandom256(x,1, N);
@@ -8601,14 +8640,8 @@ void test_transpose_square(void)
     
      setRandom256(samples,nrows*nrows, N); 
      
-     start = (double)clock()/CLOCKS_PER_SEC;
      transpose_h(result, samples, nrows, nrows);
-     end = (double)clock()/CLOCKS_PER_SEC;
-     printf("T1 : %f\n", end-start);
-     start = (double)clock()/CLOCKS_PER_SEC;
      transpose_h(samples, nrows, nrows);
-     end = (double)clock()/CLOCKS_PER_SEC;
-     printf("T2 : %f\n", end-start);
      
      n_errors=0;
      for(j=0; j< nrows*nrows; j++){
@@ -8650,10 +8683,9 @@ int main()
   test_interpol_500K();
   test_interpol_parallel_500K();
 */
-
   test_interpol_mul_randomsize();
-
 /*
+
   test_transpose_square();
   test_transpose();
 
@@ -8662,7 +8694,9 @@ int main()
   test_shlr();
   test_shll();
   test_setgetbit();
+
   test_inv();
+
   test_mul_ext();
   test_inv_ext1();
   test_inv_ext2();
