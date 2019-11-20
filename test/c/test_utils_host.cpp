@@ -7147,7 +7147,7 @@ static uint32_t ext_invX_test[] = {
 
 };
 
-void test_mul(void)
+uint32_t test_mul(void)
 {
    uint32_t r[NWORDS_256BIT]; 
 
@@ -7155,6 +7155,7 @@ void test_mul(void)
  int pidx=1;
  int n_errors=0;
  uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
+ uint32_t retval=0;
 
  for (i=0; i < sizeof(A_test)/(sizeof(uint32_t) * NWORDS_256BIT); i++){
      memcpy(a, &A_test[i*NWORDS_256BIT], sizeof(uint32_t) * NWORDS_256BIT);
@@ -7176,7 +7177,14 @@ void test_mul(void)
         n_errors++;
      }
   }
+  if (n_errors){
+     printf("\033[1;31m");
+  }
   printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
+  printf("\033[0m;");
+
+  retval = n_errors;
+  return retval;
 
 }
 
@@ -7190,6 +7198,7 @@ void test_mul3(void)
    int n_errors=0;
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
    uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
+   uint32_t retval=0;
 
    for (i=0; i < MAX_ITER*1000; i++){
      setRandom256(a,1, N);
@@ -7210,7 +7219,13 @@ void test_mul3(void)
         break;
      }
    }
+   if (n_errors){
+     printf("\033[1;31m");
+   }
    printf("N errors(Test_Mul SOS) : %d/%d\n",n_errors, i);
+   printf("\033[0m;");
+   retval = n_errors;
+   return retval;
 }
 
 void test_mul4(void)
@@ -7238,10 +7253,16 @@ void test_mul4(void)
         n_errors++;
      }
    }
+   if (n_errors){
+     printf("\033[1;31m");
+   }
    printf("N errors(Test_Squaring SOS) : %d/%d\n",n_errors, i);
+   printf("\033[0m;");
+   retval = n_errors;
+   return retval;
 }
 #endif
-void test_mul5(void)
+uint32_t test_mul5(void)
 {
    uint32_t r[NWORDS_256BIT]; 
 
@@ -7249,6 +7270,7 @@ void test_mul5(void)
    int pidx=1;
    int n_errors=0;
    uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
+   uint32_t retval=0;
 
    for (i=0; i < MAX_ITER*1000; i++){
      setRandom(a, NWORDS_256BIT);
@@ -7261,17 +7283,24 @@ void test_mul5(void)
         n_errors++;
      }
    }
+   if (n_errors){
+     printf("\033[1;31m");
+   }
    printf("N errors(Test_Mul : Montgomery Squaring FIOS) : %d/%d\n",n_errors, i);
+   printf("\033[0m;");
+   retval = n_errors;
+   return retval;
 }
 
 
 
-void test_findroots(void)
+uint32_t test_findroots(void)
 {
    int j;
    int pidx=1;
    int n_errors=0;
    uint32_t roots[NWORDS_256BIT*NROOTS];
+   uint32_t retval=0;
 
    find_roots_h(roots, p_root128, NROOTS, pidx);
 
@@ -7281,11 +7310,17 @@ void test_findroots(void)
        }
          
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Find_roots) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
+  retval = n_errors;
+  return retval;
 
 }
 
-void test_ntt()
+uint32_t test_ntt()
 {
   int i,j;
   int pidx=1;
@@ -7295,6 +7330,7 @@ void test_ntt()
   char roots_f[1000];
   int cusnarks_nroots = 1 << CusnarksGetNRoots();
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7314,7 +7350,11 @@ void test_ntt()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(FFT DIF-128) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   ntt_h(samples, roots, levels, 1, 1,1, pidx);
   intt_h(samples, roots, 1, levels, 1,pidx);
@@ -7325,14 +7365,20 @@ void test_ntt()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(FFT DIT-128) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   free(samples);
   free(result);
   free(roots);
+  retval = n_errors;
+  return retval;
 }
 
-void test_ntt_parallel(void)
+uint32_t test_ntt_parallel(void)
 {
   int i,j;
   int pidx=1;
@@ -7343,6 +7389,7 @@ void test_ntt_parallel(void)
   char roots_f[1000];
   int Nrows, Ncols;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
   Ncols = levels/2;
   Nrows = levels - Ncols;
@@ -7367,7 +7414,11 @@ void test_ntt_parallel(void)
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Parallel FFT-DIT) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIF, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIF,pidx);
@@ -7378,14 +7429,21 @@ void test_ntt_parallel(void)
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Parallel FFT-DIF) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
+
   free(samples);
   free(result);
   free(roots);
   release_h();
+  retval = n_errors;
+  return retval;
 }
 
-void test_ntt_65K()
+uint32_t test_ntt_65K()
 {
   int i,j;
   int pidx=1;
@@ -7395,6 +7453,7 @@ void test_ntt_65K()
   int levels = 16;
   int nroots = 1 << levels;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7414,7 +7473,11 @@ void test_ntt_65K()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(FFT_DIT-65K) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   ntt_dif_h(samples, roots, levels,1, 1,1, pidx);
   intt_dif_h(samples, roots, 1, levels,1, pidx);
@@ -7425,13 +7488,20 @@ void test_ntt_65K()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(FFT-DIF-65K) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
+
   free(samples);
   free(result);
   free(roots);
+  retval = n_errors;
+  return retval;
 }
 
-void test_ntt_parallel_65K(void)
+uint32_t test_ntt_parallel_65K(void)
 {
   int i,j;
   int pidx=1;
@@ -7442,6 +7512,7 @@ void test_ntt_parallel_65K(void)
   char roots_f[1000];
   int levels=Nrows + Ncols;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7463,7 +7534,11 @@ void test_ntt_parallel_65K(void)
           n_errors++;
       }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Parallel FFT-DIT-65K) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIF, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIF,pidx);
@@ -7474,14 +7549,21 @@ void test_ntt_parallel_65K(void)
           n_errors++;
       }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Parallel FFT-DIF-65K) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
+
   free(samples);
   free(result);
   free(roots);
   release_h();
+  retval = n_errors;
+  return retval;
 }
 
-void test_ntt_1M()
+uint32_t test_ntt_1M()
 {
   int i,j;
   int pidx=1;
@@ -7491,6 +7573,7 @@ void test_ntt_1M()
   int levels = 20;
   int nroots = 1 << levels;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+  uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7510,7 +7593,11 @@ void test_ntt_1M()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(FFT-DIT-1M) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   ntt_dif_h(samples, roots, levels,1, 1,1, pidx);
   intt_dif_h(samples, roots, 1, levels,1, pidx);
@@ -7521,13 +7608,20 @@ void test_ntt_1M()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(FFT-DIF-1M) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
+
   free(samples);
   free(result);
   free(roots);
+  retval = n_errors;
+  return retval;
 }
 
-void test_interpol_500K()
+uint32_t test_interpol_500K()
 {
   int i,j;
   int pidx=1;
@@ -7537,6 +7631,7 @@ void test_interpol_500K()
   int levels = 19;
   int nroots = 1 << levels;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+  uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7559,14 +7654,20 @@ void test_interpol_500K()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Interpol-1M) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   free(samples);
   free(result);
   free(roots);
+  retval = n_errors;
+  return retval;
 }
 
-void test_interpol_parallel_500K()
+uint32_t test_interpol_parallel_500K()
 {
   int i,j;
   int pidx=1;
@@ -7577,6 +7678,7 @@ void test_interpol_parallel_500K()
   char roots_f[1000];
   int levels=Nrows + Ncols;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+  uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7602,15 +7704,21 @@ void test_interpol_parallel_500K()
           n_errors++;
        }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Interpol-parallel-1M) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   free(samples);
   free(result);
   free(roots);
+  retval = n_errors;
+  return retval;
 }
 
 
-void test_ntt_parallel_1M(void)
+uint32_t test_ntt_parallel_1M(void)
 {
   int i,j;
   int pidx=1;
@@ -7621,6 +7729,7 @@ void test_ntt_parallel_1M(void)
   char roots_f[1000];
   int levels=Nrows + Ncols;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+  uint32_t retval=0;
 
   CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7642,7 +7751,11 @@ void test_ntt_parallel_1M(void)
           n_errors++;
        }
   } 
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Parallel FFT-DIT-1M) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   ntt_parallel_h(samples, roots, Nrows,Ncols,1,1, FFT_T_DIF,pidx);
   intt_parallel_h(samples, roots,1, Nrows,Ncols,1, FFT_T_DIF,pidx);
@@ -7653,16 +7766,22 @@ void test_ntt_parallel_1M(void)
           n_errors++;
        }
   } 
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(Parallel FFT-DIF-1M) : %d/%d\n",n_errors, j);
+  printf("\033[0m;");
 
   free(samples);
   free(result);
   free(roots);
   release_h();
+  retval = n_errors;
+  return retval;
 }
 
 
-void test_ntt_parallel2D_65K()
+uint32_t test_ntt_parallel2D_65K()
 {
    int i,j,k;
    int pidx=1;
@@ -7674,6 +7793,7 @@ void test_ntt_parallel2D_65K()
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7699,7 +7819,12 @@ void test_ntt_parallel2D_65K()
              n_errors++;
           }
       }
+      if (n_errors){
+        printf("\033[1;31m");
+      }
       printf("N errors(FFT 65K) : NTT parallel 2D %d/%d\n",n_errors, j);
+      printf("\033[0m;");
+      retval += n_errors;
     }
   
     free(samples);
@@ -7707,9 +7832,11 @@ void test_ntt_parallel2D_65K()
     free(roots);
     free(iroots);
     release_h();
+
+    return retval;
 }
 
-void test_nttmul_parallel2D_65K(void)
+uint32_t test_nttmul_parallel2D_65K(void)
 {
    int i,j,k;
    int pidx=1;
@@ -7721,6 +7848,7 @@ void test_nttmul_parallel2D_65K(void)
    int levels=Nrows + Ncols;
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7763,7 +7891,12 @@ void test_nttmul_parallel2D_65K(void)
           } 
       }
 
+      if (n_errors){
+        printf("\033[1;31m");
+      }
       printf("N errors(FFTMUL-65K) : NTT parallel 2D File %d/%d\n",n_errors, j);
+      printf("\033[0m;");
+      retval += n_errors;
     }
 
     free(X1);
@@ -7773,9 +7906,10 @@ void test_nttmul_parallel2D_65K(void)
     free(roots);
     free(iroots);
     release_h();
+    return retval;
 }
 
-void test_ntt_parallel3D_131K()
+uint32_t test_ntt_parallel3D_131K()
 {
    int i,j,k;
    int pidx=1;
@@ -7786,6 +7920,7 @@ void test_ntt_parallel3D_131K()
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
    init_h();
@@ -7811,7 +7946,12 @@ void test_ntt_parallel3D_131K()
              n_errors++;
           }
       }
+      if (n_errors){
+        printf("\033[1;31m");
+      }
       printf("N errors(FFT 131K) : NTT parallel 3D %d/%d\n",n_errors, j);
+      printf("\033[0m;");
+      retval += n_errors;
     }
   
     free(samples);
@@ -7819,10 +7959,11 @@ void test_ntt_parallel3D_131K()
     free(roots);
     free(iroots);
     release_h();
+    return retval;
 }
 
 
-void test_ntt_parallel2D_1M()
+uint32_t test_ntt_parallel2D_1M()
 {
    int i,j,k;
    int pidx=1;
@@ -7834,6 +7975,7 @@ void test_ntt_parallel2D_1M()
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7860,7 +8002,12 @@ void test_ntt_parallel2D_1M()
           } 
       }
 
+      if (n_errors){
+        printf("\033[1;31m");
+      }
       printf("N errors(FFT-1M) : NTT parallel 2D File %d/%d\n",n_errors, j);
+      printf("\033[0m;");
+      retval += n_errors;
     }
 
     free(samples);
@@ -7868,9 +8015,10 @@ void test_ntt_parallel2D_1M()
     free(roots);
     free(iroots);
     release_h();
+    return retval;
 }
 
-void test_nttmul_parallel2D_1M(void)
+uint32_t test_nttmul_parallel2D_1M(void)
 {
    int i,j,k;
    int pidx=1;
@@ -7882,6 +8030,7 @@ void test_nttmul_parallel2D_1M(void)
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -7925,7 +8074,12 @@ void test_nttmul_parallel2D_1M(void)
           } 
       }
 
+      if (n_errors){
+        printf("\033[1;31m");
+      }
       printf("N errors(FFTMUL-1M) : NTT parallel 2D File %d/%d\n",n_errors, j);
+      printf("\033[0m;");
+      retval += n_errors;
     }
 
     free(X1);
@@ -7935,9 +8089,10 @@ void test_nttmul_parallel2D_1M(void)
     free(roots);
     free(iroots);
     release_h();
+    return retval;
 }
 
-void test_nttmul_randomsize(void)
+uint32_t test_nttmul_randomsize(void)
 {
    int i,j,k;
    int pidx=1;
@@ -7953,6 +8108,7 @@ void test_nttmul_randomsize(void)
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f)); 
    init_h();
@@ -7994,8 +8150,10 @@ void test_nttmul_randomsize(void)
         ntt_parallel2D_h(X1, roots, Nrows, fft_Nyx, Ncols, fft_Nxx,1,1, pidx);
         ntt_parallel2D_h(Y1, roots, Nrows, fft_Nyx, Ncols, fft_Nxx,1,1, pidx);
      } else { 
+        printf("\033[1;31m");
         printf("FFTMUL-random : Invalid FFT params\n");
-        return;
+        printf("\033[0m;");
+        return 1;
      }
 
      ntt_h(X2, roots, fft_params.levels,1, 1,1, pidx);
@@ -8019,12 +8177,16 @@ void test_nttmul_randomsize(void)
              n_errors++;
           } 
       }
-
+      retval += n_errors;
+      if (n_errors){
+        printf("\033[1;31m");
+      }
       if (fft_params.fft_type == FFT_T_2D){
          printf("N errors(FFTMUL-%d) : 2D[%d/%d] %d/%d\n",(1<<fft_params.levels),Nrows, Ncols,n_errors, j);
       } else {
          printf("N errors(FFTMUL-%d) : 3D[%d/%d/%d/%d] %d/%d\n",(1<<fft_params.levels),Nrows, fft_Nyx, Ncols, fft_Nxx,n_errors, j);
       }
+      printf("\033[0m;");
 
       free(X1);
       free(X2);
@@ -8034,9 +8196,10 @@ void test_nttmul_randomsize(void)
       free(iroots);
     }
     release_h();
+    return retval;
 
 }
-void test_interpol_mul_randomsize(void)
+uint32_t test_interpol_mul_randomsize(void)
 {
    int i,j,k;
    int pidx=1;
@@ -8052,6 +8215,7 @@ void test_interpol_mul_randomsize(void)
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
+   uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
@@ -8067,8 +8231,7 @@ void test_interpol_mul_randomsize(void)
 
    args->A = X3; args->B = Y3; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
    args->astride = 1; args->rstride=2;
-   //for (k=6; k < 21; k++){
-   for (k=6; k < 7; k++){
+   for (k=6; k < 21; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
      
      ntt_build_h(&fft_params, npoints_raw);
@@ -8108,7 +8271,12 @@ void test_interpol_mul_randomsize(void)
           } 
       }
 
+     if (n_errors){
+       printf("\033[1;31m");
+     }
      printf("N errors(FFTMUL-PARALLEL - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
+     printf("\033[0m;");
+     retval += n_errors;
 
      args->Nrows = Nrows; args->Ncols=Ncols-1; args->nroots=1<<(Nrows+Ncols); 
      R = ntt_interpolandmul_server_h(args);
@@ -8118,7 +8286,12 @@ void test_interpol_mul_randomsize(void)
              n_errors++;
           } 
       }
+     if (n_errors){
+       printf("\033[1;31m");
+     }
      printf("N errors(FFTMUL-PARALLEL-SERVER - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
+     printf("\033[0m;");
+     retval += n_errors;
     }
 
     free(X1);
@@ -8131,15 +8304,17 @@ void test_interpol_mul_randomsize(void)
     free(args);
 
     release_h();
+    return retval;
 
 }
 
-void test_sort(void)
+uint32_t test_sort(void)
 {
   int n_errors=0;
   uint32_t LEN = 1024;
   uint32_t *samples = (uint32_t *)malloc(LEN*NWORDS_256BIT*sizeof(uint32_t));
   uint32_t *idx_v = (uint32_t *)malloc(LEN*sizeof(uint32_t));
+   uint32_t retval=0;
 
   setRandom256(samples, LEN,NULL);
 
@@ -8150,13 +8325,19 @@ void test_sort(void)
     }
   }
 
+   if (n_errors){
+    printf("\033[1;31m");
+   }
    printf("N errors(SORT) : %d/%d\n",n_errors, LEN);
+   printf("\033[0m;");
+   retval += n_errors;
 
   free(samples);
   free(idx_v);
+  return retval;
 }
 
-void  test_shlr(void)
+uint32_t  test_shlr(void)
 {
   uint32_t *xin = shl_in_test;
   uint32_t *xout = shlr_out_test;
@@ -8164,6 +8345,7 @@ void  test_shlr(void)
   uint32_t N = sizeof(shlc_out_test)/sizeof(uint32_t),i;
   uint32_t n_errors = 0;
   uint32_t xout_t[NWORDS_256BIT];
+  uint32_t retval=0;
 
   for (i =0; i< N; i++){
     shlru256_h(xout_t,&xin[i*NWORDS_256BIT], c[i]);
@@ -8171,10 +8353,17 @@ void  test_shlr(void)
              n_errors++;
     }
   }
-   printf("N errors(SHLR) : %d/%d\n",n_errors, N);
+  if (n_errors){
+    printf("\033[1;31m");
+  }
+  printf("N errors(SHLR) : %d/%d\n",n_errors, N);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
 }
 
-void  test_shll(void)
+uint32_t  test_shll(void)
 {
   uint32_t *xin = shl_in_test;
   uint32_t *xout = shll_out_test;
@@ -8182,6 +8371,7 @@ void  test_shll(void)
   uint32_t N = sizeof(shlc_out_test)/sizeof(uint32_t),i;
   uint32_t n_errors = 0;
   uint32_t xout_t[NWORDS_256BIT];
+  uint32_t retval=0;
 
   for (i =0; i< N; i++){
     shllu256_h(xout_t,&xin[i*NWORDS_256BIT], c[i]);
@@ -8189,16 +8379,24 @@ void  test_shll(void)
              n_errors++;
     }
   }
-   printf("N errors(SHLL) : %d/%d\n",n_errors, N);
+  if (n_errors){
+    printf("\033[1;31m");
+  }
+  printf("N errors(SHLL) : %d/%d\n",n_errors, N);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
 }
 
-void  test_setgetbit()
+uint32_t  test_setgetbit()
 {
   int pidx = 0;
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
   uint32_t x[NWORDS_256BIT];
   uint32_t i,c,b;
   uint32_t n_errors=0;
+  uint32_t retval=0;
 
   for (i=0; i < 1000; i++){
      setRandom256(x,1, N);  
@@ -8209,11 +8407,18 @@ void  test_setgetbit()
      }
      
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(SET/GET BIT) : %d/%d\n",n_errors, 1000);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
      
 }
 
-void  test_inv()
+uint32_t  test_inv()
 {
   uint32_t x[NWORDS_256BIT], xr[NWORDS_256BIT];
   const uint32_t *one = CusnarksOneGet();
@@ -8222,6 +8427,7 @@ void  test_inv()
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
   uint32_t i;
   uint32_t n_errors=0;
+  uint32_t retval=0;
 
 
   for (i=0; i < 1000; i++){
@@ -8255,17 +8461,25 @@ void  test_inv()
       n_errors++;
     }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(MONTINV) : %d/%d\n",n_errors, i);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
      
 }
 
-void  test_mul_ext()
+uint32_t  test_mul_ext()
 {
   uint32_t *x1, *x2, *y,xr[2*NWORDS_256BIT];
   int pidx = 1;
   uint32_t i;
   uint32_t n_errors=0;
   uint32_t n = sizeof(ext_X_test)/(sizeof(uint32_t)*2*NWORDS_256BIT);
+  uint32_t retval=0;
 
   for (i=0; i < n/2; i++){
      x1 = &ext_X_test[4*i*NWORDS_256BIT];
@@ -8276,17 +8490,25 @@ void  test_mul_ext()
       n_errors++;
      }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(MUL_EXT) : %d/%d\n",n_errors, i);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
      
 }
 
-void  test_inv_ext1()
+uint32_t  test_inv_ext1()
 {
   uint32_t *x1,*y,xr[2*NWORDS_256BIT];
   int pidx = 1;
   uint32_t i;
   uint32_t n_errors=0;
   uint32_t n = sizeof(ext_X_test)/(sizeof(uint32_t)*2*NWORDS_256BIT);
+  uint32_t retval=0;
 
   for (i=0; i < n; i++){
      x1 = &ext_X_test[2*i*NWORDS_256BIT];
@@ -8296,10 +8518,17 @@ void  test_inv_ext1()
       n_errors++;
      }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(MONTINV_EXT1) : %d/%d\n",n_errors, i);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
      
 }
-void  test_inv_ext2()
+uint32_t  test_inv_ext2()
 {
   uint32_t x[2*NWORDS_256BIT], xr[2*NWORDS_256BIT];
   const uint32_t *one = CusnarksOneGet();
@@ -8308,6 +8537,7 @@ void  test_inv_ext2()
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
   uint32_t i;
   uint32_t n_errors=0;
+  uint32_t retval=0;
 
   for (i=0; i < 3000; i++){
      setRandom256(x,2, N);
@@ -8322,14 +8552,22 @@ void  test_inv_ext2()
       n_errors++;
      }
   }
+  if (n_errors){
+    printf("\033[1;31m");
+  }
   printf("N errors(MONTINV_EXT2) : %d/%d\n",n_errors, i);
+  printf("\033[0m;");
+  retval += n_errors;
+
+  return retval;
      
 }
 
-void  test_ec_jacscmul(uint32_t ec2)
+uint32_t  test_ec_jacscmul(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t retval=0;
    if (ec2) {
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
@@ -8388,19 +8626,27 @@ void  test_ec_jacscmul(uint32_t ec2)
       }
    }
 
+   if (n_errors){
+    printf("\033[1;31m");
+   }
    printf("N errors(JACSCMUL %d) : %d/%d\n",ec2,n_errors,nec_points);
+   printf("\033[0m;");
+   retval += n_errors;
+
 
    free(samples);
    free(out_ecp1);
    free(out_ecp2);
    free(r);
    free(r_aff);
+   return retval;
 }
 
-void  test_ec_jacreduce(uint32_t ec2)
+uint32_t  test_ec_jacreduce(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t retval=0;
    if (ec2) {
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
@@ -8453,18 +8699,26 @@ void  test_ec_jacreduce(uint32_t ec2)
         n_errors++;
    }
 
+   if (n_errors){
+    printf("\033[1;31m");
+   }
    printf("N errors(JACADDREDUCE %d) : %d\n",ec2,n_errors);
+   printf("\033[0m;");
+   retval += n_errors;
 
    free(samples);
    free(out_ecp1);
    free(out_ecp2);
    free(r_aff);
+
+   return retval;
 }
 
-void  test_ec_jacscmul_opt(uint32_t ec2)
+uint32_t  test_ec_jacscmul_opt(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t retval=0;
    if (ec2) {
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
@@ -8518,19 +8772,27 @@ void  test_ec_jacscmul_opt(uint32_t ec2)
         n_errors++;
    }
 
+   if (n_errors){
+    printf("\033[1;31m");
+   }
    printf("N errors(JACSCMUL_OPT %d) : %d/%d\n",ec2, n_errors, nec_points);
+   printf("\033[0m;");
+   retval += n_errors;
 
    free(samples);
    free(out_ecp1);
    free(out_ecp2);
    free(r_aff);
+
+   return retval;
 }
 
 
-void  test_ec_jacreduce_opt(uint32_t ec2)
+uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t retval=0;
    if (ec2) {
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
@@ -8580,14 +8842,20 @@ void  test_ec_jacreduce_opt(uint32_t ec2)
         n_errors++;
    }
 
+   if (n_errors){
+    printf("\033[1;31m");
+   }
    printf("N errors(JACREDUCE_OPT %d) : %d\n",ec2,n_errors);
+   printf("\033[0m;");
+   retval += n_errors;
 
    free(samples);
    free(out_ecp1);
    free(r_aff);
+   return retval;
 }
 
-void test_transpose(void)
+uint32_t test_transpose(void)
 {
   //int min_m=3, max_m=14;
   int min_m=3, max_m=11;
@@ -8596,6 +8864,7 @@ void test_transpose(void)
   int i,j;
   uint32_t *samples, *result;
   const uint32_t *N = CusnarksPGet((mod_t)1);
+  uint32_t retval=0;
 
 
   for (i=min_m=3; i< max_m; i++){
@@ -8615,22 +8884,29 @@ void test_transpose(void)
          n_errors++;
        }
      }
+     if (n_errors){
+      printf("\033[1;31m");
+     }
      printf("N errors(Transpose %dx%d) : %d/%d\n",nrows,ncols,n_errors, nrows*ncols);
+     printf("\033[0m;");
+     retval += n_errors;
 
      free(samples);
      free(result);
   }
+  return retval;
 }
 
-void test_transpose_square(void)
+uint32_t test_transpose_square(void)
 {
-  int min_m=3, max_m=14;
+  int min_m=3, max_m=13;
   int nrows;
   int n_errors=0;
   int i,j;
   uint32_t *samples, *result;
   const uint32_t *N = CusnarksPGet((mod_t)1);
   double start, end;
+  uint32_t retval=0;
 
   samples = (uint32_t *)malloc((1<<(max_m-1))*(1<<(max_m-1)) * NWORDS_256BIT * sizeof(uint32_t));
   result = (uint32_t *)malloc((1<<(max_m-1))*(1<<(max_m-1)) * NWORDS_256BIT * sizeof(uint32_t));
@@ -8649,70 +8925,85 @@ void test_transpose_square(void)
          n_errors++;
        }
      }
+     if (n_errors){
+      printf("\033[1;31m");
+     }
      printf("N errors(Transpose square %dx%d) : %d/%d\n",nrows,nrows,n_errors, nrows*nrows);
+     printf("\033[0m;");
+     retval += n_errors;
 
   }
   free(samples);
   free(result);
+
+  return retval;
 }
 
 
 int main()
 {
-/*
-  test_mul();  // test montgomery mul with predefined results
+  uint32_t retval;
+
+  retval+=test_mul();  // test montgomery mul with predefined results
   //test_mul3(); // test SOS impl of montgomery mul
   //test_mul4(); // test SOS impl of montgomery squaring
 
   //test_mul5(); // test FIOS impl of montgomery squaring
-  test_findroots();
-  test_ntt();
-  test_ntt_parallel();
-  test_ntt_65K();
-  test_ntt_parallel_65K();
-  test_ntt_parallel2D_65K(); 
-  test_ntt_1M();
-  test_ntt_parallel_1M();
-  test_ntt_parallel2D_1M();
+  retval+=test_findroots();
+  retval+=test_ntt();
+  retval+=test_ntt_parallel();
+  retval+=test_ntt_65K();
+  retval+=test_ntt_parallel_65K();
+  retval+=test_ntt_parallel2D_65K(); 
+  retval+=test_ntt_1M();
+  retval+=test_ntt_parallel_1M();
+  retval+=test_ntt_parallel2D_1M();
 
-  test_ntt_parallel3D_131K(); // Forward FFT
-  test_nttmul_parallel2D_65K();
-  test_nttmul_parallel2D_1M();
-  test_nttmul_randomsize();
+  retval+=test_ntt_parallel3D_131K(); // Forward FFT
+  retval+=test_nttmul_parallel2D_65K();
+  retval+=test_nttmul_parallel2D_1M();
+  retval+=test_nttmul_randomsize();
 
-  test_interpol_500K();
-  test_interpol_parallel_500K();
-*/
-  test_interpol_mul_randomsize();
-/*
+  retval+=test_interpol_500K();
+  retval+=test_interpol_parallel_500K();
 
-  test_transpose_square();
-  test_transpose();
+  retval+=test_interpol_mul_randomsize();
 
-  test_sort();
+  retval+=test_transpose_square();
+  retval+=test_transpose();
 
-  test_shlr();
-  test_shll();
-  test_setgetbit();
+  retval+=test_sort();
 
-  test_inv();
+  retval+=test_shlr();
+  retval+=test_shll();
+  retval+=test_setgetbit();
 
-  test_mul_ext();
-  test_inv_ext1();
-  test_inv_ext2();
+  retval+=test_inv();
 
-  test_ec_jacscmul(0);    // EC1
-  test_ec_jacscmul(1);    // EC2
+  retval+=test_mul_ext();
+  retval+=test_inv_ext1();
+  retval+=test_inv_ext2();
+
+  retval+=test_ec_jacscmul(0);    // EC1
+  retval+=test_ec_jacscmul(1);    // EC2
    
-  test_ec_jacreduce(0);     // EC1
-  test_ec_jacreduce(1);     // EC2
+  retval+=test_ec_jacreduce(0);     // EC1
+  retval+=test_ec_jacreduce(1);     // EC2
 
-  test_ec_jacscmul_opt(0);    // EC1
-  test_ec_jacscmul_opt(1);    // EC2
+  retval+=test_ec_jacscmul_opt(0);    // EC1
+  retval+=test_ec_jacscmul_opt(1);    // EC2
 
-  test_ec_jacreduce_opt(0);   // EC1
-  test_ec_jacreduce_opt(1);   // EC2
-*/
+  retval+=test_ec_jacreduce_opt(0);   // EC1
+  retval+=test_ec_jacreduce_opt(1);   // EC2
+
+  if (retval){
+    printf("\033[1;31m");
+    printf("CPU tests FAILED\n");
+  } else {
+    printf("All CPU tests PASSED \n");
+  }
+  printf("\033[0m;");
+
   return 1;
 }
 
