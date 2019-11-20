@@ -332,4 +332,6 @@ void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx);
 void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots);
 void init_h(void);
 void release_h(void);
+uint32_t *get_Mmul_h();
+uint32_t get_nprocs_h();
 #endif

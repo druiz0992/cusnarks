@@ -179,9 +179,10 @@ class GrothProver(object):
            self.test_f= self.keep_f + '/' + test_f
 
         self.sort_en = 0
+        self.compute_ntt_gpu = True
 
         logging.info('#################################### ')
-        logging.info('Initializing Groth prover with the follwing parameters :')
+        logging.info('Initializing Groth prover with the following parameters :')
         logging.info(' - curve : %s',curve)
         logging.info(' - proving_key_f : %s', proving_key_f)
         logging.info(' - verification_key_f : %s',verification_key_f)
@@ -193,7 +194,9 @@ class GrothProver(object):
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
         logging.info(' - n available GPUs : %s', self.n_gpu)
+        logging.info(' - n available CPUs : %s', get_nprocs_h())
         logging.info(' - sort enable : %s', self.sort_en)
+        logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
         logging.info('#################################### ')
   
         # convert data to array of bytes so that it can be easily transfered to shared mem
@@ -337,8 +340,8 @@ class GrothProver(object):
                              'C'     : [self.ecbn128,  2, 3, 0, 3 ],
                              'hExps' : [self.ecbn128,  2, 4, 0, 3 ] }
 
-        # Init QAP process
-        self.init_p_QAP()
+        # Init CPU process
+        self.init_p_CPU()
 
         # Init Mexp process
         self.init_p_Mexp()
@@ -346,8 +349,8 @@ class GrothProver(object):
         if not start_server:
            self.startProcesses(nVars)
 
-    def init_p_QAP(self):
-        self.parent_conn_QAP, self.child_conn_QAP = Pipe()
+    def init_p_CPU(self):
+        self.parent_conn_CPU, self.child_conn_CPU = Pipe()
 
     def init_p_Mexp(self):
         self.parent_conn_Mexp = []
@@ -415,11 +418,12 @@ class GrothProver(object):
                                          ec_lable = self.ec_lable)
 
 
-
-    def pysnarkP_QAP(self, conn, wnElems,pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape):
-        logging.info(' Launching QAP Poly Process Client')
+    def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape):
+        logging.info(' Launching Poly Process Client')
+        logging.info(' Evaluating QAP')
         pk = self.pk
-        w = self.scl_array[:wnElems]
+        #w = self.scl_array[:wnElems]
+        w = np.frombuffer(w_sh, dtype=np.uint32).reshape(w_shape)
         pA_T = np.frombuffer(pA_T_sh, dtype=np.uint32).reshape(pA_T_shape)
         pB_T = np.frombuffer(pB_T_sh, dtype=np.uint32).reshape(pB_T_shape)
         #print("ProcessServer : "+str(pk.shape[0]))
@@ -433,13 +437,25 @@ class GrothProver(object):
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
 
         logging.info(' Process server - Evaluating Poly A...')
-        np.copyto(pA_T,self.evalPoly(w, pA, nVars, m, MOD_FIELD))
+        np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FIELD))
         logging.info(' Process server - Evaluating Poly B...')
-        np.copyto(pB_T,self.evalPoly(w, pB, nVars, m, MOD_FIELD))
-        logging.info(' Process server - Completed')
-
+        np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FIELD))
         end = time.time()
-        conn.send([end-start ])
+
+        start1 = time.time()
+        if self.compute_ntt_gpu is False:
+          logging.info(' Process server - Calculate H...')
+          ifft_params = ntt_build_h(self.pA_T.shape[0])
+          polH = ntt_interpolandmul_h(np.reshape(self.pA_T,-1),
+                                     np.reshape(self.pB_T,-1),
+                                     np.reshape(self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,-1), 2, ZField.get_field())
+
+          np.copyto(w[:m-1], polH[m:-1])
+          logging.info(' Process server - Completed')
+
+        end1 = time.time()
+
+        conn.send([end-start, end1-start1 ])
         conn.close()
 
     def startGPServer(self):    
@@ -471,7 +487,7 @@ class GrothProver(object):
                     conn.close()
                     continue
 
-                 # Initialize QAP Process
+                 # Initialize CPU Process
                  self.startProcesses(nVars)
 
                  self.proof(
@@ -492,12 +508,13 @@ class GrothProver(object):
 
     def startProcesses(self, nVars):
           logging.info('Starting Processes...')
-          self.p_QAP = \
+          self.p_CPU = \
                       Process(
-                            target=self.pysnarkP_QAP,
+                            target=self.pysnarkP_CPU,
                                args = (
-                                      self.child_conn_QAP,
+                                      self.child_conn_CPU,
                                       nVars,
+                                      self.scl_array_sh, self.scl_array.shape,
                                       self.pA_T_sh,self.pA_T.shape,
                                       self.pB_T_sh, self.pB_T.shape))
 
@@ -896,7 +913,7 @@ class GrothProver(object):
         self.t_GP['Read_W'] = end - start
        
         start = time.time()
-        self.p_QAP.start()
+        self.p_CPU.start()
         self.t_GP['Eval'] = time.time()-start
  
         ######################
@@ -971,8 +988,18 @@ class GrothProver(object):
         #  P4 - Poly Operations
         ######################
 
-        polH = self.calculateH()
+        # Retrieve Poly Eval Results
+        t = self.parent_conn_CPU.recv()
+        self.t_GP['Eval'] += t[0]
+        self.p_CPU.terminate()
+        self.p_CPU.join()
 
+        if self.compute_ntt_gpu:
+          self.t_GP['H'] = self.calculateH()
+        else:
+          self.t_GP['H'] = t[1]
+
+        #writeU256DataFile_h(np.reshape(self.scl_array,-1), "/home/druiz/iden3/cusnarks/test/c/aux_data/w_gpu.bin".encode("UTF-8"))
         ######################
         # Beginning of P5
         #   - Final EC MultiExp
@@ -980,8 +1007,6 @@ class GrothProver(object):
         start = time.time()
 
         logging.info(' Starting Last Mexp...')
-
-        np.copyto(self.scl_array[:domainSize-1], polH)
 
         self.findECPointsDispatch(
                                   self.dispatch_table_phase3,
@@ -1353,11 +1378,6 @@ class GrothProver(object):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
 
-        self.t_GP['Eval'] += self.parent_conn_QAP.recv()[0]
-        start = time.time()
-        self.p_QAP.terminate()
-        self.p_QAP.join()
-
         start = time.time()
         logging.info(' Calculating H...')
 
@@ -1378,6 +1398,7 @@ class GrothProver(object):
                                               self.roots_rdc_u256,
                                               self.batch_size, n_gpu=self.n_gpu)
 
-        self.t_GP['H'] = time.time()-start
 
-        return pH[m:-1]
+        np.copyto(self.scl_array[:m-1], pH[m:-1])
+
+        return time.time()-start

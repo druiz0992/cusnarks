@@ -525,6 +525,35 @@ def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=
 
      return np.reshape(outd,(-1,8))
 
+def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[ndim=1, dtype=np.uint32_t] invb,
+                         np.ndarray[ndim=1, dtype=np.uint32_t] invroots, ct.uint32_t rstride, ct.uint32_t pidx):
+
+     cdef ct.ntt_interpolandmul_t *args_c = <ct.ntt_interpolandmul_t *> malloc(sizeof(ct.ntt_interpolandmul_t))
+     cdef ct.uint32_t Nrows = np.log2(inva.shape[0]/NWORDS_256BIT)/2
+     cdef ct.uint32_t Ncols = np.log2(inva.shape[0]/NWORDS_256BIT) - Nrows
+
+     args_c.A = &inva[0]
+     args_c.B = &invb[0]
+     args_c.roots = &invroots[0]
+     args_c.Nrows = Nrows
+     args_c.Ncols = Ncols
+     args_c.nroots = Nrows+Ncols
+     args_c.rstride = rstride
+     args_c.pidx = pidx
+     args_c.max_threads = MAX_NCORES_OMP
+
+     with nogil:
+       uh.cntt_interpolandmul_server_h(args_c)
+
+     cdef ct.uint32_t [:] M = <ct.uint32_t [:(1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
+
+     free(args_c)
+
+     return np.reshape(M,(1<<(Nrows+Ncols+1),NWORDS_256BIT))
+
+def get_nprocs_h():
+    return uh.cget_nprocs_h()
+
 def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
     cdef ct.uint32_t ncoeff = pin_data.shape[0]
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(ncoeff * pin_data.shape[1],dtype=np.uint32)
