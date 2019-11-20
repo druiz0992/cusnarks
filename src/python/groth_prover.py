@@ -179,7 +179,7 @@ class GrothProver(object):
            self.test_f= self.keep_f + '/' + test_f
 
         self.sort_en = 0
-        self.compute_ntt_gpu = True
+        self.compute_ntt_gpu = False
 
         logging.info('#################################### ')
         logging.info('Initializing Groth prover with the following parameters :')
@@ -999,7 +999,14 @@ class GrothProver(object):
         else:
           self.t_GP['H'] = t[1]
 
-        #writeU256DataFile_h(np.reshape(self.scl_array,-1), "/home/druiz/iden3/cusnarks/test/c/aux_data/w_gpu.bin".encode("UTF-8"))
+        #writeU256DataFile_h(np.reshape(self.scl_array,-1), "/home/druiz/iden3/cusnarks/test/c/aux_data/w_cpu.bin".encode("UTF-8"))
+        #w_cpu = readU256DataFile_h(
+                 #"/home/druiz/iden3/cusnarks/test/c/aux_data/w_cpu.bin".encode("UTF-8"),
+                 #4194304,4194304)
+        #w_gpu = readU256DataFile_h(
+                 #"/home/druiz/iden3/cusnarks/test/c/aux_data/w_cpu.bin".encode("UTF-8"),
+                 #4194304,4194304)
+
         ######################
         # Beginning of P5
         #   - Final EC MultiExp
