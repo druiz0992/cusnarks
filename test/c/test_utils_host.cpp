@@ -7181,7 +7181,7 @@ uint32_t test_mul(void)
      printf("\033[1;31m");
   }
   printf("N errors(Test_Mul) : %d/%d\n",n_errors, i);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   retval = n_errors;
   return retval;
@@ -7223,7 +7223,7 @@ void test_mul3(void)
      printf("\033[1;31m");
    }
    printf("N errors(Test_Mul SOS) : %d/%d\n",n_errors, i);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval = n_errors;
    return retval;
 }
@@ -7257,7 +7257,7 @@ void test_mul4(void)
      printf("\033[1;31m");
    }
    printf("N errors(Test_Squaring SOS) : %d/%d\n",n_errors, i);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval = n_errors;
    return retval;
 }
@@ -7287,7 +7287,7 @@ uint32_t test_mul5(void)
      printf("\033[1;31m");
    }
    printf("N errors(Test_Mul : Montgomery Squaring FIOS) : %d/%d\n",n_errors, i);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval = n_errors;
    return retval;
 }
@@ -7314,7 +7314,7 @@ uint32_t test_findroots(void)
     printf("\033[1;31m");
   }
   printf("N errors(Find_roots) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval = n_errors;
   return retval;
 
@@ -7354,7 +7354,7 @@ uint32_t test_ntt()
     printf("\033[1;31m");
   }
   printf("N errors(FFT DIF-128) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   ntt_h(samples, roots, levels, 1, 1,1, pidx);
   intt_h(samples, roots, 1, levels, 1,pidx);
@@ -7369,7 +7369,7 @@ uint32_t test_ntt()
     printf("\033[1;31m");
   }
   printf("N errors(FFT DIT-128) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7418,7 +7418,7 @@ uint32_t test_ntt_parallel(void)
     printf("\033[1;31m");
   }
   printf("N errors(Parallel FFT-DIT) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIF, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIF,pidx);
@@ -7433,7 +7433,7 @@ uint32_t test_ntt_parallel(void)
     printf("\033[1;31m");
   }
   printf("N errors(Parallel FFT-DIF) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7477,7 +7477,7 @@ uint32_t test_ntt_65K()
     printf("\033[1;31m");
   }
   printf("N errors(FFT_DIT-65K) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   ntt_dif_h(samples, roots, levels,1, 1,1, pidx);
   intt_dif_h(samples, roots, 1, levels,1, pidx);
@@ -7492,7 +7492,7 @@ uint32_t test_ntt_65K()
     printf("\033[1;31m");
   }
   printf("N errors(FFT-DIF-65K) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7538,7 +7538,7 @@ uint32_t test_ntt_parallel_65K(void)
     printf("\033[1;31m");
   }
   printf("N errors(Parallel FFT-DIT-65K) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIF, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIF,pidx);
@@ -7553,7 +7553,7 @@ uint32_t test_ntt_parallel_65K(void)
     printf("\033[1;31m");
   }
   printf("N errors(Parallel FFT-DIF-65K) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7597,7 +7597,7 @@ uint32_t test_ntt_1M()
     printf("\033[1;31m");
   }
   printf("N errors(FFT-DIT-1M) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   ntt_dif_h(samples, roots, levels,1, 1,1, pidx);
   intt_dif_h(samples, roots, 1, levels,1, pidx);
@@ -7612,7 +7612,7 @@ uint32_t test_ntt_1M()
     printf("\033[1;31m");
   }
   printf("N errors(FFT-DIF-1M) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7658,7 +7658,7 @@ uint32_t test_interpol_500K()
     printf("\033[1;31m");
   }
   printf("N errors(Interpol-1M) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7708,7 +7708,7 @@ uint32_t test_interpol_parallel_500K()
     printf("\033[1;31m");
   }
   printf("N errors(Interpol-parallel-1M) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7755,7 +7755,7 @@ uint32_t test_ntt_parallel_1M(void)
     printf("\033[1;31m");
   }
   printf("N errors(Parallel FFT-DIT-1M) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   ntt_parallel_h(samples, roots, Nrows,Ncols,1,1, FFT_T_DIF,pidx);
   intt_parallel_h(samples, roots,1, Nrows,Ncols,1, FFT_T_DIF,pidx);
@@ -7770,7 +7770,7 @@ uint32_t test_ntt_parallel_1M(void)
     printf("\033[1;31m");
   }
   printf("N errors(Parallel FFT-DIF-1M) : %d/%d\n",n_errors, j);
-  printf("\033[0m;");
+  printf("\033[0m");
 
   free(samples);
   free(result);
@@ -7823,7 +7823,7 @@ uint32_t test_ntt_parallel2D_65K()
         printf("\033[1;31m");
       }
       printf("N errors(FFT 65K) : NTT parallel 2D %d/%d\n",n_errors, j);
-      printf("\033[0m;");
+      printf("\033[0m");
       retval += n_errors;
     }
   
@@ -7895,7 +7895,7 @@ uint32_t test_nttmul_parallel2D_65K(void)
         printf("\033[1;31m");
       }
       printf("N errors(FFTMUL-65K) : NTT parallel 2D File %d/%d\n",n_errors, j);
-      printf("\033[0m;");
+      printf("\033[0m");
       retval += n_errors;
     }
 
@@ -7950,7 +7950,7 @@ uint32_t test_ntt_parallel3D_131K()
         printf("\033[1;31m");
       }
       printf("N errors(FFT 131K) : NTT parallel 3D %d/%d\n",n_errors, j);
-      printf("\033[0m;");
+      printf("\033[0m");
       retval += n_errors;
     }
   
@@ -8006,7 +8006,7 @@ uint32_t test_ntt_parallel2D_1M()
         printf("\033[1;31m");
       }
       printf("N errors(FFT-1M) : NTT parallel 2D File %d/%d\n",n_errors, j);
-      printf("\033[0m;");
+      printf("\033[0m");
       retval += n_errors;
     }
 
@@ -8078,7 +8078,7 @@ uint32_t test_nttmul_parallel2D_1M(void)
         printf("\033[1;31m");
       }
       printf("N errors(FFTMUL-1M) : NTT parallel 2D File %d/%d\n",n_errors, j);
-      printf("\033[0m;");
+      printf("\033[0m");
       retval += n_errors;
     }
 
@@ -8152,7 +8152,7 @@ uint32_t test_nttmul_randomsize(void)
      } else { 
         printf("\033[1;31m");
         printf("FFTMUL-random : Invalid FFT params\n");
-        printf("\033[0m;");
+        printf("\033[0m");
         return 1;
      }
 
@@ -8186,7 +8186,7 @@ uint32_t test_nttmul_randomsize(void)
       } else {
          printf("N errors(FFTMUL-%d) : 3D[%d/%d/%d/%d] %d/%d\n",(1<<fft_params.levels),Nrows, fft_Nyx, Ncols, fft_Nxx,n_errors, j);
       }
-      printf("\033[0m;");
+      printf("\033[0m");
 
       free(X1);
       free(X2);
@@ -8216,22 +8216,25 @@ uint32_t test_interpol_mul_randomsize(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
+   uint32_t min_k=6, max_k = CusnarksGetNRoots();
+   time_t start2, end2, start3, end3;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
    init_h();
-   X1 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
-   Y1 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
-   X2 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
-   Y2 = (uint32_t *)malloc((1<<20)* NWORDS_256BIT * sizeof(uint32_t));
-   X3 = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
-   Y3 = (uint32_t *)malloc((1<<20)* NWORDS_256BIT * sizeof(uint32_t));
-   roots = (uint32_t *)malloc((1<<20) * NWORDS_256BIT * sizeof(uint32_t));
+   X1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   Y1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   X2 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   Y2 = (uint32_t *)malloc((cusnarks_nroots)* NWORDS_256BIT * sizeof(uint32_t));
+   X3 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   Y3 = (uint32_t *)malloc((cusnarks_nroots)* NWORDS_256BIT * sizeof(uint32_t));
+   roots = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
    args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
 
    args->A = X3; args->B = Y3; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
-   args->astride = 1; args->rstride=2;
-   for (k=6; k < 21; k++){
+   args->rstride=2;
+   for (k=min_k; k < max_k; k++){
+   //for (k=23; k < 24; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
      
      ntt_build_h(&fft_params, npoints_raw);
@@ -8263,7 +8266,9 @@ uint32_t test_interpol_mul_randomsize(void)
 
      intt_h(Y2, roots,0, fft_params.levels,1, pidx);
 
+     time(&start2);
      R = ntt_interpolandmul_parallel_h(X1,Y1, roots, Nrows, Ncols-1,2, pidx);
+     time(&end2);
      n_errors = 0;
      for (j=0;j<npoints_raw; j++){
          if (compu256_h(&R[j*NWORDS_256BIT],&Y2[j*NWORDS_256BIT])){
@@ -8274,12 +8279,14 @@ uint32_t test_interpol_mul_randomsize(void)
      if (n_errors){
        printf("\033[1;31m");
      }
-     printf("N errors(FFTMUL-PARALLEL - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
-     printf("\033[0m;");
+     printf("N errors(FFTMUL-PARALLEL - %d) : %d/%d - Time : %f\n",1 << (Nrows+Ncols),n_errors, j, difftime(end2 , start2));
+     printf("\033[0m");
      retval += n_errors;
 
      args->Nrows = Nrows; args->Ncols=Ncols-1; args->nroots=1<<(Nrows+Ncols); 
+     time(&start3);
      R = ntt_interpolandmul_server_h(args);
+     time(&end3);
      n_errors = 0;
      for (j=0;j<npoints_raw; j++){
          if (compu256_h(&R[j*NWORDS_256BIT],&Y2[j*NWORDS_256BIT])){
@@ -8289,8 +8296,8 @@ uint32_t test_interpol_mul_randomsize(void)
      if (n_errors){
        printf("\033[1;31m");
      }
-     printf("N errors(FFTMUL-PARALLEL-SERVER - %d) : %d/%d\n",1 << (Nrows+Ncols),n_errors, j);
-     printf("\033[0m;");
+     printf("N errors(FFTMUL-PARALLEL-SERVER - %d) : %d/%d - Time : %f\n",1 << (Nrows+Ncols),n_errors, j, difftime(end3,start3));
+     printf("\033[0m");
      retval += n_errors;
     }
 
@@ -8329,7 +8336,7 @@ uint32_t test_sort(void)
     printf("\033[1;31m");
    }
    printf("N errors(SORT) : %d/%d\n",n_errors, LEN);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval += n_errors;
 
   free(samples);
@@ -8357,7 +8364,7 @@ uint32_t  test_shlr(void)
     printf("\033[1;31m");
   }
   printf("N errors(SHLR) : %d/%d\n",n_errors, N);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8383,7 +8390,7 @@ uint32_t  test_shll(void)
     printf("\033[1;31m");
   }
   printf("N errors(SHLL) : %d/%d\n",n_errors, N);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8411,7 +8418,7 @@ uint32_t  test_setgetbit()
     printf("\033[1;31m");
   }
   printf("N errors(SET/GET BIT) : %d/%d\n",n_errors, 1000);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8465,7 +8472,7 @@ uint32_t  test_inv()
     printf("\033[1;31m");
   }
   printf("N errors(MONTINV) : %d/%d\n",n_errors, i);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8494,7 +8501,7 @@ uint32_t  test_mul_ext()
     printf("\033[1;31m");
   }
   printf("N errors(MUL_EXT) : %d/%d\n",n_errors, i);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8522,7 +8529,7 @@ uint32_t  test_inv_ext1()
     printf("\033[1;31m");
   }
   printf("N errors(MONTINV_EXT1) : %d/%d\n",n_errors, i);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8556,7 +8563,7 @@ uint32_t  test_inv_ext2()
     printf("\033[1;31m");
   }
   printf("N errors(MONTINV_EXT2) : %d/%d\n",n_errors, i);
-  printf("\033[0m;");
+  printf("\033[0m");
   retval += n_errors;
 
   return retval;
@@ -8630,7 +8637,7 @@ uint32_t  test_ec_jacscmul(uint32_t ec2)
     printf("\033[1;31m");
    }
    printf("N errors(JACSCMUL %d) : %d/%d\n",ec2,n_errors,nec_points);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval += n_errors;
 
 
@@ -8703,7 +8710,7 @@ uint32_t  test_ec_jacreduce(uint32_t ec2)
     printf("\033[1;31m");
    }
    printf("N errors(JACADDREDUCE %d) : %d\n",ec2,n_errors);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval += n_errors;
 
    free(samples);
@@ -8776,7 +8783,7 @@ uint32_t  test_ec_jacscmul_opt(uint32_t ec2)
     printf("\033[1;31m");
    }
    printf("N errors(JACSCMUL_OPT %d) : %d/%d\n",ec2, n_errors, nec_points);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval += n_errors;
 
    free(samples);
@@ -8846,7 +8853,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
     printf("\033[1;31m");
    }
    printf("N errors(JACREDUCE_OPT %d) : %d\n",ec2,n_errors);
-   printf("\033[0m;");
+   printf("\033[0m");
    retval += n_errors;
 
    free(samples);
@@ -8888,7 +8895,7 @@ uint32_t test_transpose(void)
       printf("\033[1;31m");
      }
      printf("N errors(Transpose %dx%d) : %d/%d\n",nrows,ncols,n_errors, nrows*ncols);
-     printf("\033[0m;");
+     printf("\033[0m");
      retval += n_errors;
 
      free(samples);
@@ -8929,7 +8936,7 @@ uint32_t test_transpose_square(void)
       printf("\033[1;31m");
      }
      printf("N errors(Transpose square %dx%d) : %d/%d\n",nrows,nrows,n_errors, nrows*nrows);
-     printf("\033[0m;");
+     printf("\033[0m");
      retval += n_errors;
 
   }
@@ -9002,7 +9009,7 @@ int main()
   } else {
     printf("All CPU tests PASSED \n");
   }
-  printf("\033[0m;");
+  printf("\033[0m");
 
   return 1;
 }

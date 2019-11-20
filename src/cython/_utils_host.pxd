@@ -207,3 +207,8 @@ cdef extern from "../cuda/utils_host.h" nogil:
 
     void crelease_h "release_h"()
   
+    ct.uint32_t * cntt_interpolandmul_server_h "ntt_interpolandmul_server_h" (ct.ntt_interpolandmul_t *args)
+
+    ct.uint32_t * cget_Mmul_h "get_Mmul_h" ()
+
+    ct.uint32_t cget_nprocs_h "get_nprocs_h"()

@@ -107,7 +107,6 @@ static  pthread_mutex_t utils_lock;
 static  pthread_barrier_t utils_barrier;
 static  uint32_t utils_nprocs = 1;
 static  uint32_t utils_mproc_init = 0;
-static  uint32_t volatile utils_wait_flag = 0;
 
 static uint32_t utils_N[MAX_NCORES_OMP * NWORDS_256BIT * ECP2_JAC_OUTDIMS];
 static uint32_t utils_zinv[2 * MAX_NCORES_OMP * NWORDS_256BIT];
@@ -342,6 +341,11 @@ void transpose_square_h(uint32_t *min, uint32_t in_nrows)
     - mutex : utils_lock
     - number of processors
 */
+uint32_t get_nprocs_h()
+{
+  return get_nprocs_conf();
+}
+
 void mproc_init_h()
 {
   if (utils_mproc_init) {
@@ -351,7 +355,6 @@ void mproc_init_h()
   utils_nprocs = get_nprocs_conf() > MAX_NCORES_OMP ? MAX_NCORES_OMP : get_nprocs_conf();
   omp_set_num_threads(utils_nprocs);
   utils_mproc_init = 1;
-  utils_wait_flag = utils_nprocs;
 
   if (pthread_mutex_init(&utils_lock, NULL) != 0){
      exit(1);
@@ -1952,6 +1955,11 @@ void M_free_h(void)
   M_mul = NULL;
 }
 
+uint32_t *get_Mmul_h()
+{
+  return M_mul;
+}
+
 void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
 {
   intt_parallel_h(A, roots, 1, Nrows, Ncols, rstride, FFT_T_DIF, pidx);
@@ -1970,7 +1978,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
     return ntt_interpolandmul_parallel_h(args->A, args->B, args->roots, args->Nrows, args->Ncols, args->rstride, args->pidx);
   }
   #ifndef PARALLEL_EN
-   return ntt_interpolandmul_parallel_h(args->A, args->B, args->roots, args->Nrows, args->Ncols, args->rstride, args->pidx);
+    return ntt_interpolandmul_parallel_h(args->A, args->B, args->roots, args->Nrows, args->Ncols, args->rstride, args->pidx);
   #endif
 
   args->max_threads = MIN(args->max_threads, MIN(utils_nprocs, 1<<MIN(args->Nrows, args->Ncols)));
@@ -2000,6 +2008,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   printf("rstride : %d\n", args->rstride);
   */
   
+  
   ntt_interpolandmul_init_h(args->A, args->B, &args->mNrows,&args->mNcols, args->Nrows, args->Ncols);
 
   for(uint32_t i=0; i< args->max_threads; i++){
@@ -2018,8 +2027,9 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
      printf("Thread : %d, start_idx : %d, end_idx : %d\n",
              w_args[i].thread_id, 
              w_args[i].start_idx,
-             w_args[i].last_idx);
+             w_args[i].last_idx);  
      */
+     
     
   }
 

@@ -484,7 +484,6 @@ typedef struct{
   uint32_t mNcols;
   uint32_t nroots;
   uint32_t rstride;
-  uint32_t astride;
   uint32_t pidx;
   uint32_t max_threads;
   uint32_t start_idx;

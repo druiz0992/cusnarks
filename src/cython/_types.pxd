@@ -48,6 +48,7 @@ cdef extern from "types.h":
   cdef uint32_t MAX_R1CSPOLYTMP_NWORDS
   cdef uint32_t N_STREAMS_PER_GPU
   cdef uint32_t GROTH_PROOF_N_ECPOINTS
+  cdef uint32_t MAX_NCORES_OMP
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -163,6 +164,22 @@ cdef extern from "types.h":
     uint32_t thread_id
     uint32_t pidx
 
+  ctypedef struct ntt_interpolandmul_t:
+    uint32_t *A;
+    uint32_t *B;
+    uint32_t *roots;
+    uint32_t Nrows;
+    uint32_t Ncols;
+    uint32_t mNrows;
+    uint32_t mNcols;
+    uint32_t nroots;
+    uint32_t rstride;
+    uint32_t pidx;
+    uint32_t max_threads;
+    uint32_t start_idx;
+    uint32_t last_idx;
+    uint32_t thread_id;
+
   ctypedef struct r1csv1_t:
     uint32_t magic_number
     uint32_t version
@@ -201,6 +218,7 @@ cdef extern from "types.h":
      KERNEL_T_ZPOLY = 0, KERNEL_T_ECBN128_T, KERNEL_T_EC2BN128_T, KERNEL_T_N
 
 _NWORDS_256BIT = NWORDS_256BIT
+_MAX_NCORES_OMP = MAX_NCORES_OMP
 _MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
 _MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS
 _NSTREAMS_PER_GPU = N_STREAMS_PER_GPU
