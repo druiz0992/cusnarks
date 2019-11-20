@@ -166,20 +166,6 @@ static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers,nt
 static void transpose_AB_h(void *args);
 static void transpose_A_h(void *args);
 void *interpol_and_mul_h(void *args);
-void *interpol_vector_even_h(void *args);
-void *interpol_vector_odd_h(void *args);
-void *interpol_ntt0_h(void *args);
-void *interpol_ntt1_h(void *args);
-void *interpol_ntt2_h(void *args);
-void *interpol_ntt3_h(void *args);
-void *interpol_ntt4_h(void *args);
-void *interpol_ntt5_h(void *args);
-void *interpol_scalemont_h(void *args);
-void *interpol_scaleext_h(void *args);
-void *interpol_l2rootsmul_h(void *args);
-void *interpol_l2irootsmul_h(void *args);
-void *interpol_l2irootsmul2_h(void *args);
-void *interpol_l3rootsmul_h(void *args);
 
 //////
 
@@ -272,25 +258,12 @@ inline void swapu256_h(uint32_t *x, uint32_t *y)
 inline void util_wait_h(uint32_t thread_id, void (*f_ptr) (void *), void * args)
 {
   pthread_barrier_wait(&utils_barrier);
-  if ((thread_id==0) && (f_ptr) ){
-     f_ptr(args);
-  }
-  pthread_barrier_wait(&utils_barrier);
-  /*
-  do{
-     if ( thread_id != 0 && utils_wait_flag){
-       break;
-     } else if (thread_id==0 && utils_wait_flag==1) {
-        if (f_ptr){
-           f_ptr(args);
-        }
-        printf("[%d] - Release\n",thread_id);
-        utils_wait_flag = utils_nprocs;
-        pthread_cond_broadcast(&utils_cond);
-        break;
+  if (f_ptr){
+     if (thread_id == 0){
+       f_ptr(args);
      }
-  }while(1);
-  */
+     pthread_barrier_wait(&utils_barrier);
+  }
 }
 
 /*
@@ -384,11 +357,6 @@ void mproc_init_h()
      exit(1);
   }
 
-  if (pthread_barrier_init(&utils_barrier, NULL,4) != 0){
-     exit(1);
-  }
-
-  //logInfo("N Procs available : %d\n", utils_nprocs);
 }
 
 /*
@@ -2005,9 +1973,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
    return ntt_interpolandmul_parallel_h(args->A, args->B, args->roots, args->Nrows, args->Ncols, args->rstride, args->pidx);
   #endif
 
-  if (args->max_threads > utils_nprocs){
-    args->max_threads = utils_nprocs; 
-  }
+  args->max_threads = MIN(args->max_threads, MIN(utils_nprocs, 1<<MIN(args->Nrows, args->Ncols)));
 
   uint32_t nvars = 1<<(args->Nrows+args->Ncols);
   uint32_t start_idx, last_idx;
@@ -2020,7 +1986,10 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
    
   pthread_t *workers = (pthread_t *) malloc(args->max_threads * sizeof(pthread_t));
   ntt_interpolandmul_t *w_args  = (ntt_interpolandmul_t *)malloc(args->max_threads * sizeof(ntt_interpolandmul_t));
-  
+  if (pthread_barrier_init(&utils_barrier, NULL, args->max_threads) != 0){
+     exit(1);
+  }
+
   /*
   printf("N threads : %d\n", args->max_threads);
   printf("N vars    : %d\n", nvars);
@@ -2060,53 +2029,15 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   */
   
   launch_client_h(interpol_and_mul_h, workers, w_args);
-  #if 0
-  // M_mul[2*i] = A[i]  * B[i]
-  launch_client_h(interpol_vector_even_h ,workers, w_args);
-
-  // A[i] = IFFT_N/2(A); B[i] = IFFT_N/2(B)
-  launch_client_h(interpol_ntt0_h ,workers, w_args);
-  // A[i] = A[i] * l2_W[i]
-  launch_client_h(interpol_l2irootsmul_h ,workers, w_args);
-  // A[i] = IFFT_N/2(A); B[i] = IFFT_N/2(B)
-  launch_client_h(interpol_ntt1_h ,workers, w_args);
-
-  // A = A.T
-  transpose_h(M_transpose,args->A,1<<args->Nrows, 1<<args->Ncols);
-  memcpy(args->A,M_transpose, (1 << (args->Nrows + args->Ncols + NWORDS_256BIT_SHIFT))* sizeof(uint32_t));
-  // B = B.T
-  transpose_h(M_transpose,args->B,1<<args->Nrows, 1<<args->Ncols);
-  memcpy(args->B,M_transpose, (1 << (args->Nrows + args->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
-
-  launch_client_h(interpol_scalemont_h ,workers, w_args);
-  launch_client_h(interpol_l3rootsmul_h ,workers, w_args);
-
-  launch_client_h(interpol_ntt2_h ,workers, w_args);
-  launch_client_h(interpol_l2rootsmul_h ,workers, w_args);
-  launch_client_h(interpol_ntt3_h ,workers, w_args);
-
-  transpose_h(M_transpose,args->A,1<<args->Nrows, 1<<args->Ncols);
-  memcpy(args->A,M_transpose, (1 << (args->Nrows + args->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
-  transpose_h(M_transpose,args->B,1<<args->Nrows, 1<<args->Ncols);
-  memcpy(args->B,M_transpose, (1 << (args->Nrows + args->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
-
-  launch_client_h(interpol_vector_odd_h ,workers, w_args);
- 
-  launch_client_h(interpol_ntt4_h ,workers, w_args);
-  launch_client_h(interpol_l2irootsmul2_h ,workers, w_args);
-  launch_client_h(interpol_ntt5_h ,workers, w_args);
-  launch_client_h(interpol_scaleext_h ,workers, w_args);
-
-  transpose_h(M_transpose,M_mul,1<<args->mNrows, 1<<args->mNcols);
-  memcpy(M_mul,M_transpose, (1 << (args->mNrows + args->mNcols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
-
   /*
-  for(uint32_t i=0; i < 1<<(args->mNcols + args->mNrows); i++){
+  for (uint32_t i=0; i < 1 << (args->Nrows +args->Ncols); i++){
     printf("[%d] : ",i);
-    printU256Number(&M_mul[i*NWORDS_256BIT]);
+    printU256Number(&args->A[i*NWORDS_256BIT]);
+    //printU256Number(&M_mul[i*2*NWORDS_256BIT]);
   }
   */
-  #endif
+
+  pthread_barrier_destroy(&utils_barrier);
   free(workers);
   free(w_args);
 
@@ -2136,19 +2067,17 @@ static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers,nt
 
   for (i=0; i < w_args[0].max_threads; i++)
   {
-     printf("Thread %d : start_idx : %d, last_idx : %d . ptr : %x\n", i, w_args[i].start_idx,w_args[i].last_idx, f_ptr);
+     //printf("Thread %d : start_idx : %d, last_idx : %d . ptr : %x\n", i, w_args[i].start_idx,w_args[i].last_idx, f_ptr);
      if ( pthread_create(&workers[i], NULL, f_ptr, (void *) &w_args[i]) ){
-       printf("error\n");
+       //printf("error\n");
        return 0;
      }
   }
 
-  printf("Max threads : %d\n",w_args[0].max_threads);
+  //printf("Max threads : %d\n",w_args[0].max_threads);
   for (i=0; i < w_args[0].max_threads; i++){
-    printf("join[%d]\n",i);
     pthread_join(workers[i], NULL);
   }
-  printf("End main\n");
   return 1;
 }
 
@@ -2174,11 +2103,13 @@ void *interpol_and_mul_h(void *args)
   uint32_t Anrows = 1 << wargs->Nrows;
   uint32_t Amncols = 1 << wargs->mNcols;
   uint32_t Amnrows = 1 << wargs->mNrows;
+  const uint32_t *scaler_mont = CusnarksIScalerGet((fmt_t)1);
+  const uint32_t *scaler_ext = CusnarksIScalerGet((fmt_t)0);
   int64_t ridx;
   uint32_t i;
 
   // multiply M_mul[2*i] = A * B
-  printf("multiply-even [%d]\n", wargs->thread_id);
+  //printf("multiply-even [%d]\n", wargs->thread_id);
   for (i=wargs->start_idx; i < wargs->last_idx; i++){
     montmult_h(&M_mul[(2*i)<<NWORDS_256BIT_SHIFT],
                &wargs->A[i<<NWORDS_256BIT_SHIFT],
@@ -2187,7 +2118,7 @@ void *interpol_and_mul_h(void *args)
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
 
-  printf("intt0 [%d]\n", wargs->thread_id);
+  //printf("intt0 [%d]\n", wargs->thread_id);
   // A = IFFT_N/2(A); B = IFFT_N/2(B)
   for (i=start_col; i<last_col; i++){
     ntt_h(&wargs->A[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, wargs->rstride<<wargs->Ncols, -1,  wargs->pidx);
@@ -2195,7 +2126,7 @@ void *interpol_and_mul_h(void *args)
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
 
-  printf("intt0 il2mul [%d]\n", wargs->thread_id);
+  //printf("intt0 il2mul [%d]\n", wargs->thread_id);
   // A[i] = A[i] * l2_IW[i]
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     ridx = (wargs->rstride * (i >> wargs->Ncols) * (i & (Ancols - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
@@ -2209,24 +2140,44 @@ void *interpol_and_mul_h(void *args)
                wargs->pidx);
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
-
-  printf("intt1 [%d]\n", wargs->thread_id);
-  // A[i] = IFFT_N/2(A); B[i] = IFFT_N/2(B)
+  
+  //printf("intt1 [%d]\n", wargs->thread_id);
+  // A[i] = IFFT_N/2(A).T; B[i] = IFFT_N/2(B).T
   for (i=start_row;i < last_row; i++){
     ntt_h(&wargs->A[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, -1, wargs->pidx);
     ntt_h(&wargs->B[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, -1, wargs->pidx);
   }
   util_wait_h(wargs->thread_id, transpose_AB_h, wargs);
 
+  // A = A * scaler * l3W; B = B * scaler * l3W
+  //printf("intt1-scaler-l3mul [%d]\n", wargs->thread_id);
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+      montmult_h(&wargs->A[i<<NWORDS_256BIT_SHIFT],
+                 &wargs->A[i<<NWORDS_256BIT_SHIFT],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
+      montmult_h(&wargs->B[i<<NWORDS_256BIT_SHIFT],
+                 &wargs->B[i<<NWORDS_256BIT_SHIFT],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
+      montmult_h(&wargs->A[i<<NWORDS_256BIT_SHIFT],
+                 &wargs->A[i<<NWORDS_256BIT_SHIFT],
+                 &wargs->roots[i<<NWORDS_256BIT_SHIFT],
+                 wargs->pidx);
+      montmult_h(&wargs->B[i<<NWORDS_256BIT_SHIFT],
+                 &wargs->B[i<<NWORDS_256BIT_SHIFT],
+                 &wargs->roots[i<<NWORDS_256BIT_SHIFT],
+                 wargs->pidx);
+  }
+  util_wait_h(wargs->thread_id, NULL, NULL);
+
   // A = FFT_N/2(A); B = FFT_N/2(B)
-  printf("intt2 [%d]\n", wargs->thread_id);
+  //printf("ntt2 [%d]\n", wargs->thread_id);
   for (i=start_col;i < last_col; i++){
     ntt_h(&wargs->A[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, wargs->rstride<<wargs->Ncols, 1,  wargs->pidx);
     ntt_h(&wargs->B[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, wargs->rstride<<wargs->Ncols, 1,  wargs->pidx);
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
 
-  printf("intt3 [%d]\n", wargs->thread_id);
+  //printf("ntt2-l2mul [%d]\n", wargs->thread_id);
   // A[i] = A[i] * l2_W[i]
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     ridx = (wargs->rstride * (i >> wargs->Ncols) * (i & (Ancols - 1))) & (wargs->rstride * Anrows * Ancols - 1);
@@ -2241,15 +2192,15 @@ void *interpol_and_mul_h(void *args)
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
 
-  printf("intt4 [%d]\n", wargs->thread_id);
-  // A = FFT_N/2(A); B = FFT_N/2(B)
+  //printf("ntt3 [%d]\n", wargs->thread_id);
+  // A = FFT_N/2(A).T; B = FFT_N/2(B).T
   for (i=start_row;i < last_row; i++){
     ntt_h(&wargs->A[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, 1, wargs->pidx);
     ntt_h(&wargs->B[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, 1, wargs->pidx);
   }
   util_wait_h(wargs->thread_id, transpose_AB_h, wargs);
 
-  printf("intt5 [%d]\n", wargs->thread_id);
+  //printf("multiply-odd [%d]\n", wargs->thread_id);
   // M_mul[2*i+1] = A * B
   for (i=wargs->start_idx; i < wargs->last_idx; i++){
     montmult_h(&M_mul[(2*i+1)<<NWORDS_256BIT_SHIFT],
@@ -2262,14 +2213,14 @@ void *interpol_and_mul_h(void *args)
   start_col = wargs->start_idx>>(wargs->mNrows-1), last_col = wargs->last_idx>>(wargs->mNrows-1);
   start_row = wargs->start_idx>>(wargs->mNcols-1), last_row = wargs->last_idx>>(wargs->mNcols-1);
 
-  printf("intt6 [%d]\n", wargs->thread_id);
+  //printf("intt4 [%d]\n", wargs->thread_id);
   // A = IFFT_N(A); B = IFFT_N(B)
   for (i=start_col;i < last_col; i++){
     ntt_h(&M_mul[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->mNrows,1 << wargs->mNcols, wargs->rstride<<(wargs->mNcols-1), -1,  wargs->pidx);
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
 
-  printf("intt7 [%d]\n", wargs->thread_id);
+  //printf("intt4-il2mul [%d]\n", wargs->thread_id);
   // A[i] = A[i] * l2_IW[i]
   for (i=wargs->start_idx*2;i < wargs->last_idx*2; i++){
     ridx = ( (wargs->rstride>>1) * (i >> wargs->mNcols) * (i & (Amncols - 1)) * -1) & ((wargs->rstride>>1) * Amnrows * Amncols - 1);
@@ -2280,222 +2231,21 @@ void *interpol_and_mul_h(void *args)
   }
   util_wait_h(wargs->thread_id, NULL, NULL);
 
-  printf("intt8 [%d]\n", wargs->thread_id);
+  //printf("intt5 [%d]\n", wargs->thread_id);
   for (i=start_row;i < last_row; i++){
     ntt_h(&M_mul[i<<wargs->mNcols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->mNcols,1, wargs->rstride<<(wargs->mNrows-1), -1, wargs->pidx);
   }
-  //util_wait_h(wargs->thread_id, transpose_A_h, wargs);
-  printf("END [%d]\n",wargs->thread_id);
-  return NULL;
-}
+  util_wait_h(wargs->thread_id, NULL, NULL);
 
-void *interpol_vector_even_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  //printf("intepol-even start [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-  for (uint32_t i=wargs->start_idx; i < wargs->last_idx; i++){
-    montmult_h(&M_mul[(2*i)<<NWORDS_256BIT_SHIFT],
-               &wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->B[i<<NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-
-  }
-  //printf("intepol-even end [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-}
-
-void *interpol_vector_odd_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  //printf("interpol-odd start [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-  for (uint32_t i=wargs->start_idx; i < wargs->last_idx; i++){
-    montmult_h(&M_mul[(2*i+1)<<NWORDS_256BIT_SHIFT],
-               &wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->B[i<<NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-  }
-  //printf("interpol-odd end [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-}
-
-void *interpol_ntt0_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t rstride = wargs->rstride << wargs->Ncols;
-  uint32_t start_col = wargs->start_idx>>wargs->Nrows, last_col = wargs->last_idx>>wargs->Nrows;
-  //printf("IFFT0 start [%d] %d-%d stride : %d\n", wargs->thread_id, start_col, last_col, rstride);
-
-  for (uint32_t i=start_col;i < last_col; i++){
-    ntt_h(&wargs->A[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, rstride, -1,  wargs->pidx);
-    ntt_h(&wargs->B[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, rstride, -1,  wargs->pidx);
-  }
-  //printf("IFFT0 end [%d] %d-%d stride : %d\n", wargs->thread_id, start_col, last_col, rstride);
-}
-
-void *interpol_ntt1_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t rstride = wargs->rstride << wargs->Nrows;
-  uint32_t start_row = wargs->start_idx>>wargs->Ncols, last_row = wargs->last_idx>>wargs->Ncols;
-  //printf("IFFT1 start [%d] %d-%d stride : %d\n", wargs->thread_id, start_row, last_row, rstride);
-
-  for (uint32_t i=start_row;i < last_row; i++){
-    ntt_h(&wargs->A[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, rstride, -1, wargs->pidx);
-    ntt_h(&wargs->B[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, rstride, -1, wargs->pidx);
-  }
-  //printf("IFFT1 end [%d] %d-%d stride : %d\n", wargs->thread_id, start_row, last_row, rstride);
-}
-
-void *interpol_ntt2_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t rstride = wargs->rstride << wargs->Ncols;
-  uint32_t start_col = wargs->start_idx>>wargs->Nrows, last_col = wargs->last_idx>>wargs->Nrows;
-  //printf("FFT2 start [%d] %d-%d stride : %d\n", wargs->thread_id, start_col, last_col, rstride);
-
-  for (uint32_t i=start_col;i < last_col; i++){
-    ntt_h(&wargs->A[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, rstride, 1,  wargs->pidx);
-    ntt_h(&wargs->B[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->Nrows,1 << wargs->Ncols, rstride, 1,  wargs->pidx);
-  }
-  //printf("FFT2 end [%d] %d-%d stride : %d\n", wargs->thread_id, start_col, last_col, rstride);
-}
-
-void *interpol_ntt3_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t rstride = wargs->rstride << wargs->Nrows;
-  uint32_t start_row = wargs->start_idx>>wargs->Ncols, last_row = wargs->last_idx>>wargs->Ncols;
-  //printf("FFT3 [%d] %d-%d stride : %d\n", wargs->thread_id, start_row, last_row, rstride);
-
-  for (uint32_t i=start_row;i < last_row; i++){
-    ntt_h(&wargs->A[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, rstride, 1, wargs->pidx);
-    ntt_h(&wargs->B[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, rstride, 1, wargs->pidx);
-  }
-}
-
-void *interpol_ntt4_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t rstride = wargs->rstride << (wargs->mNcols-1);
-  uint32_t start_col = wargs->start_idx>>(wargs->mNrows-1), last_col = wargs->last_idx>>(wargs->mNrows-1);
-  //printf("IFFT4 [%d] %d-%d stride : %d\n", wargs->thread_id, start_col, last_col, rstride);
-
-  for (uint32_t i=start_col;i < last_col; i++){
-    ntt_h(&M_mul[i<<NWORDS_256BIT_SHIFT], wargs->roots, wargs->mNrows,1 << wargs->mNcols, rstride, -1,  wargs->pidx);
-  }
-}
-
-void *interpol_ntt5_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t rstride = wargs->rstride << (wargs->mNrows-1);
-  uint32_t start_row = wargs->start_idx>>(wargs->mNcols-1), last_row = wargs->last_idx>>(wargs->mNcols-1);
-  //printf("IFFT5 [%d] %d-%d stride : %d\n", wargs->thread_id, start_row, last_row, rstride);
-
-  for (uint32_t i=start_row;i < last_row; i++){
-    ntt_h(&M_mul[i<<wargs->mNcols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->mNcols,1, rstride, -1, wargs->pidx);
-  }
-
-}
-void *interpol_l2irootsmul_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t Ancols = 1 << wargs->Ncols;
-  uint32_t Anrows = 1 << wargs->Nrows;
-  int64_t ridx;
-  //printf("l2mul [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-
-  for (uint32_t i=wargs->start_idx;i < wargs->last_idx; i++){
-    ridx = (wargs->rstride * (i >> wargs->Ncols) * (i & (Ancols - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
-    montmult_h(&wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx << NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-    montmult_h(&wargs->B[i<<NWORDS_256BIT_SHIFT],
-               &wargs->B[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx << NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-  }
-}
-
-void *interpol_l2rootsmul_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t Ancols = 1 << wargs->Ncols;
-  uint32_t Anrows = 1 << wargs->Nrows;
-  int64_t ridx;
-  //printf("l2mul [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-
-  for (uint32_t i=wargs->start_idx;i < wargs->last_idx; i++){
-    ridx = (wargs->rstride * (i >> wargs->Ncols) * (i & (Ancols - 1))) & (wargs->rstride * Anrows * Ancols - 1);
-    montmult_h(&wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx << NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-    montmult_h(&wargs->B[i<<NWORDS_256BIT_SHIFT],
-               &wargs->B[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx << NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-  }
-}
-
-void *interpol_l2irootsmul2_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t Ancols = 1 << wargs->mNcols;
-  uint32_t Anrows = 1 << wargs->mNrows;
-  int64_t ridx;
-
-  //printf("l2mul2 [%d] %d-%d\n", wargs->thread_id, wargs->start_idx*2, wargs->last_idx*2);
-  for (uint32_t i=wargs->start_idx*2;i < wargs->last_idx*2; i++){
-    ridx = ( (wargs->rstride>>1) * (i >> wargs->mNcols) * (i & (Ancols - 1)) * -1) & ((wargs->rstride>>1) * Anrows * Ancols - 1);
-    montmult_h(&M_mul[i<<NWORDS_256BIT_SHIFT],
-               &M_mul[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx << NWORDS_256BIT_SHIFT],
-               wargs->pidx);
-  }
-}
-
-void *interpol_l3rootsmul_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  //printf("l3mul [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-  for (uint32_t i=wargs->start_idx;i < wargs->last_idx; i++){
-      montmult_h(&wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->roots[i<<NWORDS_256BIT_SHIFT],
-                 wargs->pidx);
-      montmult_h(&wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->roots[i<<NWORDS_256BIT_SHIFT],
-                 wargs->pidx);
-  }
-}
-void *interpol_scalemont_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  const uint32_t *scaler = CusnarksIScalerGet((fmt_t)1);
-  //printf("scale_mont [%d] %d-%d\n", wargs->thread_id, wargs->start_idx, wargs->last_idx);
-
-  for (uint32_t i=wargs->start_idx;i < wargs->last_idx; i++){
-      montmult_h(&wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &scaler[(wargs->Nrows + wargs->Ncols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
-      montmult_h(&wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &scaler[(wargs->Nrows + wargs->Ncols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
-  }
-}
-
-void *interpol_scaleext_h(void *args)
-{
-  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  const uint32_t *scaler = CusnarksIScalerGet((fmt_t)0);
-  //printf("scale_ext [%d] %d-%d\n", wargs->thread_id, wargs->start_idx*2, wargs->last_idx*2);
-
-  for (uint32_t i=wargs->start_idx*2;i < wargs->last_idx*2; i++){
+  //printf("intt5-scaler-l3mul [%d]\n", wargs->thread_id);
+  for (i=wargs->start_idx*2;i < wargs->last_idx*2; i++){
       montmult_h(&M_mul[i<<NWORDS_256BIT_SHIFT],
                  &M_mul[i<<NWORDS_256BIT_SHIFT],
-                 &scaler[(wargs->mNrows + wargs->mNcols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
+                 &scaler_ext[(wargs->mNrows + wargs->mNcols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
   }
+  util_wait_h(wargs->thread_id, transpose_A_h, wargs);
+
+  return NULL;
 }
 
 uint32_t *ntt_interpolandmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
@@ -4186,7 +3936,6 @@ void release_h(void)
   #ifdef PARALLEL_EN
   if (utils_mproc_init) {
      pthread_mutex_destroy(&utils_lock); 
-     pthread_barrier_destroy(&utils_barrier);
      utils_nprocs = 1;
      utils_mproc_init=0;
    }
