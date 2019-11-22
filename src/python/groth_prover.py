@@ -440,6 +440,7 @@ class GrothProver(object):
         np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FIELD))
         logging.info(' Process server - Evaluating Poly B...')
         np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FIELD))
+        logging.info(' Process server - Completed Evaluating Poly B...')
         end = time.time()
 
         start1 = time.time()
@@ -448,14 +449,19 @@ class GrothProver(object):
           ifft_params = ntt_build_h(self.pA_T.shape[0])
           polH = ntt_interpolandmul_h(np.reshape(self.pA_T,-1),
                                      np.reshape(self.pB_T,-1),
-                                     np.reshape(self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,-1), 2, ZField.get_field())
-
-          np.copyto(w[:m-1], polH[m:-1])
-          logging.info(' Process server - Completed')
+                                     np.reshape(self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,-1), 2, MOD_FIELD)
+          logging.info(' Process server - Waiting for Mexp to be completed...')
 
         end1 = time.time()
+       
+        #write polH once MEXP is done (not before)
+        conn.recv()
+        if self.compute_ntt_gpu is False:
+          np.copyto(w[:m-1], polH[m:-1])
+          logging.info(' Process server - Copying polH...')
 
         conn.send([end-start, end1-start1 ])
+        logging.info(' Process server - Completed')
         conn.close()
 
     def startGPServer(self):    
@@ -923,6 +929,7 @@ class GrothProver(object):
         start = time.time()
 
         ZField.set_field(MOD_FIELD)
+
         # Init r and s scalars
         np.copyto(
               self.r_scl,
@@ -969,7 +976,6 @@ class GrothProver(object):
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
                                   sort_en=self.sort_en)
 
-
         self.findECPointsDispatch(
                              self.dispatch_table_phase2,
                              nPublic+2,
@@ -989,6 +995,7 @@ class GrothProver(object):
         ######################
 
         # Retrieve Poly Eval Results
+        self.parent_conn_CPU.send([])
         t = self.parent_conn_CPU.recv()
         self.t_GP['Eval'] += t[0]
         self.p_CPU.terminate()
@@ -998,14 +1005,6 @@ class GrothProver(object):
           self.t_GP['H'] = self.calculateH()
         else:
           self.t_GP['H'] = t[1]
-
-        #writeU256DataFile_h(np.reshape(self.scl_array,-1), "/home/druiz/iden3/cusnarks/test/c/aux_data/w_cpu.bin".encode("UTF-8"))
-        #w_cpu = readU256DataFile_h(
-                 #"/home/druiz/iden3/cusnarks/test/c/aux_data/w_cpu.bin".encode("UTF-8"),
-                 #4194304,4194304)
-        #w_gpu = readU256DataFile_h(
-                 #"/home/druiz/iden3/cusnarks/test/c/aux_data/w_cpu.bin".encode("UTF-8"),
-                 #4194304,4194304)
 
         ######################
         # Beginning of P5
@@ -1304,7 +1303,6 @@ class GrothProver(object):
 
        # Collect final results
        self.getECResults(pending_dispatch_table)
-
 
     def write_pdata(self):
         if self.out_public_f.endswith('.json'):

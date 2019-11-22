@@ -2006,6 +2006,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   printf("Ncols : %d\n", args->Ncols);
   printf("nroots : %d\n", args->nroots);
   printf("rstride : %d\n", args->rstride);
+  printf("pidx : %d\n", args->pidx);
   */
   
   
@@ -2027,23 +2028,34 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
      printf("Thread : %d, start_idx : %d, end_idx : %d\n",
              w_args[i].thread_id, 
              w_args[i].start_idx,
-             w_args[i].last_idx);  
+             w_args[i].last_idx);   
      */
-     
-    
   }
 
   /*
   printf("mNrows : %d\n", args->mNrows);
   printf("mNcols : %d\n", args->mNcols);
   */
-  
-  launch_client_h(interpol_and_mul_h, workers, w_args);
+ 
   /*
   for (uint32_t i=0; i < 1 << (args->Nrows +args->Ncols); i++){
     printf("[%d] : ",i);
     printU256Number(&args->A[i*NWORDS_256BIT]);
-    //printU256Number(&M_mul[i*2*NWORDS_256BIT]);
+    printU256Number(&args->B[i*NWORDS_256BIT]);
+  }
+  */
+
+  launch_client_h(interpol_and_mul_h, workers, w_args);
+
+  /*
+  for (uint32_t i=0; i < 1 << (args->Nrows +args->Ncols); i++){
+    printf("[%d] : ",i);
+    printU256Number(&args->A[i*NWORDS_256BIT]);
+    printU256Number(&args->B[i*NWORDS_256BIT]);
+  }
+  for (uint32_t i=0; i < 1 << (args->Nrows +args->Ncols+1); i++){
+    printf("[%d] : ",i);
+    printU256Number(&M_mul[i*NWORDS_256BIT]);
   }
   */
 
@@ -2094,7 +2106,6 @@ static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers,nt
 
 static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows, uint32_t *mNcols, uint32_t Nrows, uint32_t Ncols)
 {
-  t_uint64 size = (t_uint64) (1 << (Nrows + Ncols + 1)) * NWORDS_256BIT;
   if (Nrows < Ncols){
     *mNcols = Ncols;
     *mNrows = Nrows+1;
