@@ -14,16 +14,17 @@ setup scripts are launched.  Computation intensive functionality on the host (CP
 to build wrappers around C functions so that they can be called from Python and executed on CPU or GPU.
  An overview of the software architecture can be found [Architecture][here].
 
-Elliptic curve scalar multiplication and polynomial multiplication (via FFT), the heaviest blocks in terms of 
+Elliptic curve scalar multiplication, the heaviest blocks in terms of 
 computation requirements have been implemented to run on the GPU side. CPU is used during the conversion of Elliptic Curve points
-from jacobian to affine cordinates and during QAP reduction in the proover. In upcomming versions we will use CPUs as an additional
-resource in the FFT and multi-exponentiation stages as a way to reduce proof time.
+from jacobian to affine cordinates and during QAP reduction in the prover and to perform polynomial multiplication (via FFT). 
+In upcomming versions we will use CPUs as an additional
+resource in the last multi-exponentiation stages as a way to reduce proof time.
 
 The current partition of GPU vs. CPU functionality on the prover side is shown in below.
 
 ![proof_block_diagram](doc/block_diagram.png)
 
-The trusted setup is currently very slow. Implementation has been done using a single CPU and 32-bit arithmetic, except for the multi-exponentiation stage where we use a non-optimized algorithm for a single GPU.
+The trusted setup is currently very slow. Implementation has been done using a single CPU core, except for the multi-exponentiation stage where we use a non-optimized algorithm for a single GPU.
 
 
 ## Outline
