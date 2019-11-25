@@ -8950,7 +8950,7 @@ uint32_t test_transpose_square(void)
 int main()
 {
   uint32_t retval;
-
+  /*
   retval+=test_mul();  // test montgomery mul with predefined results
   //test_mul3(); // test SOS impl of montgomery mul
   //test_mul4(); // test SOS impl of montgomery squaring
@@ -8993,13 +8993,14 @@ int main()
 
   retval+=test_ec_jacscmul(0);    // EC1
   retval+=test_ec_jacscmul(1);    // EC2
+  */
    
   retval+=test_ec_jacreduce(0);     // EC1
   retval+=test_ec_jacreduce(1);     // EC2
 
   retval+=test_ec_jacscmul_opt(0);    // EC1
   retval+=test_ec_jacscmul_opt(1);    // EC2
-
+  
   retval+=test_ec_jacreduce_opt(0);   // EC1
   retval+=test_ec_jacreduce_opt(1);   // EC2
 

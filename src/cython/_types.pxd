@@ -165,20 +165,33 @@ cdef extern from "types.h":
     uint32_t pidx
 
   ctypedef struct ntt_interpolandmul_t:
-    uint32_t *A;
-    uint32_t *B;
-    uint32_t *roots;
-    uint32_t Nrows;
-    uint32_t Ncols;
-    uint32_t mNrows;
-    uint32_t mNcols;
-    uint32_t nroots;
-    uint32_t rstride;
-    uint32_t pidx;
-    uint32_t max_threads;
-    uint32_t start_idx;
-    uint32_t last_idx;
-    uint32_t thread_id;
+    uint32_t *A
+    uint32_t *B
+    uint32_t *roots
+    uint32_t Nrows
+    uint32_t Ncols
+    uint32_t mNrows
+    uint32_t mNcols
+    uint32_t nroots
+    uint32_t rstride
+    uint32_t pidx
+    uint32_t max_threads
+    uint32_t start_idx
+    uint32_t last_idx
+    uint32_t thread_id
+
+  ctypedef struct jacadd_reduced_t:
+    uint32_t *out_ep
+    uint32_t *scl
+    uint32_t *x
+    uint32_t *scmul
+    uint32_t *ectable
+    uint32_t n
+    uint32_t pidx
+    uint32_t max_threads
+    uint32_t start_idx
+    uint32_t last_idx
+    uint32_t thread_id
 
   ctypedef struct r1csv1_t:
     uint32_t magic_number

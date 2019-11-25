@@ -46,6 +46,7 @@
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
 #define NBITS_BYTE (8)
+#define EC_JACREDUCE_BATCH_SIZE (1<<8)
 
 #define R1CS_HDR_MAGIC_NUMBER  (0x73633172)
 #define R1CS_HDR_V01           (1)
@@ -491,6 +492,21 @@ typedef struct{
   uint32_t thread_id;
 
 }ntt_interpolandmul_t;
+
+typedef struct{
+  uint32_t *out_ep;
+  uint32_t *scl;
+  uint32_t *x;
+  uint32_t *scmul;
+  uint32_t *ectable;
+  uint32_t n;
+  uint32_t pidx;
+  uint32_t max_threads;
+  uint32_t start_idx;
+  uint32_t last_idx;
+  uint32_t thread_id;
+
+}jacadd_reduced_t;
 
 typedef enum{
   KERNEL_T_ZPOLY = 0,
