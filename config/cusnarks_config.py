@@ -145,6 +145,9 @@ def get_circuits_folder():
 def get_snarkjs_folder():
     return parse_configfile(config['folder'],'SNARKJS')
 
+def get_cusnarks_folder():
+    return CUSNARKS_HOME
+
 def get_rust_folder():
     return parse_configfile(config['folder'],'RUST-CIRCOM')
 
