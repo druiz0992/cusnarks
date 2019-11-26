@@ -896,6 +896,7 @@ def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
+"""
 def ec_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
                 np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
 
@@ -927,7 +928,7 @@ def ec2_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
      uh.cec2_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], <ct.uint32_t *>0, n, <ct.uint32_t> U256_BSELM, pidx, add_last)
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
- 
+""" 
 
 def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_affine, ct.uint32_t ec2, ct.uint32_t pidx):
      if ec2:

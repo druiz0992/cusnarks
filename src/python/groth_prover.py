@@ -137,7 +137,7 @@ class GrothProver(object):
         ZField.set_field(MOD_GROUP)
 
         self.pk = getPK()
-        self.verify = 0
+        self.verify = 2
 
         self.n_gpu = get_ngpu(max_used_percent=95.)
         if self.n_gpu == 0:
@@ -501,12 +501,8 @@ class GrothProver(object):
                          parsed_dict['proof_f'], parsed_dict['public_data_f'],
                          verify_en=int(parsed_dict['verify_en']))
 
-                 if self.verify_en:
-                   new_msg = dict(self.t_GP)
-                   new_msg['status'] = self.verify
-                 else:
-                   new_msg = dict(self.t_GP)
-                   new_msg['status'] =  2
+                 new_msg = dict(self.t_GP)
+                 new_msg['status'] = self.verify
    
                  jsocket.send_message(new_msg, conn)
                  conn.close()
@@ -715,10 +711,14 @@ class GrothProver(object):
       self.out_proof_f = out_proof_f
       self.out_public_f = out_public_f
       self.witness_f = witness_f
-      self.verify = 0
 
       self.verify_en = verify_en
       self.t_GP = {}
+
+      if (self.verify_en):
+        self.verify = 0
+      else :
+        self.verify = 2
 
       self.initECVal()
 
@@ -757,6 +757,8 @@ class GrothProver(object):
       self.test_results()
 
       copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
+
+      return self.verify
 
     def test_results(self):
       proof_r = True
