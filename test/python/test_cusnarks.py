@@ -54,7 +54,7 @@ INPUT_PK_F      = "test_cusnarks_pk.bin"
 INPUT_VK_F      = "test_cusnarks_vk.bin"
 INPUT_W_F       = "test_cusnarks_w.dat"
 OUTPUT_P_F      = "test_cusnarks_p.json"
-OUTPU_PD_F      = "test_cusnarks_pd.json"
+OUTPUT_PD_F      = "test_cusnarks_pd.json"
 
 RUST_COMMAND = "../../../target/release/za"
 RUST_GEN_CONSTRAINTS_COMPILE_OPT = "compile"
@@ -92,12 +92,14 @@ if __name__ == "__main__":
 
     call(["rm", "-f", "*test_cusnarks*"])
 
+    cusnarks_folder = cfg.get_cusnarks_folder()+"test/python"
+    os.chdir(cusnarks_folder)
     # launch setup
-    GS = GrothSetup(in_circuit_f = INPUT_CIRCUIT_F, out_pk_f=INPUT_PK_F, out_vk_f=INPUT_VK_F, keep_f=circuits_folder)
+    GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_CIRCUIT_F, out_pk_f=circuits_folder+INPUT_PK_F, out_vk_f=circuits_folder+INPUT_VK_F, keep_f=circuits_folder)
     GS.setup()
 
-    GP = GrothProver(INPUT_PK_F, INPUT_VK_F, verification_key_f=opt['verification_key_f'], start_server=0)
-    result = GP.proof(INPUT_W_F, OUTPUT_P_F, OUTPU_PD_F, verify_en=1)
+    GP = GrothProver(circuits_folder+INPUT_PK_F, verification_key_f = circuits_folder+INPUT_VK_F, start_server=0)
+    result = GP.proof(circuits_folder+INPUT_W_F, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
 
     if result == 1:
       print("Cusnarks test PASSED\n")
