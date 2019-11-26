@@ -38,18 +38,27 @@
 """
 import sys
 from random import randint
+import os
 
 sys.path.append('../../src/python')
 sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
 from groth_prover import *
+from groth_setup import *
 from subprocess import call
-import os
 import cusnarks_config as cfg
+from termcolor import colored
+
+INPUT_CIRCUIT_F = "test_cusnarks_c.bin"
+INPUT_PK_F      = "test_cusnarks_pk.bin"
+INPUT_VK_F      = "test_cusnarks_vk.bin"
+INPUT_W_F       = "test_cusnarks_w.dat"
+OUTPUT_P_F      = "test_cusnarks_p.json"
+OUTPU_PD_F      = "test_cusnarks_pd.json"
 
 RUST_COMMAND = "../../../target/release/za"
 RUST_GEN_CONSTRAINTS_COMPILE_OPT = "compile"
-RUST_GEN_CONSTRAINTS_CUDA_OPT = "--cuda=test_c.bin"
+RUST_GEN_CONSTRAINTS_CUDA_OPT = "--cuda="
 
 RUST_GEN_WITNESS_OPT1 = "test"
 RUST_GEN_WITNESS_OPT2 = "--skipcompile"
@@ -60,40 +69,37 @@ OBJ_INPUT_OPT = "-I"
 OBJ_INPUT_VAL = "binary"
 OBJ_OUTPUT_OPT = "-O"
 OBJ_OUTPUT_VAL = "binary"
-OBJ_MODE_OTP = "--reverse-bytes=4"
-OBJ_INPUT_FILE = "test1.binwitness"
-OBJ_OUTPUT_FILE = "test_w.dat"
-
-SNARKJS ="snarkjs"
-SETUP_COMMAND ="setup"
-WITNESS_COMMAND="calculatewitness"
-VERIFY_COMMAND = "verify"
-PROTOCOL_OPT = "--protocol"
-PROTOCOL = "groth"
-CIRCUIT_FILE_OPT = "-c"
-CIRCUIT_FILE = "./aux_data/circuit.json"
-DATA_FILE_OPT = "-i"
-DATA_FILE = "./aux_data/input.json"
-WITNESS_FILE_OPT = "-w"
-WITNESS_FILE = "./aux_data/witness.json"
-PROVINGKEY_FILE_OPT = "--pk"
-PROVINGKEY_FILE = "./aux_data/proving_key.json"
-VERIFICATION_FILE_OPT = "--vk"
-VERIFICATION_FILE = "./aux_data/verification_key.json"
-PROOF_FILE_OPT = "-p"
-PROOF_FILE = "./aux_data/proof.json"
-PUBLIC_FILE_OPT = "--pub"
-PUBLIC_FILE = "./aux_data/public.json"
+OBJ_MODE_OPT = "--reverse-bytes=4"
+OBJ_INPUT_F = "test1.binwitness"
 
 
 if __name__ == "__main__":
-    # cd rust_folder
+    circuits_folder = cfg.get_circuits_folder()
     rust_folder = cfg.get_rust_folder() + "/interop/circuits/cuda"
     os.chdir(rust_folder)
-    call([RUST_COMMAND, RUST_GEN_CONSTRAINTS_COMPILE, RUST_GEN_CONSTRAINTS_CUDA_OPT])
+
+    call(["rm", "-f", INPUT_CIRCUIT_F])
+    call(["rm", "-f", INPUT_W_F])
+    call(["rm", "-f", OBJ_INPUT_F])
+
+    call([RUST_COMMAND, RUST_GEN_CONSTRAINTS_COMPILE_OPT, RUST_GEN_CONSTRAINTS_CUDA_OPT+INPUT_CIRCUIT_F])
     call([RUST_COMMAND, RUST_GEN_WITNESS_OPT1, RUST_GEN_WITNESS_OPT2, RUST_GEN_WITNESS_OPT3])
-    call([RUST_COMMAND, RUST_GEN_WITNESS_OPT1, RUST_GEN_WITNESS_OPT2, RUST_GEN_WITNESS_OPT3])
 
-    call([OBJ_COMMAND, OBJ_INPUT_OPT, OBJ_INPUT_VAL, OBJ_OUTPUT_OPT, OBJ_OUTPUT_VAL, OBJ_MODE_OPT, OBJ_INPUT_FILE, OBJ_OUTPUT_FILE])
+    call([OBJ_COMMAND, OBJ_INPUT_OPT, OBJ_INPUT_VAL, OBJ_OUTPUT_OPT, OBJ_OUTPUT_VAL, OBJ_MODE_OPT, OBJ_INPUT_F, INPUT_W_F])
 
+    call(["mv", INPUT_CIRCUIT_F, circuits_folder])
+    call(["mv", "-f", INPUT_W_F, circuits_folder])
 
+    call(["rm", "-f", "*test_cusnarks*"])
+
+    # launch setup
+    GS = GrothSetup(in_circuit_f = INPUT_CIRCUIT_F, out_pk_f=INPUT_PK_F, out_vk_f=INPUT_VK_F, keep_f=circuits_folder)
+    GS.setup()
+
+    GP = GrothProver(INPUT_PK_F, INPUT_VK_F, verification_key_f=opt['verification_key_f'], start_server=0)
+    result = GP.proof(INPUT_W_F, OUTPUT_P_F, OUTPU_PD_F, verify_en=1)
+
+    if result == 1:
+      print("Cusnarks test PASSED\n")
+    else:
+      print(colored("Cusnarks test FAILED\n", 'red'))

@@ -144,17 +144,17 @@ cdef extern from "../cuda/utils_host.h" nogil:
                                            ct.uint32_t n, ct.uint32_t pidx,
                                            ct.uint32_t add_last)
 
-    void cec_jacscmul_opt_h "ec_jacscmul_opt_h"(ct.uint32_t *z, ct.uint32_t *scl, 
-                                                 ct.uint32_t *x, ct.uint32_t *ectable, 
-                                                 ct.uint32_t n,
-                                                 ct.uint32_t order,  ct.uint32_t pidx,
-                                                 ct.uint32_t add_last)
+    #void cec_jacscmul_opt_h "ec_jacscmul_opt_h"(ct.uint32_t *z, ct.uint32_t *scl, 
+                                                 #ct.uint32_t *x, ct.uint32_t *ectable, 
+                                                 #ct.uint32_t n,
+                                                 #ct.uint32_t order,  ct.uint32_t pidx,
+                                                 #ct.uint32_t add_last)
 
-    void cec2_jacscmul_opt_h "ec2_jacscmul_opt_h"(ct.uint32_t *z, ct.uint32_t *scl,
-                                                   ct.uint32_t *x, ct.uint32_t *ectable,
-                                                   ct.uint32_t n,
-                                                   ct.uint32_t order,  ct.uint32_t pidx,
-                                                   ct.uint32_t add_last)
+    #void cec2_jacscmul_opt_h "ec2_jacscmul_opt_h"(ct.uint32_t *z, ct.uint32_t *scl,
+                                                   #ct.uint32_t *x, ct.uint32_t *ectable,
+                                                   #ct.uint32_t n,
+                                                   #ct.uint32_t order,  ct.uint32_t pidx,
+                                                   #ct.uint32_t add_last)
 
     ct.uint32_t cec_isoncurve_h "ec_isoncurve_h" (ct.uint32_t *x, ct.uint32_t is_affine,
                                                   ct.uint32_t pidx)
