@@ -197,6 +197,7 @@ class GrothSetup(object):
 
     def __del__(self):
        release_h()
+       logging.shutdown()
 
     def circuitRead(self):
         # cir Json to u256
