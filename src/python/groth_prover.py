@@ -139,7 +139,10 @@ class GrothProver(object):
         self.pk = getPK()
         self.verify = 2
 
-        self.n_gpu = get_ngpu(max_used_percent=95.)
+        self.n_gpu = min(get_ngpu(max_used_percent=99.),n_gpus)
+        if 'CUDA_VISIBLE_DEVICES' in os.environ and len(os.environ['CUDA_VISIBLE_DEVICES']) > 0:
+           self.n_gpu = min(self.n_gpu,len(os.environ['CUDA_VISIBLE_DEVICES'].split(',')))
+
         if self.n_gpu == 0:
           logging.error('No available GPUs')
           sys.exit(1)
@@ -162,10 +165,6 @@ class GrothProver(object):
         self.sorted_scl_array = None
         self.sorted_scl_array_idx = None
 
-        self.n_gpu = min(get_ngpu(max_used_percent=95.),n_gpus)
-        if self.n_gpu == 0:
-          logging.error('No available GPUs')
-          sys.exit(1)
 
         if n_streams > get_nstreams():
           self.n_streams = get_nstreams()
@@ -564,6 +563,7 @@ class GrothProver(object):
 
     def __del__(self):
        release_h()
+       logging.shutdown()
 
     def read_witness_data(self):
        ## Open and parse witness data

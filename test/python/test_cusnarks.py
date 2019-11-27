@@ -51,12 +51,13 @@ from termcolor import colored
 
 INPUT_CIRCUIT_F = "test_cusnarks_c.bin"
 INPUT_PK_F      = "test_cusnarks_pk.bin"
-INPUT_VK_F      = "test_cusnarks_vk.bin"
+INPUT_VK_F      = "test_cusnarks_vk.json"
 INPUT_W_F       = "test_cusnarks_w.dat"
 OUTPUT_P_F      = "test_cusnarks_p.json"
 OUTPUT_PD_F      = "test_cusnarks_pd.json"
 
 RUST_COMMAND = "../../../target/release/za"
+RUST_INPUT_F ="circuit.circom"
 RUST_GEN_CONSTRAINTS_COMPILE_OPT = "compile"
 RUST_GEN_CONSTRAINTS_CUDA_OPT = "--cuda="
 
@@ -72,12 +73,18 @@ OBJ_OUTPUT_VAL = "binary"
 OBJ_MODE_OPT = "--reverse-bytes=4"
 OBJ_INPUT_F = "test1.binwitness"
 
+PYTHON_TEST_INPUT_F = "test_cusnarks.circom"
 
 if __name__ == "__main__":
     circuits_folder = cfg.get_circuits_folder()
     rust_folder = cfg.get_rust_folder() + "/interop/circuits/cuda"
+
+    cusnarks_folder = cfg.get_cusnarks_folder()+"test/python"
+    python_test_data_f = cusnarks_folder+"/aux_data/" + PYTHON_TEST_INPUT_F 
+
     os.chdir(rust_folder)
 
+    call(["cp", "-f", python_test_data_f, RUST_INPUT_F])
     call(["rm", "-f", INPUT_CIRCUIT_F])
     call(["rm", "-f", INPUT_W_F])
     call(["rm", "-f", OBJ_INPUT_F])
@@ -92,13 +99,19 @@ if __name__ == "__main__":
 
     call(["rm", "-f", "*test_cusnarks*"])
 
-    cusnarks_folder = cfg.get_cusnarks_folder()+"test/python"
     os.chdir(cusnarks_folder)
-    # launch setup
-    GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_CIRCUIT_F, out_pk_f=circuits_folder+INPUT_PK_F, out_vk_f=circuits_folder+INPUT_VK_F, keep_f=circuits_folder)
-    GS.setup()
 
-    GP = GrothProver(circuits_folder+INPUT_PK_F, verification_key_f = circuits_folder+INPUT_VK_F, start_server=0)
+    snarkjs_folder = cfg.get_snarkjs_folder()
+
+    # launch setup
+    GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_CIRCUIT_F, out_pk_f=circuits_folder+INPUT_PK_F,
+                    out_vk_f=circuits_folder+INPUT_VK_F, keep_f=circuits_folder,
+                    snarkjs=snarkjs_folder)
+    GS.setup()
+    del GS
+
+    GP = GrothProver(circuits_folder+INPUT_PK_F, verification_key_f = circuits_folder+INPUT_VK_F, 
+                     start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4)
     result = GP.proof(circuits_folder+INPUT_W_F, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
 
     if result == 1:
