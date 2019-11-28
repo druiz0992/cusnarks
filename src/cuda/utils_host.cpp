@@ -4061,7 +4061,7 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
 void *ec_jacreduce_batch_h(void *args)
 {
   jacadd_reduced_t *wargs = (jacadd_reduced_t *)args;
-  uint32_t n_batches = (wargs->last_idx - wargs->start_idx)/(EC_JACREDUCE_BATCH_SIZE*U256_BSELM);
+  uint32_t n_batches = MAX((wargs->last_idx - wargs->start_idx)/(EC_JACREDUCE_BATCH_SIZE*U256_BSELM),1);
   uint32_t flags[] = {EC_JACREDUCE_FLAGS_INIT | EC_JACREDUCE_FLAGS_REDUCTION, 
                       EC_JACREDUCE_FLAGS_REDUCTION};
 
@@ -4086,19 +4086,6 @@ void *ec_jacreduce_batch_h(void *args)
           MIN(wargs->last_idx - wargs->start_idx - i*EC_JACREDUCE_BATCH_SIZE, (wargs->last_idx - wargs->start_idx)/(U256_BSELM *n_batches)),
           wargs->pidx, 0, 0, 0, flags[i>0]);
   }
-
-  util_wait_h(wargs->thread_id, NULL, NULL);
-  
-  pthread_mutex_lock(&utils_lock);
-  if (wargs->thread_id == 0){
-  for(uint32_t i=0; i<4;i++){
-    printf("R[%d]\n",i);
-    printU256Number(&utils_EPout[i*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
-    printU256Number(&utils_EPout[i*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
-    printU256Number(&utils_EPout[i*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
-  } 
-  }
-  pthread_mutex_unlock(&utils_lock);
 
   util_wait_h(wargs->thread_id, ec_jacaddreduce_finish_h, wargs);
 

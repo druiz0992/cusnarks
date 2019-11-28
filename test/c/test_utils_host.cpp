@@ -8689,9 +8689,6 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
                        nec_points * outdims, nec_points * outdims);
      readU256DataFile_h(r_aff, input_test_scmul_reduction_soln_filename,
                        indims, indims);
-     printf("In\n");
-     printU256Number(r_aff);
-     printU256Number(&r_aff[NWORDS_256BIT]);
    }
 
    scl = samples;
@@ -8708,9 +8705,6 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
      args->n = nec_points;
      args->pidx = 0;
      ec_jacreduce_server_h(args);
-     printf("Out\n");
-     printU256Number(out_ecp1);
-     printU256Number(&out_ecp1[NWORDS_256BIT]);
    }
    if (memcmp(r_aff, out_ecp1,
               indims*NWORDS_256BIT*sizeof(uint32_t)) ){
