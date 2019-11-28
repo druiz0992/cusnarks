@@ -896,46 +896,11 @@ def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
-"""
-def ec_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
-                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
-
-     cdef ct.uint32_t n, out_n
-     if add_last:
-        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_INDIMS) )
-     else:
-        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP_JAC_OUTDIMS) )
-     
-     out_n = <int> ((n + U256_BSELM -1)/U256_BSELM)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(out_n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
-
-     uh.cec_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], <ct.uint32_t *> 0,n, <ct.uint32_t> U256_BSELM, pidx, add_last)
-
-     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
-
-def ec2_jacscmul_opt_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
-                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
-
-     cdef ct.uint32_t n, out_n
-     if add_last:
-        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_INDIMS) )
-     else:
-        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_OUTDIMS) )
-     
-     out_n = <int> ((n + U256_BSELM -1)/U256_BSELM)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(out_n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
-
-     uh.cec2_jacscmul_opt_h(&out_ecz[0], &in_scl[0], &in_eca[0], <ct.uint32_t *>0, n, <ct.uint32_t> U256_BSELM, pidx, add_last)
-
-     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
-""" 
-
 def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_affine, ct.uint32_t ec2, ct.uint32_t pidx):
      if ec2:
        return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
      else:
        return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
-
 
 def ec_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
@@ -990,10 +955,19 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndi
       outdims = ECP_JAC_INDIMS
 
   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
-
   cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
 
-  uh.cec_jacreduce_h(&outv[0], &inscl[0], &inv[0], n, pidx, to_aff, add_in, strip_last)
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.x = &inv[0]
+  args_c.n = n
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
 
   return np.reshape(outv,(-1, NWORDS_256BIT))
 

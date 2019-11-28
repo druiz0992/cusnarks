@@ -184,8 +184,6 @@ cdef extern from "types.h":
     uint32_t *out_ep
     uint32_t *scl
     uint32_t *x
-    uint32_t *scmul
-    uint32_t *ectable
     uint32_t n
     uint32_t pidx
     uint32_t max_threads

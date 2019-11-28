@@ -169,6 +169,7 @@ static void transpose_AB_h(void *args);
 static void transpose_A_h(void *args);
 void *interpol_and_mul_h(void *args);
 void *ec_jacreduce_batch_h(void *args);
+void ec_jacaddreduce_finish_h(void *args);
 
 //////
 
@@ -3056,7 +3057,7 @@ void ec2_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
 }
 
 
-uint32_t * ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
+void ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
 {
    uint32_t n_tables = (table_order + n - 1)/table_order;
    uint32_t i;
@@ -3064,13 +3065,9 @@ uint32_t * ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t tab
    const uint32_t *ECInf = CusnarksMiscKGet();
    const uint32_t *One = CusnarksOneMontGet(pidx);
    uint32_t ndims = ECP_JAC_OUTDIMS;
+
    if (add_last){
       ndims = ECP_JAC_INDIMS;
-   }
-
-   uint32_t *ec_table = ectable;
-   if (ectable == NULL){
-     ec_table = (uint32_t *) malloc(n_tables * table_size * NWORDS_256BIT * ECP_JAC_OUTDIMS * sizeof(uint32_t));
    }
 
    #ifndef TEST_MODE
@@ -3078,7 +3075,7 @@ uint32_t * ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t tab
    #endif
    for (i=0; i< n_tables; i++){
       // init element 0 of table
-      memcpy(&ec_table[(i*table_size)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+      memcpy(&ectable[(i*table_size)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
             &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
             sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
       uint32_t k=0, last_pow2, n_els = 0;
@@ -3087,33 +3084,31 @@ uint32_t * ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t tab
          if  ((j & (j-1)) == 0){
              last_pow2 = j;
              if (n_els < n){
-                memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                memcpy(&ectable[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                    &x[(i*table_order+k)*NWORDS_256BIT*ndims],
                    sizeof(uint32_t) * ndims * NWORDS_256BIT);
 
                 if (add_last){
-                   memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS+ECP_JAC_INDIMS*NWORDS_256BIT],
+                   memcpy(&ectable[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS+ECP_JAC_INDIMS*NWORDS_256BIT],
                       One,
                       sizeof(uint32_t) * NWORDS_256BIT);
                 }
              } else {
-                 memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                 memcpy(&ectable[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                         &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
                         sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
              }
              k++;
              n_els++;
          } else {
-             ec_jacadd_h( &ec_table[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                          &ec_table[(i*table_size+last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
-                          &ec_table[(i*table_size+j-last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+             ec_jacadd_h( &ectable[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                          &ectable[(i*table_size+last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
+                          &ectable[(i*table_size+j-last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                           pidx);
                            
          }      
       } 
    } 
-
-   return ec_table;
 }
 
 uint32_t * ec2_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
@@ -3179,26 +3174,23 @@ uint32_t * ec2_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t ta
 }
 
 
-void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t start_idx, uint32_t batch_size, uint32_t order, uint32_t pidx, uint32_t add_last=0)
+void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t order, uint32_t pidx, uint32_t add_last=0)
 {
   const uint32_t *ECInf = CusnarksMiscKGet();
   uint32_t i;
-  int debug_tid = 35;
-  uint32_t ndims = ECP_JAC_OUTDIMS;
-  if (add_last){
-      ndims = ECP_JAC_INDIMS;
-  }
+  int debug_tid = 0;
+
   uint32_t n_tables = (order + n - 1)/order;
   uint32_t table_size = 1 << order; 
 
-  uint32_t * ec_table = ec_inittable(x, ectable, n, order, pidx, add_last);
+  ec_inittable(x, ectable, n, order, pidx, add_last);
 
   /*
   for(i=debug_tid * table_size; i< (debug_tid+1)*table_size; i++){
         printf("T[%d] :\n",i-debug_tid*table_size);
-        printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
-        printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
-        printU256Number(&ec_table[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
+        printU256Number(&ectable[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
+        printU256Number(&ectable[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
+        printU256Number(&ectable[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
   }
   for(i=debug_tid * order ; i< (debug_tid+1)*order; i++){
      printf("SCL :");
@@ -3240,13 +3232,12 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
      for (int j=msb; j>=0 ; j--){
         uint32_t b = getbitu256g_h(&scl[i*order * NWORDS_256BIT], j, order);
 
-
         ec_jacdouble_h(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        &z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        pidx);
         if (b) {
            ec_jacadd_h(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
-                       &ec_table[(i * table_size + b) * NWORDS_256BIT *ECP_JAC_OUTDIMS],
+                       &ectable[(i * table_size + b) * NWORDS_256BIT *ECP_JAC_OUTDIMS],
                        &z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS],
                        pidx);
         }
@@ -3262,12 +3253,7 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
           printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
         }
         */
-
      }
-  }
-
-  if (ectable == NULL){
-    free(ec_table);
   }
 }
 
@@ -3341,18 +3327,20 @@ void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectab
                        &z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS],
                        pidx);
         }
+        
         /*
-        if (i==debug_tid){ 
+         if (i==debug_tid){ 
           printf("offset : %d, b : %d\n",j, b);
-          printf("Q :\n");
-          printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
-          printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+NWORDS_256BIT]);
-          printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
-          printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+3*NWORDS_256BIT]);
-          printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+4*NWORDS_256BIT]);
-          printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+5*NWORDS_256BIT]);
+          printf("Q2[%d] :\n",i);
+          printU256Number(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS]);
+          printU256Number(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS+NWORDS_256BIT]);
+          printU256Number(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS+2*NWORDS_256BIT]);
+          printU256Number(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS+3*NWORDS_256BIT]);
+          printU256Number(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS+4*NWORDS_256BIT]);
+          printU256Number(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS+5*NWORDS_256BIT]);
         }
         */
+       
 
      }
   }
@@ -3710,6 +3698,66 @@ void ec2_isinf(uint32_t *z, const uint32_t *x, const uint32_t n, const uint32_t 
     z[j] = ec2_isinf(&x[ECP2_JAC_INDIMS],pidx);
   } 
 }
+
+void ec_jacaddreduce_finish_h(void *args)
+{
+  jacadd_reduced_t *wargs = (jacadd_reduced_t *)args;
+  ec_jacaddreduce_h(
+          wargs->out_ep,
+          &utils_EPout[wargs->thread_id*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
+          wargs->max_threads,
+          wargs->pidx, 1, 0, 1, EC_JACREDUCE_FLAGS_REDUCTION | EC_JACREDUCE_FLAGS_FINISH);
+
+}
+
+void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last, uint32_t flags)
+{
+  uint32_t i;
+  uint32_t outdims = ECP_JAC_OUTDIMS, indims = ECP_JAC_OUTDIMS;
+  const uint32_t *One;
+  uint32_t start_idx=1;
+
+  One = CusnarksOneMontGet((mod_t)pidx);
+
+  if (strip_last){
+    outdims = ECP_JAC_INDIMS;
+  }
+  if (add_in){
+    indims = ECP_JAC_INDIMS;
+  }
+  
+  if ((flags & EC_JACREDUCE_FLAGS_REDUCTION) && !(flags & EC_JACREDUCE_FLAGS_FINISH)){
+    start_idx = 0;
+  } 
+  if ( (n > 1) && (flags & EC_JACREDUCE_FLAGS_INIT) ){
+    start_idx = 2;
+    ec_jacadd_h(z, x, &x[ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT], pidx);
+
+  } 
+
+  if ((n > 1) && (flags & EC_JACREDUCE_FLAGS_REDUCTION))  {
+
+      for (uint32_t j=start_idx; j<n; j++){
+        if (flags & EC_JACREDUCE_FLAGS_FINISH){
+           ec_jacadd_h(utils_EPout,
+                       utils_EPout,
+                       &x[(j*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],pidx);
+        } else {
+          ec_jacadd_h(z, z, &x[(j*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],pidx);
+        }
+      }
+   }
+
+   if (flags & EC_JACREDUCE_FLAGS_FINISH){
+     if (to_aff){
+       ec_jac2aff_h(z,utils_EPout,1,pidx, strip_last);
+     } else {
+       memmove(z,utils_EPout,outdims*NWORDS_256BIT*sizeof(uint32_t));
+     }
+   }
+
+}
+
 void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last)
 {
   uint32_t i;
@@ -3725,7 +3773,7 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
   } else {
     n_threads = 1;
   }
-
+  
   omp_set_num_threads(n_threads);
   One = CusnarksOneMontGet((mod_t)pidx);
 
@@ -3741,28 +3789,26 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
       #pragma omp parallel for if(parallelism_enabled)
     #endif
     for (i =0; i < n_threads; i++){
-       if (x != utils_EPin){
-         memcpy(&utils_EPin[(i*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) +  (ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT)],
+       memcpy(&utils_EPin[(i*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) +  (ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT)],
               One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
-         memcpy(&utils_EPin[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
+       memcpy(&utils_EPin[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
               &x[i*vars_per_thread * indims << NWORDS_256BIT_SHIFT],
               indims*sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
 
-         memcpy(&utils_EPin[((i+1)*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) + (ECP_JAC_INDIMS << NWORDS_256BIT_SHIFT)],
+       memcpy(&utils_EPout[(i*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) + (ECP_JAC_INDIMS << NWORDS_256BIT_SHIFT)],
               One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
-         memcpy(&utils_EPin[(i+1)*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
+       memcpy(&utils_EPout[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
               &x[(i*vars_per_thread * indims << NWORDS_256BIT_SHIFT) + (indims<<NWORDS_256BIT_SHIFT)],
               indims*sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
-       }
-    
+
        ec_jacadd_h(&utils_EPout[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
                    &utils_EPin[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
-                   &utils_EPin[(i+1)*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT], pidx);
+                   &utils_EPout[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT], pidx);
     }
 
   } else {
-    memcpy(&utils_EPout[2<<NWORDS_256BIT_SHIFT], One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
     memcpy(utils_EPout,x,ECP_JAC_INDIMS*sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
+    memcpy(&utils_EPout[ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT], One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
   }
 
   if (n > 1) {
@@ -3772,49 +3818,48 @@ void ec_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint
     #endif
     for(i=0; i<n_threads;i++){
       uint32_t tid = omp_get_thread_num();
-      for (uint32_t j=2; j<vars_per_thread; j++){
-        if (x != utils_EPin){
-          memcpy(&utils_EPin[(tid*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) +  (ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT)],
-                  One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
-          memcpy(&utils_EPin[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
-                   &x[(tid*vars_per_thread*indims<<NWORDS_256BIT_SHIFT) + (j*indims<<NWORDS_256BIT_SHIFT)],
-                   indims*sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
+      for (uint32_t j=2; j<vars_last_thread; j++){
+        if (j == vars_last_thread && tid < n_threads-1){
+          break;
         }
-
-        ec_jacadd_h(&utils_EPout[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
-                    &utils_EPout[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
-                    &utils_EPin[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],pidx);
-      }
-      for(uint32_t j = vars_per_thread; j < vars_last_thread && tid < n_threads - 1; j++)
-      {
-        if (x != utils_EPin){
-          memcpy(&utils_EPin[(tid*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) +  (ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT)],
-                 One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
-          memcpy(&utils_EPin[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
+        memcpy(&utils_EPin[(tid*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT) +  (ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT)],
+                One, sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
+        memcpy(&utils_EPin[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
                  &x[(tid*vars_per_thread*indims<<NWORDS_256BIT_SHIFT) + (j*indims<<NWORDS_256BIT_SHIFT)],
                  indims*sizeof(uint32_t)<<NWORDS_256BIT_SHIFT);
-        }
 
         ec_jacadd_h(&utils_EPout[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
                     &utils_EPout[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],
                     &utils_EPin[(tid*ECP_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],pidx);
       }
     }
+    /*
+    for(i=0; i<4;i++){
+       printf("X2[%d]\n",i);
+       printU256Number(&utils_EPout[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT]);
+       printU256Number(&utils_EPout[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+       printU256Number(&utils_EPout[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT+4*NWORDS_256BIT]);
+    }
+    */
 
     for (i =1; i < n_threads; i++){
        ec_jacadd_h(utils_EPout,
                    utils_EPout,
                    &utils_EPout[i*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT], pidx);
     }
-   }
+  }
 
+   /*
+       printf("XF2\n");
+       printU256Number(&utils_EPout[0]);
+       printU256Number(&utils_EPout[2*NWORDS_256BIT]);
+       printU256Number(&utils_EPout[4*NWORDS_256BIT]);
+   */
    if (to_aff){
      ec_jac2aff_h(z,utils_EPout,1,pidx, strip_last);
    } else {
      memcpy(z,utils_EPout,outdims*NWORDS_256BIT*sizeof(uint32_t));
    }
-
-  omp_set_num_threads(utils_nprocs);
 }
 
 void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last)
@@ -3899,6 +3944,14 @@ void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uin
                     &utils_EPin[(tid*ECP2_JAC_OUTDIMS)<<NWORDS_256BIT_SHIFT],pidx);
       }
     }
+    /*
+    for(i=0; i<4;i++){
+       printf("X2[%d]\n",i);
+       printU256Number(&utils_EPout[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT]);
+       printU256Number(&utils_EPout[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+       printU256Number(&utils_EPout[i*ECP2_JAC_OUTDIMS*NWORDS_256BIT+4*NWORDS_256BIT]);
+    }
+    */
 
     for (i =1; i < n_threads; i++){
        ec2_jacadd_h(utils_EPout,
@@ -3907,23 +3960,17 @@ void ec2_jacaddreduce_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uin
     }
   }
 
+   /*
+       printf("XF2\n");
+       printU256Number(&utils_EPout[0]);
+       printU256Number(&utils_EPout[2*NWORDS_256BIT]);
+       printU256Number(&utils_EPout[4*NWORDS_256BIT]);
+   */
    if (to_aff){
      ec2_jac2aff_h(z,utils_EPout,1,pidx, strip_last);
    } else {
      memcpy(z,utils_EPout,outdims*NWORDS_256BIT*sizeof(uint32_t));
    }
-
-}
-
-uint32_t ec_jacreduce_init_h(uint32_t **ectable, uint32_t **scmul, uint32_t n, uint32_t order)
-{
-  uint32_t ntables =  (order + n - 1) / order;
-
-  //initialize tables and scmul values
-  *ectable = (uint32_t *)malloc((1<<order) * ntables * ECP_JAC_OUTDIMS * NWORDS_256BIT * sizeof(uint32_t));
-  *scmul = (uint32_t *)malloc(ntables * ECP_JAC_OUTDIMS * NWORDS_256BIT * sizeof(uint32_t));
-
-  return ntables;
 }
 
 uint32_t ec2_jacreduce_init_h(uint32_t **ectable, uint32_t **scmul, uint32_t n, uint32_t order)
@@ -3943,39 +3990,10 @@ void ec_jacreduce_del_h(uint32_t *ectable, uint32_t *scmul)
   free(scmul);
 }
 
-void ec_jacreduce_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last)
-{
-  uint32_t ntables, i, batch_size;
-  uint32_t indims = ECP_JAC_OUTDIMS;
-  uint32_t n_threads = MIN(n, get_nprocs_conf());
-
-  if (add_in){
-    indims = ECP_JAC_INDIMS;
-  }
-
-  printf("n_threads : %d\n", n_threads);
-  printf("indims : %d\n",indims);
-  printf("n : %d\n",n);
-
-  for (i=0; i < n; i += n_threads*EC_JACREDUCE_BATCH_SIZE){
-    //ntables = ec_jacreduce_init_h(&ectable, &scmul, n, U256_BSELM);
-    batch_size = MIN(EC_JACREDUCE_BATCH_SIZE, n/n_threads - i*EC_JACREDUCE_BATCH_SIZE);
-    ntables = (U256_BSELM + batch_size - 1) / U256_BSELM;
-    printf("[%d] - batch_size : %d, n_tables : %d\n",i, batch_size, ntables);
-    ec_jacscmul_opt_h(utils_EPin, scl, x, utils_ectable, n, i, batch_size, U256_BSELM, pidx, add_in);
-    ec_jacaddreduce_h(z, utils_EPin, ntables, pidx, to_aff, 0, strip_last);
-
-    //ec_jacreduce_del_h(ectable, scmul);
-  }
-}
-
 void ec_jacreduce_server_h(jacadd_reduced_t *args)
 {
-  uint32_t *ectable, *scmul;
-  uint32_t ntables;
   uint32_t start_idx, last_idx;
   uint32_t vars_per_thread = args->n;
-  uint32_t batch_size = args->n;
   args->max_threads = get_nprocs_conf();
 
   // set number of threads and vars per thread depending on nvars
@@ -3985,11 +4003,11 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
     args->max_threads = 1;
   }
 
-  if ((!args->max_threads) || (!utils_mproc_init)) {
-    return ec_jacreduce_h(args->out_ep, args->scl, args->x, args->n, args->pidx, 1, 1, 1);
+  if (!utils_mproc_init) {
+    exit(1);
   }
   #ifndef PARALLEL_EN
-    return ec_jacreduce_h(args->out_ep, args->scl, args->x, args->n, args->pidx, 1, 1, 1);
+    exit(1);
   #endif
 
   pthread_t *workers = (pthread_t *) malloc(args->max_threads * sizeof(pthread_t));
@@ -3997,13 +4015,14 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   if (pthread_barrier_init(&utils_barrier, NULL, args->max_threads) != 0){
      exit(1);
   }
-
+  
   /*
   printf("N threads : %d\n", args->max_threads);
-  printf("N vars    : %d\n", nvars);
+  printf("N vars    : %d\n", args->n);
   printf("Vars per thread : %d\n", vars_per_thread);
   printf("pidx : %d\n", args->pidx);
   */
+ 
   
   for(uint32_t i=0; i< args->max_threads; i++){
      start_idx = i * vars_per_thread;
@@ -4026,14 +4045,13 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   }
 
   parallelism_enabled = 0;
-  ntables = ec_jacreduce_init_h(&ectable, &scmul, MIN(batch_size,args->n), U256_BSELM);
 
   launch_client_h(ec_jacreduce_batch_h, workers,(void *) w_args, sizeof(jacadd_reduced_t), args->max_threads);
 
   pthread_barrier_destroy(&utils_barrier);
   free(workers);
   free(w_args);
-  ec_jacreduce_del_h(ectable, scmul);
+
   parallelism_enabled = 1;
 
   return; 
@@ -4043,17 +4061,33 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
 void *ec_jacreduce_batch_h(void *args)
 {
   jacadd_reduced_t *wargs = (jacadd_reduced_t *)args;
-  uint32_t batch_size;
+  uint32_t n_batches = (wargs->last_idx - wargs->start_idx)/(EC_JACREDUCE_BATCH_SIZE*U256_BSELM);
+  uint32_t flags[] = {EC_JACREDUCE_FLAGS_INIT | EC_JACREDUCE_FLAGS_REDUCTION, 
+                      EC_JACREDUCE_FLAGS_REDUCTION};
 
-  for (uint32_t i; i <10; i++){
-    ec_jacscmul_opt_h(wargs->scmul,
-                      &wargs->scl[batch_size*i<<NWORDS_256BIT_SHIFT],
-                      &wargs->x[batch_size*i*ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT],
-                      wargs->ectable, batch_size, i, batch_size,U256_BSELM, wargs->pidx, 1);
+  /*
+  pthread_mutex_lock(&utils_lock);
+  printf("[%d] - N batches : %d\n",wargs->thread_id, n_batches);
+  pthread_mutex_unlock(&utils_lock);
+  */
+
+  for (uint32_t i=0; i < n_batches; i++){
+    ec_jacscmul_opt_h(
+           &utils_EPin[wargs->thread_id*EC_JACREDUCE_BATCH_SIZE*ECP_JAC_OUTDIMS<<NWORDS_256BIT_SHIFT],
+           &wargs->scl[(wargs->start_idx + EC_JACREDUCE_BATCH_SIZE*U256_BSELM*i)<<NWORDS_256BIT_SHIFT],
+           &wargs->x[(wargs->start_idx + EC_JACREDUCE_BATCH_SIZE*U256_BSELM*i)*ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT],
+           &utils_ectable[wargs->thread_id * EC_JACREDUCE_BATCH_SIZE*ECP_JAC_OUTDIMS<<(NWORDS_256BIT_SHIFT+U256_BSELM)], 
+           MIN(wargs->last_idx - wargs->start_idx - i*EC_JACREDUCE_BATCH_SIZE, (wargs->last_idx - wargs->start_idx)/n_batches),
+           U256_BSELM, wargs->pidx, 1);
   
-    //ec_jacaddreduce_h(z, scmul, ntables, pidx, to_aff, 0, strip_last);
-    util_wait_h(wargs->thread_id, NULL, NULL);
+    ec_jacaddreduce_h(
+          &utils_EPout[wargs->thread_id*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
+          &utils_EPin[wargs->thread_id*EC_JACREDUCE_BATCH_SIZE*ECP_JAC_OUTDIMS << NWORDS_256BIT_SHIFT],
+          MIN(wargs->last_idx - wargs->start_idx - i*EC_JACREDUCE_BATCH_SIZE, (wargs->last_idx - wargs->start_idx)/(U256_BSELM *n_batches)),
+          wargs->pidx, 0, 0, 0, flags[i>0]);
   }
+
+  util_wait_h(wargs->thread_id, ec_jacaddreduce_finish_h, wargs);
 
   return NULL;
 }
