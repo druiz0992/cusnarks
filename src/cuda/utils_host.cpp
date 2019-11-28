@@ -4087,6 +4087,19 @@ void *ec_jacreduce_batch_h(void *args)
           wargs->pidx, 0, 0, 0, flags[i>0]);
   }
 
+  util_wait_h(wargs->thread_id, NULL, NULL);
+  
+  pthread_mutex_lock(&utils_lock);
+  if (wargs->thread_id == 0){
+  for(uint32_t i=0; i<4;i++){
+    printf("R[%d]\n",i);
+    printU256Number(&utils_EPout[i*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
+    printU256Number(&utils_EPout[i*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
+    printU256Number(&utils_EPout[i*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+  } 
+  }
+  pthread_mutex_unlock(&utils_lock);
+
   util_wait_h(wargs->thread_id, ec_jacaddreduce_finish_h, wargs);
 
   return NULL;
