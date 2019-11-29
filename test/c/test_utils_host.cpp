@@ -8814,7 +8814,7 @@ uint32_t test_transpose_square(void)
 int main()
 {
   uint32_t retval;
-  /*
+
   retval+=test_mul();  // test montgomery mul with predefined results
   //test_mul3(); // test SOS impl of montgomery mul
   //test_mul4(); // test SOS impl of montgomery squaring
@@ -8854,7 +8854,6 @@ int main()
   retval+=test_mul_ext();
   retval+=test_inv_ext1();
   retval+=test_inv_ext2();
-  */
  
   retval+=test_ec_jacscmul(0);    // EC1
   retval+=test_ec_jacscmul(1);    // EC2
