@@ -2,14 +2,14 @@
 BEFORE RUNNING THE TEST:
 
 1. Make sure cusnakrs is running:
-export LD_LIBRARY_PATH=/home/tester/production/cusnarks/lib:$LD_LIBRARY_PATH
-cd /home/tester/production/cusnarks/src/python
+export LD_LIBRARY_PATH=/mnt/disk2/tester/cusnarks/lib:$LD_LIBRARY_PATH
+cd /mnt/disk2/tester/cusnarks/src/python
 python3 pysnarks.py -alive IS_ALIVE
 
 2. If the output of the command is not {success: 1} you must start cusnark. Open a new terminal and run:
-export LD_LIBRARY_PATH=/home/tester/production/cusnarks/lib:$LD_LIBRARY_PATH
-cd /home/tester/production/cusnarks/src/python
-CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -pk /home/tester/production/cusnarks/circuits/r1cs4M_pk.bin -vk /home/tester/production/cusnarks/circuits/r1cs4M_vk.json
+export LD_LIBRARY_PATH=/mnt/disk2/tester/cusnarks/lib:$LD_LIBRARY_PATH
+cd /mnt/disk2/tester/cusnarks/src/python
+CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -pk /mnt/disk2/tester/cusnarks/circuits/rollup_1x8_pk.bin -vk /mnt/disk2/tester/cusnarks/circuits/rollup_1x8_vk.json
 
 3. Wait until you see "...server is ready", it will take a bit more than a minute. Then repeat step 1 to check that the terminal session where the test will be run can access cusnark.
 */
@@ -45,6 +45,29 @@ describe("cusnarks API test. ",function(){
 
     it("should be pending status. If not cusnarks probably is not initialized", (done) => checkStatus("Pending", done));
 
+    it("Should cancel the proof generation", async () => {
+        const res = await cancelProof();
+        res.status.should.equal(200);
+        while (await getStatus() === "Pending") {
+            console.error("...Waiting for server to cancel the proof generation");
+            child_process.execSync("sleep 2");
+        }
+        (await getStatus()).should.equal("Idle");
+    });
+
+    it("should receive a second proof generation request", (done) => {
+        host
+        .post("/input")
+        .send(input)
+        .expect("Content-type",/json/)
+        .expect(200) // THis is HTTP response
+        .end((err,res) => {
+            // HTTP status should be 200
+            res.status.should.equal(200);
+            done();
+        });
+    });
+
     it("Wait until proof generation finishes, it should be succesfull! (it will take a while)", async () => {
         while (await getStatus() === "Pending") {
             console.error("...Waiting for server to finish proof generation");
@@ -66,7 +89,18 @@ async function getStatus() {
         .get("/status")
         .end((err,res) => {
             if(err !== null) reject("_error_geting_status");
-            resolve(res.body.status)
+            resolve(res.body.status);
+        });
+    }); 
+}
+
+async function cancelProof() {
+    return new Promise ((resolve, reject) => {
+        host
+        .post("/cancel")
+        .end((err, res) => {
+            if(err !== null) reject("_error_geting_status");
+            resolve(res);
         });
     }); 
 }

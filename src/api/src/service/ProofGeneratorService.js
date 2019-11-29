@@ -6,7 +6,6 @@ const { writeWitnessBin }   = require("./witnessBin");
 const cu                    = require("./cusnarkCLI");
 
 const config = JSON.parse(fs.readFileSync(`${__dirname}/../../config.json`, "utf8"));
-// UNCOMMENT FOR REALNESS
 const circuitDef  = JSON.parse(fs.readFileSync(config.circuitFile, "utf8"));
 const circuit     = new zkSnark.Circuit(circuitDef);
 
@@ -45,15 +44,17 @@ exports.getStatus = function() {
  * no response value expected for this operation
  **/
 exports.postCancel = function() {
-  return new Promise(function(resolve, reject) {
-    var examples = {};
-    examples['application/json'] = true;
+  return new Promise(async function(resolve, reject) {
+    await cu.cancelProof();
+    resolve();
+    // var examples = {};
+    // examples['application/json'] = true;
     // TODO: RETURNING A MOCKUP, NOT IMPLEMENTED YET
-    reject({
-      notImplemented: true,
-      message: "This feature is not fully implemented yet. You can use the mockup data provided in this response but keep in mind that the values are reandomly generated.",
-      mockup: examples[Object.keys(examples)[0]]
-    })
+    // reject({
+    //   notImplemented: true,
+    //   message: "This feature is not fully implemented yet. You can use the mockup data provided in this response but keep in mind that the values are reandomly generated.",
+    //   mockup: examples[Object.keys(examples)[0]]
+    // })
     // return resolve(answer);
   });
 }
@@ -100,7 +101,7 @@ function genProof() {
     .then((cmdRes) => {
       let response = 0;
       try {
-        response = JSON.parse(cmdRes.stdout).status;
+        response = JSON.parse(cmdRes).status;
       } finally {
         if (response === 1) {
           // PROOF GENERATED SUCCESSFULY
@@ -110,7 +111,11 @@ function genProof() {
           };
           currentState = state.FINISHED;
           console.log("PROOF GENERATED!");
-          return
+          return;
+        } else if (response === 2){
+          // CANCEL GENERATING PROOF
+          console.error("CANCEL PROOF GENERATION");
+          currentState = state.IDLE;
         } else {
           // ERROR GENERATING PROOF
           console.error("ERROR GENERATING PROOF; UNEXPECTED RESPONSE: ", cmdRes);

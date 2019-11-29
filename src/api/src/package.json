@@ -21,6 +21,7 @@
     "connect": "^3.2.0",
     "js-yaml": "^3.3.0",
     "oas3-tools": "^1.0.1",
+    "ps-tree": "^1.2.0",
     "snarkjs": "^0.1.20"
   },
   "devDependencies": {
