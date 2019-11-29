@@ -115,12 +115,12 @@ if __name__ == "__main__":
       # launch setup
       GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_CIRCUIT_F, out_pk_f=circuits_folder+INPUT_PK_F,
                       out_vk_f=circuits_folder+INPUT_VK_F, keep_f=circuits_folder,
-                      snarkjs=snarkjs_folder)
+                      snarkjs=snarkjs_folder, seed=123)
       GS.setup()
       del GS
   
       GP = GrothProver(circuits_folder+INPUT_PK_F, verification_key_f = circuits_folder+INPUT_VK_F, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
       result = GP.proof(circuits_folder+INPUT_W_F, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
 
     if result == 1:

@@ -4023,7 +4023,14 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   printf("pidx : %d\n", args->pidx);
   */
  
-  
+  /*
+  for(uint32_t i=0; i<args->n; i++){
+    printf("%d\n",i);
+    printU256Number(&args->scl[i*NWORDS_256BIT]);
+    printU256Number(&args->x[i*NWORDS_256BIT*ECP_JAC_INDIMS]);
+    printU256Number(&args->x[i*NWORDS_256BIT*ECP_JAC_INDIMS+NWORDS_256BIT]);
+  }
+  */
   for(uint32_t i=0; i< args->max_threads; i++){
      start_idx = i * vars_per_thread;
      last_idx = (i+1) * vars_per_thread;
@@ -4035,13 +4042,13 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
      w_args[i].start_idx = start_idx;
      w_args[i].last_idx = last_idx;
      w_args[i].thread_id = i;
-     
-     /*
+    
+     /* 
      printf("Thread : %d, start_idx : %d, end_idx : %d\n",
              w_args[i].thread_id, 
              w_args[i].start_idx,
              w_args[i].last_idx);   
-     */
+    */
   }
 
   parallelism_enabled = 0;

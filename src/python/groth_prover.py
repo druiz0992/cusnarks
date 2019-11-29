@@ -179,6 +179,7 @@ class GrothProver(object):
 
         self.sort_en = 0
         self.compute_ntt_gpu = False
+        self.compute_last_mexp_gpu = False
 
         logging.info('#################################### ')
         logging.info('Initializing Groth prover with the following parameters :')
@@ -196,6 +197,7 @@ class GrothProver(object):
         logging.info(' - n available CPUs : %s', get_nprocs_h())
         logging.info(' - sort enable : %s', self.sort_en)
         logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
+        logging.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
         logging.info('#################################### ')
   
         # convert data to array of bytes so that it can be easily transfered to shared mem
@@ -282,6 +284,11 @@ class GrothProver(object):
         self.pi_c_eccf1_sh = RawArray(c_uint32, ECP_JAC_INDIMS * NWORDS_256BIT)
         self.pi_c_eccf1 = \
                  np.frombuffer( self.pi_c_eccf1_sh,
+                                dtype=np.uint32).reshape(ECP_JAC_INDIMS, NWORDS_256BIT)  
+
+        self.pi_c2_eccf1_sh = RawArray(c_uint32, ECP_JAC_INDIMS * NWORDS_256BIT)
+        self.pi_c2_eccf1 = \
+                 np.frombuffer( self.pi_c2_eccf1_sh,
                                 dtype=np.uint32).reshape(ECP_JAC_INDIMS, NWORDS_256BIT)  
 
         self.pi_b1_eccf1_sh = RawArray(c_uint32, ECP_JAC_INDIMS * NWORDS_256BIT)
@@ -417,7 +424,7 @@ class GrothProver(object):
                                          ec_lable = self.ec_lable)
 
 
-    def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape):
+    def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape, pi_c2_eccf1_sh):
         logging.info(' Launching Poly Process Client')
         logging.info(' Evaluating QAP')
         pk = self.pk
@@ -425,11 +432,12 @@ class GrothProver(object):
         w = np.frombuffer(w_sh, dtype=np.uint32).reshape(w_shape)
         pA_T = np.frombuffer(pA_T_sh, dtype=np.uint32).reshape(pA_T_shape)
         pB_T = np.frombuffer(pB_T_sh, dtype=np.uint32).reshape(pB_T_shape)
+        pi_c2_eccf1 = np.frombuffer(pi_c2_eccf1_sh, dtype=np.uint32).reshape(-1,NWORDS_256BIT)
         #print("ProcessServer : "+str(pk.shape[0]))
         start = time.time()
 
         #ZField.set_field(MOD_FIELD)
-        pk_bin = pkbin_get(pk,['nVars', 'domainSize', 'polsA', 'polsB'])
+        pk_bin = pkbin_get(pk,['nVars', 'domainSize', 'polsA', 'polsB','hExps'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
@@ -449,17 +457,33 @@ class GrothProver(object):
           polH = ntt_interpolandmul_h(np.reshape(self.pA_T,-1),
                                      np.reshape(self.pB_T,-1),
                                      np.reshape(self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,-1), 2, MOD_FIELD)
-          logging.info(' Process server - Waiting for Mexp to be completed...')
 
         end1 = time.time()
-       
-        #write polH once MEXP is done (not before)
-        conn.recv()
-        if self.compute_ntt_gpu is False:
-          np.copyto(w[:m-1], polH[m:-1])
-          logging.info(' Process server - Copying polH...')
 
-        conn.send([end-start, end1-start1 ])
+        start2 = time.time()
+
+        if self.compute_last_mexp_gpu is False:
+          logging.info(' Process server - Starting Last Mexp...')
+          # vector needs to be power of two, so i add one last element
+          polH[-1] = np.asarray([0,0,0,0,0,0,0,0],dtype=np.uint32)
+          np.copyto(pi_c2_eccf1,
+                    ec_jacreduce_h(
+                         np.reshape(polH[m:],-1),
+                         pk_bin[4][:m*NWORDS_256BIT*ECP_JAC_INDIMS],
+                         MOD_GROUP, 1, 1, 1)
+                    )
+          logging.info(' Process server - Completed Last Mexp...')
+        else:
+          logging.info(' Process server - Waiting for Mexp to be completed...')
+
+          #write polH once MEXP is done (not before)
+          conn.recv()
+          if self.compute_ntt_gpu is False:
+            np.copyto(w[:m-1], polH[m:-1])
+            logging.info(' Process server - Copying polH...')
+  
+        end2 = time.time()
+        conn.send([end-start, end1-start1, end2-start2])
         logging.info(' Process server - Completed')
         conn.close()
 
@@ -517,7 +541,8 @@ class GrothProver(object):
                                       nVars,
                                       self.scl_array_sh, self.scl_array.shape,
                                       self.pA_T_sh,self.pA_T.shape,
-                                      self.pB_T_sh, self.pB_T.shape))
+                                      self.pB_T_sh, self.pB_T.shape,
+                                      self.pi_c2_eccf1))
 
     def initECVal(self):
         np.copyto( 
@@ -540,6 +565,14 @@ class GrothProver(object):
 
         np.copyto(
                   self.pi_c_eccf1,
+                      np.reshape(
+                           np.concatenate((
+                                    ECC.zero[ZUtils.FRDC].as_uint256(),
+                                    ECC.one[ZUtils.FRDC].as_uint256())),
+                           (-1,NWORDS_256BIT)) )
+
+        np.copyto(
+                  self.pi_c2_eccf1,
                       np.reshape(
                            np.concatenate((
                                     ECC.zero[ZUtils.FRDC].as_uint256(),
@@ -967,7 +1000,7 @@ class GrothProver(object):
         domainSize = pk_bin[1][0]
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
 
-        pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps'])
+        pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps','delta_1'])
 
  
         self.findECPointsDispatch(
@@ -986,6 +1019,7 @@ class GrothProver(object):
 
         # Assign collected values to pi's
         self.assignECPvalues(compute_ECP=False)
+        logging.info(' First Mexp completed...')
 
         end = time.time()
         self.t_GP['Mexp'] = (end - start)
@@ -997,7 +1031,9 @@ class GrothProver(object):
         ######################
 
         # Retrieve Poly Eval Results
-        self.parent_conn_CPU.send([])
+        if self.compute_last_mexp_gpu:
+          self.parent_conn_CPU.send([])
+
         t = self.parent_conn_CPU.recv()
         self.t_GP['Eval'] += t[0]
         self.p_CPU.terminate()
@@ -1014,23 +1050,63 @@ class GrothProver(object):
         ######################
         start = time.time()
 
-        logging.info(' Starting Last Mexp...')
-
-        self.findECPointsDispatch(
+        if self.compute_last_mexp_gpu:
+           logging.info(' Starting Last Mexp...')
+           self.findECPointsDispatch(
                                   self.dispatch_table_phase3,
                                   self.batch_size_mexp_phase3,
                                   self.dispatch_table_phase3.shape[0]-1, pk_bin,
                                   sort_idx = self.ec_type_dict['hExps'][2],
                                   change_rs_scl_idx = [self.ec_type_dict['hExps'][2]],
                                   sort_en=self.sort_en)
-
-        self.assignECPvalues(compute_ECP=True)
+        
+           self.assignECPvalues(compute_ECP=True)
+        else:
+           self.t_GP['Mexp'] += t[2]
+           self.reduceLastMexp(pk_bin[5])
 
         end = time.time()
         self.t_GP['Mexp'] += (end - start)
      
         return 
  
+    def reduceLastMexp(self, delta):
+           a1 = ec_jacscmul_h(
+                 np.reshape(self.s_scl,-1),
+                 np.reshape(self.pi_a_eccf1,-1),
+                 MOD_GROUP,1)
+
+           a2 = ec_jacscmul_h(
+                 np.reshape(self.r_scl,-1),
+                 np.reshape(self.pi_b1_eccf1,-1),
+                 MOD_GROUP,1)
+
+           a3 = ec_jacscmul_h(
+                 np.reshape(self.neg_rs_scl,-1),
+                 np.reshape(delta,-1),
+                 MOD_GROUP,1)
+
+           a4 = np.concatenate((self.pi_c2_eccf1,
+                                [ECC.one[ZUtils.FRDC].as_uint256()]))
+
+           EC_C_idx = self.ec_type_dict['C'][4]
+           a5 = ec_jacaddreduce_h(
+                           np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
+                           MOD_GROUP,
+                           1,   # to affine
+                           1,   # Add z coordinate to inout
+                           0)   # strip z coordinate from affine result
+
+           a = np.concatenate((a1,a2,a3,a4,a5))
+           np.copyto(
+                    self.pi_c_eccf1,
+                    ec_jacaddreduce_h(
+                                      np.reshape(a,-1),
+                                      MOD_GROUP,
+                                      1,   # to affine
+                                      0,   # Add z coordinate to input
+                                      1)   # strip z coordinate from affine result
+                    )
 
     def assignECPvalues(self, compute_ECP=False):
 
@@ -1079,7 +1155,6 @@ class GrothProver(object):
                                       1,   # Add z coordinate to inout
                                       1)   # strip z coordinate from affine result
                                    )
-
 
     def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0):
             ZField.set_field(MOD_GROUP)
