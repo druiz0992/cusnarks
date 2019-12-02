@@ -179,7 +179,7 @@ class GrothProver(object):
 
         self.sort_en = 0
         self.compute_ntt_gpu = False
-        self.compute_last_mexp_gpu = False
+        self.compute_last_mexp_gpu = True
 
         logging.info('#################################### ')
         logging.info('Initializing Groth prover with the following parameters :')
