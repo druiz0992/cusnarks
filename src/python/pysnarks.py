@@ -88,7 +88,7 @@ def init():
     opt['out_proving_key_f'] = None
     opt['verify'] = 0
     opt['batch_size'] = 20
-    opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),2)
+    opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),4)
     opt['max_streams'] = get_nstreams()
     opt['start_server'] = 1
     opt['reserved_cpus'] = 0
