@@ -12,7 +12,7 @@ Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving la
 setup scripts are launched.  Computation intensive functionality on the host (CPU) side has been written in C/C++.
  Computation intensive functionality on the the device (GPU) side has been writted in CUDA. Cython is used 
 to build wrappers around C functions so that they can be called from Python and executed on CPU or GPU.
- An overview of the software architecture can be found [Architecture][here].
+ An overview of the software architecture can be found [here](#Architecture].
 
 Elliptic curve scalar multiplication, the heaviest blocks in terms of 
 computation requirements have been implemented to run on the GPU side. CPU is used during the conversion of Elliptic Curve points
