@@ -87,10 +87,10 @@ up to 2^19 constraints. When prompted, provide the desired number of roots to ge
 make config
 ```
 
-6. Launch units tests (optional) -> Currently, not working, but don't worry. Bugs are in the test :-))
+6. Launch units tests (optional)
 
 ```sh
-make test
+CUDA_VISIBLE_DEVICES=1,2 make test
 ```
 
 ## Launching Cusnarks
