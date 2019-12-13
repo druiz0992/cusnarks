@@ -31,6 +31,7 @@ The trusted setup is currently very slow. Implementation has been done using a s
 * [Installation][]
 * [Launching Cusnarks](#Launching-Cusnarks)
 * [Example][] 
+* [Cusnarks Options][]
 * [Architecture][]
 * [Modules][]
 * [Some Results][]
@@ -281,7 +282,12 @@ Go to directory *$CUSNARKS_HOME/src/python/* to launch Proof server
 CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -pk r1cs4M_pk.bin -vk r1cs4M_vk.json
 ```
 
-Wait a few seconds until *Server ready* message appears on the screen.
+Wait a few seconds until the message below appears on the screen.
+
+	GP init : 112.70901942253113
+	Server listening on port 8193 ready...
+	Server listening on port 8192 ready...
+
 
 To check Proof server progress type:
 
@@ -305,6 +311,51 @@ tail -f $CUSNARKS_HOME/circuits/_PROOF/log
 
 When the proof is generated, you can launch another Proof client following the same steps as described in this section.
 
+When the proof is generated the client will display aome type of message on screen:
+
+	{
+  	  "witness_f": "/mnt/disk2/druiz/cusnarks/circuits/r1cs4M_w.dat",
+  	  "proof_f": "/mnt/disk2/druiz/cusnarks/circuits/r1cs4M_proof.json",
+  	  "public_data_f": "/mnt/disk2/druiz/cusnarks/circuits/r1cs4M_pd.json",
+  	  "verify_en": 1,
+  	  "proof_id": 0,
+  	  "result": 1,
+  	  "init": [
+    	    0.0102,
+    	    0.04
+  	    ],
+  	  "Read_W": [
+    	    0.3188,
+    	    1.14
+  	    ],
+  	  "Eval": [
+    	    9.4916,
+    	    34.05
+  	    ],
+  	  "Mexp": [
+    	    27.1099,
+    	    97.25
+  	    ],
+  	  "H": [
+    	    6.6682,
+    	    23.92
+  	    ],
+  	  "Proof": 27.8771
+	}
+
+* **witness_f** : location of witness file
+* **proof_f** : location of output proof file
+* **public_data_f** : location of output public data file
+* **verify_en** : Flag to indicate if verification was requested (1: Verification Enabled/ 0: Verification Disabled)
+* **proof_id** : Proof unique identifier
+* **result** : Proof result (-2: Aborted, -1: Ongoing, 0 :Failed, 1: Sucess, 2: Verification not requested) 
+* **init** : Array containing two numbers. First number is time taken by initialization in seconds. Second number is the relative initialization time with respect to complete proof time
+* **Read_W** : Array containing two numbers. First number is time taken by reading witness file in seconds. Second number is the relative witness reading time with respect to complete proof time
+* **Eval** : Array containing two numbers. First number is time taken by poly evaluation phase in seconds. Second number is the relative poly evaluation time with respect to complete proof time
+* **Mexp** : Array containing two numbers. First number is time taken by multi-exponentiation phase in seconds. Second number is the relative multi-exponentiation time with respect to complete proof time
+* **H** : Array containing two numbers. First number is time taken by FFT phase in seconds. Second number is the relative FFT time with respect to complete proof time
+* **Proof** : Total proof time in seconds
+
 3. Stop Proof server
 
 If you want to launch a new Proof server with a different proving/verification key, you need to first stop the Proof server, and then follow the steps outlined above to generate a new set of constraints, witness and Trusted Setup.
@@ -314,6 +365,83 @@ To stop the server:
 ```sh
 python3 pysnarks.py -stop_server 1
 ```
+## Cusnarks Options
+
+This section describes the some of the options embedded in cusnarks via command arguments.
+General usage is:
+ 
+```sh
+python pysnaks.py [OPTIONS]
+```
+**NOTE** Remember that cusnarks needs to be launched from *$CUSNARKS_HOME/src/python* directory.
+
+In section [Example](#example) we described the minimum arguments required to launch cusnarks. In this section we will further detail some additional options.
+
+To list all available options, type:
+
+```sh
+python3 pysnarks.py -h
+```
+Options can be divided in three groups:
+* Generic mode : General info
+* Setup mode : Configure Trusted setup
+* Proof mode : Configure Proof generation
+
+### Deprecated 
+This section enumerates options that are either deprecated and its use may produce unintended results, or functionality that is still not implemented. At some point, all deprecated options will be deleted from the menu.
+
+- snarkjs <SNARKJS location> : describes current location of snarkjs.
+- ml <MIN_LEVELS>  : Unclear use.
+- Ml <MAX_LEVELS>  : Unclear use.
+- rep <N_REP>      : Unclear use.
+- b <BENCHMARK>    : Unclear use.
+- r_cpus RESERVED_CPUS : Mechanism to limit the number of CPUs used. 
+- wf <WITNESS_FORMAT> : Input witness format (Montgomery/Normal). Currently, only normal format is accepted.
+- df <DATA_FOLDER> :
+	
+### Generic
+* -h
+
+### Setup
+Setup is launched with the following command:
+
+```sh
+python3 pysnarks.py -m s [SETUP_OPTIONS]
+```
+
+- in_c <INPUT_CIRCUIT> : 
+- out_c <OUTPUT_CIRCUIT> :
+- out_cf <OUTPUT_CIRCUIT_FORMAT> :
+- pk <PROVING_KEY>
+- vk <VERIFICATION KEY>
+- kf <KEYS_FORMAT>
+- d <DEBUG>
+- seed <SEED
+
+### Proof
+Proof is launched with the following command:
+
+```sh
+CUDA_VISIBLE_DEVICES=0,1,2 python3 pysnarks.py -m p [PROOF_OPTIONS]
+```
+- pk PROVING_KEY
+- vk VERIFICTION_KEY
+- seed SEED
+- w <WITNESS_FILE>
+- p PROOF
+- pd PUBLIC_DATA
+- v VERIFY
+- gpu MAX_GPUs
+- stream MAX_STREAMS
+- server <START_SERVER>
+
+Additionally, it is possible to launch several comands without *-m p* option that affect the behavior of a previously launched proof server. Examples of this include:
+
+- stop_server <STOP_SERVER> : 
+- stop_client <STOP_CLIENT> :
+- alive <IS_ALIVE> :
+- l <LIST> :
+
 
 ## Architecture
 
@@ -759,6 +887,7 @@ Future direction of cusnarks will include:
 [constraints-circom-format]: ###Constraints
 [witness-format]: ###Witness
 [Example]: #Example
+[Cusnarks Options]: #Cusnarks-Options
 [Next Steps]: #Next-Steps
 [Documentation]: #Documentation
 [DIZK]: https://eprint.iacr.org/2018/691.pdf 
