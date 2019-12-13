@@ -43,6 +43,7 @@ import argparse
 import os
 import sys
 import time
+import ast
 from subprocess import call
 
 from groth_prover import *
@@ -53,6 +54,7 @@ CUMODE_SETUP  = 0
 CUMODE_PROOF  = 1
 
 PORT = 8192
+PORT2 = 8193
 
 sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
@@ -92,6 +94,7 @@ def init():
     opt['max_streams'] = get_nstreams()
     opt['start_server'] = 1
     opt['reserved_cpus'] = 0
+    opt['list'] = 1
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -203,9 +206,17 @@ def init():
     parser.add_argument(
        '-stop_server', '--stop_server', required=False)  
 
-    help_str = 'Is proog server alive' 
+    help_str = 'Stop proof client' 
+    parser.add_argument(
+       '-stop_client', '--stop_client', required=False)  
+
+    help_str = 'Is proof server alive' 
     parser.add_argument(
        '-alive', '--is_alive', required=False)  
+
+    help_str = 'Return last N proof results ' + str(opt['list']) 
+    parser.add_argument(
+       '-l', '--list', required=False)  
 
     help_str = 'Reserved N CPUs' + str(opt['reserved_cpus'])
     parser.add_argument(
@@ -250,20 +261,39 @@ def run(opt, parser):
     if args.stop_server is not None :
       if is_port_in_use(PORT):
           query = { 'stop_server' : 1 }
-          jsocket = jsonSocket()
+          jsocket = jsonSocket(port = PORT)
           result = jsocket.send_message(query)
           print("Stopping proof server")
       return
 
-    if args.is_alive is not None :
+    if args.stop_client is not None :
       if is_port_in_use(PORT):
-          query = { 'is_alive' : 1 }
+          query = { 'stop_client' : 1 }
           jsocket = jsonSocket()
+          result = jsocket.send_message(query)
+          print("Stopping proof client")
+      return
+
+    if args.is_alive is not None :
+      if is_port_in_use(PORT2):
+          query = { 'is_alive' : 1 }
+          jsocket = jsonSocket(port = PORT2)
           result = jsocket.send_message(query)
           print(result)
           return 1
       else: 
         return 0
+
+    if args.list is not None:
+        opt['list'] = args.list
+        if is_port_in_use(PORT):
+            query = {'list' : opt['list']}
+            jsocket = jsonSocket()
+            result = jsocket.send_message(query)
+            print(result)
+            return 1
+        else:
+          return 0
 
 
     if args.mode != "s" and args.mode != 'setup' and \
@@ -404,9 +434,17 @@ def run(opt, parser):
                     'verify_en' : opt['verify'] }
 
           jsocket = jsonSocket()
-          result = jsocket.send_message(query)
-          print(result)
+          jsocket.send_message(query)
+          query = {'list' : -1}
+          jsocket = jsonSocket()
+          while(True):
+            time.sleep(5)
+            result = jsocket.send_message(query)
+            result_dict = ast.literal_eval(result)
+            if result_dict['result'] != -1:
+                break
 
+          print(result)
 
 def isOpen(ip,port):
    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

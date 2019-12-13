@@ -293,7 +293,7 @@ During this stage prover is being initialized with the contents of the proving k
 2. Launch Proof client
 
 ```sh
-CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -w r1cs100k_w.dat -p r1cs100k_proof.json -pd r1cs100k_pd.json -v 1
+CUDA_VISIBLE_DEVICES=1,2 python3 pysnarks.py -m p -w r1cs4M_w.dat -p r1cs4M_proof.json -pd r1cs4M_pd.json -v 1
 ```
 Wait a few seconds until final completion message appears on screen. At the end of the process the proof and the public data files will be written to *$CUSNARKS_HOME/circuits/* folder.
 

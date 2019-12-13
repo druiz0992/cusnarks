@@ -46,6 +46,7 @@
 """
 import json,ast
 import os.path
+import signal
 import numpy as np
 import time
 from subprocess import call
@@ -138,6 +139,7 @@ class GrothProver(object):
 
         self.pk = getPK()
         self.verify = 2
+        self.stop_client = mp.Value('i',0)
 
         self.n_gpu = min(get_ngpu(max_used_percent=99.),n_gpus)
         if 'CUDA_VISIBLE_DEVICES' in os.environ and len(os.environ['CUDA_VISIBLE_DEVICES']) > 0:
@@ -488,26 +490,37 @@ class GrothProver(object):
         conn.close()
 
     def startGPServer(self):    
+           self.port_first = 8192
+           self.port_second = 8193
+           self.proof_id = 0
+           self.proof_repo = []
            pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
            nVars = int(pkbin_vars[0][0])
            logging.info('Launching GP Server')
-           jsocket = json_socket.jsonSocket()
+           p = Process(target=self.startServer, args = (self.port_first,0))
+           p.start()
+           self.startServer(self.port_second, nVars)
+
+    def startServer(self, port, nVars):    
+           logging.info('Launching GP Server')
+           jsocket = json_socket.jsonSocket(port=port)
 
            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
            s.bind((jsocket.host,jsocket.port))
            s.listen(1)
-           print('Server ready...')
+           print('Server listening on port ' +str(port) +' ready...')
            while True: # Accept connections from multiple clients
-               logging.info('Listening for client...')
+               logging.info('Waiting for client at port %s...', port)
                conn, addr = s.accept()
-               logging.info('New connecton from address %s', addr)
+               logging.info('New connecton from address %s port %s', addr, port)
                msg = jsocket.receive_message(conn)
                if len(msg):
                  # Call some action and return results
                  parsed_dict = ast.literal_eval(json.loads(json.dumps(msg)))
                  if 'stop_server' in parsed_dict and parsed_dict['stop_server'] == 1:
                     logging.info('Stopping server')
+                    os.kill(os.getppid(), signal.SIGTERM)
                     sys.exit(1)
                  elif 'is_alive' in parsed_dict:
                     new_msg = {}
@@ -516,19 +529,53 @@ class GrothProver(object):
                     conn.close()
                     continue
 
-                 # Initialize CPU Process
-                 self.startProcesses(nVars)
+                 elif 'stop_client' in parsed_dict:
+                     self.stop_client.value = 1
+                     logging.info('Stopping client...')
+                     conn.close()
 
-                 self.proof(
+                 elif 'status' in parsed_dict:
+                     self.proof_repo[-1]['result'] = parsed_dict['status']
+                     del parsed_dict['status']
+                     self.proof_repo[-1].update(parsed_dict)
+                     conn.close()
+
+                 elif 'list' in parsed_dict:
+                     if len(self.proof_repo) > int(parsed_dict['list']):
+                       new_msg = dict(self.proof_repo[int(parsed_dict['list'])])
+                       jsocket.send_message(new_msg, conn)
+                     elif int(parsed_dict['list']) == -1:
+                       new_msg = dict(self.proof_repo[int(parsed_dict['list'][-1])])
+                       jsocket.send_message(new_msg, conn)
+                     conn.close()
+                     
+                 elif 'witness_f' in parsed_dict and nVars==0:
+                     query = { 'witness_f' : parsed_dict['witness_f'], 'proof_f' : parsed_dict['proof_f'],
+                             'public_data_f' : parsed_dict['public_data_f'], 'verify_en' : parsed_dict['verify_en'], 'proof_id' : self.proof_id, 'result' : -1 }
+                     self.proof_id+=1
+                     logging.info('Request for new proof received in primary server')
+                     self.proof_repo.append(query)
+
+                     p = json_socket.jsonSocket(port=self.port_second)
+                     p.send_message(query)
+                     conn.close()
+
+                 elif 'witness_f' in parsed_dict and nVars:
+                   logging.info('Request for new proof received in secondary server')
+                   conn.close()
+                   # Initialize CPU Process
+                   self.startProcesses(nVars)
+
+                   self.proof(
                          parsed_dict['witness_f'],
                          parsed_dict['proof_f'], parsed_dict['public_data_f'],
                          verify_en=int(parsed_dict['verify_en']))
 
-                 new_msg = dict(self.t_GP)
-                 new_msg['status'] = self.verify
-   
-                 jsocket.send_message(new_msg, conn)
-                 conn.close()
+                   new_msg = dict(self.t_GP)
+                   new_msg['status'] = self.verify
+
+                   p = json_socket.jsonSocket(port=self.port_first)
+                   p.send_message(new_msg)
    
 
     def startProcesses(self, nVars):
@@ -747,6 +794,7 @@ class GrothProver(object):
 
       self.verify_en = verify_en
       self.t_GP = {}
+      self.stop_client.value = 0
 
       if (self.verify_en):
         self.verify = 0
@@ -772,6 +820,10 @@ class GrothProver(object):
       ##### Starting proof
 
       self.gen_proof()
+      
+      if self.stop_client.value:
+          self.verify = -2
+          return self.verify
 
       self.t_GP['Proof'] = time.time() - start
 
@@ -1010,12 +1062,23 @@ class GrothProver(object):
                                   change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
                                   sort_en=self.sort_en)
+        if self.stop_client.value:
+            self.p_CPU.terminate()
+            self.p_CPU.join()
+            logging.info('Client stopped...')
+            return
 
         self.findECPointsDispatch(
                              self.dispatch_table_phase2,
                              nPublic+2,
                              self.dispatch_table_phase2.shape[0]+1, pk_bin,
                              sort_en = self.sort_en)
+
+        if self.stop_client.value:
+            self.p_CPU.terminate()
+            self.p_CPU.join()
+            logging.info('Client stopped...')
+            return
 
         # Assign collected values to pi's
         self.assignECPvalues(compute_ECP=False)
@@ -1377,6 +1440,9 @@ class GrothProver(object):
                     logging.error('Exception occurred when getting EC results. Exiting program...')
                     sys.exit(1)
                  pending_dispatch_table = []
+
+          if self.stop_client.value:
+              return
 
        # Collect final results
        self.getECResults(pending_dispatch_table)
