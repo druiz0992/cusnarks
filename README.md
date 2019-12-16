@@ -130,7 +130,7 @@ There are two mechanisms to generate a proof:
 #### Server Mode
 To launch Proof Server:
 ```sh
-CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -pk <INPUT_PROVING_KEY file> 
+CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -pk <INPUT_PROVING_KEY file> -vk <INPUT_VERIFICATION_KEY file> 
 ```
 
 Mandatory arguments:
@@ -139,7 +139,7 @@ Mandatory arguments:
 To request a proof: 
 
 ```sh
-CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -vk <INPUT_VERIFICATION_KEY file> -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
+CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -w <INPUT_WITNESS file file> -p <OUTPUT_PROOF file> -pd <OUTPUT_PUBLIC_DATA file> -seed <RANDOM SEED> -v <0|1>
 ```
 Mandatory arguments:
 - **INPUT_WITNESS file** : Input Witness file. Extension needs to be .bin or .dat.  
