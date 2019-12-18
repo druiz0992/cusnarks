@@ -4,6 +4,7 @@ const fs                    = require("fs")
 const zkSnark               = require("snarkjs");
 const { writeWitnessBin }   = require("./witnessBin");
 const cu                    = require("./cusnarkCLI");
+const { unstringifyBigInts } = require("snarkjs");
 
 const config = JSON.parse(fs.readFileSync(`${__dirname}/../../config.json`, "utf8"));
 const circuitDef  = JSON.parse(fs.readFileSync(config.circuitFile, "utf8"));
@@ -69,8 +70,9 @@ exports.postCancel = function() {
  **/
 exports.postInput = function(input) {
   return new Promise(function(resolve, reject) {
-    // UNCOMMENT FOR REALNESS: 
-    const witness = circuit.calculateWitness(input);
+    // UNCOMMENT FOR REALNESS:
+    const parseInputs = unstringifyBigInts(input);
+    const witness = circuit.calculateWitness(parseInputs);
     writeWitnessBin(witness, config.witnessFile)
       .then(() => {
         genProof(); // generate the proof, don't wait for it!
@@ -101,7 +103,7 @@ function genProof() {
     .then((cmdRes) => {
       let response = 0;
       try {
-        response = JSON.parse(cmdRes).status;
+        response = JSON.parse(cmdRes).result;
       } finally {
         if (response === 1) {
           // PROOF GENERATED SUCCESSFULY

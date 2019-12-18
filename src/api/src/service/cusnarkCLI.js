@@ -18,11 +18,11 @@ const kill = async function (pid) {
              }
         });
     });
-  };
+};
 
 const noProcess = "NO CURRENT PROCESS";
 
-let resolvePRomise;
+let resolvePromise;
 let child = noProcess;
 
 exports.generateProof = (config) => {
@@ -36,7 +36,7 @@ exports.generateProof = (config) => {
             -pd ${config.publicDataFile} \
             -v 1`;
 
-        console.error("EXECUTING cudaProofGenerator: ", cmd);
+        console.error("EXECUTING cudaProofGenerator", cmd);
         resolvePromise = resolve;
         child = exec(cmd, (error, stdout, stderr) => {
             if (error) {
@@ -48,7 +48,7 @@ exports.generateProof = (config) => {
             resolve(stdout.trim());
         }); 
   });
-}
+};
 
 exports.cancelProof = async () => {
     if (child !== noProcess){
@@ -57,3 +57,6 @@ exports.cancelProof = async () => {
         child = noProcess;
     } 
 };
+
+// command to cancel cuSnarks
+// python3 pysnarks.py -stop_client 1
