@@ -166,9 +166,22 @@ third_party_libs:
 	@for i in $(AUX_RSUBDIRS); do \
 		(cd $$i; $(CARGO)); done
 
+clib:
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(PCG_REPO); do git clone $$j; done;  fi
+	@for i in $(AUX_CSUBDIRS); do \
+		(cd $$i; $(MAKE)); done
+	if ! test -d $(LIB_PATH); \
+		then mkdir $(LIB_PATH); fi
+	@for i in $(CUSRC_PATH); do \
+		echo "make build in $$i..."; \
+		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+
+	
 
 third_party_libs_clean:
 	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
 
-.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs
+.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs clib
 
