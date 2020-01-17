@@ -106,12 +106,10 @@ def profile_u256():
         nkernels = 2
 
     for i in range(niter):
-       u256 = U256(nsamples, seed=10)
-       _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params, n_kernels = nkernels )
+       _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params, 0,0, n_kernels = nkernels )
        if i :
            kernel_stats.append(kernel_time)
 
-    
     logging.info("Max : %s [s], Min : %s [s], Mean : %s[s]" % (np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
 
 if __name__ == "__main__":

@@ -436,18 +436,16 @@ double CUSnarks::kernelLaunch(
 
   // measure data xfer time Host -> Device
   cudaSetDevice(gpu_id);
-  double _start, _end, _total_start, _total_end;
+  double _total_start, _total_end;
   _total_start = elapsedTime();
-  _start = elapsedTime();
   in_data_host[gpu_id][stream_id] = in_vector_host->data;
+  start_copy_in = elapsedTime();
   if (stream_id == 0){
-     start_copy_in = elapsedTime();
      CCHECK(cudaMemcpy(
               &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
               in_vector_host->data,
               in_vector_host->size,
               cudaMemcpyHostToDevice));
-     end_copy_in = elapsedTime() - start_copy_in;
   } else {
     CCHECK(cudaMemcpyAsync(
              &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
@@ -455,34 +453,32 @@ double CUSnarks::kernelLaunch(
              in_vector_host->size,
              cudaMemcpyHostToDevice,
              this->stream[gpu_id][stream_id]));
-    _end = elapsedTime() - _start;
   }
+  end_copy_in = elapsedTime() - start_copy_in;
   logInfo("In Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
-         in_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
+         in_data_host[gpu_id][stream_id], gpu_id, stream_id, end_copy_in);
  
   // configure kernel. Input parameter invludes block size. Grid is calculated 
   // depending on input data length and stride (how many samples of input data are 
   // used per thread
-  _start = elapsedTime();
   params_host[gpu_id][stream_id]= (kernel_params_t *) params;
   for (i=0; i < n_kernel; i++){
+    start_copy_in = elapsedTime();
     if (stream_id == 0){
-      start_copy_in = elapsedTime();
       CCHECK(cudaMemcpy(params_device[gpu_id][stream_id],
                         &params_host[gpu_id][stream_id][i],
                         sizeof(kernel_params_t),
                         cudaMemcpyHostToDevice));
-      end_copy_in = +(elapsedTime() - start_copy_in);
     } else {
       CCHECK(cudaMemcpyAsync(params_device[gpu_id][stream_id],
                         &params_host[gpu_id][stream_id][i],
                         sizeof(kernel_params_t),
                         cudaMemcpyHostToDevice,
                         this->stream[gpu_id][stream_id]));
-      _end = elapsedTime() - _start;
     }
+    end_copy_in += (elapsedTime() - start_copy_in);
     logInfo("In Params : Ptr : %x, gpu_id : %u, stream_id : %u, time : %f\n",
-           params_host[gpu_id][stream_id], gpu_id, stream_id, _end);
+           params_host[gpu_id][stream_id], gpu_id, stream_id, end_copy_in);
     blockD = config[i].blockD;
     if (config[i].gridD == 0){
        config[i].gridD = (blockD + in_vector_host->length/params[i].stride - 1) / blockD;
@@ -491,17 +487,15 @@ double CUSnarks::kernelLaunch(
     smemS = config[i].smemS;
     kernel_idx = config[i].kernel_idx;
 
-    _start = elapsedTime();
+    //_start = elapsedTime();
     // launch kernel
+    start_kernel = elapsedTime();
     if (stream_id == 0){
-       start_kernel = elapsedTime();
        kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS>>>(
                                                   out_vector_device[gpu_id][stream_id].data,
                                                   in_vector_device[gpu_id][stream_id].data,
                                                    params_device[gpu_id][stream_id]
                                                              );
-       end_kernel = elapsedTime() - start_kernel;
-       total_kernel +=end_kernel;
     } else {
        CCHECK(cudaEventRecord(start_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
        kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS, this->stream[gpu_id][stream_id]>>>(
@@ -510,11 +504,12 @@ double CUSnarks::kernelLaunch(
                                                                   params_device[gpu_id][stream_id]
                                                                   );
        CCHECK(cudaEventRecord(end_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
-       _end = elapsedTime() - _start;
-       logInfo("Launch async stream : ptr: %x, gpu_id : %d, stream_id : %d, Time : %f\n",
-                       this->stream[gpu_id][stream_id],gpu_id, stream_id, _end);  
     }
-    CCHECK(cudaGetLastError());
+    end_kernel = elapsedTime() - start_kernel;
+    total_kernel += end_kernel;
+    logInfo("Launch stream : ptr: %x, gpu_id : %d, stream_id : %d, Time : %f\n",
+                     this->stream[gpu_id][stream_id],gpu_id, stream_id, end_kernel);  
+    //CCHECK(cudaGetLastError());
     //CCHECK(cudaDeviceSynchronize());
 
     logInfo("Params : premod : %d, premul : %d,  midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d, As mont : %d\n",
@@ -527,7 +522,6 @@ double CUSnarks::kernelLaunch(
 
     // retrieve kernel output data from GPU to host
   start_copy_out = elapsedTime();
-  _start = elapsedTime();
   if (config[0].return_val){
      out_data_host[gpu_id][stream_id] = out_vector_host->data;
      if (stream_id == 0){
@@ -544,14 +538,12 @@ double CUSnarks::kernelLaunch(
             out_vector_host->size,
             cudaMemcpyDeviceToHost,
             stream[gpu_id][stream_id]));
-        _end = elapsedTime() - _start;
      }
-     logInfo("Out Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
-        out_data_host[gpu_id][stream_id], gpu_id, stream_id, _end);
   }
- 
   end_copy_out = elapsedTime() - start_copy_out;
   _total_end = elapsedTime() - _total_start;
+  logInfo("Out Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
+        out_data_host[gpu_id][stream_id], gpu_id, stream_id, end_copy_out);
   logInfo("Kernel total time : %f,\n\n", _total_end);
 
   logInfo("----- Info -------\n");
@@ -570,7 +562,10 @@ double CUSnarks::kernelLaunch(
   logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
           out_vector_host->size, end_copy_out);
 
-  return total_kernel;
+  //return _total_end; // processing time + xfer time
+  return total_kernel; // processing time
+  //return end_copy_in;   // xfer in time
+  //return end_copy_out;  // xfer out time
 }
 
 void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)

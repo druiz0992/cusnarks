@@ -4176,7 +4176,7 @@ void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots)
 void init_h(void)
 {
   #ifdef PARALLEL_EN
-  if (!utils_mproc_init) { 
+  if (!utils_mproc_init) {  
     mproc_init_h();
   }
   #endif
