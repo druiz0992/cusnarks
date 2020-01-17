@@ -173,7 +173,7 @@ class GrothProver(object):
         else :
           self.n_streams = n_streams
 
-        copy_input_files([proving_key_f, verification_key_f], self.keep_f)
+        #copy_input_files([proving_key_f, verification_key_f], self.keep_f)
         if test_f is None:
            self.test_f = test_f
         else:
@@ -841,7 +841,7 @@ class GrothProver(object):
       self.write_proof()
       self.test_results()
 
-      copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
+      #copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
 
       return self.verify
 

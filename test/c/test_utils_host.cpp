@@ -7188,6 +7188,37 @@ uint32_t test_mul(void)
 
 }
 
+uint32_t test_mul_prof(void)
+{
+
+ uint32_t samples=0;
+ int pidx=1;
+ uint32_t retval=0;
+ struct timespec start, end;
+ double elapsed=0.0;
+     
+ init_h();
+ samples = 1000000000;
+ clock_gettime(CLOCK_MONOTONIC, &start);
+
+ #pragma omp parallel for 
+ for (uint32_t j=0;j<samples; j++){
+     uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
+     uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
+     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
+     uint32_t r[NWORDS_256BIT];
+     montmult_h(r, a, b, pidx);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed = (double) (end.tv_sec - start.tv_sec);
+  elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  printf("Time(Test_Mul %d) : %d. Time : %f\n", samples, elapsed);
+  printf("\033[0m");
+
+  return retval;
+
+}
+
 #if 0
 void test_mul3(void)
 {
@@ -8816,9 +8847,11 @@ int main()
   uint32_t retval;
 
   retval+=test_mul();  // test montgomery mul with predefined results
+  retval+=test_mul_prof();  // test montgomery mul with predefined results
   //test_mul3(); // test SOS impl of montgomery mul
   //test_mul4(); // test SOS impl of montgomery squaring
 
+  #if 0
   //test_mul5(); // test FIOS impl of montgomery squaring
   retval+=test_findroots();
   retval+=test_ntt();
@@ -8861,6 +8894,7 @@ int main()
   retval+=test_ec_jacreduce_opt(0);   // EC1
   retval+=test_ec_jacreduce_opt(1);   // EC2
 
+#endif
   if (retval){
     printf("\033[1;31m");
     printf("CPU tests FAILED\n");
