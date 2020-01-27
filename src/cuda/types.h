@@ -35,6 +35,7 @@
 #define _TYPES_H_
 
 #define NWORDS_256BIT           (8)
+#define NBITS_254BIT           (254)
 #define NWORDS_256BIT_SHIFT     (3)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
@@ -114,7 +115,6 @@
 #define ECBN128_BLOCK_DIM          (256)
 
 #define N_STREAMS_PER_GPU (1+4)
-#define MAX_NCORES_OMP        (32)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
@@ -264,6 +264,14 @@ typedef struct{
   
 }fft_params_t;
 
+typedef struct{
+  uint32_t *x0;
+  uint32_t *x1;
+  uint32_t *x2;
+  uint32_t *x3;
+  uint32_t *x4;
+}inv_t;
+
 // kernel input parameters
 typedef struct{
    uint32_t premod; // data requires to be mod-ded as preprocessing stage  
@@ -297,6 +305,8 @@ typedef enum{
    CB_U256_ADDM_REDUCE_SHFL,
    CB_U256_SHR1,
    CB_U256_SHL1,
+   CB_U256_SHL,
+   CB_U256_ALMINV,
    CB_U256_N
 
 }u256_callback_t;

@@ -102,6 +102,8 @@
 #define MAX(X,Y)  ((X)>=(Y) ? (X) : (Y))
 #define MIN(X,Y)  ((X)<(Y) ? (X) : (Y))
 
+#define MAX_NCORES_OMP        (32)
+#define _CASM
 //MPROC VARS
 static  pthread_mutex_t utils_lock;
 static  pthread_barrier_t utils_barrier;
@@ -154,6 +156,49 @@ inline t_uint64 addu64_h(t_uint64 *c, t_uint64 *a, t_uint64 *b)
  return carry;
 }
 
+inline void init_invtable(inv_t *data_table, uint32_t *u, uint32_t *v, uint32_t *s, uint32_t *r1, uint32_t *zero)
+{
+  // x0 = x0 - x1;
+  // x0 = x0 >> 1
+  // x4 = x2 + x3;
+  // x3 = x3 << 1
+  data_table[0].x0 = u;
+  data_table[0].x1 = zero;
+  data_table[0].x2 = zero;
+  data_table[0].x3 = s;
+  data_table[0].x4 = s;
+
+  data_table[1].x0 = v;
+  data_table[1].x1 = zero;
+  data_table[1].x2 = zero;
+  data_table[1].x3 = r1;
+  data_table[1].x4 = r1;
+
+  data_table[2].x0 = u;
+  data_table[2].x1 = v;
+  data_table[2].x2 = r1;
+  data_table[2].x3 = s;
+  data_table[2].x4 = r1;
+
+  data_table[3].x0 = v;
+  data_table[3].x1 = u;
+  data_table[3].x2 = s;
+  data_table[3].x3 = r1;
+  data_table[3].x4 = s;
+}
+
+inline void almmontinv_step_h(inv_t *table)
+{
+  // x0 = x0 - x1;
+  // x0 = x0 >> 1
+  // x4 = x2 + x3;
+  // x3 = x3 << 1
+  subu256_h(table->x0, table->x0, table->x1);
+  shlru256_h(table->x0, table->x0,1);
+  addu256_h(table->x4, table->x2,table->x3);
+  shllu256_h(table->x3, table->x3,1);
+}
+
 static void _ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 static void _intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx);
@@ -171,6 +216,14 @@ void *interpol_and_mul_h(void *args);
 void *ec_jacreduce_batch_h(void *args);
 void ec_jacaddreduce_finish_h(void *args);
 
+#ifdef _CASM
+extern "C" void rawAddLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawSubLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawMontgomeryMul_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawAddLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawSubLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawMontgomeryMul_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+#endif
 //////
 
 /*
@@ -973,6 +1026,45 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
     }
   }
 }
+void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p)
+{
+  int j;
+  _RNG* rng = _RNG::get_instance(x[0]);
+
+  memset(x,0,NWORDS_256BIT*sizeof(uint32_t)*nsamples);
+  if (min_nwords == -1){
+	  min_nwords = 0;
+  }
+  if (max_nwords == -1){
+	  max_nwords = NWORDS_256BIT - 1;
+  }
+
+  #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+  #endif
+  for (j=0; j < nsamples; j++){
+    uint32_t nwords;
+    uint32_t nbits;
+    do {
+      rng->randu32(&nwords,1);
+      nwords %= NWORDS_256BIT;
+
+    }while(nwords >= min_nwords && nwords <= max_nwords);
+
+    rng->randu32(&nbits,1);
+
+    nbits %= 32;
+
+    rng->randu32(&x[j*NWORDS_256BIT],nwords+1); 
+
+    x[j*NWORDS_256BIT+nwords] &= ((1 << nbits)-1);
+    if ((p!= NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
+         do{
+           subu256_h(&x[j*NWORDS_256BIT], p);
+         }while(compu256_h(&x[j*NWORDS_256BIT],p) >=0);
+    }
+  }
+}
 
 /*
    Generates N 256 bit samples with incremements of inc starting at start. If sample reached value of mod,
@@ -1191,6 +1283,7 @@ void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t sor
 *****************************************************************************/
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
 {
+  #ifndef _CASM
   int i, j;
   t_uint64 S, C, C1, C2, C3=0, M[2], X[2], carry;
   uint32_t T[NWORDS_256BIT_FIOS+1];
@@ -1342,6 +1435,14 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
   //printU256Number("U : \n",U);
+
+ #else
+    if (pidx == MOD_GROUP ){
+       rawMontgomeryMul_R(U, A, B);
+    } else {
+       rawMontgomeryMul_Q(U, A, B);
+    }
+ #endif
 }
 
 void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
@@ -2368,12 +2469,21 @@ void ntt_build_h(fft_params_t *ntt_params, uint32_t nsamples)
 */
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
+   #ifndef _CASM
    //uint32_t tmp[NWORDS_256BIT];
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
    addu256_h(z, x, y);
    if(compu256_h(z, N) >= 0) {
       subu256_h(z, z, N);
    }
+   #else
+    if (pidx == MOD_GROUP ){
+       rawAddLL_R(z, x, y);
+    } else {
+       rawAddLL_Q(z, x, y);
+    }
+	
+   #endif
 
    //memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
 }
@@ -2393,15 +2503,23 @@ void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
 */
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
-   uint32_t tmp[NWORDS_256BIT];
+  #ifndef _CASM
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
 
    subu256_h(z, x, y);
-   if(compu256_h(z, N) >= 0) {
+   //if(compu256_h(z, N) >= 0) {
+   if(z[NWORDS_256BIT-1] > N[NWORDS_256BIT-1]){
        addu256_h(z, z, N);
    }
 
    //memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
+  #else
+    if (pidx == MOD_GROUP ){
+       rawSubLL_R(z, x, y);
+    } else {
+       rawSubLL_Q(z, x, y);
+    }
+  #endif
 }
 void subm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
@@ -2548,6 +2666,7 @@ uint32_t getbitu256g_h(uint32_t *x, uint32_t n, uint32_t group_size)
 */
 void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
 {
+#if 1
    uint32_t k;
    uint32_t t[] = {1,0,0,0,0,0,0,0};
 
@@ -2559,6 +2678,27 @@ void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
    shllu256_h(t,t,2 * NWORDS_256BIT * NBITS_WORD - k);
    to_montgomery_h(t,t,pidx);
    montmult_h(y, y,t,pidx);
+#else
+   uint32_t k;
+   uint32_t t[] = {1,0,0,0,0,0,0,0};
+   uint32_t t_idx;
+
+   const uint32_t *R[2];
+   R[0] = CusnarksR2Get((mod_t)pidx);
+   R[1] = CusnarksR3Get((mod_t)pidx);
+   uint32_t shift[2];
+
+   almmontinv_h(y,&k, x, pidx);
+
+   t_idx = 2*NWORDS_256BIT*NBITS_WORD/k-1;
+   shift[0] = 2*NWORDS_256BIT * NBITS_WORD - k;
+   shift[1] = NWORDS_256BIT * NBITS_WORD - k;
+
+   shllu256_h(t,t,shift[t_idx]);
+   montmult_h(y, y, R[t_idx],pidx);
+   montmult_h(y, y, t,pidx);
+
+#endif
 }
 void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
 {
@@ -2568,9 +2708,10 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
   uint32_t s[] = {1,0,0,0,0,0,0,0};
   uint32_t r1[] = {0,0,0,0,0,0,0,0};
   uint32_t i = 0;
+  uint32_t t0,t1,t2,t3;
+  uint32_t tmp[NWORDS_256BIT];
+  uint32_t zero[] = {0,0,0,0,0,0,0,0};
 
-  const uint32_t *zero = CusnarksZeroGet();
-  
   memcpy(u,P,NWORDS_256BIT*sizeof(uint32_t));
   memcpy(v,a,NWORDS_256BIT*sizeof(uint32_t));
   *k = 0;
@@ -2580,6 +2721,23 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
   // v is < 256 bits, < u
   // s is  1     
   // r1 is 0
+
+#if 0
+  inv_t data_table[4];
+  uint32_t data_table_r[] = {0,1,0,3,0,1,0,2};
+
+  init_invtable(data_table, u, v, s, r1, zero);
+
+  while(compu256_h(v,zero) != 0){
+     t0 = u[0] & 0x1; 
+     t1 = (v[0] & 0x1) << 1;
+     subu256_h(tmp,v,u);
+     t2 = (tmp[NWORDS_256BIT-1] & 0x80000000) >> 29;
+     t3 = t0 + t1 + t2;
+     almmontinv_step_h(&data_table[data_table_r[t3]]);	  
+     (*k)++;
+  }
+#else
   while(compu256_h(v,zero) != 0){
      if (getbitu256_h(u,0) == 0){
         shlru256_h(u,u,1);
@@ -2600,11 +2758,13 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
      }
      (*k)++;
   }
+#endif
   
   if (compu256_h(r1,P) >= 0){
       subu256_h(r1,P);
   }
   subu256_h(r, (uint32_t *)P,r1);
+  uint32_t  tmp_msb = msbu256_h(a); 
 }
 
 void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
@@ -3994,7 +4154,7 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
 {
   uint32_t start_idx, last_idx;
   uint32_t vars_per_thread = args->n;
-  args->max_threads = get_nprocs_conf();
+  args->max_threads = get_nprocs_conf() > MAX_NCORES_OMP ? MAX_NCORES_OMP : get_nprocs_conf();
 
   // set number of threads and vars per thread depending on nvars
   if (args->n >= args->max_threads*2*U256_BSELM){

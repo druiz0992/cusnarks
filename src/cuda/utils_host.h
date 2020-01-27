@@ -292,6 +292,7 @@ uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
 void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t sort_en);
 void setRandom(uint32_t *x, const uint32_t);
 void setRandom256(uint32_t *x, uint32_t nsamples, const uint32_t *p);
+void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p);
 void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx);
 void ec_stripc_h(uint32_t *z, uint32_t *x, uint32_t n);

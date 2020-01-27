@@ -496,6 +496,7 @@ double CUSnarks::kernelLaunch(
                                                   in_vector_device[gpu_id][stream_id].data,
                                                    params_device[gpu_id][stream_id]
                                                              );
+      CCHECK(cudaDeviceSynchronize());
     } else {
        CCHECK(cudaEventRecord(start_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
        kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS, this->stream[gpu_id][stream_id]>>>(
@@ -509,8 +510,6 @@ double CUSnarks::kernelLaunch(
     total_kernel += end_kernel;
     logInfo("Launch stream : ptr: %x, gpu_id : %d, stream_id : %d, Time : %f\n",
                      this->stream[gpu_id][stream_id],gpu_id, stream_id, end_kernel);  
-    //CCHECK(cudaGetLastError());
-    //CCHECK(cudaDeviceSynchronize());
 
     logInfo("Params : premod : %d, premul : %d,  midx : %d, In Length : %d, Out Length : %d, Stride : %d, Padding Idx : %d, As mont : %d\n",
         params[i].premod, params[i].premul, params[i].midx, params[i].in_length, params[i].out_length, params[i].stride, params[i].padding_idx, params[i].as_mont);
@@ -562,8 +561,8 @@ double CUSnarks::kernelLaunch(
   logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
           out_vector_host->size, end_copy_out);
 
-  //return _total_end; // processing time + xfer time
-  return total_kernel; // processing time
+  return _total_end; // processing time + xfer time
+  //return total_kernel; // processing time
   //return end_copy_in;   // xfer in time
   //return end_copy_out;  // xfer out time
 }
