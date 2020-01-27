@@ -71,6 +71,8 @@ __device__ void addz(Z2_t *z, Z2_t *x, Z2_t *y, mod_t midx);
 __device__ void movz(Z2_t *x, uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t size);
 __device__ void movz(uint32_t *y, uint32_t yoffset, Z2_t *x, uint32_t xoffset, uint32_t size);
 __device__ void setkz(Z2_t *z, uint32_t offset, uint32_t *x);
+__device__ void invz(Z2_t *z,  Z2_t *x,  mod_t midx);
+__device__ void div2z(Z2_t *z, Z2_t *x);
 
 __device__ void xeccz(Z2_t *z, Z2_t *x);
 __device__ void yeccz(Z2_t *z, Z2_t *x);

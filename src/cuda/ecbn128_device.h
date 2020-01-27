@@ -54,13 +54,15 @@ __global__ void madec2jac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector,
 template<typename T1, typename T2>
 __forceinline__ __device__ void madecjac(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem_ptr, kernel_params_t *params);
 template<typename T1, typename T2>
-__forceinline__ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem_ptr, kernel_params_t *params);
+__device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem_ptr, kernel_params_t *params);
 template<typename T1, typename T2>
-__forceinline__ __device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t x1offset, T1 *zx2, uint32_t x2offset, mod_t midx);
+__device__ void addecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t x1offset, T1 *zx2, uint32_t x2offset, mod_t midx);
 template<typename T1, typename T2>
 __forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t x1offset, T1 *zx2, uint32_t x2offset, mod_t midx);
 template<typename T1, typename T2>
-__forceinline__ __device__ void doublecjac(T1 *xr, T1 *x1, mod_t midx);
+__device__ void doublecjac(T1 *xr, T1 *x1, mod_t midx);
+template<typename T1, typename T2>
+__device__ void doublecjac(T1 *xr, T1 *x1, uint32_t nrep, mod_t midx);
 template <typename T1, typename T2>
 __forceinline__ __device__ void addecjacaff(T1  *zxr, T1 *zx1, T1 *zx2, mod_t midx);
 template<typename T1, typename T2>
@@ -68,7 +70,7 @@ __forceinline__ __device__ void doublecjacaff(T1 *zxr,  T1 *zx1, mod_t midx);
 template<typename T1, typename T2>
 __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
 template<typename T1, typename T2>
-__forceinline__ __device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
+__device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
 template<typename T1, typename T2>
 __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane );
 template<typename T1, typename T2>
@@ -79,6 +81,8 @@ template<typename T1, typename T2>
 __device__ void scmulecjac_step_l2r2(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset, mod_t midx );
 template<typename T1, typename T2>
 __device__ void build_ec_table(T1 *d_out,T1 *d_in, uint32_t din_offset, uint32_t *scl, kernel_params_t *params);
+template<typename T1, typename T2>
+__device__ void toaff(T1 *zxr,  T1 *zx1, mod_t midx);
 
 #if 0
 __global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);

@@ -48,7 +48,7 @@
  printf("%s",str);
  
  for (i=0; i < NWORDS_256BIT; i++){
-   printf("%u ",n[i]);
+   printf("%x ",n[i]);
  }
  printf("\n");
 }
@@ -69,7 +69,7 @@
  }
  printf("\n");
  for (i=NWORDS_256BIT; i < 2*NWORDS_256BIT; i++){
-   printf("%u ",n[i]);
+   printf("%x ",n[i]);
  }
  printf("\n");
 }

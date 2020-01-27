@@ -71,11 +71,23 @@ def profile_u256():
     u256_vector = u256.rand(nsamples)
     u256_vector = u256.randu256(nsamples, u256_p)
             
-    kernel_config['kernel_idx'] = [CB_U256_MULM]
+    #kernel_config['kernel_idx'] = [CB_U256_MULM]
+    #kernel_config['kernel_idx'] = [CB_U256_ADDM]
+    #kernel_config['kernel_idx'] = [CB_U256_SHL1]
+    #kernel_config['kernel_idx'] = [CB_U256_SHL]
+    kernel_config['kernel_idx'] = [CB_U256_ALMINV]
+    #kernel_config['kernel_idx'] = [CB_U256_SUBM]
 
     if kernel_config['kernel_idx'][0] == CB_U256_MOD or kernel_params['premod'][0] == 1:
       for s in u256_vector:
          s |= 0xF0000000
+    elif kernel_config['kernel_idx'][0] == CB_U256_SHR1 or \
+         kernel_config['kernel_idx'][0] == CB_U256_SHL1 or \
+         kernel_config['kernel_idx'][0] == CB_U256_SHL or \
+         kernel_config['kernel_idx'][0] == CB_U256_ALMINV :
+        kernel_params['stride'] = [1]
+        kernel_params['out_length'] = nsamples
+
     elif kernel_config['kernel_idx'][0] == CB_U256_ADDM_REDUCE:
         kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
         kernel_params['premod'] = [1, 0]
@@ -106,6 +118,7 @@ def profile_u256():
         nkernels = 2
 
     for i in range(niter):
+       print("kernel launched")
        _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params, 0,0, n_kernels = nkernels )
        if i :
            kernel_stats.append(kernel_time)

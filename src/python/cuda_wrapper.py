@@ -1529,12 +1529,11 @@ def zpoly_mad_cuda(pysnark, vectors, fidx, gpu_id=0, stream_id=0):
      return vector,t
      """
 
-def get_shfl_blockD(nsamples):
+def get_shfl_blockD(nsamples, max_block_size=8):
 
    l = max(math.ceil(math.log2(nsamples)),5)
-   nb = math.ceil(l/8)
+   nb = math.ceil(l/max_block_size)
    lpb = math.ceil(l/nb)
-
    blockD = [1<<lpb] 
    rsamples = l - lpb
    while rsamples > lpb:
