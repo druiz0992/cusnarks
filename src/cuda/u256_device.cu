@@ -38,6 +38,8 @@
 #include "log.h"
 #include "utils_device.h"
 #include "u256_device.h"
+#include "asm_device.h"
+
 
 /*
     Modular addition kernel
@@ -51,7 +53,7 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     uint32_t __restrict__ *x;
     uint32_t __restrict__ *y;
     uint32_t __restrict__ *z;
-   
+  
     if(tid >= params->in_length/params->stride) {
       return;
     }
@@ -524,11 +526,14 @@ __global__ void shr1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
     memset(z, 0, NWORDS_256BIT*sizeof(uint32_t));
  
+    logInfoBigNumberTid(1,"X: \n",x);
     #pragma unroll
     for (i=0; i< NWORDS_256BIT*32; i++){   
-      b_shifted = shr1u256((const uint32_t *)x);
+      b_shifted = shr1u256(x);
       z[i/32] |= (b_shifted << (i % 32));
+      //logInfoTid("b : %d\n",b_shifted);
     }
+    logInfoBigNumberTid(1,"Z: \n",z);
 }
 
 /*
@@ -556,82 +561,69 @@ __global__ void shl1u256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     logInfoBigNumberTid(1,"X: \n",x);
     #pragma unroll
     for (i= NWORDS_256BIT*32-1; i>=0; i--){   
-      b_shifted = shl1u256((const uint32_t *)x);
+      b_shifted = shl1u256(x);
       z[i/32] |= (b_shifted << (i % 32));
-      logInfoTid("C : %d\n",b_shifted);
+    }
+    logInfoBigNumberTid(1,"Z: \n",z);
+}
+
+/*
+  Left logical shift kernel
+*/
+__global__ void shlu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    int i;
+
+    uint32_t __restrict__ *x;
+    uint32_t __restrict__ y[NWORDS_256BIT];
+    uint32_t __restrict__ *z;
+   
+    if(tid >= params->in_length) {
+      return;
+    }
+
+    //memset causes blocking operations on current device
+    x = (uint32_t *) &in_vector[tid * U256K_OFFSET + U256_XOFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+    memset(z, 0, NWORDS_256BIT*sizeof(uint32_t));
+
+    logInfoBigNumberTid(1,"X: \n",x);
+    #pragma unroll
+    for (i= NWORDS_256BIT*32-1; i>=0; i--){   
+      movu256(y,x);
+      shlu256(y,i);
       logInfoBigNumberTid(1,"X: \n",x);
-      logInfoBigNumberTid(1,"Z: \n",z);
+      logInfoBigNumberTid(1,"Z: \n",y);
     }
 }
 
-
 /*
-   z(288 bits) = x(288 bits) + y(256 bits)
-   TODO : pending
+  Right logical shift kernel
 */
-__forceinline__ __device__ void addu288(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ *y)
+__global__ void almmontinvu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
-  // z[i] = x[i] + y[i] for 8x32 bit words
-  asm("{                             \n\t"
-      //".reg .u32         %x_;        \n\t"
-      //".reg .u32         %y_;        \n\t"
-      //"mov.u32           %x_,%8;     \n\t"
-      //"mov.u32           %y_,%9;     \n\t"
-      "add.cc.u32        %0, %8, %9;\n\t"             // sum with carry out
-      //"mov.u32           %x_,%10;     \n\t"
-      //"mov.u32           %y_,%11;     \n\t"
-      "addc.cc.u32       %1, %10, %11;\n\t"             // sum with carry in and carry out
-      //"mov.u32           %x_,%12;     \n\t"
-      //"mov.u32           %y_,%13;     \n\t"
-      "addc.cc.u32       %2, %12, %13;\n\t"             // sum with carry in and carry out
-      //"mov.u32           %x_,%14;     \n\t"
-      //"mov.u32           %y_,%15;     \n\t"
-      "addc.cc.u32       %3, %14, %15;\n\t"             // sum with carry in and carry out
-      //"mov.u32           %x_,%16;     \n\t"
-      //"mov.u32           %y_,%17;     \n\t"
-      "addc.cc.u32       %4, %16, 17;\n\t"             // sum with carry in and carry out
-      //"mov.u32           %x_,%18;     \n\t"
-      //"mov.u32           %y_,%19;     \n\t"
-      "addc.cc.u32       %5, %18, %19;\n\t"             // sum with carry in and carry out
-      //"mov.u32           %x_,%20;     \n\t"
-      //"mov.u32           %y_,%21;     \n\t"
-      "addc.cc.u32       %6, %20, %21;\n\t"             // sum with carry in and carry out
-      //"mov.u32           %x_,%22;     \n\t"
-      //"mov.u32           %y_,%23;     \n\t"
-      "addc.u32          %7, %22, %23;\n\t"             // sum with carry in 
-      "}                             \n\n"
-      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
-        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7]), "=r"(z[8])
-      : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
-        "r"(x[2]), "r"(y[2]), "r"(x[3]), "r"(y[3]),
-        "r"(x[4]), "r"(y[4]), "r"(x[5]), "r"(y[5]),
-        "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]),"r"(x[8]));
-}
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    uint32_t i;
 
+    uint32_t __restrict__ *x;
+    uint32_t __restrict__ *z;
+   
+    if(tid >= params->in_length) {
+      return;
+    }
 
-// multiply by small constant (<= 32) 
-__device__ void mulku256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, const uint32_t __restrict__ k, mod_t midx)
-{
-  uint32_t i;
-  uint32_t tmp[NWORDS_256BIT+1];  //288 bits. I can multiply by up to 32
-
-	   //TODO change be movu256
-  //memcpy(tmp, x, NWORDS_256BIT * sizeof(uint32_t));
-  movu256(tmp, (uint32_t *)x);
-
-  assert(k < U256_MAX_SMALLK);
-
-  addu288(z,x,x); 
-
-  #pragma unroll
-  for (i=0; i<k-1; i++){
-    addu288(z,z,x); 
-  }
-
-  // TODO
-  // modulo p and return
-}
+    //memset causes blocking operations on current device
+    x = (uint32_t *) &in_vector[tid * U256K_OFFSET + U256_XOFFSET];
+    z = (uint32_t *) &out_vector[tid * U256K_OFFSET];
  
+    logInfoTid("MONT INV : %d\n", tid);
+    logInfoBigNumberTid(1,"X: \n",x);
+    #pragma unroll
+    almmontinvu256(z,x,params->midx);
+    logInfoBigNumberTid(1,"Z: \n",z);
+}
+
 
 /*
    aA = X[0] * Y[0]
@@ -646,16 +638,6 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
     uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
     uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT],tmp4[NWORDS_256BIT];
 
-    #if 0
-    mulmontu256(tmp1, A,B,midx);                  
-    mulmontu256(tmp2, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
-
-    mulmontu256(tmp3, A,&B[NWORDS_256BIT],midx);                  
-    mulmontu256(tmp4, &A[NWORDS_256BIT],B,midx);                  
-
-    submu256(U, tmp1, tmp2, midx);   
-    addmu256(&U[NWORDS_256BIT], tmp3, tmp4, midx);                
-    #else
     mulmontu256(tmp1, A,B,midx);                  
     mulmontu256(tmp2, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
 
@@ -666,22 +648,6 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
     addmu256(&U[NWORDS_256BIT], tmp1, tmp2, midx);                
     submu256(&U[NWORDS_256BIT], tmp3, &U[NWORDS_256BIT], midx);                
 
-    #endif
- 
-    /* 
-    addmu256(tmp1, A, &A[NWORDS_256BIT], midx);                // tmp1 = X[0] + X[1]
-    addmu256(tmp2, B, &B[NWORDS_256BIT], midx);                // tmp2 = Y[0] + Y[1]
-     
-    mulmontu256(tmp1,tmp1,tmp2,midx);                          // tmp1 = tmp1 * tmp2  
-    mulmontu256(tmp2,A,B,midx);                                // tmp2 = aA = X[0] * Y[0] 
-    mulmontu256(U,&A[NWORDS_256BIT],&B[NWORDS_256BIT],midx);   // Z[0] = bB = X[1] * Y[1]
-
-    submu256(&U[NWORDS_256BIT], tmp1, tmp2, midx);             //Z[1] = tmp1 - aA
-    submu256(&U[NWORDS_256BIT], &U[NWORDS_256BIT], U, midx);   //Z[1] = tmp1 - aA - bB
-    
-    mulmontu256(U,U,nonres,midx);                                    // Z[0] = bB * non_residue
-    addmu256(U,U,tmp2, midx);                                  // Z[0] = Z[0] + aA 
-    */
 }
 
 /*
@@ -733,9 +699,10 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
    * www.microsoft.com/en-us/research/wp-content/uploads/1998/06/97Acar.pdf
 
 */
+#if 1
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
-    uint32_t i,j;
+    uint32_t i;
     uint32_t S, C=0, C1, C2,C3;
     uint32_t __restrict__ M, X[2];
     uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0};
@@ -920,154 +887,178 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    return;
 }
 
-#if 0
-// SOS Version is commented out because FIOS performs better (even squaring). I leave it here in case
-// i decide to optimized
-
-// SOS
+#else
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
-{ 
-    uint32_t i,j;
-    uint32_t S, C=0, C1, C2,C3=0,C4=0;
-    uint32_t __restrict__ M[2], X[2];
-    uint32_t __restrict__ T[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+{
+ asm(ASM_MUL_INIT 
+     ASM_MONTMULU256(r,a,b)
+     ASM_SUBU256(r,r,n)
+     //ASM_LTU256 
+     //ASM_ADDU256  
+     //ASM_MUL_END
+     ASM_MUL_PACK);
 
-    logDebugBigNumber("P\n",(uint32_t *)P_u256);
-    logDebugBigNumber("PN\n",(uint32_t *)PN_u256);
-    logDebugBigNumber("A\n", (uint32_t*) A);
-    logDebugBigNumber("B\n", (uint32_t *)B);
-
-    #if 0
-    #pragma unroll
-    for(i=0; i<NWORDS_256BIT; i++) {
-       C=0;
-       #pragma unroll
-       for (j=0; j < NWORDS_256BIT; j++){
-          //(C,S) := t[i+j] + a[j]*b[i] + C
-          madcu32(&C, &S,A[j],B[i],C);
-          addcu32(&C1, &T[i+j], T[i+j], S);
-	  C += C1;
-       }
-       T[i+NWORDS_256BIT] = C;
-    }
-    #endif
-
-    #pragma unroll
-    for(i=0; i<NWORDS_256BIT; i++) {
-       //(C,S) := t[i+i] + a[i]*a[i]
-       madcu32(&C, &T[i,i],A[i],A[i],T[i+i]);
-       #pragma unroll
-       for (j=i+1; j < NWORDS_256BIT; j++){
-          //(C,S) := t[i+j] + 2*a[j]*a[i] + C
-          madcu32(&C, &S,A[j],A[i],C);
-          addcu32(&C1, &T[i+j], T[i+j], S);
-	  C += C1;
-       }
-       T[i+NWORDS_256BIT] += C;
-    }
-
-    #pragma unroll
-    for (i=0; i < NWORDS_256BIT; i++) {
-       C = 0;
-       // m = S*n'[0] mod W, where W=2^32
-       // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
-       mulu32(M, T[i], PN_u256[0]);
-       #pragma unroll
-       for (j=0; j < NWORDS_256BIT; j++){
-         //(C,S) := t[i+j] + m*n[j] + C
-         madcu32(&C,&S,M[0], P_u256[j],C);
-         addcu32(&C1, &T[i+j], T[i+j], S);
-         C += C1;
-	 //C += ((C3 >> (i+j+1)) & 0x1);
-	 //C3 &= (0xFFFFFFFF ^ (1 << (1+j+i)));
-       }
-       addcu32(&C4, &T[i+NWORDS_256BIT], T[i+NWORDS_256BIT], C);
-       //C3 |= (C4 << (i+NWORDS_256BIT +1));
-    }
-
-    movu256(U,&T[NWORDS_256BIT]);
-  
-    /* Step 3: if(u>=n) return u-n else return u */
-   if (ltu256(P_u256,U)){
-      subu256(U,U,P_u256);
-   }
-   logDebugBigNumber("U after mod\n",U);
-
-   return;
+#if 0
+     if (ltu256(P_u256,T)){
+      subu256(U,T,P_u256);
+     } else {
+       movu256(U,T);
+     }
+#endif
 }
 #endif
-
+/*
+  Montgomery Modular Inverse - Revisited
+  E. Savas, C.K.Koc
+  IEEE trasactions on Computers Vol49, No 7. July 2000
+*/
 __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
 {
    //TODO : implement proper squaring
-   #if 1
    mulmontu256(U,A,A,midx);
-   #else
-    uint32_t i,j;
-    uint32_t S, C=0, C1, C2,C3,C4;
-    uint32_t __restrict__ M[2], X[2];
-    uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
-
-    #pragma unroll
-    for(i=0; i<NWORDS_256BIT; i++)
-    {
-      // (C,S) = t[i+i] + a[i]*a[i], worst case 2 words
-      madcu32(&C,&S,A[i],A[i],T[i+i]);
-      T[i+i] = S;
-
-      #pragma unroll
-      for (j=i; j < NWORDS_256BIT; j++){
-        //(C,S) := t[i+j] + 2*a[j]*a[i] + C
-        madcu32(&C,&S,A[j],A[i],T[i+j]);
-        C1 = (X[0] >> 31)+C2;
-        X[0] <<= 1;
-        C2 = X[1] >> 31;
-        X[1] = (X[1] << 1) + C1;
-        addcu32(&C1, &X[0], X[0], C);
-        addcu32(&C, &S, T[i+j],X[0]);
-        C += C1;
-        addcu32(&X[0], &C, C,X[1]);
-        T[i+j] = S;
-      }
-      T[i+NWORDS_256BIT] += C;
-    }
-
-    #pragma unroll
-    for (i=0; i< NWORDS_256BIT; i++){
-       C = 0;
-       //m := t[i]*n'[0] mod W
-       mulu32(M, T[i], PN_u256[0]);
-
-       #pragma unroll
-       for (j=0; j < NWORDS_256BIT; j++){
-           //(C,S) := t[i+j] + m*n[j] + C
-           mulu32(X, M[0], P_u256[j]);
-           addcu32(&C1, &X[0], X[0],C);
-           addcu32(&C, &S, T[i+j], X[0]);
-           C += C1;
-           C += ((C3 >> (i+j+1)) & 1);
-	   C3 &= (0xFFFFFFFF ^ (1 << (1+j+i))); 
-           addcu32(&X[0], &C, C, X[1]);
-           T[i+j] = S;
-       }
-         addcu32(&C4,&T[i+NWORDS_256BIT], T[i+NWORDS_256BIT], C);
-         C3 |= (C4 << (i+NWORDS_256BIT+1));  
-    }
-    movu256(U,&T[NWORDS_256BIT]);
-
-    /* Step 3: if(u>=n) return u-n else return u */
-    if (ltu256(P_u256,U)){
-       subu256(U,U,P_u256);
-    }
-   return;
-
-   #endif
 }
 
+__device__ uint32_t almmontinvu256(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx)
+{
+  const uint32_t __restrict__ *P = mod_info_ct[midx].p;
+
+  uint32_t u[NWORDS_256BIT], v[NWORDS_256BIT];
+  uint32_t s[] = {1,0,0,0,0,0,0,0};
+  uint32_t r1[] = {0,0,0,0,0,0,0,0};
+  uint32_t k = 0;
+  uint32_t t0,t1,t2;
+  uint32_t tmp[NWORDS_256BIT];
+
+  movu256(u, (uint32_t *)P);
+  movu256(v, (uint32_t *)x);
+
+  //Phase 1 - ALmost inverse r = a^(-1) * 2 ^k, n<=k<=2n
+  // u is  < 256bits
+  // v is < 256 bits, < u
+  // s is  1     
+  // r1 is 0
+#if 1
+  //inv_t data_table[4];
+  //uint32_t data_table_r[] = {0,1,0,3,0,1,0,2};
+
+  //init_invtable(data_table, u, v, s, r1);
+
+  while(eq0u256(v) == 0){
+     t0 = u[0] & 0x1; 
+     t1 = (v[0] & 0x1) << 1;
+     subu256(tmp,v,u);
+     t2 = (tmp[NWORDS_256BIT-1] & 0x80000000) >> 29;
+     t0 = t0 + t1 + t2;
+
+     logInfoTid("t0 : %d\n",t0);
+     logInfoBigNumberTid(1,"u: \n",u);
+     logInfoBigNumberTid(1,"v: \n",v);
+     //almmontinv_step_h(&data_table[data_table_r[t0]]);	  
+     if (t0 % 2 == 0) {
+        shr1u256(u);
+        shl1u256(s);
+     } else if (t0 == 3) {
+        //subu256(v,v,u);
+        movu256(v, (uint32_t *)tmp);
+        shr1u256(v);
+        addu256(s,s,r1);
+        shl1u256(r1);
+     } else if (t0 == 7) {
+        //subu256(u,u,v);
+        negu256(u, (uint32_t *)tmp);
+        shr1u256(u);
+        addu256(r1,r1,s);
+        shl1u256(s);
+     } else{ 
+        shr1u256(v);
+        shl1u256(r1);
+     }
+     k++;
+     //if (k==1000) break;
+     if (k == 1000) {
+        //int tid = threadIdx.x + blockDim.x * blockIdx.x;
+        //logInfo("tid : %d\n",tid);
+	break;
+     }
+  }
+
+#else
+  logInfoBigNumberTid(1,"U: \n",u);
+  logInfoBigNumberTid(1,"V: \n",v);
+  while(eq0u256(v) == 0){
+     logInfoBigNumberTid(1,"u: \n",u);
+     logInfoBigNumberTid(1,"v: \n",v);
+     if (u[0] & 0x1 == 0){
+        shr1u256(u);
+        shl1u256(s);
+     } else if (v[0] & 0x1 == 0){
+        shr1u256(v);
+        shl1u256(r1);
+     } else if (ltu256(v,u)) {
+        subu256(u,u,v);
+        shr1u256(u);
+        addu256(r1,r1,s);
+        shl1u256(s);
+     } else {
+        subu256(v,v,u);
+        shr1u256(v);
+        addu256(s,s,r1);
+        shl1u256(r1);
+     }
+     k++;
+  }
+#endif
+  
+  if (ltu256(P,r1)){
+      subu256(r1,r1,P);
+  }
+  subu256(y, P,r1);
+
+  return k;
+}
+
+__device__ uint32_t invmontu256(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx)
+{
+   uint32_t k;
+   uint32_t t[] = {1,0,0,0,0,0,0,0};
+   uint32_t t_idx;
+
+   const uint32_t *R[2];
+   R[0] = mod_info_ct[midx].r2;
+   R[1] = mod_info_ct[midx].r2modp;
+   uint32_t shift[2];
+
+   k = almmontinvu256(y, x, midx);
+
+   t_idx = 2*NWORDS_256BIT*NBITS_WORD/k-1;
+   shift[0] = 2*NWORDS_256BIT * NBITS_WORD - k;
+   shift[1] = NWORDS_256BIT * NBITS_WORD - k;
+
+   shlu256(t,shift[t_idx]);
+   mulmontu256(y, y, R[t_idx],midx);
+   mulmontu256(y, y, t,midx);
+}
+
+__device__ uint32_t invmontu256_2(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx)
+{
+  uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
+  const uint32_t Zero[] = {0,0,0,0,0,0,0,0};
+
+  sqmontu256(t0, x, midx);
+  sqmontu256(t1, &x[NWORDS_256BIT], midx);
+  addmu256(t0,t0,t1,midx);
+  invmontu256(t0,t0,midx);
+
+  mulmontu256(y, x, t0, midx);
+  mulmontu256(&y[NWORDS_256BIT], &x[NWORDS_256BIT], t0, midx);
+  submu256(&y[NWORDS_256BIT],Zero,&y[NWORDS_256BIT],midx);
+}
+
+__device__ void div2u256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x)
+{
+  movu256(z,(uint32_t *)x);
+  shr1u256(z);
+}
 /*
    x mod N
 
@@ -1153,9 +1144,10 @@ __device__ void modu255(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 /*
    x >> 1 for 256 bit number
 */
-__device__ uint32_t shr1u256(const uint32_t __restrict__ *x)
+__device__ uint32_t shr1u256(uint32_t __restrict__ *x)
 {
    uint32_t c; 
+#if 0
    asm("{                                    \n\t"
        ".reg .u32          %tmp;             \n\t"
        "and.b32            %8, %9,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
@@ -1195,14 +1187,36 @@ __device__ uint32_t shr1u256(const uint32_t __restrict__ *x)
          "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 
       return c;
+#else
+   asm("{                                    \n\t"
+       "bfe.u32            %8,   %9,  0,1;  \n\t"       
+       "shf.r.clamp.b32   %0, %9, %10, 1;   \n\t"
+       "shf.r.clamp.b32   %1, %10, %11, 1 ;  \n\t"
+       "shf.r.clamp.b32   %2, %11, %12, 1;   \n\t"
+       "shf.r.clamp.b32   %3, %12, %13, 1;   \n\t"
+       "shf.r.clamp.b32   %4, %13, %14, 1;   \n\t"
+       "shf.r.clamp.b32   %5, %14, %15, 1;   \n\t"
+       "shf.r.clamp.b32   %6, %15, %16, 1;   \n\t"
+       "shr.b32           %7, %16, 1;        \n\t"
+       "}                               \n\t"
+       : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
+         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7]), "=r"(c)
+       : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
+         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+
+      return c;
+
+#endif
+
 }
 
 /*
    x << 1 for 256 bit number
 */
-__device__ uint32_t shl1u256(const uint32_t __restrict__ *x)
+__device__ uint32_t shl1u256(uint32_t __restrict__ *x)
 {
    uint32_t c; 
+#if 0
    asm("{                                    \n\t"
        ".reg .u32          %tmp;             \n\t"
        "bfe.u32            %8,   %16,  31,1;  \n\t"       // c = x[7] & (1<<31)
@@ -1235,9 +1249,67 @@ __device__ uint32_t shl1u256(const uint32_t __restrict__ *x)
          "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 
       return c;
+
+#else
+   asm("{                                    \n\t"
+       "bfe.u32            %8,   %16,  31,1;  \n\t"       // c = x[7] & (1<<31)
+       "shf.l.clamp.b32   %7, %15, %16, 1;   \n\t"
+       "shf.l.clamp.b32   %6, %14, %15, 1 ;  \n\t"
+       "shf.l.clamp.b32   %5, %13, %14, 1;   \n\t"
+       "shf.l.clamp.b32   %4, %12, %13, 1;   \n\t"
+       "shf.l.clamp.b32   %3, %11, %12, 1;   \n\t"
+       "shf.l.clamp.b32   %2, %10, %11, 1;   \n\t"
+       "shf.l.clamp.b32   %1, %9, %10, 1;   \n\t"
+       "shl.b32           %0, %9, 1;        \n\t"
+       "}                               \n\t"
+       : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
+         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7]), "=r"(c)
+       : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
+         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
+
+      return c;
+
+#endif
 }
 
 
+/*
+   x << count for 256 bit number
+*/
+__device__ void shlu256(uint32_t *x, uint32_t count)
+{
+   uint32_t word_idx =  count >> NBITS_WORD_LOG2;
+   uint32_t bit_idx = NBITS_WORD - (count & NBITS_WORD_MOD);
+   uint32_t bit_count = NBITS_WORD - bit_idx;
+   uint32_t i;
+
+   logInfoTid("count :%d\n",count);
+   logInfoTid("word_idx :%d\n",word_idx);
+   logInfoTid("bit_idx :%d\n",bit_idx);
+   logInfoTid("bit_count :%d\n",bit_count);
+   asm("{                                    \n\t"
+       "shf.l.clamp.b32   %7, %14, %15, %16;   \n\t"
+       "shf.l.clamp.b32   %6, %13, %14, %16;   \n\t"
+       "shf.l.clamp.b32   %5, %12, %13, %16;   \n\t"
+       "shf.l.clamp.b32   %4, %11, %12, %16;   \n\t"
+       "shf.l.clamp.b32   %3, %10, %11, %16;   \n\t"
+       "shf.l.clamp.b32   %2, %9, %10, %16;   \n\t"
+       "shf.l.clamp.b32   %1, %8, %9, %16;   \n\t"
+       "shl.b32            %0, %8, %16;        \n\t"
+       "}                               \n\t"
+       : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
+         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7]) 
+       : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
+         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]),
+	 "r"(bit_count));
+
+   for (i=word_idx; i < NWORDS_256BIT; i++){
+      x[NWORDS_256BIT-1-i+word_idx] = x[NWORDS_256BIT-1-i];	   
+   }
+   for (i=0; i < word_idx; i++){
+      x[i] = 0;
+   }
+}
 /*
    (x & (1<< bsel)) >> bsel  for 256 bit number
 */
@@ -1283,7 +1355,7 @@ __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
 */
 __device__ uint32_t clzMu256(const uint32_t __restrict__ *x)
 {
-   uint32_t i,j, c, rc, mrc=255; 
+   uint32_t i,j, c, rc, mrc=256; 
   
    #pragma unroll 
    for (i=0; i< U256_BSELM; i++){
@@ -1296,9 +1368,8 @@ __device__ uint32_t clzMu256(const uint32_t __restrict__ *x)
             "}                   \n\t"
             :"=r"(c), "=r"(rc) : "r"(x[NWORDS_256BIT*i+j-1]), "r"(rc));
      }
-     if (rc <= mrc) { mrc = rc; }
+     if (rc < mrc) { mrc = rc; }
    }
-
    return mrc;
 }
 
@@ -1317,6 +1388,50 @@ __device__ uint32_t clzu256(const uint32_t __restrict__ *x)
    }
 
    return rc;
+}
+
+__forceinline__ __device__ void almmontinv_step_h(inv_t *table)
+{
+  // x0 = x0 - x1;
+  // x0 = x0 >> 1
+  // x4 = x2 + x3;
+  // x3 = x3 << 1
+  subu256(table->x0, table->x0, table->x1);
+  shr1u256(table->x0);
+  addu256(table->x4, table->x2,table->x3);
+  shl1u256(table->x3);
+}
+
+__forceinline__ __device__ void init_invtable(inv_t *data_table, uint32_t *u, uint32_t *v, uint32_t *s, uint32_t *r1)
+{
+  uint32_t zero[] = {0,0,0,0,0,0,0,0};
+  // x0 = x0 - x1;
+  // x0 = x0 >> 1
+  // x4 = x2 + x3;
+  // x3 = x3 << 1
+  data_table[0].x0 = u;
+  data_table[0].x1 = zero;
+  data_table[0].x2 = zero;
+  data_table[0].x3 = s;
+  data_table[0].x4 = s;
+
+  data_table[1].x0 = v;
+  data_table[1].x1 = zero;
+  data_table[1].x2 = zero;
+  data_table[1].x3 = r1;
+  data_table[1].x4 = r1;
+
+  data_table[2].x0 = u;
+  data_table[2].x1 = v;
+  data_table[2].x2 = r1;
+  data_table[2].x3 = s;
+  data_table[2].x4 = r1;
+
+  data_table[3].x0 = v;
+  data_table[3].x1 = u;
+  data_table[3].x2 = s;
+  data_table[3].x3 = r1;
+  data_table[3].x4 = s;
 }
 
 // returns 1 if x - y >= y and x = x-y
@@ -1355,3 +1470,5 @@ __forceinline__ __device__ void shflxoru256(uint32_t *d_out, uint32_t *d_in, uin
     out->z = __shfl_xor_sync(0xffffffff, in.z, srcLane);
     out->w = __shfl_xor_sync(0xffffffff, in.w, srcLane);
 }
+
+

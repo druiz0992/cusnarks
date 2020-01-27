@@ -36,6 +36,19 @@
 #define NEG(X) (~(X))
 #define SWAP(a,b) (((a) ^ (b)) && ((b) ^= (a) ^= (b), (a) ^= (b))) 
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define ADD_FIRSTADD                            \
+    "movq    (%[A]), %%rax          \n\t"      \
+    "movq    %%rax, (%[C])          \n\t"      \
+    "movq    (%[B]), %%rax           \n\t"      \
+    "addq    %%rax, (%[C])           \n\t"
+
+#define ADD_NEXTADD(ofs)                                \
+    "movq    " STR(ofs) "(%[A]), %%rax          \n\t"   \
+    "movq    %%rax, " STR(ofs) "(%[C])          \n\t"   \
+    "movq    " STR(ofs) "(%[B]), %%rax          \n\t"   \
+    "adcq    %%rax, " STR(ofs) "(%[C])          \n\t"
 /* 
    Substract 256 bit integers X and Y.
 
@@ -95,6 +108,23 @@ inline void addu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
   const t_uint64 *dA = (t_uint64 *)a;
   const t_uint64 *dB = (t_uint64 *)b;
   t_uint64 *dC = (t_uint64 *)c;
+
+#if 0
+  uint32_t dC2[NWORDS_256BIT/2];
+
+  dC2[0] = dA[0]; dC2[1] = dA[1]; dC2[2]= dA[2]; dC2[3] = dA[3];
+
+   __asm__
+            ("/* perform bignum addition */   \n\t"
+             ADD_FIRSTADD
+             ADD_NEXTADD(8)
+             ADD_NEXTADD(16)
+             ADD_NEXTADD(24)
+             "done%=:                         \n\t"
+             :
+             : [A] "r" (dA), [B] "r" (dB), [C] "r" (dC2)
+             : "cc", "memory", "%rax");
+#else
   t_uint64 tmp = dA[0];
 
   dC[0] = dA[0] + dB[0];
@@ -117,8 +147,10 @@ inline void addu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
   carry = (dC[3] < carry);
   dC[3] += tmp;
   carry += (dC[3] < tmp);
-
+ 
+#endif
 }
+
 inline void addu256_h(uint32_t *x, const uint32_t *y)
 {
    addu256_h(x, x, y);
@@ -260,6 +292,7 @@ uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
 void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t sort_en);
 void setRandom(uint32_t *x, const uint32_t);
 void setRandom256(uint32_t *x, uint32_t nsamples, const uint32_t *p);
+void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p);
 void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx);
 void ec_stripc_h(uint32_t *z, uint32_t *x, uint32_t n);
