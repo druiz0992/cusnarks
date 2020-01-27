@@ -4,7 +4,7 @@ It has been designed with the objective of computing proofs for up to 2^27 const
 4xGPUs and 32xCPU cores (we are not quite there though).
 CUSNARKS is expected to work with [circom][] for the generation and compilation of circuits, and with [snarkjs][] 
 for the computation witnesses, proof verification and parts of
- the trusted setup.  Additionally, cusnarks works with [rust-circom][], an optimized version of [circom][] that allows to compile and generate
+ the trusted setup.  Additionally, cusnarks works with [circom2][], an optimized version of [circom][] that allows to compile and generate
 witnesses for very large circuits.
 
 
@@ -37,7 +37,7 @@ The trusted setup is currently very slow. Implementation has been done using a s
 * [Some Results][]
 * [File Formats][]
 * [Other Info](#Other-Info)
-* [Documentation][]
+* [References][]
 * [Next Steps][]
   
 ## Installation
@@ -53,6 +53,7 @@ Tested library versions provided for reference.
         - future (0.17.1)
         - nvgpu (0.8.0)
     - g++ compiler (7.4.0)
+    - nasm (2.13.02)
     - CUDA toolkit (10.1)
     - openmp (201511)
     - node (10.16.0)
@@ -93,9 +94,52 @@ make config
 ```sh
 CUDA_VISIBLE_DEVICES=1,2 make test
 ```
+**NOTE:** CUDA_VISIBLE_DEVICES is used to select the GPUs to be used. To get a numbered list of available GPUs type:
 
+```sh
+nvidia-smi
+```
+The output may look like this:
+
+	Thu Dec 19 12:57:34 2019       
+	+-----------------------------------------------------------------------------+
+	| NVIDIA-SMI 440.33.01    Driver Version: 440.33.01    CUDA Version: 10.2     |
+	|-------------------------------+----------------------+----------------------+
+	| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+	| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+	|===============================+======================+======================|
+	|   0  GeForce GTX 1080    Off  | 00000000:5E:00.0 Off |                  N/A |
+	| 42%   62C    P2   106W / 180W |   2693MiB /  8119MiB |    100%      Default |
+	+-------------------------------+----------------------+----------------------+
+	|   1  GeForce GTX 1080    Off  | 00000000:B1:00.0 Off |                  N/A |
+	| 27%   25C    P8     6W / 180W |   2687MiB /  8119MiB |      0%      Default |
+	+-------------------------------+----------------------+----------------------+
+	|   2  GeForce GTX 1080    Off  | 00000000:D9:00.0 Off |                  N/A |
+	|  0%   24C    P8     9W / 240W |   2687MiB /  8119MiB |      0%      Default |
+	+-------------------------------+----------------------+----------------------+
+                                                                               	
+	+-----------------------------------------------------------------------------+
+	| Processes:                                                       GPU Memory |
+	|  GPU       PID   Type   Process name                             Usage      |
+	|=============================================================================|
+	|    0     32195      C   python3                                     2683MiB |
+	|    1     32195      C   python3                                     2677MiB |
+	|    2     32195      C   python3                                     2677MiB |
+	+-----------------------------------------------------------------------------+
+
+In the example above, there are 3 GPUs numbered 0,1,2.
+
+To launch GPU tests you need the following command: 
+```sh
+CUDA_VISIBLE_DEVICES=1,2 make test_gpu
+```
+To launch CPU tests you need the following command:
+
+```sh
+make test_cpu
+```
 ## Launching Cusnarks
-Launch setup and proof generation by running pysnarks.py. 
+Launch setup and proof generation by running pysnarks.py. Following command displays help menu.
 
 ```sh
 cd src/python
@@ -160,10 +204,12 @@ CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PRO
 ```
 
 ## Example
-In this section we will go through an example on how to compile a circuit using [rust-circom][] to obtain a valid set of R1CS constraints and a valid witness, and how to call cusnarks to compute the Trusted Setup and the Proof.
+In this section we will go through an example on how to compile a circuit using [circom2][] to obtain a valid set of R1CS constraints and a valid witness, and how to call cusnarks to compute the Trusted Setup and the Proof.
 
 ### Circuit Compilation
-Cusnarks provides a compiler [rust-circom][] to generate R1CS constraints and witness from a given circuit. [rust-circom][] is located in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/*. 
+Cusnarks provides a compiler [circom2][] to generate R1CS constraints and witness from a given circuit. [circom2][] is located in *$CUSNARKS_HOME/third_party_libs/za/*. 
+
+If you have followed the installation steps indicated in this manual rust compiler is already installed in your system. If this is the case, you can directly jumt to step 3. Otherwise, keep reading.
 
 Steps to follow :
 
@@ -175,7 +221,7 @@ sudo apt-get install clang build-essential libssl-dev
 source $HOME/.cargo/env
 ```
 
-2. Compile [rust-circom][]
+2. Compile [circom2][]
 
 From *$CUSNARKS_HOME/* type:
 
@@ -183,11 +229,11 @@ From *$CUSNARKS_HOME/* type:
 make all
 ```
 
-After this step is completed, cusnarks and [rust-circom][] are ready to use.
+After this step is completed, cusnarks and [circom2][] are ready to use.
 
 3. Review circuit
 
-[rust-circom][] provides a test circuit that can be used to generate test proofs with an arbitrary number of constraints. The circuit can be found in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/interop/circuits/cuda/circuit.circom*. The circuit is shown below.
+[circom2][] provides a test circuit that can be used to generate test proofs with an arbitrary number of constraints. The circuit can be found in *$CUSNARKS_HOME/third_party_libs/za/interop/circuits/cuda/circuit.circom*. The circuit is shown below.
 
 	template T(N) {
 		signal private input p;
@@ -228,7 +274,7 @@ To modify the number of constraints, set the number *N* in T(N) to the desired n
 From the same directory where *circuit.circom* is placed, type:
 
 ```sh
-../../../target/release/za compile --cuda=r1cs4M_c.bin
+../../../target/release/circom2 compile --cuda=r1cs4M_c.bin
 ```
 
 Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin* located in the same folder as *circuit.circom*. The format of *r1cs4M_c.bin* is described in [constraints-circom-format][].
@@ -237,7 +283,7 @@ Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin
 From the same directory where *circuit.circom* is placed, type:
 
 ```sh
-../../../target/release/za test --skipcompile --outputwitness
+../../../target/release/circom2 test --skipcompile --outputwitness
 ```
 Wait a few minutes and the output will be a witness file called *test1.binwitness*. Unfortunately, this witness file is in big-endian format and we need to convert it to little-endian.
 
@@ -565,7 +611,7 @@ Constraint system generated by [circom][].  JSON file includes the following key
 |protocol| 'groth'|
 
 #### .bin
-Constraint system generated by [rust-circom][]. 32 bit words are represented as Little Endian.
+Constraint system generated by [circom2][]. 32 bit words are represented as Little Endian.
 
 |Key | Bit size | Description |
 |----|----------|-------------|
@@ -753,20 +799,21 @@ Generated by [circom][]. Format is :
 |------|----------|-------------|
 |nWords|32 bit|  Number of witness input |
 |wSize|32 bit|  Size of witness in 32 bit words |
-|other|32 bit|  Empty |
+|other|64 bit|  Empty |
 |witness_0|n bit| Witness 0 |
 |witness_1|n bit| Witness 1 |
 |...|n bit| ...|
 |witness_N-1|n bit| Witness N-1|
 
 #### .dat
-Generated by [rust-circom][]. Format is :
+Generated by [circom2][]. Format is :
 
 |Field | Bit size | Description |
 |------|----------|-------------|
 |nWords|32 bit| Number of witness input |
 |wSize |32 bit| Size of witness in 32 bit words|
 | other |64 bit| Empty|
+| other |128 bit| Empty|
 | witness_0|n bit | Witness 0|
 | witness_1|n bit | Witness 1|
 | ...| n bit | ... |
@@ -827,7 +874,7 @@ things are done in parallel.
 * **third_party_libs**\ : Exteral libraries used will be automatically downloaded here
    - *pcg-cpp*\  : implementation of PCG family of random number generators. Full details can be found at the [PCG-Random website].
    - *snarkjs*\  : snarkjs repository
-   - *rust-circom*\ : rust circom repository
+   - *za*\ : rust circom repository
 * **circuits**\   : Default location where circuits are processed by cusnarks.
    - *_SETUP*\    : Default location where Trusted setup files are copied.
    - *_PROOF*\    : Default location where Proof fils are copied.
@@ -851,8 +898,8 @@ After modifying *log.h* you will need to do a *make clean build* to recompile wi
 
 **NOTE:** if logging is disabled, logging function calls are not compiled and thus add no overhead.
 
-## Documentation
-The following a non-comprehensive list of interesting material:
+## References
+The following is a non-comprehensive list of interesting material:
 * [DIZK][] : Paper on distributed snarks
 * [Elliptic curve primer][] : elliptic curve crypto primer book
 * [snarkjs][]  : javascript implementation of zksnarks
@@ -870,7 +917,7 @@ Future direction of cusnarks will include:
 [dependencies]: #Requirements 
 [snarkjs]: https://www.github.com/iden3/snarkjs
 [circom]: https://www.github.com/iden3/circom
-[rust-circom]:https://www.github.com/adria0/rust-circom-experimental
+[circom2]:https://www.github.com/iden3/za
 [PCG-Random website]: http://www.pcg-random.org
 [unittest]: https://python.org/3/library/unittest.html
 [Architecture]: #Architecture
@@ -889,7 +936,7 @@ Future direction of cusnarks will include:
 [Example]: #Example
 [Cusnarks Options]: #Cusnarks-Options
 [Next Steps]: #Next-Steps
-[Documentation]: #Documentation
+[References]: #References
 [DIZK]: https://eprint.iacr.org/2018/691.pdf 
 [Elliptic curve primer]: http://tomlr.free.fr/Math%E9matiques/Math%20Complete/Cryptography/Guide%20to%20Elliptic%20Curve%20Cryptography%20-%20D.%20Hankerson,%20A.%20Menezes,%20S.%20Vanstone.pdf 
 [bellman]: https://github.com/zkcrypto/bellman

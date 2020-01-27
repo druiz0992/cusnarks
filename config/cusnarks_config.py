@@ -59,9 +59,9 @@ snarkjs = {
 }
 
 rust_circom = {
-    'url'   :  'http://github.com/adria0/rust-circom-experimental.git',
-    'folder' :  CUSNARKS_REPO + 'third_party_libs/rust-circom-experimental',
-    'Q1'     : '\n\n\nrust-circom-experimental is used to accelerate the compilation of snarks circuits.\n'+ \
+    'url'   :  'http://github.com/iden3/za.git',
+    'folder' :  CUSNARKS_REPO + 'third_party_libs/za',
+    'Q1'     : '\n\n\nza is used to accelerate the compilation of snarks circuits.\n'+ \
                '\n\nCusnarks uses adria0\'s fork. Do you want to download it now [Y/N] - Y?\n',
     'Q2'     : 'Have you downloaded rust_circom already?\n' + \
                'If so, please enter the directory location. [N/<directory location>] - N?\n',

@@ -7149,7 +7149,7 @@ static uint32_t ext_invX_test[] = {
 
 uint32_t test_mul(void)
 {
-   uint32_t r[NWORDS_256BIT]; 
+ uint32_t r[NWORDS_256BIT]; 
 
  int i;
  int pidx=1;
@@ -7188,80 +7188,100 @@ uint32_t test_mul(void)
 
 }
 
-#if 0
-void test_mul3(void)
+uint32_t test_mul_prof(void)
 {
-   uint32_t r[NWORDS_256BIT]; 
 
-   int i;
-   int pidx=1;
-   int n_errors=0;
-   const uint32_t *N = CusnarksPGet((mod_t)pidx);
-   uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
-   uint32_t retval=0;
-
-   for (i=0; i < MAX_ITER*1000; i++){
-     setRandom256(a,1, N);
-     setRandom256(b,1, N);
-    
-     montmult_h(r, a, b, pidx);
-     montmult_sos_h(c, a, b, pidx);
-
-     if (compu256_h(r,c)){
-        printU256Number(a);
-        printU256Number(b);
-        printf("Error in mult %d\n",i);
-        printf("Expected\n");
-        printU256Number(r);
-        printf("Obtained\n");
-        printU256Number(c);
-        n_errors++;
-        break;
-     }
-   }
-   if (n_errors){
-     printf("\033[1;31m");
-   }
-   printf("N errors(Test_Mul SOS) : %d/%d\n",n_errors, i);
-   printf("\033[0m");
-   retval = n_errors;
-   return retval;
-}
-
-void test_mul4(void)
-{
-   uint32_t r[NWORDS_256BIT]; 
-
-   int i;
-   int pidx=1;
-   int n_errors=0;
-   uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
-
-   for (i=0; i < MAX_ITER*1000; i++){
-     setRandom(a, NWORDS_256BIT);
-     a[NWORDS_256BIT-1] &= 0x7FFFFFF;
+ uint32_t samples=0;
+ int pidx=1;
+ uint32_t retval=0;
+ struct timespec start, end;
+ double elapsed=0.0;
      
-     montmult_h(r, a, a, pidx);
-     montmult_sos_h(c, a, a, pidx);
+ init_h();
+ samples = 1000000000;
+ clock_gettime(CLOCK_MONOTONIC, &start);
 
-     if (compu256_h(r,c)){
-        //printf("Error in mult %d\n",i);
-        //printf("Expected\n");
-        //printU256Number(r);
-        //printf("Obtained\n");
-        //printU256Number(c);
-        n_errors++;
-     }
-   }
-   if (n_errors){
-     printf("\033[1;31m");
-   }
-   printf("N errors(Test_Squaring SOS) : %d/%d\n",n_errors, i);
-   printf("\033[0m");
-   retval = n_errors;
-   return retval;
+ #pragma omp parallel for 
+ for (uint32_t j=0;j<samples; j++){
+     uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,2147483648};
+     uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,34424242};
+     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
+     uint32_t r[NWORDS_256BIT];
+     montmult_h(r, a, b, pidx);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed = (double) (end.tv_sec - start.tv_sec);
+  elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  printf("Time(Test_Mul %u) Time : %f\n", samples, elapsed);
+  printf("\033[0m");
+
+  return retval;
+
 }
-#endif
+
+uint32_t test_addm_prof(void)
+{
+
+ uint32_t samples=0;
+ int pidx=1;
+ uint32_t retval=0;
+ struct timespec start, end;
+ double elapsed=0.0;
+     
+ init_h();
+ samples = 1000000000;
+ clock_gettime(CLOCK_MONOTONIC, &start);
+
+ #pragma omp parallel for 
+ for (uint32_t j=0;j<samples; j++){
+     uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,2147483648};
+     uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,34424242};
+     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
+     uint32_t r[NWORDS_256BIT];
+     addm_h(r, a, b, pidx);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed = (double) (end.tv_sec - start.tv_sec);
+  elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  printf("Time(Test_Addm %u) : Time : %f\n", samples, elapsed);
+  printf("\033[0m");
+
+  return retval;
+
+}
+
+uint32_t test_subm_prof(void)
+{
+
+ uint32_t samples=0;
+ int pidx=1;
+ uint32_t retval=0;
+ struct timespec start, end;
+ double elapsed=0.0;
+     
+ init_h();
+ samples = 1000000000;
+ clock_gettime(CLOCK_MONOTONIC, &start);
+
+ #pragma omp parallel for 
+ for (uint32_t j=0;j<samples; j++){
+     uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,2147483648};
+     uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,34424242};
+     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
+     uint32_t r[NWORDS_256BIT];
+     subm_h(r, a, b, pidx);
+  }
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed = (double) (end.tv_sec - start.tv_sec);
+  elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  printf("Time(Test_Subm %u) : Time : %f\n", samples, elapsed);
+  printf("\033[0m");
+
+  return retval;
+
+}
+
+
 uint32_t test_mul5(void)
 {
    uint32_t r[NWORDS_256BIT]; 
@@ -8109,11 +8129,16 @@ uint32_t test_nttmul_randomsize(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
+   uint32_t min_k=6, max_k = CusnarksGetNRoots();
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f)); 
    init_h();
 
-   for (k=6; k < 21; k++){
+   if (max_k > 21) {
+     max_k = 21;
+   }
+
+   for (k=min_k; k < max_k; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
      
      ntt_build_h(&fft_params, npoints_raw);
@@ -8216,9 +8241,12 @@ uint32_t test_interpol_mul_randomsize(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
-   uint32_t min_k=6, max_k = CusnarksGetNRoots();
    time_t start2, end2, start3, end3;
+   uint32_t min_k=6, max_k = CusnarksGetNRoots();
 
+   if (max_k > 22) {
+     max_k = 22;
+   }
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
    init_h();
@@ -8437,17 +8465,7 @@ uint32_t  test_inv()
   uint32_t retval=0;
 
 
-  for (i=0; i < 1000; i++){
-     setRandom256(x,1, N);
-     if (compu256_h(x,zero) == 0){ continue;}  
-     montinv_h(xr, x, pidx);
-     from_montgomery_h(xr, xr, pidx);
-     montmult_h(xr, xr, x, pidx);
-     if (compu256_h(xr,one)){
-      n_errors++;
-    }
-  }
-  for (; i < 2000; i++){
+  for (i=0; i < 50000; i++){
      setRandom256(x,1, N);
      if (compu256_h(x,zero) == 0){ continue;}  
      montinv_h(xr, x, pidx);
@@ -8457,17 +8475,7 @@ uint32_t  test_inv()
       n_errors++;
     }
   }
-  for (; i < 3000; i++){
-     setRandom256(x,1, N);
-     if (compu256_h(x,zero) == 0){ continue;}  
-     to_montgomery_h(x, x, pidx);
-     montinv_h(xr, x, pidx);
-     montmult_h(xr, xr, x, pidx);
-     from_montgomery_h(xr, xr, pidx);
-     if (compu256_h(xr,one)){
-      n_errors++;
-    }
-  }
+
   if (n_errors){
     printf("\033[1;31m");
   }
@@ -8546,7 +8554,7 @@ uint32_t  test_inv_ext2()
   uint32_t n_errors=0;
   uint32_t retval=0;
 
-  for (i=0; i < 3000; i++){
+  for (i=0; i < 50000; i++){
      setRandom256(x,2, N);
      if (compu256_h(x,zero) == 0){ continue;}  
      to_montgomery_h(x, x, pidx);
@@ -8714,7 +8722,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    if (n_errors){
     printf("\033[1;31m");
    }
-   printf("N errors(JACREDUCE_OPT %d) : %d\n",ec2,n_errors);
+   printf("N errors(JACREDUCE_OPT %d : %d) : %d\n",ec2,nec_points,n_errors);
    printf("\033[0m");
    retval += n_errors;
 
@@ -8725,6 +8733,82 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    release_h();
    return retval;
 }
+
+uint32_t  test_ec_jacreduce_opt_prof(uint32_t ec2)
+{
+   uint32_t indims = ECP_JAC_INDIMS;
+   uint32_t outdims = ECP_JAC_OUTDIMS;
+   uint32_t retval=0;
+   uint32_t n_reps = 4096;
+   if (ec2) {
+        indims = ECP2_JAC_INDIMS;
+        outdims = ECP2_JAC_OUTDIMS;
+   }
+
+   struct stat st;
+
+   if (ec2){
+     stat(input2_test_scmul_filename, &st);
+   } else {
+     stat(input_test_scmul_filename, &st);
+   }
+	    
+   uint32_t  nec_points = st.st_size/(NWORDS_256BIT*sizeof(uint32_t)*(indims+1));
+   uint32_t *scl, *in_ecp, *out_ecp1, *out_ecp2,*samples,  *r_aff;
+   uint32_t i;
+   uint32_t n_errors=0;
+
+   init_h();
+
+   samples = (uint32_t *) malloc( n_reps * nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   out_ecp1 = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
+   jacadd_reduced_t *args = (jacadd_reduced_t *)malloc(sizeof(jacadd_reduced_t));
+
+   if (ec2){
+     readU256DataFile_h(samples, input2_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+   } else {
+     readU256DataFile_h(samples, input_test_scmul_filename,
+                       nec_points * outdims, nec_points * outdims);
+   }
+
+   for (i=1; i < n_reps; i++){
+     memcpy(&samples[i*outdims*nec_points*NWORDS_256BIT], samples, nec_points * outdims);
+   }
+
+   scl = samples;
+   in_ecp = &samples[n_reps * nec_points * NWORDS_256BIT];
+
+   struct timespec start, end;
+   double elapsed=0.0;
+   clock_gettime(CLOCK_MONOTONIC, &start);
+
+   if (ec2){ 
+     // Multiply points
+     ec2_jacreduce_h(out_ecp1, scl, in_ecp, n_reps * nec_points, 0, 1, 1, 1);
+   } else{
+     // Multiply points
+     args->out_ep = out_ecp1;
+     args->scl = scl;
+     args->x = in_ecp;
+     args->n = n_reps * nec_points;
+     args->pidx = 0;
+     ec_jacreduce_server_h(args);
+   }
+
+   clock_gettime(CLOCK_MONOTONIC, &end);
+   elapsed = (double) (end.tv_sec - start.tv_sec);
+   elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+   printf("Time(Test JACREDUCE_OPT %d : %d) : %f\n",ec2,n_reps*nec_points,elapsed);
+   printf("\033[0m");
+
+   free(samples);
+   free(out_ecp1);
+   free(args);
+   release_h();
+   return retval;
+}
+
 
 uint32_t test_transpose(void)
 {
@@ -8816,8 +8900,9 @@ int main()
   uint32_t retval;
 
   retval+=test_mul();  // test montgomery mul with predefined results
-  //test_mul3(); // test SOS impl of montgomery mul
-  //test_mul4(); // test SOS impl of montgomery squaring
+  retval+=test_mul_prof();  // Profile montgomery mul 
+  retval+=test_addm_prof();  // Profile addm
+  retval+=test_subm_prof();  // Profile subm
 
   //test_mul5(); // test FIOS impl of montgomery squaring
   retval+=test_findroots();
@@ -8848,7 +8933,6 @@ int main()
   retval+=test_shlr();
   retval+=test_shll();
   retval+=test_setgetbit();
-
   retval+=test_inv();
 
   retval+=test_mul_ext();
@@ -8859,7 +8943,10 @@ int main()
   retval+=test_ec_jacscmul(1);    // EC2
    
   retval+=test_ec_jacreduce_opt(0);   // EC1
-  retval+=test_ec_jacreduce_opt(1);   // EC2
+  //retval+=test_ec_jacreduce_opt(1);   // EC2
+
+  retval+=test_ec_jacreduce_opt_prof(0);   // EC1
+  //retval+=test_ec_jacreduce_opt_prof(1);   // EC2
 
   if (retval){
     printf("\033[1;31m");

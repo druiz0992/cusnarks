@@ -164,6 +164,17 @@ __device__ void mulz(Z2_t *z,  Z2_t *x, Z2_t *y, mod_t midx)
   mulmontu256_2(z->getu256(), x->getu256(), y->getu256(), midx);  
 }
 
+__device__ void invz(Z2_t *z,  Z2_t *x,  mod_t midx)
+{
+  invmontu256_2(z->getu256(), x->getu256(), midx );
+}
+
+__device__ void div2z(Z2_t *z,  Z2_t *x)
+{
+  div2u256(z->getu256(), x->getu256());
+  div2u256(z->get2u256(), x->get2u256());
+}
+
 __device__ void mul2z(Z2_t *z,  Z2_t *x, mod_t midx)
 {
   addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
