@@ -1555,7 +1555,7 @@ __device__ void scmulecjac_step_l2r2(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset
    //addecjacmixed<T1, T2> (Q,0, N,b*3, Q,0, midx);
    //*cdouble = *cdouble +1;
    if (b){
-     logInfoTid("cdouble : %d\n",*cdouble);
+     //logInfoTid("cdouble : %d\n",*cdouble);
      //doublecjac<T1, T2>(Q,Q, *cdouble, midx);
      addecjac<T1, T2> (Q,0, N,b*3, Q,0, midx);
      //*cdouble=0;
