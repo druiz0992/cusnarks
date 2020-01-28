@@ -49,6 +49,7 @@ PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
 CTEST_PATH = $(CUSNARKS_PATH)/test/c
+CTEST_IDEAS_PATH = $(CUSNARKS_PATH)/test/ideas
 CONFIG_PATH= $(CUSNARKS_PATH)/config
 
 AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
@@ -151,13 +152,18 @@ test_gpu:
 	@for i in $(PYTST_PATH); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
+debug_gpu:   
+	@for i in $(CTEST_IDEAS_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 config:   
 	@for i in $(CONFIG_SUBDIRS); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
 
 clean:
-	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(SCRIPTS_SUBDIRS); do \
+	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(SCRIPTS_SUBDIRS) $(CTEST_IDEAS_PATH); do \
 	echo "clearing all in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
@@ -179,5 +185,5 @@ third_party_libs:
 third_party_libs_clean:
 	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
 
-.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_cpu test_gpu
+.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_cpu test_gpu debug_gpu
 

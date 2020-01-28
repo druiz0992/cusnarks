@@ -54,7 +54,7 @@ main()
       kconfig[i].kernel_idx = CB_ZPOLY_FFT3DXX;
     }
     
-    t = z1poly->kernelLaunch(&out_vector, &in_vector, kconfig, kparams,1);
+    t = z1poly->kernelLaunch(&out_vector, &in_vector, kconfig, kparams,0,0,1);
 
     printf("Time : %f\n",t);
     printf("IN\n");
