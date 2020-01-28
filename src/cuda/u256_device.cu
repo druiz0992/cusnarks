@@ -465,6 +465,7 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
     }
 
     mulmontu256(U, (const uint32_t *)A, (const uint32_t *) B, params->midx);
+    logInfoBigNumberTid(1,"U\n",(uint32_t *)U);
 
    return;
 }
@@ -713,8 +714,8 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
     //movu256(Br,(uint32_t *)B);
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    //logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
-    //logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
+    logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
+    logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
     #pragma unroll
     for(i=0; i<NWORDS_256BIT; i++)
     {
@@ -884,6 +885,7 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    } else {
        movu256(U,T);
    }
+   logInfoBigNumberTid(1,"U\n",(uint32_t *)U);
    return;
 }
 
