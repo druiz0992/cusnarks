@@ -104,7 +104,8 @@ if __name__ == "__main__":
  
          print("Compiling Circuit......\n")
          RUST_COMMAND = RUST_COMMAND_1
-         if os.path.exists(rust_folder+RUST_COMMAND_2):
+         print(rust_folder+RUST_COMMAND_2)
+         if os.path.exists(rust_folder+"/"+RUST_COMMAND_2):
              RUST_COMMAND = RUST_COMMAND_2
 
          call([RUST_COMMAND, RUST_GEN_CONSTRAINTS_COMPILE_OPT, RUST_GEN_CONSTRAINTS_CUDA_OPT+INPUT_CIRCUIT_F])
