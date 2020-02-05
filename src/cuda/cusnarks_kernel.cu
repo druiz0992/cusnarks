@@ -243,8 +243,8 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size, uint32
 
       // Allocate kernel params in global memory 
       CCHECK(cudaMalloc((void**) &this->params_device[i][j], sizeof(kernel_params_t)));
-      logInfo("in size (%d-%d) : %d, data  in: %x, data out : %x, params : %x \n",
-          i,j,in_size,
+      logInfo("in size (%d-%d) : %d, out size : %d,  data  in: %x, data out : %x, params : %x \n",
+          i,j,in_size, out_size,
           this->in_vector_device[i][j].data,
           this->out_vector_device[i][j].data,
           this->params_device[i][j]);
@@ -303,7 +303,7 @@ void CUSnarks::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod=NUL
     //uint32_t size_sample = in_vector_device.size / (in_vector_device.length * sizeof(uint32_t));
     //rng->randu256(samples, n_samples * size_sample, 1);
     //rng->randu256(samples, n_samples, mod);
-    setRandom256(samples, n_samples, mod);
+    setRandom256(samples, n_samples,0,7, mod);
 }
 
 void CUSnarks::saveFile(uint32_t *samples, uint32_t n_samples, char *fname)
@@ -410,6 +410,7 @@ double CUSnarks::kernelLaunch(
 {
   uint32_t i;
   
+  double start_launch = elapsedTime();
   // check input lengths do not exceed reserved amount
   if (in_vector_host->length > in_vector_device[gpu_id][stream_id].length) { 
     logInfo("Error IVHL : %d >  IVDL : %d\n",in_vector_host->length, in_vector_device[gpu_id][stream_id].length);
@@ -429,7 +430,7 @@ double CUSnarks::kernelLaunch(
         out_vector_host->length *
                (out_vector_device[gpu_id][stream_id].size / out_vector_device[gpu_id][stream_id].length );
 
-  double end_copy_in=0.0, end_copy_out=0.0, total_kernel=0.0;
+  double end_copy_in=0.0, end_copy_out=0.0, total_kernel=0.0, total_launch;
   double start_copy_in, start_kernel, end_kernel,start_copy_out;
 
   int blockD, gridD, smemS, kernel_idx;
@@ -539,8 +540,10 @@ double CUSnarks::kernelLaunch(
             stream[gpu_id][stream_id]));
      }
   }
-  end_copy_out = elapsedTime() - start_copy_out;
-  _total_end = elapsedTime() - _total_start;
+  total_launch = elapsedTime();  
+  end_copy_out = total_launch - start_copy_out;
+  _total_end = total_launch - _total_start;
+  total_launch = total_launch - start_launch;
   logInfo("Out Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
         out_data_host[gpu_id][stream_id], gpu_id, stream_id, end_copy_out);
   logInfo("Kernel total time : %f,\n\n", _total_end);
@@ -561,8 +564,10 @@ double CUSnarks::kernelLaunch(
   logInfo("Time Elapsed Xfering out %d bytes : %f sec\n",
           out_vector_host->size, end_copy_out);
 
-  return _total_end; // processing time + xfer time
-  //return total_kernel; // processing time
+  //return 0.0;
+  //return total_launch; // processing time + xfer time
+  //return _total_end; // processing time + xfer time
+  return total_kernel; // processing time
   //return end_copy_in;   // xfer in time
   //return end_copy_out;  // xfer out time
 }

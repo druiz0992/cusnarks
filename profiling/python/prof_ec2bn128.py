@@ -46,6 +46,7 @@ from zfield import *
 from zpoly import *
 from constants import *
 from ecc import *
+from cuda_wrapper import *
 
 logging.basicConfig(level=logging.DEBUG,
                     format='[%(processName)s] %(asctime)s %(levelname)s %(message)s')
@@ -55,25 +56,44 @@ sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 from pycusnarks import *
 
 sys.path.append('../../src/python')
-ZPOLY_datafile = '../../data/zpoly_data_1M.npz'
 
 def profile_ec2bn128():
 
-    niter = 2
+    nkernels = 1
+    nsamples = 1<<20
+    sort_en = 1
+    n_gpu = 1
+    max_streams = N_STREAMS_PER_GPU - 1
+    #n_streams = max_streams
+    n_streams = -1
+    if n_streams < 0:
+        n_streams=0
+
+    niter = n_streams * n_gpu
+    if niter == 0:
+        niter = n_gpu
+
     curve_data = ZUtils.CURVE_DATA['BN128']
     prime = ZUtils.CURVE_DATA['BN128']['prime']
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
     ECC.init(curve_data['curve_params'])
-    nsamples = 1<<20
-    cu_ec2bn128 = EC2BN128(2*nsamples+3, seed=560)
     pu256 = BigInt(prime).as_uint256()
 
+    midx = MOD_GROUP
+    G = to_montgomeryN_h( np.asarray([45883430, 2390996433, 1232798066, 3706394933, 2541820639, 4223149639, 2945863739,  425146433,
+                          2288773622, 1637743261, 4120812408, 4269789847,  589004286, 4288551522, 2929607174,  687701739,   
+                          2823577920, 2947838845, 1476581572, 1615060314, 1386229638,  166285564,  988445547,  352252035,  
+                          3340261102, 1678334806,  847068347, 3696752930,  859115638, 1442395582, 2482857090,  228892902,
+                          1,0,0,0,0,0,0,0,
+                          0,0,0,0,0,0,0,0], dtype=np.uint32),midx)
+    G = np.reshape(G,-1)
 
-    nkernels = 1
+    cu_ec2bn128 = EC2BN128(2*nsamples+3, seed=560)
 
     #my_kernels = [CB_EC2_JACAFF_ADD , CB_EC2_JAC_ADD , CB_EC2_JACAFF_DOUBLE,
                   #CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CM_EC2_JAC_MUL1, CB_EC2_JAC_MAD_SHFL]
-    my_kernels = [CB_EC2_JAC_MAD_SHFL]
+    #my_kernels = [CB_EC2_JAC_MAD_SHFL]
+    my_kernels = [CB_EC2_JAC_ADD]
     #my_kernels = [CB_EC2_JAC_ADD, CB_EC2_JAC_DOUBLE]
     #my_kernels = [CB_EC2_JAC_DOUBLE]
 
@@ -83,17 +103,20 @@ def profile_ec2bn128():
       kernel_stats = []
 
       # Test ECBN kernel:
+      kernel_params['in_length'] = [6*nsamples]
+      kernel_params['out_length'] = 6*nsamples
+      kernel_params['stride'] = [3]
+      kernel_params['premod'] = [0]
+      kernel_params['midx'] = [MOD_GROUP]
+  
       kernel_config['smemS'] = [0]
       kernel_config['blockD'] = [128]
-      kernel_params['padding_idx'] = [0]
-      kernel_params['premod'] = [0]
-      kernel_params['midx'] = [MOD_FIELD]
       kernel_config['gridD'] = [0]
       kernel_config['kernel_idx'] = [k]
      
       if kernel_config['kernel_idx'][0] == CB_EC2_JACAFF_ADD:
             kernel_params['in_length'] = [nsamples * ECP2_JAC_INDIMS]
-            kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS) / 2
+            kernel_params['out_length'] = int((nsamples * ECP2_JAC_OUTDIMS) / 2)
             kernel_params['stride'] = [2 * ECP2_JAC_INDIMS]
 
       if kernel_config['kernel_idx'][0] == CB_EC2_JAC_ADD :
@@ -119,38 +142,70 @@ def profile_ec2bn128():
 
   
       if kernel_config['kernel_idx'][0] == CB_EC2_JAC_MAD_SHFL:
-         kernel_params['stride'] = [ECP2_JAC_INDIMS + U256_NDIMS, ECP2_JAC_OUTDIMS, ECP2_JAC_OUTDIMS]
-         kernel_config['blockD'] = [128,128,64]
-         kernel_params['premul'] = [1,0,0]
-         kernel_params['premod'] = [0,0,0]
-         kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD]
-         kernel_config['smemS'] = [kernel_config['blockD'][0]/32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4, \
-                                   kernel_config['blockD'][1]/32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4, \
-                                   kernel_config['blockD'][2]/32 * NWORDS_256BIT * ECP2_JAC_OUTDIMS * 4]
-         kernel_config['kernel_idx'] = [CB_EC2_JAC_MAD_SHFL, CB_EC2_JAC_MAD_SHFL, CB_EC2_JAC_MAD_SHFL]
-         out_len1 = ECP2_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][0]*kernel_params['stride'][0]/ (ECP2_JAC_INDIMS + U256_NDIMS)) -1) /
-                                   (kernel_config['blockD'][0]*kernel_params['stride'][0]/ (ECP2_JAC_INDIMS + U256_NDIMS)))
-         out_len2 = ECP2_JAC_OUTDIMS * ((nsamples + (kernel_config['blockD'][1]*kernel_params['stride'][1]/ (ECP2_JAC_INDIMS + U256_NDIMS)) -1) /
-                                   (kernel_config['blockD'][1]*kernel_params['stride'][1]/ (ECP2_JAC_INDIMS + U256_NDIMS)))
-         kernel_params['in_length'] = [nsamples * (ECP2_JAC_INDIMS+U256_NDIMS), out_len1, out_len2]
-         kernel_params['out_length'] = 1 * ECP2_JAC_OUTDIMS
-         kernel_params['padding_idx'] = [0,0,0]
-         kernel_config['gridD'] = [0,1,1]
-         min_length = [ECP2_JAC_OUTDIMS * \
-                          (kernel_config['blockD'][idx] ) for idx in range(len(kernel_params['stride']))]
-         nkernels = 3
   
+         outdims = ECP2_JAC_OUTDIMS
+         indims_e = ECP2_JAC_INDIMS + U256_NDIMS
+ 
+         kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM),8)
+
+         kernel = CB_EC2_JAC_MAD_SHFL
+         nkernels = len(kernel_config['blockD'])
+         kernel_params['stride']    = [outdims] * nkernels
+         kernel_params['stride'][0]    =  indims_e
+         kernel_params['premul']    = [0] * nkernels
+         kernel_params['premul'][0] = 1
+         kernel_params['premod']    = [0] * nkernels
+         kernel_params['midx']      = [0] * nkernels
+         kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
+         kernel_config['kernel_idx'] =[kernel] * nkernels
+         kernel_params['in_length'] = [nsamples* indims_e]*nkernels
+         for l in xrange(1,nkernels):
+           kernel_params['in_length'][l] = outdims * (
+               int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
+             (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
+
+         kernel_params['out_length'] = 1 * outdims
+         kernel_params['padding_idx'] = [1] * nkernels
+         kernel_config['gridD'] = [0] * nkernels
+         kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
+         kernel_config['gridD'][nkernels-1] = 1
+         #nkernels = 1
+         if nkernels == 1:
+             print("Warning : Only 1 kernel enabled")
+         sort_en = 1
+         print("Sort enable : "+str(sort_en))
+
+
+      niter = 10
       for i in range(niter):
-         ec2bn128_vector = cu_ec2bn128.randu256(5*nsamples,pu256)
-         idx_v = sortu256_idx_h(ec2bn128_vector[:nsamples])
-         input_vector = np.concatenate((ec2bn128_vector[:nsamples][idx_v], ec2bn128_vector[nsamples:]))
-         _,kernel_time = cu_ec2bn128.kernelLaunch(input_vector, kernel_config, kernel_params,n_kernels = nkernels)
+         gpu_id=i%n_gpu
+         if n_streams:
+           stream_id = int(i/n_gpu)+1
+         else:
+           stream_id = 0
+
+         print(gpu_id, stream_id)
+
+         ec2bn128_vector = cu_ec2bn128.randu256(nsamples,pu256)
+         tmp = ec2_jacscmulx1_h(np.reshape(ec2bn128_vector[:nsamples*NWORDS_256BIT],-1), G, midx, 0)
+
+         if my_kernels[0] == CB_EC2_JAC_MAD_SHFL:
+           tmp = ec2_jac2aff_h(np.reshape(tmp,-1), midx, 1)
+           ec2bn128_vector = np.concatenate((ec2bn128_vector, tmp))
+           idx_v = sortu256_idx_h(ec2bn128_vector[:nsamples],sort_en)
+           input_vector = np.concatenate((ec2bn128_vector[:nsamples][idx_v], ec2bn128_vector[nsamples:]))
+         else:
+             input_vector = tmp
+
+         _,kernel_time = cu_ec2bn128.kernelLaunch(input_vector, kernel_config, kernel_params,gpu_id,n_streams,n_kernels = nkernels)
          if i :
              kernel_stats.append(kernel_time)
   
       
-      logging.info("Kernel %s : - Max : %s [s], Min : %s [s], Mean : %s[s]" % (k, np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
+      if niter > 1:
+        logging.info("Kernel %s : - Max : %s [s], Min : %s [s], Mean : %s[s]" % (k, np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
   
+      sys.exit(1)
   
   
 if __name__ == "__main__":

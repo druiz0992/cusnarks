@@ -20,6 +20,7 @@ CUSNARKS_LIB=$(CUSNARKS_LIB)
 CUBIN_NAME=$(CUBIN_NAME)
 AUX_INCLUDES=$(AUX_INCLUDES)
 DEFINES=$(DEFINES)
+DEFINES_DEBUG=$(DEFINES_DEBUG)
 
 LOG_LEVEL=$(LOG_LEVEL)
 
@@ -29,7 +30,7 @@ ASM = nasm
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
 DEBUG=0
 ifeq ($(DEBUG),1)
-  CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE -std=c++11 -I $(INCLUDE_PATH) -w
+  CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE $(DEFINES_DEBUG) -std=c++11 -I $(INCLUDE_PATH) -w
   CUFLAGS=-rdc=true -G -O3 --source-in-ptx -keep --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v -Xptxas -maxrregcount=120 --cudart shared $(GENCODE_ARCH_COMPUTE)
 else
   CFLAGS=-c -O3 -DLINUXINTEL64 -lineinfo $(DEFINES) -std=c++11 -I $(INCLUDE_PATH) -w

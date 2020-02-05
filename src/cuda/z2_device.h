@@ -78,6 +78,9 @@ __device__ void xeccz(Z2_t *z, Z2_t *x);
 __device__ void yeccz(Z2_t *z, Z2_t *x);
 __device__ void zeccz(Z2_t *z, Z2_t *x);
 __device__ void infz(Z2_t *z, mod_t midx);
+__device__ void addecjacz(Z2_t *zxr, uint32_t zoffset, Z2_t *zx1, uint32_t x1offset, Z2_t *zx2, uint32_t x2offset, mod_t midx);
+__device__ void doublecjacz(Z2_t *zxr, Z2_t *zx1, mod_t midx);
+__device__ void scmulec_stepz(Z2_t *Q,Z2_t *N, uint32_t *scl, uint32_t msb,  mod_t midx );
 
 
 #endif
