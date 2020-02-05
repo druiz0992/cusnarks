@@ -114,7 +114,7 @@
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
 
-#define N_STREAMS_PER_GPU (1+4)
+#define N_STREAMS_PER_GPU (1+5)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
@@ -307,6 +307,7 @@ typedef enum{
    CB_U256_SHL1,
    CB_U256_SHL,
    CB_U256_ALMINV,
+   CB_U256_MULM2,
    CB_U256_N
 
 }u256_callback_t;

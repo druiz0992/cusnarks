@@ -91,7 +91,7 @@ using namespace std;
 // kernel callbacks indexed by XXX_callback_t enum type
 static kernel_cb u256_kernel_callbacks[] = {addmu256_kernel, submu256_kernel, modu256_kernel, mulmontu256_kernel,
                                             addmu256_reduce_kernel, addmu256_reduce_shfl_kernel, shr1u256_kernel,
-                                            shl1u256_kernel, shlu256_kernel, almmontinvu256_kernel};
+                                            shl1u256_kernel, shlu256_kernel, almmontinvu256_kernel, mulmontu256_2_kernel};
 
 /*
     Constructor : Reserves GPU memory and data initialization.

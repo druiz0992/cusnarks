@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <time.h>
+#include <omp.h>
 #include "types.h"
 #include "constants.h"
 #include "utils_host.h"
@@ -7190,30 +7191,39 @@ uint32_t test_mul(void)
 
 uint32_t test_mul_prof(void)
 {
+  uint32_t nsamples=1<<25;
+  int pidx=1;
+  uint32_t retval=0;
+  struct timespec start, end;
+  double elapsed=0.0;
+  uint32_t ncores = get_nprocs_conf();
+  
+  const uint32_t *P =  CusnarksPGet((mod_t)pidx);
+  uint32_t *a = (uint32_t *) malloc( ncores * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *b = (uint32_t *) malloc( ncores * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *r = (uint32_t *) malloc( ncores * NWORDS_256BIT * sizeof(uint32_t));
+ 
+  setRandom256(a, ncores, 0, 8, P);
+  setRandom256(b, ncores, 0, 8, P);
+ 
+  init_h();
+  clock_gettime(CLOCK_MONOTONIC, &start);
 
- uint32_t samples=0;
- int pidx=1;
- uint32_t retval=0;
- struct timespec start, end;
- double elapsed=0.0;
-     
- init_h();
- samples = 1000000000;
- clock_gettime(CLOCK_MONOTONIC, &start);
-
- #pragma omp parallel for 
- for (uint32_t j=0;j<samples; j++){
-     uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,2147483648};
-     uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,34424242};
-     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
-     uint32_t r[NWORDS_256BIT];
-     montmult_h(r, a, b, pidx);
+  #pragma omp parallel for 
+  for (uint32_t i=0; i< nsamples; i++){ 
+    uint32_t tid = omp_get_thread_num();
+    montmult_h(&r[tid*NWORDS_256BIT], (const uint32_t *) &a[tid*NWORDS_256BIT],(const uint32_t *) &b[tid*NWORDS_256BIT], pidx);
   }
+ 
   clock_gettime(CLOCK_MONOTONIC, &end);
   elapsed = (double) (end.tv_sec - start.tv_sec);
   elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
-  printf("Time(Test_Mul %u) Time : %f\n", samples, elapsed);
+  printf("Time(Test_Mul N samples : %u) Time : %f\n", nsamples, elapsed);
   printf("\033[0m");
+
+  free(r);
+  free(a);
+  free(b);
 
   return retval;
 
@@ -7236,7 +7246,6 @@ uint32_t test_addm_prof(void)
  for (uint32_t j=0;j<samples; j++){
      uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,2147483648};
      uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,34424242};
-     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
      uint32_t r[NWORDS_256BIT];
      addm_h(r, a, b, pidx);
   }
@@ -7267,7 +7276,6 @@ uint32_t test_subm_prof(void)
  for (uint32_t j=0;j<samples; j++){
      uint32_t b[] = {2342242,2242424,244646,21313,325432535,24242,24242,2147483648};
      uint32_t a[] = {2342242,2242424,244646,21313,325432535,24242,24242,34424242};
-     uint32_t c[] = {2342242,2242424,244646,21313,325432535,24242,24242,424242};
      uint32_t r[NWORDS_256BIT];
      subm_h(r, a, b, pidx);
   }
@@ -8424,6 +8432,78 @@ uint32_t  test_shll(void)
   return retval;
 }
 
+uint32_t test_interpol_mul_randomsize_prof(void)
+{
+   int i,j,k;
+   int pidx=1;
+   int n_errors=0;
+   fft_params_t fft_params;
+   int Nrows,Ncols,fft_Nyx,fft_Nxx;
+   const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   uint32_t *X1,*X2,*X3;
+   uint32_t *Y1,*Y2,*Y3;
+   uint32_t *R;
+   uint32_t *roots, *iroots;
+   ntt_interpolandmul_t *args;
+   char roots_f[1000];
+   int cusnarks_nroots = 1 << CusnarksGetNRoots();
+   uint32_t npoints_raw, npoints, nroots;
+   uint32_t retval=0;
+   uint32_t min_k=22, max_k = CusnarksGetNRoots();
+   struct timespec start, end;
+   double elapsed=0.0;
+     
+   CusnarksGetFRoots(roots_f, sizeof(roots_f));
+
+   init_h();
+   X1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   Y1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   roots = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
+
+   args->A = X1; args->B = Y1; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
+   args->rstride=2;
+   readU256DataFile_h(roots,roots_f,cusnarks_nroots,cusnarks_nroots);
+   memset(X1,0, NWORDS_256BIT * sizeof(uint32_t) * cusnarks_nroots); 
+   memset(Y1,0, NWORDS_256BIT * sizeof(uint32_t) * cusnarks_nroots); 
+   setRandom256(X1, cusnarks_nroots/2, N);
+   setRandom256(Y1, cusnarks_nroots/2, N);
+
+   printf("Starting log2 N constraints: %d\n",min_k-1);
+   for (k=min_k; k <= max_k; k++){
+     clock_gettime(CLOCK_MONOTONIC, &start);
+     npoints_raw = 1 << k;
+     
+     ntt_build_h(&fft_params, npoints_raw);
+     npoints = npoints_raw + fft_params.padding;
+     nroots = npoints;
+
+     Nrows = k/2;
+     Ncols = k - Nrows;
+
+     args->Nrows = Nrows; args->Ncols=Ncols-1; args->nroots=1<<(Nrows+Ncols); 
+     R = ntt_interpolandmul_server_h(args);
+
+     clock_gettime(CLOCK_MONOTONIC, &end);
+     elapsed = (double) (end.tv_sec - start.tv_sec);
+     elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+     //printf("Time(FFTMUL-PARALLEL-SERVER - %d) Time : %f\n", 1 << (Nrows+Ncols), elapsed);
+     printf("%lld\n",(long long unsigned int) (elapsed*1000));
+    }
+    
+    
+    printf("\033[0m");
+    free(X1);
+    free(Y1);
+    free(roots);
+    free(args);
+
+    release_h();
+    return 0;
+
+}
+
+
 uint32_t  test_setgetbit()
 {
   int pidx = 0;
@@ -8514,6 +8594,44 @@ uint32_t  test_mul_ext()
 
   return retval;
      
+}
+
+uint32_t test_mul_ext_prof(void)
+{
+  uint32_t nsamples=1<<25;
+  int pidx=1;
+  uint32_t retval=0;
+  struct timespec start, end;
+  double elapsed=0.0;
+  uint32_t ncores = get_nprocs_conf();
+ 
+  const uint32_t *P =  CusnarksPGet((mod_t)pidx);
+  uint32_t *a = (uint32_t *) malloc( 2*ncores * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *b = (uint32_t *) malloc( 2*ncores * NWORDS_256BIT * sizeof(uint32_t));
+  uint32_t *r = (uint32_t *) malloc( 2*ncores * NWORDS_256BIT * sizeof(uint32_t));
+      
+  setRandom256(a, 2*ncores, 0, 8, P);
+  setRandom256(b, 2*ncores, 0, 8, P);
+  
+  init_h();
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  
+  #pragma omp parallel for 
+  for(uint32_t i=0; i < nsamples; i++){
+    uint32_t tid = omp_get_thread_num();
+    montmult_ext_h(&r[tid * 2* NWORDS_256BIT], 
+		    (const uint32_t *) &a[tid*2*NWORDS_256BIT],
+		    (const uint32_t *) &b[tid*2*NWORDS_256BIT], pidx);
+  }
+ 
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  elapsed = (double) (end.tv_sec - start.tv_sec);
+  elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  printf("Time(Test_Mul Ext. N samples :  %u) Time : %f\n", nsamples, elapsed);
+  printf("\033[0m");
+
+   return retval;
+
 }
 
 uint32_t  test_inv_ext1()
@@ -8772,8 +8890,22 @@ uint32_t  test_ec_jacreduce_opt_prof(uint32_t ec2)
                        nec_points * outdims, nec_points * outdims);
    }
 
+   memcpy(
+	   &samples[n_reps*nec_points*NWORDS_256BIT],
+	   &samples[nec_points * NWORDS_256BIT],
+	   2 * NWORDS_256BIT * sizeof(uint32_t)
+	  );
    for (i=1; i < n_reps; i++){
-     memcpy(&samples[i*outdims*nec_points*NWORDS_256BIT], samples, nec_points * outdims);
+     memcpy(   
+	     &samples[i*nec_points*NWORDS_256BIT],
+             samples,
+	     nec_points * NWORDS_256BIT * sizeof(uint32_t)
+	    );
+     memcpy(
+             &samples[n_reps * nec_points*NWORDS_256BIT+i*nec_points*2*NWORDS_256BIT],
+	     &samples[i*nec_points*NWORDS_256BIT], 
+	     2 * nec_points * NWORDS_256BIT * sizeof(uint32_t)
+	   );
    }
 
    scl = samples;
@@ -8899,10 +9031,14 @@ int main()
 {
   uint32_t retval;
 
-  retval+=test_mul();  // test montgomery mul with predefined results
   retval+=test_mul_prof();  // Profile montgomery mul 
+  retval+=test_mul_ext_prof();  // Profile montgomery mul 
+  retval+=test_interpol_mul_randomsize_prof();
+  retval+=test_ec_jacreduce_opt_prof(0);   // EC1
   retval+=test_addm_prof();  // Profile addm
   retval+=test_subm_prof();  // Profile subm
+
+  retval+=test_mul();  // test montgomery mul with predefined results
 
   //test_mul5(); // test FIOS impl of montgomery squaring
   retval+=test_findroots();
@@ -8934,8 +9070,8 @@ int main()
   retval+=test_shll();
   retval+=test_setgetbit();
   retval+=test_inv();
-
   retval+=test_mul_ext();
+
   retval+=test_inv_ext1();
   retval+=test_inv_ext2();
  
@@ -8944,9 +9080,6 @@ int main()
    
   retval+=test_ec_jacreduce_opt(0);   // EC1
   //retval+=test_ec_jacreduce_opt(1);   // EC2
-
-  retval+=test_ec_jacreduce_opt_prof(0);   // EC1
-  //retval+=test_ec_jacreduce_opt_prof(1);   // EC2
 
   if (retval){
     printf("\033[1;31m");

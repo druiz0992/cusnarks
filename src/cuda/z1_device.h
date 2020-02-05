@@ -76,6 +76,8 @@ __device__ void xeccz(Z1_t *z, Z1_t *x);
 __device__ void yeccz(Z1_t *z, Z1_t *x);
 __device__ void zeccz(Z1_t *z, Z1_t *x);
 __device__ void infz(Z1_t *z, mod_t midx);
+__device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1offset, Z1_t *zx2, uint32_t x2offset, mod_t midx);
+__device__ void scmulec_stepz(Z1_t *Q,Z1_t *N, uint32_t *scl, uint32_t msb,  mod_t midx );
 
 
 #endif

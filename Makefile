@@ -110,9 +110,12 @@ AUX_REPOS := $(aux_repos)
 #             2 -> Warning
 #             1 -> Info
 #             0 -> Debug
-# 
+#
 
-DEFINES = -DPARALLEL_EN 
+#DEFINES
+# -DPARALLEL_EN, -DCU_ASM, -DCU_ASM, -DCU_ASM_ECADD
+DEFINES = -DPARALLEL_EN  -DCU_ASM 
+DEFINES_DEBUG = -DCU_ASM
 
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
@@ -126,7 +129,8 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
               'AUX_INCLUDES=$(AUX_INCLUDES)'  \
-              'DEFINES=$(DEFINES)'  
+              'DEFINES=$(DEFINES)'   \
+              'DEFINES_DEBUG=$(DEFINES_DEBUG)'  
   
 build:
 	@for i in $(SUBDIRS); do \

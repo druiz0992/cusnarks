@@ -59,6 +59,7 @@ extern __device__ void modu255(uint32_t __restrict__ *z, const uint32_t __restri
 extern __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 extern __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
 extern __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
+extern __device__ void mulmontu256_2_asm(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx);
 extern __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx);
 extern __device__ uint32_t almmontinvu256(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx);
 extern __device__ uint32_t invmontu256(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx);
@@ -80,6 +81,44 @@ extern __device__ void div2u256(uint32_t __restrict__ *z, const uint32_t __restr
 */
 template <typename T1, typename T2, typename T3>
 __forceinline__ __device__ void addu256(T1 *z, T2 *x, T3 *y)
+{
+  // z[i] = x[i] + y[i] for 8x32 bit words
+  asm ("{                             \n\t"
+      ".reg .u32         %x_;        \n\t"
+      ".reg .u32         %y_;        \n\t"
+      "mov.u32           %x_,%8;     \n\t"
+      "mov.u32           %y_,%9;     \n\t"
+      "add.cc.u32        %0, %x_, %y_;\n\t"             // sum with carry out
+      "mov.u32           %x_,%10;     \n\t"
+      "mov.u32           %y_,%11;     \n\t"
+      "addc.cc.u32       %1, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%12;     \n\t"
+      "mov.u32           %y_,%13;     \n\t"
+      "addc.cc.u32       %2, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%14;     \n\t"
+      "mov.u32           %y_,%15;     \n\t"
+      "addc.cc.u32       %3, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%16;     \n\t"
+      "mov.u32           %y_,%17;     \n\t"
+      "addc.cc.u32       %4, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%18;     \n\t"
+      "mov.u32           %y_,%19;     \n\t"
+      "addc.cc.u32       %5, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%20;     \n\t"
+      "mov.u32           %y_,%21;     \n\t"
+      "addc.cc.u32       %6, %x_, %y_;\n\t"             // sum with carry in and carry out
+      "mov.u32           %x_,%22;     \n\t"
+      "mov.u32           %y_,%23;     \n\t"
+      "addc.u32          %7, %x_, %y_;\n\t"             // sum with carry in 
+      "}                             \n\n"
+      : "=r"(z[0]), "=r"(z[1]), "=r"(z[2]), "=r"(z[3]),
+        "=r"(z[4]), "=r"(z[5]), "=r"(z[6]), "=r"(z[7])
+      : "r"(x[0]), "r"(y[0]), "r"(x[1]), "r"(y[1]),
+        "r"(x[2]), "r"(y[2]), "r"(x[3]), "r"(y[3]),
+        "r"(x[4]), "r"(y[4]), "r"(x[5]), "r"(y[5]),
+        "r"(x[6]), "r"(y[6]), "r"(x[7]), "r"(y[7]));
+}
+__forceinline__ __device__ void addu256(uint32_t *z, const uint32_t *x, const uint32_t *y)
 {
   // z[i] = x[i] + y[i] for 8x32 bit words
   asm ("{                             \n\t"

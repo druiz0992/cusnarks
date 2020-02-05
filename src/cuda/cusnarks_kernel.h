@@ -64,7 +64,6 @@ class CUSnarks {
         void allocateCudaCteResources(void);
         void releaseCudaResources(void);
         void releaseCudaStreamResources(void);
-        double elapsedTime(void);
 
     public:
 
@@ -93,6 +92,7 @@ class CUSnarks {
         uint32_t * streamGetOutputData(uint32_t gpu_id, uint32_t stream_id);
         uint32_t  streamGetOutputDataLen(uint32_t gpu_id, uint32_t stream_id);
         void streamDel(uint32_t gpu_id, uint32_t stream_id);
+        double elapsedTime(void);
 };
 
 #endif

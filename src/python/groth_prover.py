@@ -107,6 +107,10 @@ class GrothProver(object):
 
         random.seed(self.seed) 
 
+        self.sort_en = 0
+        self.compute_ntt_gpu = False
+        self.compute_last_mexp_gpu = True
+
         self.roots_f = cfg.get_roots_file()
         self.n_bits_roots = cfg.get_n_roots()
 
@@ -119,7 +123,8 @@ class GrothProver(object):
         self.ecbn128  = ECBN128(self.batch_size,   seed=self.seed)
         self.ec2bn128 =\
                 EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * self.batch_size), seed=self.seed)
-        self.cuzpoly = ZCUPoly(5*self.batch_size  + 2, seed=self.seed)
+        if self.compute_ntt_gpu:
+            self.cuzpoly = ZCUPoly(5*self.batch_size  + 2, seed=self.seed)
     
         self.out_proving_key_f = out_pk_f
         self.out_proving_key_format = out_pk_format
@@ -179,29 +184,6 @@ class GrothProver(object):
         else:
            self.test_f= self.keep_f + '/' + test_f
 
-        self.sort_en = 0
-        self.compute_ntt_gpu = False
-        self.compute_last_mexp_gpu = True
-
-        logging.info('#################################### ')
-        logging.info('Initializing Groth prover with the following parameters :')
-        logging.info(' - curve : %s',curve)
-        logging.info(' - proving_key_f : %s', proving_key_f)
-        logging.info(' - verification_key_f : %s',verification_key_f)
-        logging.info(' - out_pk_f : %s',out_pk_f)
-        logging.info(' - out_pk_format : %s',out_pk_format) 
-        logging.info(' - test_f : %s',self.test_f)
-        logging.info(' - benchmark_f : %s', benchmark_f)
-        logging.info(' - seed : %s', self.seed)
-        logging.info(' - snarkjs : %s', snarkjs)
-        logging.info(' - keep_f : %s', keep_f)
-        logging.info(' - n available GPUs : %s', self.n_gpu)
-        logging.info(' - n available CPUs : %s', get_nprocs_h())
-        logging.info(' - sort enable : %s', self.sort_en)
-        logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
-        logging.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
-        logging.info('#################################### ')
-  
         # convert data to array of bytes so that it can be easily transfered to shared mem
         if self.test_f :
            self.load_pkdata()
@@ -220,12 +202,13 @@ class GrothProver(object):
         logging.info('Reading Proving Key...')
         readU256PKFileTo_h(self.proving_key_f.encode("UTF-8"), self.pk)
              
-        pkbin_vars = pkbin_get(self.pk,['nVars','domainSize', 'delta_1', 'hExps'])
+        pkbin_vars = pkbin_get(self.pk,['nVars','domainSize', 'delta_1', 'hExps', 'nPublic'])
         nVars = int(pkbin_vars[0][0])
         domainSize = int(pkbin_vars[1][0])
         delta_1 = pkbin_vars[2]
         hExps = pkbin_vars[3]
         hExps[2*(domainSize+1)*NWORDS_256BIT:2*(domainSize+2)*NWORDS_256BIT] = delta_1
+        nPublic = int(pkbin_vars[4][0])
 
         # scl_array
         self.scl_array_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)     
@@ -313,6 +296,28 @@ class GrothProver(object):
         self.neg_rs_scl_sh = RawArray(c_uint32, NWORDS_256BIT)
         self.neg_rs_scl = np.frombuffer(self.neg_rs_scl_sh, dtype=np.uint32)
 
+        logging.info('#################################### ')
+        logging.info('Initializing Groth prover with the following parameters :')
+        logging.info(' - curve : %s',curve)
+        logging.info(' - proving_key_f : %s', proving_key_f)
+        logging.info(' - verification_key_f : %s',verification_key_f)
+        logging.info(' - out_pk_f : %s',out_pk_f)
+        logging.info(' - out_pk_format : %s',out_pk_format) 
+        logging.info(' - test_f : %s',self.test_f)
+        logging.info(' - benchmark_f : %s', benchmark_f)
+        logging.info(' - seed : %s', self.seed)
+        logging.info(' - snarkjs : %s', snarkjs)
+        logging.info(' - keep_f : %s', keep_f)
+        logging.info(' - n available GPUs : %s', self.n_gpu)
+        logging.info(' - n available CPUs : %s', get_nprocs_h())
+        logging.info(' - sort enable : %s', self.sort_en)
+        logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
+        logging.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
+        logging.info(' - N Constraints : %s', nVars)
+        logging.info(' - Domain Size : %s', domainSize)
+        logging.info(' - N Public : %s', nPublic)
+        logging.info('#################################### ')
+  
         if self.out_proving_key_f is not None:
              if self.out_proving_key_f.endswith('.json'):
                pk_dict =pkvars_to_json(self.out_proving_key_format, EC_T_AFFINE, self.pk)
@@ -392,12 +397,26 @@ class GrothProver(object):
         # EC reduce A, B2, B1 and C from nPublic+1 to end	
         self.dispatch_table_phase1 = buildDispatchTable( nbatches-1,
                                          self.ec_type_dict['C'][2]+1,
+                                         #3,
                                          self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
                                          nPublic+1, nVars,
                                          start_pidx=self.ec_type_dict['A'][2],
                                          start_gpu_idx=next_gpu_idx,
                                          start_stream_idx=first_stream_idx,
                                          ec_lable = self.ec_lable)
+                                         #ec_lable = np.asarray(['A', 'B1', 'C']))
+
+        #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
+        self.dispatch_table_phase1b = buildDispatchTable( nbatches-1,
+                                         #self.ec_type_dict['C'][2]+1,
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
+                                         nPublic+1, nVars,
+                                         start_pidx=0,
+                                         start_gpu_idx=next_gpu_idx,
+                                         start_stream_idx=first_stream_idx,
+                                         #ec_lable = self.ec_lable)
+                                         ec_lable = np.asarray(['B2']))
 
         # EC reduce A, B2 and B1 from 0 to nPublic+1
         self.dispatch_table_phase2 = buildDispatchTable(1, 
@@ -485,6 +504,7 @@ class GrothProver(object):
             logging.info(' Process server - Copying polH...')
   
         end2 = time.time()
+        # t poly prep, t1, NTT t2 : last Mexp
         conn.send([end-start, end1-start1, end2-start2])
         logging.info(' Process server - Completed')
         conn.close()
@@ -511,9 +531,9 @@ class GrothProver(object):
            s.listen(1)
            print('Server listening on port ' +str(port) +' ready...')
            while True: # Accept connections from multiple clients
-               logging.info('Waiting for client at port %s...', port)
+               #logging.info('Waiting for client at port %s...', port)
                conn, addr = s.accept()
-               logging.info('New connecton from address %s port %s', addr, port)
+               #logging.info('New connecton from address %s port %s', addr, port)
                msg = jsocket.receive_message(conn)
                if len(msg):
                  # Call some action and return results
@@ -765,7 +785,10 @@ class GrothProver(object):
     
       self.t_GP['init'] = [round(self.t_GP['init'],4), round(100*self.t_GP['init']/self.t_GP['Proof'],2)] 
       self.t_GP['Read_W'] = [round(self.t_GP['Read_W'],4), round(100*self.t_GP['Read_W']/self.t_GP['Proof'],2)] 
+      self.t_GP['Mexp'] = self.t_GP['Mexp1'] + self.t_GP['Mexp2']
       self.t_GP['Mexp'] = [round(self.t_GP['Mexp'],4), round(100*self.t_GP['Mexp']/self.t_GP['Proof'],2)] 
+      self.t_GP['Mexp1'] = [round(self.t_GP['Mexp1'],4), round(100*self.t_GP['Mexp1']/self.t_GP['Proof'],2)] 
+      self.t_GP['Mexp2'] = [round(self.t_GP['Mexp2'],4), round(100*self.t_GP['Mexp2']/self.t_GP['Proof'],2)] 
       self.t_GP['Eval'] = [round(self.t_GP['Eval'],4), round(100*self.t_GP['Eval']/self.t_GP['Proof'],2)] 
       self.t_GP['H'] = [round(self.t_GP['H'],4), round(100*self.t_GP['H']/self.t_GP['Proof'],2)] 
       self.t_GP['Proof'] = round(self.t_GP['Proof'],4)
@@ -777,6 +800,8 @@ class GrothProver(object):
       logging.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + ' %)')
       logging.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + ' %)')
       logging.info('------ Time Multi-exp.         : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + ' %)')
+      logging.info('------ Time Multi-exp 1.         : %s ', str(self.t_GP['Mexp1'][0]) + ' sec.(' + str(self.t_GP['Mexp1'][1]) + ' %)')
+      logging.info('------ Time Multi-exp 2.         : %s ', str(self.t_GP['Mexp2'][0]) + ' sec.(' + str(self.t_GP['Mexp2'][1]) + ' %)')
       logging.info('------ Time Poly Calculation   : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + ' %)')
       logging.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + ' %)')
       logging.info('#################################### ')
@@ -1055,13 +1080,25 @@ class GrothProver(object):
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps','delta_1'])
 
  
+        #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
+        #self.findECPointsDispatch(
+                                  #self.dispatch_table_phase1b,
+                                  #self.batch_size_mexp_phase1,
+                                  #self.dispatch_table_phase1b.shape[0]-1, pk_bin,
+                                  #change_s_scl_idx = [self.ec_type_dict['B2'][2]],
+                                  #sort_en=self.sort_en)
+
         self.findECPointsDispatch(
                                   self.dispatch_table_phase1,
                                   self.batch_size_mexp_phase1,
                                   self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]+1), pk_bin,
+                                  #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]), pk_bin,
                                   change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
+                                  #change_s_scl_idx = [self.ec_type_dict['B1'][2]],
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
                                   sort_en=self.sort_en)
+
+
         if self.stop_client.value:
             self.p_CPU.terminate()
             self.p_CPU.join()
@@ -1085,7 +1122,7 @@ class GrothProver(object):
         logging.info(' First Mexp completed...')
 
         end = time.time()
-        self.t_GP['Mexp'] = (end - start)
+        self.t_GP['Mexp1'] = (end - start)
 
         ######################
         # Beginning of P3 and P4
@@ -1125,11 +1162,11 @@ class GrothProver(object):
         
            self.assignECPvalues(compute_ECP=True)
         else:
-           self.t_GP['Mexp'] += t[2]
+           self.t_GP['Mexp2'] = t[2]
            self.reduceLastMexp(pk_bin[5])
 
         end = time.time()
-        self.t_GP['Mexp'] += (end - start)
+        self.t_GP['Mexp2'] = (end - start)
      
         return 
  
@@ -1328,6 +1365,7 @@ class GrothProver(object):
        n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
        pending_dispatch_table = []
        n_dispatch=len(pending_dispatch_table)
+       #print(dispatch_table)
 
        for bidx, p in enumerate(dispatch_table):
           #Retrieve point name : A,B1,B2,..
@@ -1346,6 +1384,8 @@ class GrothProver(object):
           gpu_id    = p[3]
           stream_id = p[4]
           init_ec_val = self.init_ec_val[gpu_id][stream_id][pidx]
+
+          #print(P, step, EPidx, pidx, ecidx, start_idx, end_idx)
 
           if bidx >= last_batch_idx:
             if bidx == last_batch_idx:
@@ -1406,6 +1446,7 @@ class GrothProver(object):
 
           # Copy last batch EC point sum
           EC_P[ecidx][-step:] = init_ec_val
+          #print(EC_P[ecidx].shape)
 
           result, t = self.compute_proof_ecp(
               cuda_ec128,

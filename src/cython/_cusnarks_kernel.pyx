@@ -65,9 +65,14 @@ IF CUDA_DEF:
              self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
           if out_size == 0:
              self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
- 
+
+      def elapsedTime(self):
+          return self._cusnarks_ptr.elapsedTime()
+
       def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
                        ct.uint32_t stream_id=0, ct.uint32_t n_kernels=1):
+          cdef double start_k = self._cusnarks_ptr.elapsedTime()
+          cdef double end_k
           cdef ct.uint32_t i=0
           cdef ct.vector_t out_v
           cdef ct.vector_t in_v
@@ -194,7 +199,10 @@ IF CUDA_DEF:
             else:
               kparams[i].as_mont = 1
 
+          end_k = self._cusnarks_ptr.elapsedTime() - start_k
+
           cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
+          start_k = self._cusnarks_ptr.elapsedTime()
           cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
 
           if stream_id == -1:  
@@ -202,7 +210,8 @@ IF CUDA_DEF:
 
           free(kconfig)
   
-          return np.copy(np.asarray(kdata).reshape(-1,in_vec.shape[1])), exec_time
+          end_k = end_k + self._cusnarks_ptr.elapsedTime() - start_k
+          return np.copy(np.asarray(kdata).reshape(-1,in_vec.shape[1])), exec_time + end_k
 
       def streamDel(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
           self._cusnarks_ptr.streamDel(gpu_id, stream_id)
@@ -545,7 +554,7 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
      with nogil:
        uh.cntt_interpolandmul_server_h(args_c)
 
-     cdef ct.uint32_t [:] M = <ct.uint32_t [:(1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
+     cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
 
      free(args_c)
 
@@ -893,6 +902,26 @@ def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
 
      uh.cec2_jacscmul_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacscmulx1_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     n= <int> (in_scl.shape[0]/NWORDS_256BIT) 
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec_jacscmulx1_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec2_jacscmulx1_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     n= <int> (in_scl.shape[0]/NWORDS_256BIT) 
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec2_jacscmulx1_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 

@@ -56,7 +56,7 @@ from bigint import *
 
 def profile_u256():
 
-    niter = 10
+    niter = 20
     kernel_stats = []
     prime = ZUtils.CURVE_DATA['BN128']['prime_r']
     u256_p = BigInt(prime).as_uint256()
@@ -71,16 +71,20 @@ def profile_u256():
     u256_vector = u256.rand(nsamples)
     u256_vector = u256.randu256(nsamples, u256_p)
             
-    #kernel_config['kernel_idx'] = [CB_U256_MULM]
+    kernel_config['kernel_idx'] = [CB_U256_MULM]
+    #kernel_config['kernel_idx'] = [CB_U256_MULM2]
     #kernel_config['kernel_idx'] = [CB_U256_ADDM]
     #kernel_config['kernel_idx'] = [CB_U256_SHL1]
     #kernel_config['kernel_idx'] = [CB_U256_SHL]
-    kernel_config['kernel_idx'] = [CB_U256_ALMINV]
+    #kernel_config['kernel_idx'] = [CB_U256_ALMINV]
     #kernel_config['kernel_idx'] = [CB_U256_SUBM]
 
     if kernel_config['kernel_idx'][0] == CB_U256_MOD or kernel_params['premod'][0] == 1:
       for s in u256_vector:
          s |= 0xF0000000
+    elif kernel_config['kernel_idx'][0] == CB_U256_MULM2:
+        kernel_params['stride'] = [4]
+
     elif kernel_config['kernel_idx'][0] == CB_U256_SHR1 or \
          kernel_config['kernel_idx'][0] == CB_U256_SHL1 or \
          kernel_config['kernel_idx'][0] == CB_U256_SHL or \
@@ -118,12 +122,12 @@ def profile_u256():
         nkernels = 2
 
     for i in range(niter):
-       print("kernel launched")
        _, kernel_time = u256.kernelLaunch(u256_vector, kernel_config, kernel_params, 0,0, n_kernels = nkernels )
        if i :
            kernel_stats.append(kernel_time)
 
-    logging.info("Max : %s [s], Min : %s [s], Mean : %s[s]" % (np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
+    if niter > 1:
+      logging.info("Max : %s [s], Min : %s [s], Mean : %s[s]" % (np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
 
 if __name__ == "__main__":
     profile_u256()

@@ -454,18 +454,7 @@ __global__ void mulmontu256_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
     B = (uint32_t *) &in_vector[tid * 2 * U256K_OFFSET + U256_YOFFSET];
     U = (uint32_t *) &out_vector[tid * U256K_OFFSET];
    
-    // ensure A, B < p 
-    // TODO : If numbers are already in Montgomery format
-    // premod operations doesn't make any sense. I leave it 
-    // for the moment as during testing I multiply random numbers without
-    // checking if they are greated than the prime number
-    if (params->premod){
-      modu255(A,A, params->midx);
-      modu255(B,B, params->midx);
-    }
-
     mulmontu256(U, (const uint32_t *)A, (const uint32_t *) B, params->midx);
-    logInfoBigNumberTid(1,"U\n",(uint32_t *)U);
 
    return;
 }
@@ -486,20 +475,8 @@ __global__ void mulmontu256_2_kernel(uint32_t *out_vector, uint32_t *in_vector, 
  
     A = (uint32_t *) &in_vector[tid * 4 * U256K_OFFSET + U256_XOFFSET];
     B = (uint32_t *) &in_vector[tid * 4 * U256K_OFFSET + U256_YOFFSET];
-    U = (uint32_t *) &out_vector[tid * U256K_OFFSET];
+    U = (uint32_t *) &out_vector[tid * 2 * U256K_OFFSET];
    
-    // ensure A, B < p 
-    // TODO : If numbers are already in Montgomery format
-    // premod operations doesn't make any sense. I leave it 
-    // for the moment as during testing I multiply random numbers without
-    // checking if they are greated than the prime number
-    if (params->premod){
-      modu255(A,A, params->midx);
-      modu255(B,B, params->midx);
-      modu255(&A[2*NWORDS_256BIT],&A[2*NWORDS_256BIT], params->midx);
-      modu255(&B[2*NWORDS_256BIT],&B[2*NWORDS_256BIT], params->midx);
-    }
-
     mulmontu256_2(U, (const uint32_t *)A, (const uint32_t *) B, params->midx);
 
    return;
@@ -634,22 +611,42 @@ __global__ void almmontinvu256_kernel(uint32_t *out_vector, uint32_t *in_vector,
 */
 __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 {
-    //int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    int tid = threadIdx.x * NWORDS_256BIT;
-    uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
-    uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT],tmp4[NWORDS_256BIT];
 
-    mulmontu256(tmp1, A,B,midx);                  
-    mulmontu256(tmp2, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
+#ifndef CU_ASM
+    uint32_t tmulx[NWORDS_256BIT],tmuly[NWORDS_256BIT],tmulz[NWORDS_256BIT];
+    uint32_t tmp4[NWORDS_256BIT];
 
-    addmu256(tmp3,A,&A[NWORDS_256BIT], midx);                
+    mulmontu256(tmulx, A,B,midx);                  
+    mulmontu256(tmuly, &A[NWORDS_256BIT],&B[NWORDS_256BIT],midx); 
+
+    addmu256(tmulz,A,&A[NWORDS_256BIT], midx);                
     addmu256(tmp4,B,&B[NWORDS_256BIT], midx);                
-    mulmontu256(tmp3, tmp3,tmp4,midx); 
-    submu256(U, tmp1, tmp2, midx);   
-    addmu256(&U[NWORDS_256BIT], tmp1, tmp2, midx);                
-    submu256(&U[NWORDS_256BIT], tmp3, &U[NWORDS_256BIT], midx);                
+    mulmontu256(tmulz, tmulz,tmp4,midx); 
+    submu256(U, tmulx, tmuly, midx);   
+    addmu256(&U[NWORDS_256BIT], tmulx, tmuly, midx);                
+    submu256(&U[NWORDS_256BIT], tmulz, &U[NWORDS_256BIT], midx);                
 
+#else
+
+     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+
+     asm(ASM_MULG2_INIT 
+         ASM_MONTMULU256(tmulx,ax,bx)  
+         ASM_MODU256(tmulx)
+         ASM_MONTMULU256(tmuly,ay,by)  
+         ASM_MODU256(tmuly)
+         ASM_ADDU256(tmulz, ax, ay)    
+         ASM_SUBMU256(rx, tmulx, tmuly)   
+         ASM_ADDMU256(tmulx, tmulx, tmuly)  
+         ASM_ADDU256(tmuly, bx, by)
+         ASM_MONTMULU256(ry, tmulz, tmuly)
+         ASM_MODU256(ry)
+         ASM_SUBMU256(ry, ry, tmulx)
+         ASM_MULG2_PACK);
+#endif
 }
+
 
 /*
    ab =  X[0] * X[1]
@@ -660,6 +657,7 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
 */
 __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
 {
+#if 0
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
     uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT];
@@ -676,11 +674,10 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
 
     addmu256(&U[NWORDS_256BIT],tmp1,tmp1,midx);
     submu256(U,tmp2, tmp3,midx);                                 // Z[0] = X[0] * X[0] - (X[1] * X[1])
+#else
+    mulmontu256_2(U, A, A, midx);
+#endif
     
-    /*
-    logInfoBigNumberTid(1,"U[0]:\n",(uint32_t *)U);
-    logInfoBigNumberTid(1,"U[1]:\n",(uint32_t *)&U[NWORDS_256BIT]);
-    */
 }
 
 
@@ -700,22 +697,24 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
    * www.microsoft.com/en-us/research/wp-content/uploads/1998/06/97Acar.pdf
 
 */
-#if 1
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
+    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+
+    logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
+    logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
+
+#ifndef CU_ASM
     uint32_t i;
     uint32_t S, C=0, C1, C2,C3;
     uint32_t __restrict__ M, X[2];
     uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0};
-    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
 
     //movu256(Ar,(uint32_t *)A);
     //movu256(Br,(uint32_t *)B);
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
-    logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
     #pragma unroll
     for(i=0; i<NWORDS_256BIT; i++)
     {
@@ -880,35 +879,25 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
 
    /* Step 3: if(u>=n) return u-n else return u */
    if (ltu256(P_u256,T)){
-   //if (P_u256[NWORDS_256BIT-1] < T[NWORDS_256BIT-1]){
       subu256(U,T,P_u256);
    } else {
        movu256(U,T);
    }
-   logInfoBigNumberTid(1,"U\n",(uint32_t *)U);
-   return;
-}
 
 #else
-__device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
-{
+
  asm(ASM_MUL_INIT 
      ASM_MONTMULU256(r,a,b)
-     ASM_SUBU256(r,r,n)
-     //ASM_LTU256 
-     //ASM_ADDU256  
-     //ASM_MUL_END
+     ASM_MODU256(r)
      ASM_MUL_PACK);
 
-#if 0
-     if (ltu256(P_u256,T)){
-      subu256(U,T,P_u256);
-     } else {
-       movu256(U,T);
-     }
 #endif
+ logInfoBigNumberTid(1,"U\n",(uint32_t *)U);
+
+ return;
+
 }
-#endif
+
 /*
   Montgomery Modular Inverse - Revisited
   E. Savas, C.K.Koc
@@ -1149,47 +1138,7 @@ __device__ void modu255(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
 __device__ uint32_t shr1u256(uint32_t __restrict__ *x)
 {
    uint32_t c; 
-#if 0
-   asm("{                                    \n\t"
-       ".reg .u32          %tmp;             \n\t"
-       "and.b32            %8, %9,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
-       "shr.u32            %0,   %9,  1;     \n\t"  // x[0] = x[0] >> 1
-       "and.b32            %tmp, %10,  1;     \n\t"  // x[0] |= (x[1] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %0,   %0,  %tmp;  \n\t"
-       "shr.u32            %1,   %10,   1;     \n\t"  // x[1] = x[1] >> 1
-       "and.b32            %tmp, %11,  1;     \n\t"  // x[1] |= (x[2] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %1,   %1,  %tmp;   \n\t"
-       "shr.u32            %2,   %11,  1;     \n\t"  // x[2] = x[2] >> 1
-       "and.b32            %tmp, %12,  1;     \n\t"  // x[2] |= (x[3] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %2,   %2,  %tmp;   \n\t"
-       "shr.u32            %3,   %12,  1;     \n\t"  // x[3] = x[3] >> 1
-       "and.b32            %tmp, %13,  1;     \n\t"  // x[3] |= (x[4] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %3,   %3,  %tmp;   \n\t"
-       "shr.u32            %4,   %13,  1;     \n\t"  // x[4] = x[4] >> 1
-       "and.b32            %tmp, %14,  1;     \n\t"  // x[4] |= (x[5] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %4,   %4,  %tmp;   \n\t"
-       "shr.u32            %5,   %14,  1;     \n\t"  // x[5] = x[5] >> 1
-       "and.b32            %tmp, %15,  1;     \n\t"  // x[5] |= (x[6] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %5,   %5,  %tmp;   \n\t"
-       "shr.u32            %6,   %15,  1;     \n\t"  // x[6] = x[6] >> 1
-       "and.b32            %tmp, %16,  1;     \n\t"  // x[6] |= (x[7] & 1) << 31
-       "shl.b32            %tmp, %tmp, 31;   \n\t"
-       "or.b32             %6,   %6,  %tmp;   \n\t"
-       "shr.u32            %7,   %16,  1;     \n\t"  // x[7] = x[7] >> 1
-       "}                               \n\t"
-       : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
-         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7]), "=r"(c)
-       : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
-         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 
-      return c;
-#else
    asm("{                                    \n\t"
        "bfe.u32            %8,   %9,  0,1;  \n\t"       
        "shf.r.clamp.b32   %0, %9, %10, 1;   \n\t"
@@ -1208,8 +1157,6 @@ __device__ uint32_t shr1u256(uint32_t __restrict__ *x)
 
       return c;
 
-#endif
-
 }
 
 /*
@@ -1218,41 +1165,7 @@ __device__ uint32_t shr1u256(uint32_t __restrict__ *x)
 __device__ uint32_t shl1u256(uint32_t __restrict__ *x)
 {
    uint32_t c; 
-#if 0
-   asm("{                                    \n\t"
-       ".reg .u32          %tmp;             \n\t"
-       "bfe.u32            %8,   %16,  31,1;  \n\t"       // c = x[7] & (1<<31)
-       "shl.b32            %7,   %16,  1;         \n\t"   // x[7] = x[7] << 1
-       "bfe.u32            %tmp, %15, 31,1;  \n\t"        // tmp = x[6] & (1<<31)
-       "or.b32             %7,   %7,  %tmp;  \n\t"        // x[7] |= tmp
-       "shl.b32            %6,   %15,  1;         \n\t"   // x[6] = x[6] << 1
-       "bfe.u32            %tmp, %14, 31,1;  \n\t"        // tmp = x[5] & (1<<31)
-       "or.b32             %6,   %6,  %tmp;  \n\t"        // x[6] |= tmp
-       "shl.b32            %5,   %14,  1;         \n\t"   // x[5] = x[5] << 1
-       "bfe.u32            %tmp, %13, 31,1;  \n\t"        // tmp = x[4] & (1<<31)
-       "or.b32             %5,   %5,  %tmp;  \n\t"        // x[5] |= tmp
-       "shl.b32            %4,   %13,  1;         \n\t"   // x[4] = x[4] << 1
-       "bfe.u32            %tmp, %12, 31,1;  \n\t"        // tmp = x[3] & (1<<31)
-       "or.b32             %4,   %4,  %tmp;  \n\t"        // x[4] |= tmp
-       "shl.b32            %3,   %12,  1;         \n\t"   // x[3] = x[3] << 1
-       "bfe.u32            %tmp, %11, 31,1;  \n\t"        // tmp = x[2] & (1<<31)
-       "or.b32             %3,   %3,  %tmp;  \n\t"        // x[3] |= tmp
-       "shl.b32            %2,   %11,  1;         \n\t"   // x[2] = x[2] << 1
-       "bfe.u32            %tmp, %10, 31,1;  \n\t"        // tmp = x[1] & (1<<31)
-       "or.b32             %2,   %2,  %tmp;  \n\t"        // x[2] |= tmp
-       "shl.b32            %1,   %10,  1;         \n\t"   // x[1] = x[1] << 1
-       "bfe.u32            %tmp, %9, 31,1;  \n\t"        // tmp = x[0] & (1<<31)
-       "or.b32             %1,   %1,  %tmp;  \n\t"        // x[1] |= tmp
-       "shl.b32            %0,   %9,  1;         \n\t"   // x[0] = x[0] << 1
-       "}                               \n\t"
-       : "=r"(x[0]), "=r"(x[1]), "=r"(x[2]), "=r"(x[3]), 
-         "=r"(x[4]), "=r"(x[5]), "=r"(x[6]), "=r"(x[7]), "=r"(c)
-       : "r"(x[0]), "r"(x[1]), "r"(x[2]), "r"(x[3]), 
-         "r"(x[4]), "r"(x[5]), "r"(x[6]), "r"(x[7]));
 
-      return c;
-
-#else
    asm("{                                    \n\t"
        "bfe.u32            %8,   %16,  31,1;  \n\t"       // c = x[7] & (1<<31)
        "shf.l.clamp.b32   %7, %15, %16, 1;   \n\t"
@@ -1271,7 +1184,6 @@ __device__ uint32_t shl1u256(uint32_t __restrict__ *x)
 
       return c;
 
-#endif
 }
 
 

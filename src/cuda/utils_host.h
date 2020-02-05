@@ -262,6 +262,7 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void mulN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void montmult_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
+void montmultN_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 //void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
@@ -305,6 +306,8 @@ void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec2_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
 void ec2_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
+void ec_jacscmulx1_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
+void ec2_jacscmulx1_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
 void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t order, uint32_t pidx, uint32_t add_last);
 void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable,
 	       	uint32_t n, uint32_t order,  uint32_t pidx, uint32_t add_last);
