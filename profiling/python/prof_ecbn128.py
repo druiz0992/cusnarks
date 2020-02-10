@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
 /*
     Copyright 2018 0kims association.
@@ -91,8 +92,10 @@ def profile_ecbn128():
                   #CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MUL1, CB_EC_JAC_MAD_SHFL]
     #my_kernels = [CB_EC_JAC_MAD_SHFL]
     #my_kernels = [CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE]
-    my_kernels = [CB_EC_JAC_MAD_SHFL]
     #my_kernels = [CB_EC_JAC_ADD]
+    #my_kernels = [CB_EC_JAC_MUL_OPT]
+    #my_kernels = [CB_EC_JAC_MAD_SHFL]
+    my_kernels = [CB_EC_JAC_RED]
 
     for k in my_kernels:
       kernel_params = {}
@@ -122,43 +125,16 @@ def profile_ecbn128():
          kernel_params['out_length'] = int(3*nsamples/2)
          kernel_params['stride'] = [2 * 3]
          nkernels = 1
-  
-      if kernel_config['kernel_idx'][0] == CB_EC_JAC_MAD_SHFL:
-   
-         outdims = 3
-         indims_e = 3
-         kernel = CB_EC_JAC_MAD_SHFL
+      
+      if kernel_config['kernel_idx'][0] == CB_EC_JAC_MUL_OPT and \
+              len(kernel_config['kernel_idx']) == 1:
 
- 
-         kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM),8)
+         kernel_params['in_length'] = [3*nsamples]
+         kernel_params['out_length'] = int(3*nsamples/U256_BSELM)
+         kernel_params['stride'] = [U256_BSELM * 3]
+         nkernels = 1
 
-         nkernels = len(kernel_config['blockD'])
-         kernel_params['stride']    = [outdims] * nkernels
-         kernel_params['stride'][0]    =  indims_e
-         kernel_params['premul']    = [0] * nkernels
-         kernel_params['premul'][0] = 1
-         kernel_params['premod']    = [0] * nkernels
-         kernel_params['midx']      = [0] * nkernels
-         kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
-         kernel_config['kernel_idx'] =[kernel] * nkernels
-         kernel_params['in_length'] = [nsamples* indims_e]*nkernels
-         for l in xrange(1,nkernels):
-           kernel_params['in_length'][l] = outdims * (
-               int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
-             (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
-
-         kernel_params['out_length'] = 1 * outdims
-         kernel_params['padding_idx'] = [1] * nkernels
-         kernel_config['gridD'] = [0] * nkernels
-         kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
-         kernel_config['gridD'][nkernels-1] = 1
-         #nkernels = 1
-         if nkernels == 1:
-             print("Warning : Only 1 kernel enabled")
-         print("Sort enable : "+str(sort_en))
-
-
-      niter = 10
+      niter = 1
       for i in range(niter):
          gpu_id=i%n_gpu
          if n_streams:
@@ -171,7 +147,9 @@ def profile_ecbn128():
          ecbn128_vector = cu_ecbn128.randu256(nsamples,pu256)
          tmp = ec_jacscmulx1_h(np.reshape(ecbn128_vector[:nsamples*NWORDS_256BIT],-1), G, midx, 0)
 
-         if my_kernels[0] == CB_EC_JAC_MAD_SHFL:
+         if my_kernels[0] == CB_EC_JAC_MAD_SHFL or \
+                 my_kernels[0] == CB_EC_JAC_RED or \
+                 my_kernels[0] == CB_EC_JAC_MUL_OPT:
              tmp = ec_jac2aff_h(np.reshape(tmp,-1), midx, 1)
              ecbn128_vector = np.concatenate((ecbn128_vector, tmp))
              idx_v = sortu256_idx_h(ecbn128_vector[:nsamples],sort_en)
@@ -179,7 +157,19 @@ def profile_ecbn128():
          else:
              input_vector = tmp
 
-         r,kernel_time = cu_ecbn128.kernelLaunch(input_vector, kernel_config, kernel_params,gpu_id, n_streams,n_kernels=nkernels)
+
+         if kernel_config['kernel_idx'][0] == CB_EC_JAC_MAD_SHFL or \
+            kernel_config['kernel_idx'][0] == CB_EC_JAC_RED:
+            separate_k = 1
+
+            if kernel_config['kernel_idx'][0] == CB_EC_JAC_MAD_SHFL :
+                separate_k = 0
+
+            a, r,kernel_time = ec_mad_cuda2(cu_ecbn128, input_vector, midx, 0, shamir_en=1, gpu_id=0, stream_id=0,separate_k=separate_k)
+
+         else:
+           print(kernel_params, kernel_config)
+           r,kernel_time = cu_ecbn128.kernelLaunch(input_vector, kernel_config, kernel_params,gpu_id, n_streams,n_kernels=nkernels)
          if i :
              kernel_stats.append(kernel_time)
       
@@ -188,8 +178,5 @@ def profile_ecbn128():
 
      
 
-      sys.exit(1)
-  
-  
 if __name__ == "__main__":
     profile_ecbn128()

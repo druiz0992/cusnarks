@@ -73,6 +73,36 @@
     ASM_MUL_BLOCK(out,in1,in2,7) \
     ASM_MUL_REDUCTION_BLOCK_LAST(out)
 
+#if 0
+#define ASM_MONTSQ256(out,in1, in2)  \
+    ASM_MONTSQ_START(out,in1, in2) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MONTSQ_BLOCK1(out, in1, in2) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MUL_BLOCK(out, in1, in2,2) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MUL_BLOCK(out,in1,in2,3) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MUL_BLOCK(out,in1,in2,4) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MUL_BLOCK(out,in1,in2,5) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MUL_BLOCK(out,in1,in2,6) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
+    ASM_MUL_BLOCK(out,in1,in2,7) \
+    ASM_MUL_REDUCTION_BLOCK_LAST(out)
+#endif
+
+#define ASM_MONTMULU256_64(out,in1,in2)  \
+    ASM_MUL_START_64(out,in1,in2) \
+    ASM_MUL_REDUCTION_BLOCK_LAST_64(out) \
+    ASM_MUL_BLOCK_64(out, in1, in2,1) \
+    ASM_MUL_REDUCTION_BLOCK_LAST_64(out) \
+    ASM_MUL_BLOCK_64(out, in1, in2,2) \
+    ASM_MUL_REDUCTION_BLOCK_LAST_64(out) \
+    ASM_MUL_BLOCK_64(out,in1,in2,3) \
+    ASM_MUL_REDUCTION_BLOCK_LAST_64(out) 
+
 #define ASM_MUL_INIT \
       "{\n\t" \
            ".reg .u32 a0, a1, a2, a3, a4, a5, a6, a7;\n\t"  \
@@ -109,6 +139,80 @@
            "mov.u32         n6, %30;\n\t" \
            "mov.u32         n7, %31;\n\t" \
            "mov.u32         q, %32;\n\t"
+
+#define ASM_MUL_INIT_64 \
+      "{\n\t" \
+           ".reg .u32 a0, a1, a2, a3, a4, a5, a6, a7;\n\t"  \
+           ".reg .u32 b0, b1, b2, b3, b4, b5, b6, b7;\n\t"  \
+           ".reg .u32 r0, r1, r2, r3, r4, r5, r6, r7;\n\t"  \
+           ".reg .u32 n0, n1, n2, n3, n4, n5, n6, n7;\n\t"  \
+           ".reg .u32 m, q, lo, hi;\n\t"  \
+	   ".reg .pred p1;\n\t" \
+                                     \
+           "mov.b64         {a0,a1}, %4;\n\t" \
+           "mov.b64         {a2,a3}, %5;\n\t" \
+           "mov.b64         {a4,a5}, %6;\n\t" \
+           "mov.b64         {a6,a7}, %7;\n\t" \
+                                        \
+           "mov.b64         {b0,b1}, %8;\n\t" \
+           "mov.b64         {b2,b3}, %9;\n\t" \
+           "mov.b64         {b4,b5}, %10;\n\t" \
+           "mov.b64         {b6,b7}, %11;\n\t" \
+                                        \
+           "mov.b64         {n0,n1}, %12;\n\t" \
+           "mov.b64         {n2,n3}, %13;\n\t" \
+           "mov.b64         {n4,n5}, %14;\n\t" \
+           "mov.b64         {n6,n7}, %15;\n\t" \
+                                        \
+           "mov.u32         q, %16;\n\t"
+
+#define ASM_MONTSQ_INIT_64 \
+      "{\n\t" \
+           ".reg .u32 a0, a1, a2, a3, a4, a5, a6, a7;\n\t"  \
+           ".reg .u32 r0, r1, r2, r3, r4, r5, r6, r7;\n\t"  \
+           ".reg .u32 n0, n1, n2, n3, n4, n5, n6, n7;\n\t"  \
+           ".reg .u32 m, q, lo, hi;\n\t"  \
+	   ".reg .pred p1;\n\t" \
+                                     \
+           "mov.b64         {a0,a1}, %4;\n\t" \
+           "mov.b64         {a2,a3}, %5;\n\t" \
+           "mov.b64         {a4,a5}, %6;\n\t" \
+           "mov.b64         {a6,a7}, %7;\n\t" \
+                                        \
+           "mov.b64         {n0,n1}, %8;\n\t" \
+           "mov.b64         {n2,n3}, %9;\n\t" \
+           "mov.b64         {n4,n5}, %10;\n\t" \
+           "mov.b64         {n6,n7}, %11;\n\t" \
+                                        \
+           "mov.u32         q, %12;\n\t"
+
+
+#define ASM_MUL_INIT_64_2 \
+      "{\n\t" \
+           ".reg .u64 a0, a1, a2, a3;\n\t"  \
+           ".reg .u64 b0, b1, b2, b3;\n\t"  \
+           ".reg .u64 r0, r1, r2, r3;\n\t"  \
+           ".reg .u64 n0, n1, n2, n3;\n\t"  \
+           ".reg .u64 m, q, lo, hi;\n\t"  \
+	   ".reg .pred p1;\n\t" \
+                                     \
+           "mov.b64         a0, %4;\n\t" \
+           "mov.b64         a1, %5;\n\t" \
+           "mov.b64         a2, %6;\n\t" \
+           "mov.b64         a3, %7;\n\t" \
+                                        \
+           "mov.b64         b0, %8;\n\t" \
+           "mov.b64         b1, %9;\n\t" \
+           "mov.b64         b2, %10;\n\t" \
+           "mov.b64         b3, %11;\n\t" \
+                                        \
+           "mov.b64         n0, %12;\n\t" \
+           "mov.b64         n1, %13;\n\t" \
+           "mov.b64         n2, %14;\n\t" \
+           "mov.b64         n3, %15;\n\t" \
+                                       \
+           "mov.b64         q, %16;\n\t"
+
 
 #define ASM_MULG2_INIT \
       "{\n\t" \
@@ -170,6 +274,47 @@
            "mov.u32         n7, %55;\n\t" \
            "mov.u32         q, %56;\n\t"
 
+#define ASM_MULG2_INIT_64 \
+      "{\n\t" \
+           ".reg .u32 ax0, ax1, ax2, ax3, ax4, ax5, ax6, ax7;\n\t"  \
+           ".reg .u32 ay0, ay1, ay2, ay3, ay4, ay5, ay6, ay7;\n\t"  \
+           ".reg .u32 bx0, bx1, bx2, bx3, bx4, bx5, bx6, bx7;\n\t"  \
+           ".reg .u32 by0, by1, by2, by3, by4, by5, by6, by7;\n\t"  \
+           ".reg .u32 rx0, rx1, rx2, rx3, rx4, rx5, rx6, rx7;\n\t"  \
+           ".reg .u32 ry0, ry1, ry2, ry3, ry4, ry5, ry6, ry7;\n\t"  \
+           ".reg .u32 tmulx0, tmulx1, tmulx2, tmulx3, tmulx4, tmulx5, tmulx6, tmulx7;\n\t"  \
+           ".reg .u32 tmuly0, tmuly1, tmuly2, tmuly3, tmuly4, tmuly5, tmuly6, tmuly7;\n\t"  \
+           ".reg .u32 tmulz0, tmulz1, tmulz2, tmulz3, tmulz4, tmulz5, tmulz6, tmulz7;\n\t"  \
+           ".reg .u32 n0, n1, n2, n3, n4, n5, n6, n7;\n\t"  \
+           ".reg .u32 m, q, lo, hi;\n\t"  \
+	   ".reg .pred p1;\n\t" \
+                                     \
+           "mov.b64         {ax0,ax1}, %8;\n\t" \
+           "mov.b64         {ax2,ax3}, %9;\n\t" \
+           "mov.b64         {ax4,ax5}, %10;\n\t" \
+           "mov.b64         {ax6,ax7}, %11;\n\t" \
+	            \
+           "mov.b64         {ay0,ay1}, %12;\n\t" \
+           "mov.b64         {ay2,ay3}, %13;\n\t" \
+           "mov.b64         {ay4,ay5}, %14;\n\t" \
+           "mov.b64         {ay6,ay7}, %15;\n\t" \
+	            \
+           "mov.b64         {bx0,bx1}, %16;\n\t" \
+           "mov.b64         {bx2,bx3}, %17;\n\t" \
+           "mov.b64         {bx4,bx5}, %18;\n\t" \
+           "mov.b64         {bx6,bx7}, %19;\n\t" \
+	            \
+           "mov.b64         {by0,by1}, %20;\n\t" \
+           "mov.b64         {by2,by3}, %21;\n\t" \
+           "mov.b64         {by4,by5}, %22;\n\t" \
+           "mov.b64         {by6,by7}, %23;\n\t" \
+	            \
+           "mov.b64         {n0,n1}, %24;\n\t" \
+           "mov.b64         {n2,n3}, %25;\n\t" \
+           "mov.b64         {n4,n5}, %26;\n\t" \
+           "mov.b64         {n6,n7}, %27;\n\t" \
+	            \
+           "mov.u32         q, %28;\n\t"
 
 #define ASM_MUL_START(out, in1, in2) \
      "mul.lo.u32 "#out"0, "#in1"0, "#in2"0;\n\t"           \
@@ -188,6 +333,49 @@
      "madc.hi.cc.u32 "#out"6, "#in1"0, "#in2"5, "#out"6;\n\t"           \
      "madc.hi.cc.u32 "#out"7, "#in1"0, "#in2"6, "#out"7;\n\t"           \
      "madc.hi.cc.u32 lo, "#in1"0, "#in2"7, 0;\n\t"          
+
+#define ASM_MONTSQ_START(out, in1, in2) \
+     "mul.lo.u32 "#out"0, "#in1"0, "#in2"0;\n\t"           \
+     "mul.lo.u32 "#out"1, "#in1"0, "#in2"1;\n\t"           \
+     "mul.lo.u32 "#out"2, "#in1"0, "#in2"2;\n\t"           \
+     "mul.lo.u32 "#out"3, "#in1"0, "#in2"3;\n\t"           \
+     "mul.lo.u32 "#out"4, "#in1"0, "#in2"4;\n\t"           \
+     "mul.lo.u32 "#out"5, "#in1"0, "#in2"5;\n\t"           \
+     "mul.lo.u32 "#out"6, "#in1"0, "#in2"6;\n\t"           \
+     "mul.lo.u32 "#out"7, "#in1"0, "#in2"7;\n\t"           \
+     "mul.hi.u32 tth0, "#in1"0, "#in2"1;\n\t"           \
+     "mul.hi.u32 tth1, "#in1"0, "#in2"2;\n\t"           \
+     "mul.hi.u32 tth2, "#in1"0, "#in2"3;\n\t"           \
+     "mul.hi.u32 tth3, "#in1"0, "#in2"4;\n\t"           \
+     "mul.hi.u32 tth4, "#in1"0, "#in2"5;\n\t"           \
+     "mul.hi.u32 tth5, "#in1"0, "#in2"6;\n\t"           \
+     "mul.hi.u32 tth6, "#in1"0, "#in2"7;\n\t"           \
+     "mov.u32    ttl0, "#out"1;\n\t" \
+     "mov.u32    ttl1, "#out"2;\n\t" \
+     "mov.u32    ttl2, "#out"3;\n\t" \
+     "mov.u32    ttl3, "#out"4;\n\t" \
+     "mov.u32    ttl4, "#out"5;\n\t" \
+     "mov.u32    ttl5, "#out"6;\n\t" \
+     "mov.u32    ttl6, "#out"7;\n\t" \
+       \
+     "mad.hi.cc.u32 "#out"1, "#in1"0, "#in2"0, "#out"1;\n\t"           \
+     "addc.cc.u32 "#out"2, tth0, "#out"2;\n\t"           \
+     "addc.cc.u32 "#out"3, tth1, "#out"3;\n\t"           \
+     "addc.cc.u32 "#out"4, tth2, "#out"4;\n\t"           \
+     "addc.cc.u32 "#out"5, tth3, "#out"5;\n\t"           \
+     "addc.cc.u32 "#out"6, tth4, "#out"6;\n\t"           \
+     "addc.cc.u32 "#out"7, tth5, "#out"7;\n\t"           \
+     "addc.cc.u32 lo, tth6, 0;\n\t"          
+
+#define ASM_MUL_START_64(out, in1, in2) \
+     "mul.lo.u64 "#out"0, "#in1"0, "#in2"0;\n\t"           \
+     "mul.lo.u64 "#out"1, "#in1"0, "#in2"1;\n\t"           \
+     "mul.lo.u64 "#out"2, "#in1"0, "#in2"2;\n\t"           \
+     "mul.lo.u64 "#out"3, "#in1"0, "#in2"3;\n\t"           \
+     "mad.hi.cc.u64 "#out"1, "#in1"0, "#in2"0, "#out"1;\n\t"           \
+     "madc.hi.cc.u64 "#out"2, "#in1"0, "#in2"1, "#out"2;\n\t"           \
+     "madc.hi.cc.u64 "#out"3, "#in1"0, "#in2"2, "#out"3;\n\t"           \
+     "madc.hi.cc.u64 lo, "#in1"0, "#in2"3, 0;\n\t"          
 
 #define ASM_MUL_REDUCTION_BLOCK_LAST(out) \
        "mul.lo.u32   m, "#out"0, q;\n\t" \
@@ -209,7 +397,22 @@
        "madc.lo.cc.u32  "#out"5, m, n6, "#out"6;\n\t" \
        "madc.lo.cc.u32  "#out"6, m, n7, "#out"7;\n\t" \
        "addc.cc.u32  "#out"7, lo, 0;\n\t" \
-       "addc.u32  lo, hi, 0;\n\t" 
+       "addc.u32  lo, hi, 0;\n\t"
+
+#define ASM_MUL_REDUCTION_BLOCK_LAST_64(out) \
+       "mul.lo.u64   m, "#out"0, q;\n\t" \
+       "mad.lo.cc.u64 "#out"0, m, n0, "#out"0;\n\t" \
+       "madc.hi.cc.u64 "#out"1, m, n0, "#out"1;\n\t" \
+       "madc.hi.cc.u64 "#out"2, m, n1, "#out"2;\n\t" \
+       "madc.hi.cc.u64 "#out"3, m, n2, "#out"3;\n\t" \
+       "madc.hi.cc.u64  lo, m, n3, lo;\n\t" \
+       "addc.u64  hi, 0, 0;\n\t" \
+       "mad.lo.cc.u64 "#out"0, m, n1, "#out"1;\n\t" \
+       "madc.lo.cc.u64  "#out"1, m, n2, "#out"2;\n\t" \
+       "madc.lo.cc.u64  "#out"2, m, n3, "#out"3;\n\t" \
+       "addc.cc.u64  "#out"3, lo, 0;\n\t" \
+       "addc.u64  lo, hi, 0;\n\t" 
+
 
 #define ASM_MUL_BLOCK(out, in1, in2, idx) \
     "mad.lo.cc.u32 "#out"0, "#in1#idx", "#in2"0, "#out"0;\n\t" \
@@ -229,7 +432,82 @@
     "madc.hi.cc.u32 "#out"6, "#in1#idx", "#in2"5, "#out"6;\n\t" \
     "madc.hi.cc.u32 "#out"7, "#in1#idx", "#in2"6, "#out"7;\n\t" \
     "madc.hi.cc.u32 lo, "#in1#idx", "#in2"7, lo;\n\t" \
-    "addc.u32 hi, 0, 0;\n\t"   
+    "addc.u32 hi, 0, 0;\n\t"  
+
+#if 0
+#define ASM_MONTSQ_BLOCK2(out, in1, in2)  \
+    "add.cc.u32 "#out"0, ttl1, "#out"0;\n\t" \
+    "addc.cc.u32 "#out"1, ttl7, "#out"1;\n\t" \
+    "madc.lo.cc.u32 "#out"2, "#in1#idx", "#in2"2, "#out"2;\n\t" \
+    "addc.cc.u32 "#out"2, ttl0, "#out"2;\n\t" \
+    "mul.lo.u32  ttl0, "#in1"2, "#in2"3;\n\t" \
+    "mul.lo.u32  ttl1, "#in1"2, "#in2"4;\n\t" \
+    "mul.lo.u32  ttl7, "#in1"2, "#in2"5;\n\t" \
+    "mul.lo.u32  ttl12, "#in1"2, "#in2"6;\n\t" \
+    "mul.hi.u32  tth12, "#in1"2, "#in2"6;\n\t" \
+    "mul.lo.u32  ttl13, "#in1"2, "#in2"7;\n\t" \
+    "mul.hi.u32  tth13, "#in1"2, "#in2"7;\n\t" \
+    "addc.cc.u32 "#out"3, ttl0, "#out"3;\n\t" \
+    "addc.cc.u32 "#out"4, ttl11, "#out"4;\n\t" \
+    "addc.cc.u32 "#out"5, ttl12, "#out"5;\n\t" \
+    "addc.cc.u32 "#out"6, ttl13, "#out"6;\n\t" \
+    "addc.cc.u32 "#out"7, ttl14, "#out"7;\n\t" \
+    "addc.u32 lo, lo, 0;\n\t" \
+    "add.cc.u32 "#out"1, tth1, "#out"1;\n\t" \
+    "addc.cc.u32 "#out"2, tth7, "#out"2;\n\t" \
+    "madc.hi.cc.u32 "#out"3, "#in1#idx", "#in2"2, "#out"3;\n\t" \
+    "madc.hi.cc.u32 "#out"4, "#in1#idx", "#in2"3, "#out"4;\n\t" \
+    "madc.hi.cc.u32 "#out"5, "#in1#idx", "#in2"4, "#out"5;\n\t" \
+    "madc.hi.cc.u32 "#out"6, "#in1#idx", "#in2"5, "#out"6;\n\t" \
+    "madc.hi.cc.u32 "#out"7, "#in1#idx", "#in2"6, "#out"7;\n\t" \
+    "madc.hi.cc.u32 lo, "#in1#idx", "#in2"7, lo;\n\t" \
+    "addc.u32 hi, 0, 0;\n\t"  
+
+#define ASM_MONTSQ_BLOCK1(out, in1, in2) \
+    "add.cc.u32 "#out"0, ttl0, "#out"0;\n\t" \
+    "mul.lo.u32  ttl0, "#in1"1, "#in2"2;\n\t" \
+    "mul.lo.u32  ttl7, "#in1"1, "#in2"3;\n\t" \
+    "mul.hi.u32  tth7, "#in1"1, "#in2"3;\n\t" \
+    "mul.lo.u32  ttl8, "#in1"1, "#in2"4;\n\t" \
+    "mul.hi.u32  tth8, "#in1"1, "#in2"4;\n\t" \
+    "mul.lo.u32  ttl9, "#in1"1, "#in2"5;\n\t" \
+    "mul.hi.u32  tth9, "#in1"1, "#in2"5;\n\t" \
+    "mul.lo.u32  ttl10, "#in1"1, "#in2"6;\n\t" \
+    "mul.lhiu32  tth10, "#in1"1, "#in2"6;\n\t" \
+    "mul.lo.u32  ttl11, "#in1"1, "#in2"7;\n\t" \
+    "mul.hi.u32  tth11, "#in1"1, "#in2"7;\n\t" \
+    "madc.lo.cc.u32 "#out"1, "#in1"1, "#in2"1, "#out"1;\n\t" \
+    "addc.cc.u32 "#out"2, ttl0, "#out"2;\n\t" \
+    "addc.cc.u32 "#out"3, ttl7, "#out"3;\n\t" \
+    "addc.cc.u32 "#out"4, ttl8, "#out"4;\n\t" \
+    "addc.cc.u32 "#out"5, ttl9, "#out"5;\n\t" \
+    "addc.cc.u32 "#out"6, ttl10, "#out"6;\n\t" \
+    "addc.cc.u32 "#out"7, ttl11, "#out"7;\n\t" \
+    "addc.u32 lo, lo, 0;\n\t" \
+    "add.cc.u32 "#out"1, tth0, "#out"1;\n\t" \
+    "mul.hi.u32  tth0, "#in1"1, "#in2"2;\n\t" \
+    "madc.hi.cc.u32 "#out"2, "#in1#idx", "#in2"1, "#out"2;\n\t" \
+    "addc.u32 "#out"3, tth0, "#out"3;\n\t" \
+    "addc.u32 "#out"4, tth7, "#out"4;\n\t" \
+    "addc.u32 "#out"5, tth8, "#out"5;\n\t" \
+    "addc.u32 "#out"6, tth9, "#out"6;\n\t" \
+    "addc.u32 "#out"7, tth10, "#out"7;\n\t" \
+    "addc.u32 lo, tth11, lo;\n\t" \
+    "addc.u32 hi, 0, 0;\n\t" 
+#endif
+
+#define ASM_MUL_BLOCK_64(out, in1, in2, idx) \
+    "mad.lo.cc.u64 "#out"0, "#in1#idx", "#in2"0, "#out"0;\n\t" \
+    "madc.lo.cc.u64 "#out"1, "#in1#idx", "#in2"1, "#out"1;\n\t" \
+    "madc.lo.cc.u64 "#out"2, "#in1#idx", "#in2"2, "#out"2;\n\t" \
+    "madc.lo.cc.u64 "#out"3, "#in1#idx", "#in2"3, "#out"3;\n\t" \
+    "addc.u64 lo, lo, 0;\n\t" \
+    "mad.hi.cc.u64 "#out"1, "#in1#idx", "#in2"0, "#out"1;\n\t" \
+    "madc.hi.cc.u64 "#out"2, "#in1#idx", "#in2"1, "#out"2;\n\t" \
+    "madc.hi.cc.u64 "#out"3, "#in1#idx", "#in2"2, "#out"3;\n\t" \
+    "madc.hi.cc.u64 lo, "#in1#idx", "#in2"3, lo;\n\t" \
+    "addc.u64 hi, 0, 0;\n\t"  
+
 
 #define ASM_MUL_END \
       "END_MUL:\n\t" 
@@ -253,6 +531,42 @@
          "r"(P_u256[0]), "r"(P_u256[1]), "r"(P_u256[2]), "r"(P_u256[3]), \
          "r"(P_u256[4]), "r"(P_u256[5]), "r"(P_u256[6]), "r"(P_u256[7]), \
          "r"(PN_u256[0])
+
+#define ASM_MUL_PACK_64 \
+      "mov.b64        %0, {r0,r1};\n\t"   \
+      "mov.b64        %1, {r2,r3};\n\t"   \
+      "mov.b64        %2, {r4,r5};\n\t"   \
+      "mov.b64        %3, {r6,r7};\n\t"   \
+      "}\n\t" \
+       : "=l"(dU[0]), "=l"(dU[1]), "=l"(dU[2]), "=l"(dU[3]) \
+       : "l"(dA[0]), "l"(dA[1]), "l"(dA[2]), "l"(dA[3]),   \
+         "l"(dB[0]), "l"(dB[1]), "l"(dB[2]), "l"(dB[3]), \
+         "l"(dP_u256[0]), "l"(dP_u256[1]), "l"(dP_u256[2]), "l"(dP_u256[3]), \
+         "r"(PN_u256[0])
+
+#define ASM_MONTSQ_PACK_64 \
+      "mov.b64        %0, {r0,r1};\n\t"   \
+      "mov.b64        %1, {r2,r3};\n\t"   \
+      "mov.b64        %2, {r4,r5};\n\t"   \
+      "mov.b64        %3, {r6,r7};\n\t"   \
+      "}\n\t" \
+       : "=l"(dU[0]), "=l"(dU[1]), "=l"(dU[2]), "=l"(dU[3]) \
+       : "l"(dA[0]), "l"(dA[1]), "l"(dA[2]), "l"(dA[3]),   \
+         "l"(dP_u256[0]), "l"(dP_u256[1]), "l"(dP_u256[2]), "l"(dP_u256[3]), \
+         "r"(PN_u256[0])
+
+#define ASM_MUL_PACK_64_2 \
+      "mov.b64        %0, r0;\n\t"   \
+      "mov.b64        %1, r1;\n\t"   \
+      "mov.b64        %2, r2;\n\t"   \
+      "mov.b64        %3, r3;\n\t"   \
+      "}\n\t" \
+       : "=l"(dU[0]), "=l"(dU[1]), "=l"(dU[2]), "=l"(dU[3]) \
+       : "l"(dA[0]), "l"(dA[1]), "l"(dA[2]), "l"(dA[3]),   \
+         "l"(dB[0]), "l"(dB[1]), "l"(dB[2]), "l"(dB[3]), \
+         "l"(dP_u256[0]), "l"(dP_u256[1]), "l"(dP_u256[2]), "l"(dP_u256[3]), \
+         "l"(dPN_u256[0])
+
 
 #define ASM_MULG2_PACK \
       "mov.u32        %0, rx0;\n\t"   \
@@ -288,40 +602,25 @@
          "r"(P_u256[4]), "r"(P_u256[5]), "r"(P_u256[6]), "r"(P_u256[7]), \
          "r"(PN_u256[0])
 
-#define ASM_MULG2_PACKT \
-      "mov.u32        %0, rx0;\n\t"   \
-      "mov.u32        %1, rx1;\n\t"   \
-      "mov.u32        %2, rx2;\n\t"   \
-      "mov.u32        %3, rx3;\n\t"   \
-      "mov.u32        %4, rx4;\n\t"   \
-      "mov.u32        %5, rx5;\n\t"   \
-      "mov.u32        %6, rx6;\n\t"   \
-      "mov.u32        %7, rx7;\n\t"   \
-      "mov.u32        %8, tmulx0;\n\t"   \
-      "mov.u32        %9, tmulx1;\n\t"   \
-      "mov.u32        %10, tmulx2;\n\t"   \
-      "mov.u32        %11, tmulx3;\n\t"   \
-      "mov.u32        %12, tmulx4;\n\t"   \
-      "mov.u32        %13, tmulx5;\n\t"   \
-      "mov.u32        %14, tmulx6;\n\t"   \
-      "mov.u32        %15, tmulx7;\n\t"   \
+#define ASM_MULG2_PACK_64 \
+      "mov.b64        %0, {rx0, rx1};\n\t"   \
+      "mov.b64        %1, {rx2, rx3};\n\t"   \
+      "mov.b64        %2, {rx4, rx5};\n\t"   \
+      "mov.b64        %3, {rx6, rx7};\n\t"   \
+              \
+      "mov.b64        %4, {ry0, ry1};\n\t"   \
+      "mov.b64        %5, {ry2, ry3};\n\t"   \
+      "mov.b64        %6, {ry4, ry5};\n\t"   \
+      "mov.b64        %7, {ry6, ry7};\n\t"   \
       "}\n\t" \
-       : "=r"(U[0]), "=r"(U[1]), "=r"(U[2]), "=r"(U[3]), \
-         "=r"(U[4]), "=r"(U[5]), "=r"(U[6]), "=r"(U[7]), \
-         "=r"(U[8]), "=r"(U[9]), "=r"(U[10]), "=r"(U[11]), \
-         "=r"(U[12]), "=r"(U[13]), "=r"(U[14]), "=r"(U[15]) \
-       : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]),   \
-         "r"(A[4]), "r"(A[5]), "r"(A[6]), "r"(A[7]),   \
-         "r"(A[8]), "r"(A[9]), "r"(A[10]), "r"(A[11]),   \
-         "r"(A[12]), "r"(A[13]), "r"(A[14]), "r"(A[15]),   \
-         "r"(B[0]), "r"(B[1]), "r"(B[2]), "r"(B[3]), \
-         "r"(B[4]), "r"(B[5]), "r"(B[6]), "r"(B[7]), \
-         "r"(B[8]), "r"(B[9]), "r"(B[10]), "r"(B[11]), \
-         "r"(B[12]), "r"(B[13]), "r"(B[14]), "r"(B[15]), \
-         "r"(P_u256[0]), "r"(P_u256[1]), "r"(P_u256[2]), "r"(P_u256[3]), \
-         "r"(P_u256[4]), "r"(P_u256[5]), "r"(P_u256[6]), "r"(P_u256[7]), \
+       : "=l"(dU[0]), "=l"(dU[1]), "=l"(dU[2]), "=l"(dU[3]), \
+         "=l"(dU[4]), "=l"(dU[5]), "=l"(dU[6]), "=l"(dU[7]) \
+       : "l"(dA[0]), "l"(dA[1]), "l"(dA[2]), "l"(dA[3]),   \
+         "l"(dA[4]), "l"(dA[5]), "l"(dA[6]), "l"(dA[7]),   \
+         "l"(dB[0]), "l"(dB[1]), "l"(dB[2]), "l"(dB[3]), \
+         "l"(dB[4]), "l"(dB[5]), "l"(dB[6]), "l"(dB[7]), \
+         "l"(dP_u256[0]), "l"(dP_u256[1]), "l"(dP_u256[2]), "l"(dP_u256[3]), \
          "r"(PN_u256[0])
-
 
 #define ASM_SUBU256(out, in1, in2) \
       "sub.cc.u32        "#out"0, "#in1"0, "#in2"0;\n\t"      \
@@ -363,6 +662,19 @@
         "@p1 addc.cc.u32       "#in"5, "#in"5, n5;\n\t"    \
         "@p1 addc.cc.u32       "#in"6, "#in"6, n6;\n\t"    \
         "@p1 addc.u32          "#in"7, "#in"7, n7;\n\t"    
+
+#define ASM_MODU256_64(in) \
+	"setp.ge.u64           p1, "#in"3, n3;\n\t"  \
+        "@p1 sub.cc.u64        "#in"0, "#in"0, n0;\n\t"      \
+        "@p1 subc.cc.u64       "#in"1, "#in"1, n1;\n\t"     \
+        "@p1 subc.cc.u64       "#in"2, "#in"2, n2;\n\t"    \
+        "@p1 subc.cc.u64       "#in"3, "#in"3, n3;\n\t"    \
+        "@p1 bfe.u64            m, "#in"3, 63, 1;\n\t"   \
+        "@p1 setp.eq.u64        p1, m,  1;\n\t"      \
+        "@p1 add.cc.u64        "#in"0, "#in"0, n0;\n\t"      \
+        "@p1 addc.cc.u64       "#in"1, "#in"1, n1;\n\t"     \
+        "@p1 addc.cc.u64       "#in"2, "#in"2, n2;\n\t"    \
+        "@p1 add.cc.u64        "#in"3, "#in"3, n3;\n\t"    \
 
 #define ASM_SUBMU256(out, in1, in2) \
 	ASM_SUBU256(out, in1, in2) \

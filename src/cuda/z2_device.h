@@ -46,6 +46,7 @@ class Z2_t {
      __device__ uint32_t *getu256(uint32_t offset);
      __device__ uint32_t *get2u256(uint32_t offset);
      __device__ uint32_t *getsingleu256(uint32_t offset);
+     __device__ void      setsingleu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset);
      __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset);
      __device__ void setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset);
      __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize);

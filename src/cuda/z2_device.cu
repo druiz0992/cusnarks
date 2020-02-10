@@ -103,6 +103,13 @@ __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint3
    movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y->el[(yoffset)*2*NWORDS_256BIT+NWORDS_256BIT]);
 }
 
+__device__ void Z2_t::setsingleu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
+{ 
+              //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
+              //ysize * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[(xoffset)*2*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
+}
 __device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
 { 
     //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
