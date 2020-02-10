@@ -941,9 +941,13 @@ void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt,  c
     fseek(ifp, 32, SEEK_SET);
   }
 
+#if 0
   for (i=0;i<inlen; i++){
     fread(&samples[i*NWORDS_256BIT],sizeof(uint32_t),NWORDS_256BIT,ifp);
   }
+#else
+    fread(samples,sizeof(uint32_t)*NWORDS_256BIT,inlen,ifp);
+#endif
   
   fclose(ifp);
 }

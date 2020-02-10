@@ -61,7 +61,7 @@ def profile_ec2bn128():
 
     nkernels = 1
     nsamples = 1<<20
-    sort_en = 1
+    sort_en = 0
     n_gpu = 1
     max_streams = N_STREAMS_PER_GPU - 1
     #n_streams = max_streams
@@ -74,6 +74,7 @@ def profile_ec2bn128():
         niter = n_gpu
 
     curve_data = ZUtils.CURVE_DATA['BN128']
+
     prime = ZUtils.CURVE_DATA['BN128']['prime']
     ZField(prime, ZUtils.CURVE_DATA['BN128']['curve'])
     ECC.init(curve_data['curve_params'])
@@ -92,10 +93,12 @@ def profile_ec2bn128():
 
     #my_kernels = [CB_EC2_JACAFF_ADD , CB_EC2_JAC_ADD , CB_EC2_JACAFF_DOUBLE,
                   #CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CM_EC2_JAC_MUL1, CB_EC2_JAC_MAD_SHFL]
-    #my_kernels = [CB_EC2_JAC_MAD_SHFL]
-    my_kernels = [CB_EC2_JAC_ADD]
+    #my_kernels = [CB_EC2_JAC_ADD]
     #my_kernels = [CB_EC2_JAC_ADD, CB_EC2_JAC_DOUBLE]
     #my_kernels = [CB_EC2_JAC_DOUBLE]
+    #my_kernels = [CB_EC2_JAC_MUL_OPT]
+    #my_kernels = [CB_EC2_JAC_MAD_SHFL]
+    my_kernels = [CB_EC2_JAC_RED]
 
     for k in my_kernels:
       kernel_params = {}
@@ -140,43 +143,16 @@ def profile_ec2bn128():
             kernel_params['out_length'] = (nsamples * ECP2_JAC_OUTDIMS)
             kernel_params['stride'] = [1 * (ECP2_JAC_INDIMS + U256_NDIMS)]
 
-  
-      if kernel_config['kernel_idx'][0] == CB_EC2_JAC_MAD_SHFL:
-  
-         outdims = ECP2_JAC_OUTDIMS
-         indims_e = ECP2_JAC_INDIMS + U256_NDIMS
- 
-         kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM),8)
+      if kernel_config['kernel_idx'][0] == CB_EC2_JAC_MUL_OPT and \
+              len(kernel_config['kernel_idx']) == 1:
 
-         kernel = CB_EC2_JAC_MAD_SHFL
-         nkernels = len(kernel_config['blockD'])
-         kernel_params['stride']    = [outdims] * nkernels
-         kernel_params['stride'][0]    =  indims_e
-         kernel_params['premul']    = [0] * nkernels
-         kernel_params['premul'][0] = 1
-         kernel_params['premod']    = [0] * nkernels
-         kernel_params['midx']      = [0] * nkernels
-         kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
-         kernel_config['kernel_idx'] =[kernel] * nkernels
-         kernel_params['in_length'] = [nsamples* indims_e]*nkernels
-         for l in xrange(1,nkernels):
-           kernel_params['in_length'][l] = outdims * (
-               int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
-             (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
-
-         kernel_params['out_length'] = 1 * outdims
-         kernel_params['padding_idx'] = [1] * nkernels
-         kernel_config['gridD'] = [0] * nkernels
-         kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
-         kernel_config['gridD'][nkernels-1] = 1
-         #nkernels = 1
-         if nkernels == 1:
-             print("Warning : Only 1 kernel enabled")
-         sort_en = 1
-         print("Sort enable : "+str(sort_en))
+         kernel_params['in_length'] = [5*nsamples]
+         kernel_params['out_length'] = int(6*nsamples/U256_BSELM)
+         kernel_params['stride'] = [U256_BSELM * 3]
+         nkernels = 1
 
 
-      niter = 10
+      niter = 1
       for i in range(niter):
          gpu_id=i%n_gpu
          if n_streams:
@@ -189,7 +165,9 @@ def profile_ec2bn128():
          ec2bn128_vector = cu_ec2bn128.randu256(nsamples,pu256)
          tmp = ec2_jacscmulx1_h(np.reshape(ec2bn128_vector[:nsamples*NWORDS_256BIT],-1), G, midx, 0)
 
-         if my_kernels[0] == CB_EC2_JAC_MAD_SHFL:
+         if my_kernels[0] == CB_EC2_JAC_MAD_SHFL or \
+                 my_kernels[0] == CB_EC2_JAC_RED or \
+                 my_kernels[0] == CB_EC2_JAC_MUL_OPT:
            tmp = ec2_jac2aff_h(np.reshape(tmp,-1), midx, 1)
            ec2bn128_vector = np.concatenate((ec2bn128_vector, tmp))
            idx_v = sortu256_idx_h(ec2bn128_vector[:nsamples],sort_en)
@@ -197,15 +175,24 @@ def profile_ec2bn128():
          else:
              input_vector = tmp
 
-         _,kernel_time = cu_ec2bn128.kernelLaunch(input_vector, kernel_config, kernel_params,gpu_id,n_streams,n_kernels = nkernels)
+         if kernel_config['kernel_idx'][0] == CB_EC2_JAC_MAD_SHFL or \
+            kernel_config['kernel_idx'][0] == CB_EC2_JAC_RED:
+            separate_k = 1
+
+            if kernel_config['kernel_idx'][0] == CB_EC2_JAC_MAD_SHFL :
+                separate_k = 0
+
+            a, r,kernel_time = ec_mad_cuda2(cu_ec2bn128, input_vector, midx, 1, shamir_en=1, gpu_id=0, stream_id=0,separate_k=separate_k)
+
+         else:
+           print(kernel_params, kernel_config)
+           r,kernel_time = cu_ec2bn128.kernelLaunch(input_vector, kernel_config, kernel_params,gpu_id,n_streams,n_kernels = nkernels)
          if i :
              kernel_stats.append(kernel_time)
   
       
       if niter > 1:
         logging.info("Kernel %s : - Max : %s [s], Min : %s [s], Mean : %s[s]" % (k, np.max(kernel_stats), np.min(kernel_stats), np.mean(kernel_stats)))
-  
-      sys.exit(1)
   
   
 if __name__ == "__main__":

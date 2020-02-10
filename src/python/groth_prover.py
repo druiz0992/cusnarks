@@ -1259,7 +1259,7 @@ class GrothProver(object):
     def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0):
             ZField.set_field(MOD_GROUP)
             #TODO : remove in_v
-            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id)
+            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id,True)
 
             if ec2 and stream_id == 0:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
@@ -1348,12 +1348,11 @@ class GrothProver(object):
        ec_start_idx = [nsamples+ECP_JAC_INDIMS*(nsamples-batch_size), 
                        nsamples+ECP2_JAC_INDIMS*(nsamples-batch_size)]
 
-       # add scl to multiply previous EC_P
+       ## add scl to multiply previous EC_P
        EC_P[0][nsamples-1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
        EC_P[1][nsamples-1] = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
 
        return nsamples, EC_P, scl_start_idx, ec_start_idx
-
 
     def findECPointsDispatch(self, dispatch_table, batch_size, last_batch_idx, pk_bin,
                              sort_idx=0, change_s_scl_idx=[-1], change_r_scl_idx=[-1], change_rs_scl_idx=[-1], sort_en=0):
@@ -1384,7 +1383,6 @@ class GrothProver(object):
           gpu_id    = p[3]
           stream_id = p[4]
           init_ec_val = self.init_ec_val[gpu_id][stream_id][pidx]
-
           #print(P, step, EPidx, pidx, ecidx, start_idx, end_idx)
 
           if bidx >= last_batch_idx:

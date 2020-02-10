@@ -114,7 +114,7 @@
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
 
-#define N_STREAMS_PER_GPU (1+5)
+#define N_STREAMS_PER_GPU (1+4)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
@@ -326,6 +326,8 @@ typedef enum{
    CB_EC_JAC_MUL1,
    CB_EC_JAC_MAD,
    CB_EC_JAC_MAD_SHFL,
+   CB_EC_JAC_MUL_OPT,
+   CB_EC_JAC_RED,
    CB_EC_N
 
 }ec_callback_t;
@@ -340,6 +342,8 @@ typedef enum{
    CB_EC2_JAC_MUL1,
    CB_EC2_JAC_MAD,
    CB_EC2_JAC_MAD_SHFL,
+   CB_EC2_JAC_MUL_OPT,
+   CB_EC2_JAC_RED,
    CB_EC2_N
 
 }ec2_callback_t;

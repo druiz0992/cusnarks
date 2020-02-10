@@ -80,6 +80,10 @@ __device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset, uint3
 { 
    movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
 }
+__device__ void Z1_t::setsingleu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
+{ 
+   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+}
 __device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
 { 
    movu256(&el[(xoffset)*NWORDS_256BIT],&y[(yoffset)*NWORDS_256BIT]);
