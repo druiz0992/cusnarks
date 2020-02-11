@@ -2281,7 +2281,7 @@ void *interpol_and_mul_h(void *args)
   //__builtin_prefetch(&M_mul[(2*wargs->start_idx)<<NWORDS_256BIT_SHIFT]);
   //__builtin_prefetch(&wargs->A[wargs->start_idx<<NWORDS_256BIT_SHIFT]);
   //__builtin_prefetch(&wargs->B[wargs->start_idx<<NWORDS_256BIT_SHIFT]);
-  //for (i=wargs->start_idx; i < wargs->last_idx; i++){
+  for (i=wargs->start_idx; i < wargs->last_idx; i++){
     //if (i < wargs->last_idx -1){
       //__builtin_prefetch(&M_mul[(2*(i+1))<<NWORDS_256BIT_SHIFT]);
       //__builtin_prefetch(&wargs->A[(i+1)<<NWORDS_256BIT_SHIFT]);
