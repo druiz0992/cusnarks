@@ -219,6 +219,11 @@ inline int32_t ltu256_h(const uint32_t *x, const uint32_t *y)
   return (compu256_h(x, y) < 0);
 }
 
+inline int32_t ltu32_h(const uint32_t *x, const uint32_t *y)
+{
+  return *x < *y;
+}
+
 /* 
    Compare 256 bit integers X and Y.
 

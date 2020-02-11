@@ -396,15 +396,15 @@ class GrothProver(object):
 
         # EC reduce A, B2, B1 and C from nPublic+1 to end	
         self.dispatch_table_phase1 = buildDispatchTable( nbatches-1,
-                                         self.ec_type_dict['C'][2]+1,
-                                         #3,
+                                         #self.ec_type_dict['C'][2]+1,
+                                         3,
                                          self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
                                          nPublic+1, nVars,
                                          start_pidx=self.ec_type_dict['A'][2],
                                          start_gpu_idx=next_gpu_idx,
                                          start_stream_idx=first_stream_idx,
-                                         ec_lable = self.ec_lable)
-                                         #ec_lable = np.asarray(['A', 'B1', 'C']))
+                                         #ec_lable = self.ec_lable)
+                                         ec_lable = np.asarray(['A', 'B1', 'C']))
 
         #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
         self.dispatch_table_phase1b = buildDispatchTable( nbatches-1,
@@ -730,6 +730,11 @@ class GrothProver(object):
        else:
           logging.error('Witness file %s doesn\'t exist', self.witness_f)
           sys.exit(1)
+
+       #self.sorted_scl_array_idx = \
+              #sortu256_idx_h(self.scl_array, sort_en)
+       #self.sorted_scl_array = \
+              #self.scl_array[self.sorted_scl_array_idx]
        
     def load_pkdata(self):
        if self.proving_key_f.endswith('npz'):
@@ -1081,20 +1086,21 @@ class GrothProver(object):
 
  
         #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
-        #self.findECPointsDispatch(
-                                  #self.dispatch_table_phase1b,
-                                  #self.batch_size_mexp_phase1,
-                                  #self.dispatch_table_phase1b.shape[0]-1, pk_bin,
-                                  #change_s_scl_idx = [self.ec_type_dict['B2'][2]],
-                                  #sort_en=self.sort_en)
+        self.findECPointsDispatch(
+                                  self.dispatch_table_phase1b,
+                                  self.batch_size_mexp_phase1,
+                                  self.dispatch_table_phase1b.shape[0]-1, pk_bin,
+                                  sort_idx = self.ec_type_dict['B2'][2],
+                                  change_s_scl_idx = [self.ec_type_dict['B2'][2]],
+                                  sort_en=self.sort_en)
 
         self.findECPointsDispatch(
                                   self.dispatch_table_phase1,
                                   self.batch_size_mexp_phase1,
-                                  self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]+1), pk_bin,
-                                  #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]), pk_bin,
-                                  change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
-                                  #change_s_scl_idx = [self.ec_type_dict['B1'][2]],
+                                  #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]+1), pk_bin,
+                                  self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]), pk_bin,
+                                  #change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
+                                  change_s_scl_idx = [self.ec_type_dict['B1'][2]],
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
                                   sort_en=self.sort_en)
 
@@ -1105,6 +1111,7 @@ class GrothProver(object):
             logging.info('Client stopped...')
             return
 
+        #print(self.dispatch_table_phase2, self.dispatch_table_phase2.shape[0]+1)
         self.findECPointsDispatch(
                              self.dispatch_table_phase2,
                              nPublic+2,
@@ -1259,8 +1266,8 @@ class GrothProver(object):
     def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0):
             ZField.set_field(MOD_GROUP)
             #TODO : remove in_v
+            #print(ecbn128_samples.shape, ec2, shamir_en, gpu_id, stream_id)
             in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id,True)
-
             if ec2 and stream_id == 0:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
             elif stream_id == 0:
@@ -1364,7 +1371,6 @@ class GrothProver(object):
        n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
        pending_dispatch_table = []
        n_dispatch=len(pending_dispatch_table)
-       #print(dispatch_table)
 
        for bidx, p in enumerate(dispatch_table):
           #Retrieve point name : A,B1,B2,..
@@ -1383,7 +1389,6 @@ class GrothProver(object):
           gpu_id    = p[3]
           stream_id = p[4]
           init_ec_val = self.init_ec_val[gpu_id][stream_id][pidx]
-          #print(P, step, EPidx, pidx, ecidx, start_idx, end_idx)
 
           if bidx >= last_batch_idx:
             if bidx == last_batch_idx:
@@ -1444,7 +1449,6 @@ class GrothProver(object):
 
           # Copy last batch EC point sum
           EC_P[ecidx][-step:] = init_ec_val
-          #print(EC_P[ecidx].shape)
 
           result, t = self.compute_proof_ecp(
               cuda_ec128,
