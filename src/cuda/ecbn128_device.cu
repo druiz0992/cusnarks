@@ -261,7 +261,7 @@ __global__ void __launch_bounds__(128,5)scmulecjacopt_kernel(uint32_t *out_vecto
     scmulecjac_opt<Z1_t, uint256_t>(&sumX,0,
                            &sumX2, 2*idx*U256_BSELM, 
                            &scl[idx*NWORDS_256BIT *U256_BSELM],  params);
-   /logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
+   logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
 }
 
 __global__ void __launch_bounds__(128,4) scmulec2jacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
