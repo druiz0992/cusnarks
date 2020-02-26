@@ -78,7 +78,7 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None):
  
         # Check valid folder exists
         if keep_f is None:
@@ -149,6 +149,11 @@ class GrothSetup(object):
 
         copy_input_files([in_circuit_f], self.keep_f)
 
+        self.write_table_en = False
+        self.write_table_f = write_table_f
+        if write_table_f is not None:
+          self.write_table_en = True
+
         self.sort_en = 1
 
         logging.info('#################################### ')
@@ -168,6 +173,8 @@ class GrothSetup(object):
         logging.info(' - keep_f : %s', keep_f)
         logging.info(' - bs : %s', batch_size)
         logging.info(' - sort enable : %s', self.sort_en)
+        logging.info(' - write_table_en : %s', self.write_table_en)
+        logging.info(' - table_f : %s', self.write_table_f)
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
@@ -308,6 +315,7 @@ class GrothSetup(object):
 
         self.logTimeResults()
 
+        self.write_tables()
         self.write_pk()
         self.write_vk()
         # TODO : The idea is to do some precalculations to compute multiexp later during
@@ -536,7 +544,8 @@ class GrothSetup(object):
       infv = ec_isinf(np.reshape(self.pk['A'],-1), ZField.get_field())
       self.pk['A_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
-      #self.pk['A_table'] = ec_inittable_h(np.reshape(self.pk['A'],-1), U256_BSELM, MOD_GROUP, 1)
+      if self.write_table_en:
+         self.pk['A_table'] = ec_inittable_h(np.reshape(self.pk['A'],-1), U256_BSELM, MOD_GROUP, 1)
 
       end = time.time()
       self.t_S['A'] = end - start
@@ -558,7 +567,10 @@ class GrothSetup(object):
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
-      #self.pk['B1_table'] = ec_inittable_h(np.reshape(self.pk['B1'],-1), U256_BSELM, MOD_GROUP, 1)
+      if self.write_table_en:
+         self.pk['B1_table'] = ec_inittable_h(np.reshape(self.pk['B1'],-1), U256_BSELM, MOD_GROUP, 1)
+      print("p jac2aff")
+
       infv = ec_isinf(np.reshape(self.pk['B1'],-1), ZField.get_field())
       self.pk['B1_density'] = 100.0  - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
@@ -581,6 +593,8 @@ class GrothSetup(object):
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
       self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
+      if self.write_table_en:
+         self.pk['B2_table'] = ec2_inittable_h(np.reshape(self.pk['B2'],-1), U256_BSELM, MOD_GROUP, 1)
       infv = ec2_isinf(np.reshape(self.pk['B2'],-1), ZField.get_field())
       self.pk['B2_density'] = 100.0 - 100 * np.count_nonzero(infv == 1) / len(infv)
 
@@ -611,7 +625,8 @@ class GrothSetup(object):
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
       self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
-      #self.pk['C_table'] = ec_inittable_h(np.reshape(self.pk['C'],-1), U256_BSELM, MOD_GROUP, 1)
+      if self.write_table_en:
+         self.pk['C_table'] = ec_inittable_h(np.reshape(self.pk['C'],-1), U256_BSELM, MOD_GROUP, 1)
       infv = ec_isinf(np.reshape(self.pk['C'],-1), ZField.get_field())
       self.pk['C_density'] = 100.0 - 100.0 * np.count_nonzero(infv == 1) / len(infv)
 
@@ -644,6 +659,8 @@ class GrothSetup(object):
       self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
       self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_256BIT)
+      if self.write_table_en:
+         self.pk['hExps_table'] = ec_inittable_h(np.reshape(self.pk['hExps'],-1), U256_BSELM, MOD_GROUP, 1)
 
       end = time.time()
       self.t_S['hExps'] =end - start 
@@ -748,6 +765,30 @@ class GrothSetup(object):
         appendU256DataFile_h(nWords_C, out_pk_aux_f.encode("UTF-8"))
         appendU256DataFile_h(np.reshape(pk_bin['C_table'],-1), out_pk_aux_f.encode("UTF-8"))
 
+ 
+    def write_tables(self):
+       logging.info('#################################### ')
+       logging.info('')
+       logging.info('Writing Table files')
+       self.pk['A_table'] = ec_jac2aff_h(np.reshape(self.pk['A_table'],-1),MOD_GROUP,1)
+       self.pk['B1_table'] = ec_jac2aff_h(np.reshape(self.pk['B1_table'],-1),MOD_GROUP,1)
+       self.pk['C_table'] = ec_jac2aff_h(np.reshape(self.pk['C_table'],-1),MOD_GROUP,1)
+       self.pk['hExps_table'] = ec_jac2aff_h(np.reshape(self.pk['hExps_table'],-1),MOD_GROUP,1)
+       self.pk['B2_table'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table'],-1),MOD_GROUP,1)
+       logging.info('A : %s ', self.pk['A_table'].shape)
+       logging.info('B1 : %s ', self.pk['B1_table'].shape)
+       logging.info('B2 : %s ', self.pk['B2_table'].shape)
+       logging.info('C : %s ', self.pk['C_table'].shape)
+       logging.info('hExps : %s ', self.pk['hExps_table'].shape)
+
+       tables = np.concatenate((self.pk['A_table'], self.pk['B2_table'], self.pk['B1_table'], self.pk['C_table'], self.pk['hExps_table']))
+       writeU256DataFile_h(np.reshape(tables,-1), self.write_table_f.encode("UTF-8"))
+       del tables, self.pk['A_table'], self.pk['B2_table'], self.pk['B1_table'], self.pk['C_table'], self.pk['hExps_table']
+
+       logging.info('')
+       logging.info('')
+       logging.info('#################################### ')
+     
     def write_pk(self):
 
        logging.info('#################################### ')

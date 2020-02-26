@@ -751,6 +751,26 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     #ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
     return pout
 
+def readWitnessShmem_h(ct.uint32_t nVars):
+        cdef ct.uint32_t **w_ptr = NULL
+        cdef ct.uint32_t flag, shmid
+
+        if (nVars < (1 << 25)):
+            flag = SHMEM_T_WITNESS_32M
+        elif (nVars < (1 << 26)):
+            flag = SHMEM_T_WITNESS_64M
+        else:
+            flag = SHMEM_T_WITNESS_128M
+
+        shmid = uh.ccreateSharedMemBuf(<void **>w_ptr, <ct.shmem_t> flag)
+        cdef ct.uint32_t [:] kdata = <ct.uint32_t [:nVars * NWORDS_256BIT]>w_ptr[0]
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_witness = np.zeros((nVars*NWORDS_256BIT), dtype=np.uint32)
+        out_witness = np.copy(np.asarray(kdata).reshape(-1,NWORDS_256BIT))
+
+        uh.cdestroySharedMemBuf(w_ptr[0], shmid)
+
+        return out_witness
+
 def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
                   np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
         cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
@@ -930,6 +950,39 @@ def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_
        return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
      else:
        return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
+
+def ec_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order, ct.uint32_t pidx, ct.uint32_t add_last):
+    cdef ct.uint32_t indims=ECP_JAC_OUTDIMS
+    cdef ct.uint32_t n, table_size
+
+    if add_last:
+        indims=ECP_JAC_INDIMS
+
+    n= <int> (in_v.shape[0]/NWORDS_256BIT/indims) 
+    table_size = <int> ((1<<order) * n * NWORDS_256BIT * ECP_JAC_OUTDIMS/order)
+
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_table = np.zeros(table_size, dtype=np.uint32)
+
+    uh.cec_inittable_h(&in_v[0], &out_table[0], n, order, pidx, add_last)
+
+    return np.reshape(out_table,(-1,NWORDS_256BIT))
+
+def ec2_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order, ct.uint32_t pidx, ct.uint32_t add_last):
+    cdef ct.uint32_t indims=ECP2_JAC_OUTDIMS
+    cdef ct.uint32_t n, table_size
+
+    if add_last:
+        indims=ECP2_JAC_INDIMS
+
+    n= <int> (in_v.shape[0]/NWORDS_256BIT/indims) 
+    table_size = <int> ((1<<order) * n * NWORDS_256BIT * ECP2_JAC_OUTDIMS/order)
+
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_table = np.zeros(table_size, dtype=np.uint32)
+
+    uh.cec2_inittable_h(&in_v[0], &out_table[0], n, order, pidx, add_last)
+
+    return np.reshape(out_table,(-1,NWORDS_256BIT))
+
 
 def ec_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,

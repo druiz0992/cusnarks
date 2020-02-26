@@ -90,6 +90,9 @@
 #include <unistd.h> 
 #include <omp.h>
 #include <x86intrin.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #include "types.h"
 #include "constants.h"
@@ -743,6 +746,7 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
   FILE *ifp = fopen(filename,"rb");
   uint32_t k=0,i;
   uint32_t tmp_word, n_coeff;
+  uint32_t offset;
 
   r1cs_hdr->R1CSA_nCoeff=0;
   r1cs_hdr->R1CSB_nCoeff=0;
@@ -762,11 +766,15 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
     exit(1);
   }
 
+  fseek(ifp, R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES * sizeof(char), SEEK_SET);
+  fread(&offset, sizeof(uint32_t), 1, ifp); 
+  fseek(ifp, (R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES + 8 + offset) * sizeof(char), SEEK_SET);
+
   fread(&r1cs_hdr->word_width_bytes, sizeof(uint32_t), 1, ifp); 
   if (r1cs_hdr->word_width_bytes != 4){
-    printf("Unexpected R1CS word width\n");
-    fclose(ifp);
-    exit(1);
+     printf("Unexpected R1CS word width\n");
+     fclose(ifp);
+     exit(1);
   }
 
   fread(&r1cs_hdr->nVars, sizeof(uint32_t), 1, ifp); 
@@ -806,7 +814,8 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
 
   samples[r1cs_offset++] = r1cs->nConstraints;
   
-  fseek(ifp, R1CS_HDR_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_SET);
+  //fseek(ifp, R1CS_HDR_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_SET);
+  fseek(ifp, R1CS_CONST_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_CUR);
 
   while (!feof(ifp)){
     fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
@@ -3266,7 +3275,7 @@ void ec2_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx)
 }
 
 
-void ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
+void ec_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
 {
    uint32_t n_tables = (table_order + n - 1)/table_order;
    uint32_t i;
@@ -3320,7 +3329,7 @@ void ec_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_ord
    } 
 }
 
-uint32_t * ec2_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
+void ec2_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last=0)
 {
    uint32_t n_tables = (table_order + n - 1)/table_order;
    uint32_t i;
@@ -3378,8 +3387,6 @@ uint32_t * ec2_inittable(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t ta
          }      
       } 
    } 
-
-   return ec_table;
 }
 
 
@@ -3392,7 +3399,7 @@ void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectabl
   uint32_t n_tables = (order + n - 1)/order;
   uint32_t table_size = 1 << order; 
 
-  ec_inittable(x, ectable, n, order, pidx, add_last);
+  ec_inittable_h(x, ectable, n, order, pidx, add_last);
 
   /*
   for(i=debug_tid * table_size; i< (debug_tid+1)*table_size; i++){
@@ -3471,14 +3478,10 @@ void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectab
   const uint32_t *ECInf = CusnarksMiscKGet();
   uint32_t i;
   int debug_tid = 8191;
-  uint32_t ndims = ECP2_JAC_OUTDIMS;
-  if (add_last){
-      ndims = ECP2_JAC_INDIMS;
-  }
   uint32_t n_tables = (order + n - 1)/order;
   uint32_t table_size = 1 << order; 
 
-  uint32_t * ec_table = ec2_inittable(x, ectable, n, order, pidx, add_last);
+  ec2_inittable_h(x, ectable, n, order, pidx, add_last);
 
  /*
   for(i=debug_tid * table_size; i< (debug_tid+1)*table_size; i++){
@@ -3532,7 +3535,7 @@ void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectab
                        pidx);
         if (b) {
            ec2_jacadd_h(&z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS],
-                       &ec_table[(i * table_size + b) * NWORDS_256BIT *ECP2_JAC_OUTDIMS],
+                       &ectable[(i * table_size + b) * NWORDS_256BIT *ECP2_JAC_OUTDIMS],
                        &z[i * NWORDS_256BIT * ECP2_JAC_OUTDIMS],
                        pidx);
         }
@@ -3554,9 +3557,6 @@ void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectab
      }
   }
 
-  if (ectable == NULL){
-    free(ec_table);
-  }
 }
 
 
@@ -4519,3 +4519,41 @@ void release_h(void)
   #endif
   M_free_h();
 }
+
+int createSharedMemBuf(void **shmem, shmem_t type)
+{
+  int shmid;
+  // give your shared memory an id, anything will do
+  key_t key = SHMEM_WITNESS_KEY;
+  unsigned long long size;
+
+  if (type == SHMEM_T_WITNESS_32M) {
+	  size = (1ull << 25) * sizeof (unsigned int) * 8;
+  } else if (type == SHMEM_T_WITNESS_64M) { 
+	  size = (1ull << 26) * sizeof (unsigned int) * 8;
+  } else{
+	  size = (1ull << 27) * sizeof (unsigned int) * 8;
+  }
+
+  // Setup shared memory
+  if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0)
+  {
+     return -1;
+  }
+  // Attached shared memory
+  if ((*shmem = shmat(shmid, NULL, 0)) == (char *) -1)
+  {
+     return -1;
+  }
+
+  return shmid;
+}
+
+void destroySharedMemBuf(void *shmem, int shmid)
+{
+   // Detach and remove shared memory
+   shmdt(shmem);
+   shmctl(shmid, IPC_RMID, NULL);
+}
+	
+
