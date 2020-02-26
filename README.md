@@ -587,7 +587,7 @@ formats.
 
 |File type        | Extensions|
 |-----------------|-----------|
-| Constraints     | .bin, .json, .rics|
+| Constraints     | .bin, .json, .r1cs|
 |Proving Key      | .json, .bin |
 |Verification Key | .json                   |
 |Witness          | .txt, .json, .dat, .bin |

@@ -95,6 +95,7 @@ def init():
     opt['start_server'] = 1
     opt['reserved_cpus'] = 0
     opt['list'] = 1
+    opt['table_f'] = None
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -222,6 +223,9 @@ def init():
     parser.add_argument(
        '-r_cpus', '--reserved_cpus', type=int, help=help_str, required=False)  
 
+    help_str = 'Output Table File. Default : ' +str(opt['table_f'])
+    parser.add_argument(
+       '-t', '--table_f', type=str, help=help_str, required=False)  
 
     return opt, parser
 
@@ -313,6 +317,13 @@ def run(opt, parser):
         else:
            opt['verification_key_f'] = opt['data_f'] + args.verification_key
 
+    if args.table_f is not None:
+        if '/' in args.table_f:
+           opt['table_f'] = args.table_f
+        else:
+           opt['table_f'] = opt['data_f'] + args.table_f
+
+
     if args.seed is not None:
          opt['seed'] = args.seed
 
@@ -370,7 +381,7 @@ def run(opt, parser):
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
-                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'])
+                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'], write_table_f=opt['table_f'])
       
       GS.setup()
 
@@ -418,7 +429,7 @@ def run(opt, parser):
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'])
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], write_table_f=opt['table_f'])
           end = time.time() - start
           print("GP init : "+str(end))
 

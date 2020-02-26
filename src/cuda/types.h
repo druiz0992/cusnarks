@@ -56,6 +56,10 @@
 #define R1CS_HDR_V01           (1)
 #define R1CS_HDR_START_OFFSET_NWORDS (8)
 
+#define R1CS_HDR_START_HDR_NBYTES (12)
+#define R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES (R1CS_HDR_START_HDR_NBYTES + 8)
+#define R1CS_CONST_START_OFFSET_NWORDS (2)
+
 #define WITNESS_HEADER_N_OFFSET_NWORDS (0)
 #define WITNESS_HEADER_SIZE_OFFSET_NWORDS (2)
 #define WITNESS_HEADER_OTHER_OFFSET_NWORDS (3)
@@ -115,6 +119,8 @@
 #define ECBN128_BLOCK_DIM          (256)
 
 #define N_STREAMS_PER_GPU (1+4)
+
+#define SHMEM_WITNESS_KEY (123456)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
@@ -224,6 +230,14 @@ typedef enum {
 
 }fmt_t;
 
+
+typedef enum{
+  SHMEM_T_WITNESS_32M = 0,
+  SHMEM_T_WITNESS_64M,
+  SHMEM_T_WITNESS_128M,
+
+  SHMEM_T_N
+}shmem_t;
 
 
 // data vector
@@ -555,4 +569,11 @@ typedef enum{
   R1CS_N_IDX = 3
 
 }r1cs_idx_t;
+
+typedef enum{
+   R1CS_SECTION_HDR = 1,
+   R1CS_SECTION_CONSTRAINT = 2,
+   R1CS_SECTION_WIRE2LABELID = 3
+
+}r1cs_section_t;
 #endif

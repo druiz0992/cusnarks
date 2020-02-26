@@ -49,6 +49,7 @@ cdef extern from "types.h":
   cdef uint32_t N_STREAMS_PER_GPU
   cdef uint32_t GROTH_PROOF_N_ECPOINTS
   cdef uint32_t MAX_NCORES_OMP
+  cdef uint32_t U256_BSELM
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -211,6 +212,8 @@ cdef extern from "types.h":
   ctypedef enum misc_const_len_t:
     MISC_K_1 = 0, MISC_K_INF = 2, MISC_K_INF2 = 5, MISC_K_N = 11 
   
+  ctypedef enum shmem_t:
+      SHMEM_T_WITNESS_32M = 0, SHMEM_T_WITNESS_64M, SHMEM_T_WITNESS_128M, SHMEM_T_N
 
   ctypedef enum snarks_file_t:
       SNARKSFILE_T_CIRCUIT = 0, SNARKSFILE_T_PK, SNARKSFILE_T_VK, SNARKSFILE_T_WITNESS,
@@ -234,3 +237,4 @@ _MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
 _MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS
 _NSTREAMS_PER_GPU = N_STREAMS_PER_GPU
 _GROTH_PROOF_N_ECPOINTS = GROTH_PROOF_N_ECPOINTS
+_U256_BSELM = U256_BSELM

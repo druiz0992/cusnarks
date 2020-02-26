@@ -82,7 +82,7 @@ class GrothProver(object):
     
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None, n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
-                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, reserved_cpus=0, batch_size=20):
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, reserved_cpus=0, batch_size=20, write_table_f=None):
 
         # Check valid folder exists
         if keep_f is None:
@@ -110,6 +110,11 @@ class GrothProver(object):
         self.sort_en = 0
         self.compute_ntt_gpu = False
         self.compute_last_mexp_gpu = True
+
+        self.write_table_en = False
+        self.write_table_f = write_table_f
+        if write_table_f is not None:
+          self.write_table_en = True
 
         self.roots_f = cfg.get_roots_file()
         self.n_bits_roots = cfg.get_n_roots()
@@ -311,13 +316,25 @@ class GrothProver(object):
         logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info(' - n available CPUs : %s', get_nprocs_h())
         logging.info(' - sort enable : %s', self.sort_en)
+        logging.info(' - write_table_en : %s', self.write_table_en)
+        logging.info(' - table_f : %s', self.write_table_f)
         logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
         logging.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
         logging.info(' - N Constraints : %s', nVars)
         logging.info(' - Domain Size : %s', domainSize)
         logging.info(' - N Public : %s', nPublic)
         logging.info('#################################### ')
-  
+ 
+        if self.write_table_f:
+          logging.info('#################################### ')
+          logging.info('..')
+          Tables = readU256DataFile_h(self.write_table_f.encode("UTF-8"), 
+                  int(nVars*2*6*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM), 
+                  int(nVars*2*5*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM))
+          logging.info('# Reading Tables (%s Bytes)...', Tables.shape)
+          logging.info('..')
+          logging.info('#################################### ')
+           
         if self.out_proving_key_f is not None:
              if self.out_proving_key_f.endswith('.json'):
                pk_dict =pkvars_to_json(self.out_proving_key_format, EC_T_AFFINE, self.pk)
@@ -717,15 +734,18 @@ class GrothProver(object):
              np.copyto(
                 self.scl_array[:nVars],
                 readWitnessFile_h(self.witness_f.encode("UTF-8"),0, nVars ))
-           #from json/txt to bin
-           """
-           if self.witness_f.endswith('.txt'):
-             w_file = self.witness_f.replace('txt','bin')
-           elif self.witness_f.endswith('.json'):
-             w_file = self.witness_f.replace('json','bin')
+           else:
+             np.copyto(
+                self.scl_array[:nVars],
+                readWitnessShmem_h(nVars) )
+             """
+             if self.witness_f.endswith('.txt'):
+               w_file = self.witness_f.replace('txt','bin')
+             elif self.witness_f.endswith('.json'):
+               w_file = self.witness_f.replace('json','bin')
 
-           writeWitnessFile_h(np.reshape(self.scl_array,-1),self.w_file.encode("UTF-8"))
-           """
+             writeWitnessFile_h(np.reshape(self.scl_array,-1),self.w_file.encode("UTF-8"))
+             """
 
        else:
           logging.error('Witness file %s doesn\'t exist', self.witness_f)
