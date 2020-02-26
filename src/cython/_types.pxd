@@ -41,6 +41,7 @@ cdef extern from "types.h":
   ctypedef unsigned int uint32_t
   ctypedef int int32_t
   ctypedef unsigned long long int t_uint64
+  ctypedef long long int t_int64
 
   #Constants 
   cdef uint32_t NWORDS_256BIT
@@ -200,11 +201,14 @@ cdef extern from "types.h":
     uint32_t nPubOutputs
     uint32_t nPubInputs
     uint32_t nPrivInputs
+    uint32_t nLabels
     uint32_t nConstraints
 
     uint32_t R1CSA_nCoeff
     uint32_t R1CSB_nCoeff
     uint32_t R1CSC_nCoeff
+    uint32_t constraintOffset
+    t_int64  constraintLen;
 
   ctypedef enum r1cs_idx_t:
      R1CSA_IDX=0, R1CSB_IDX, R1CSC_IDX, R1CS_N_IDX

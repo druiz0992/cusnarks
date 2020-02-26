@@ -56,9 +56,10 @@
 #define R1CS_HDR_V01           (1)
 #define R1CS_HDR_START_OFFSET_NWORDS (8)
 
+#define R1CS_SECTION_LEN_NBYTES (12)
 #define R1CS_HDR_START_HDR_NBYTES (12)
-#define R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES (R1CS_HDR_START_HDR_NBYTES + 8)
-#define R1CS_CONST_START_OFFSET_NWORDS (2)
+#define R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES (R1CS_HDR_START_HDR_NBYTES + R1CS_HDR_START_HDR_NBYTES)
+#define R1CS_CONST_START_OFFSET_NWORDS (R1CS_HDR_START_HDR_NBYTES/4)
 
 #define WITNESS_HEADER_N_OFFSET_NWORDS (0)
 #define WITNESS_HEADER_SIZE_OFFSET_NWORDS (2)
@@ -125,6 +126,7 @@
 typedef unsigned int uint32_t;
 typedef int int32_t;
 typedef unsigned long long int t_uint64;
+typedef long long int t_int64;
 
 typedef unsigned int uint256_t[NWORDS_256BIT];
 typedef unsigned int uint512_t[2*NWORDS_256BIT];
@@ -554,11 +556,14 @@ typedef struct {
   uint32_t nPubOutputs;
   uint32_t nPubInputs;
   uint32_t nPrivInputs;
+  uint32_t nLabels;
   uint32_t nConstraints;
 
   uint32_t R1CSA_nCoeff;
   uint32_t R1CSB_nCoeff;
   uint32_t R1CSC_nCoeff;
+  uint32_t constraintOffset;
+  t_int64  constraintLen;
 
 }r1csv1_t;
 

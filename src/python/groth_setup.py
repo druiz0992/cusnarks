@@ -315,7 +315,9 @@ class GrothSetup(object):
 
         self.logTimeResults()
 
-        self.write_tables()
+        if self.write_table_en:
+          self.write_tables()
+
         self.write_pk()
         self.write_vk()
         # TODO : The idea is to do some precalculations to compute multiexp later during
@@ -569,7 +571,6 @@ class GrothSetup(object):
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
       if self.write_table_en:
          self.pk['B1_table'] = ec_inittable_h(np.reshape(self.pk['B1'],-1), U256_BSELM, MOD_GROUP, 1)
-      print("p jac2aff")
 
       infv = ec_isinf(np.reshape(self.pk['B1'],-1), ZField.get_field())
       self.pk['B1_density'] = 100.0  - 100.0 *  np.count_nonzero(infv == 1) / len(infv)

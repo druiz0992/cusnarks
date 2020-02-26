@@ -746,7 +746,7 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
   FILE *ifp = fopen(filename,"rb");
   uint32_t k=0,i;
   uint32_t tmp_word, n_coeff;
-  uint32_t offset;
+  t_int64 offset;
 
   r1cs_hdr->R1CSA_nCoeff=0;
   r1cs_hdr->R1CSB_nCoeff=0;
@@ -768,9 +768,11 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
 
   fseek(ifp, R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES * sizeof(char), SEEK_SET);
   fread(&offset, sizeof(uint32_t), 1, ifp); 
+  //printf("offset : %d\n", offset);
   fseek(ifp, (R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES + 8 + offset) * sizeof(char), SEEK_SET);
 
   fread(&r1cs_hdr->word_width_bytes, sizeof(uint32_t), 1, ifp); 
+  //printf("word_width_bytes : %d\n", r1cs_hdr->word_width_bytes);
   if (r1cs_hdr->word_width_bytes != 4){
      printf("Unexpected R1CS word width\n");
      fclose(ifp);
@@ -778,13 +780,33 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
   }
 
   fread(&r1cs_hdr->nVars, sizeof(uint32_t), 1, ifp); 
+  //printf("nVars : %d\n", r1cs_hdr->nVars);
   fread(&r1cs_hdr->nPubOutputs, sizeof(uint32_t), 1, ifp); 
+  //printf("nPubOutputs : %d\n", r1cs_hdr->nPubOutputs);
   fread(&r1cs_hdr->nPubInputs, sizeof(uint32_t), 1, ifp); 
+  //printf("nPubInputs : %d\n", r1cs_hdr->nPubInputs);
   fread(&r1cs_hdr->nPrivInputs, sizeof(uint32_t), 1, ifp); 
+  //printf("nPrivInputs : %d\n", r1cs_hdr->nPrivInputs);
+  fread(&r1cs_hdr->nLabels, sizeof(uint32_t), 1, ifp); 
+  //printf("nLabels : %d\n", r1cs_hdr->nLabels);
   fread(&r1cs_hdr->nConstraints, sizeof(uint32_t), 1, ifp); 
+  //printf("nConstraints : %d\n", r1cs_hdr->nConstraints);
 
-  while (!feof(ifp)){
+  fread(&offset, sizeof(uint32_t), 1, ifp); 
+  fread(&r1cs_hdr->constraintLen, sizeof(uint32_t), 2, ifp); 
+  //printf("Const section len : %lld\n",r1cs_hdr->constraintLen);
+
+  r1cs_hdr->constraintOffset = ftell(ifp);
+
+  r1cs_hdr->R1CSA_nCoeff = 0;
+  r1cs_hdr->R1CSB_nCoeff = 0;
+  r1cs_hdr->R1CSC_nCoeff = 0;
+
+  offset = r1cs_hdr->constraintLen;
+
+  while (offset > 0){
     fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
+    offset-=4;
     if (k%3 == R1CSA_IDX){
       r1cs_hdr->R1CSA_nCoeff+= (n_coeff);
     } else if (k%3 == R1CSB_IDX){
@@ -794,13 +816,24 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
     }
     for (i=0; i< n_coeff; i++){
       fseek(ifp, 4, SEEK_CUR);
-      fread(&tmp_word, 1, 1, ifp); 
+      offset-=4;
+      fread(&tmp_word, sizeof(char), 1, ifp); 
+      tmp_word &= 0xFF;
+      offset-=1;
       fseek(ifp, tmp_word, SEEK_CUR);
+      offset-=tmp_word;
     }
     k++;
   }
-  fclose(ifp);
+
+  //printf("N coeff R1CSA : %d\n", r1cs_hdr->R1CSA_nCoeff);
+  //printf("N coeff R1CSB : %d\n", r1cs_hdr->R1CSB_nCoeff);
+  //printf("N coeff R1CSC : %d\n", r1cs_hdr->R1CSC_nCoeff);
   
+  //printf("end of constraints : %lld\n",ftell(ifp));
+  //fread(&offset, sizeof(uint32_t), 1, ifp); 
+  //printf("Lable section len : %lld\n",offset);
+  fclose(ifp);
   return;
 }
   
@@ -811,24 +844,31 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
   uint32_t tmp_word, n_coeff;
   uint32_t r1cs_offset=0, r1cs_coeff_offset=1+r1cs->nConstraints, r1cs_val_offset = 1+r1cs->nConstraints;
   uint32_t k=0, accum_coeffs=0, i,j;
+  t_int64 offset = r1cs->constraintLen;
 
   samples[r1cs_offset++] = r1cs->nConstraints;
   
-  //fseek(ifp, R1CS_HDR_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_SET);
-  fseek(ifp, R1CS_CONST_START_OFFSET_NWORDS * sizeof(uint32_t), SEEK_CUR);
+  //printf("constraint len : %lld\n",offset);
+  fseek(ifp, r1cs->constraintOffset, SEEK_SET);
 
-  while (!feof(ifp)){
+  //while (!feof(ifp)){
+  while (!offset){
     fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
+    offset-=4;
     if (k%3 == r1cs_idx) {
       accum_coeffs+= ((uint32_t) n_coeff);
       samples[r1cs_offset++] = accum_coeffs;
       r1cs_val_offset += n_coeff;
       for (i=0; i< n_coeff; i++){
         fread(&samples[r1cs_coeff_offset++], sizeof(uint32_t), 1, ifp); 
+        offset-=4;
         fread(&tmp_word, 1,1, ifp);
+	tmp_word &= tmp_word & 0xFF;
+        offset-=1;
         for(j=0; j <tmp_word; j++){
            fread(&samples[r1cs_val_offset+j], 1, 1, ifp); 
         }
+        offset-=tmp_word;
         r1cs_val_offset += NWORDS_256BIT;
       }
       r1cs_coeff_offset = r1cs_val_offset;
@@ -836,8 +876,12 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
     }  else {
       for (i=0; i< n_coeff; i++){
         fseek(ifp, 4, SEEK_CUR);
+        offset-=4;
         fread(&tmp_word, 1, 1, ifp); 
+	tmp_word &=0xFF;
+        offset-=1;
         fseek(ifp, tmp_word, SEEK_CUR);
+        offset-=tmp_word;
       }
     }
     
