@@ -954,13 +954,14 @@ def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_
 
 def ec_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order, ct.uint32_t pidx, ct.uint32_t add_last):
     cdef ct.uint32_t indims=ECP_JAC_OUTDIMS
-    cdef ct.uint32_t n, table_size
+    cdef ct.uint32_t n, table_size, n_elems
 
     if add_last:
         indims=ECP_JAC_INDIMS
 
     n= <int> (in_v.shape[0]/NWORDS_256BIT/indims) 
-    table_size = <int> ((1<<order) * n * NWORDS_256BIT * ECP_JAC_OUTDIMS/order)
+    n_elems = <int> ((n + order - 1) / order)
+    table_size = <int> ((1<<order) * (n_elems * NWORDS_256BIT * ECP_JAC_OUTDIMS))
 
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_table = np.zeros(table_size, dtype=np.uint32)
 
@@ -970,13 +971,14 @@ def ec_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order
 
 def ec2_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order, ct.uint32_t pidx, ct.uint32_t add_last):
     cdef ct.uint32_t indims=ECP2_JAC_OUTDIMS
-    cdef ct.uint32_t n, table_size
+    cdef ct.uint32_t n, table_size, n_elems
 
     if add_last:
         indims=ECP2_JAC_INDIMS
 
     n= <int> (in_v.shape[0]/NWORDS_256BIT/indims) 
-    table_size = <int> ((1<<order) * n * NWORDS_256BIT * ECP2_JAC_OUTDIMS/order)
+    n_elems = <int> ((n + order - 1) / order)
+    table_size = <int> ((1<<order) * n_elems * NWORDS_256BIT * ECP2_JAC_OUTDIMS)
 
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_table = np.zeros(table_size, dtype=np.uint32)
 

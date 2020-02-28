@@ -768,11 +768,11 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
 
   fseek(ifp, R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES * sizeof(char), SEEK_SET);
   fread(&offset, sizeof(uint32_t), 1, ifp); 
+  offset &= 0xFFFF;
   //printf("offset : %d\n", offset);
   fseek(ifp, (R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES + 8 + offset) * sizeof(char), SEEK_SET);
 
   fread(&r1cs_hdr->word_width_bytes, sizeof(uint32_t), 1, ifp); 
-  //printf("word_width_bytes : %d\n", r1cs_hdr->word_width_bytes);
   if (r1cs_hdr->word_width_bytes != 4){
      printf("Unexpected R1CS word width\n");
      fclose(ifp);
@@ -780,21 +780,25 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
   }
 
   fread(&r1cs_hdr->nVars, sizeof(uint32_t), 1, ifp); 
-  //printf("nVars : %d\n", r1cs_hdr->nVars);
   fread(&r1cs_hdr->nPubOutputs, sizeof(uint32_t), 1, ifp); 
-  //printf("nPubOutputs : %d\n", r1cs_hdr->nPubOutputs);
   fread(&r1cs_hdr->nPubInputs, sizeof(uint32_t), 1, ifp); 
-  //printf("nPubInputs : %d\n", r1cs_hdr->nPubInputs);
   fread(&r1cs_hdr->nPrivInputs, sizeof(uint32_t), 1, ifp); 
-  //printf("nPrivInputs : %d\n", r1cs_hdr->nPrivInputs);
   fread(&r1cs_hdr->nLabels, sizeof(uint32_t), 1, ifp); 
-  //printf("nLabels : %d\n", r1cs_hdr->nLabels);
   fread(&r1cs_hdr->nConstraints, sizeof(uint32_t), 1, ifp); 
-  //printf("nConstraints : %d\n", r1cs_hdr->nConstraints);
 
   fread(&offset, sizeof(uint32_t), 1, ifp); 
   fread(&r1cs_hdr->constraintLen, sizeof(uint32_t), 2, ifp); 
-  //printf("Const section len : %lld\n",r1cs_hdr->constraintLen);
+
+  /*
+  printf("word_width_bytes : %d\n", r1cs_hdr->word_width_bytes);
+  printf("nVars : %d\n", r1cs_hdr->nVars);
+  printf("nPubOutputs : %d\n", r1cs_hdr->nPubOutputs);
+  printf("nPubInputs : %d\n", r1cs_hdr->nPubInputs);
+  printf("nPrivInputs : %d\n", r1cs_hdr->nPrivInputs);
+  printf("nLabels : %d\n", r1cs_hdr->nLabels);
+  printf("nConstraints : %d\n", r1cs_hdr->nConstraints);
+  printf("Const section len : %lld\n",r1cs_hdr->constraintLen);
+  */
 
   r1cs_hdr->constraintOffset = ftell(ifp);
 
@@ -806,7 +810,7 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
 
   while (offset > 0){
     fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
-    offset-=4;
+    offset-=sizeof(uint32_t);
     if (k%3 == R1CSA_IDX){
       r1cs_hdr->R1CSA_nCoeff+= (n_coeff);
     } else if (k%3 == R1CSB_IDX){
@@ -816,24 +820,26 @@ void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename)
     }
     for (i=0; i< n_coeff; i++){
       fseek(ifp, 4, SEEK_CUR);
-      offset-=4;
       fread(&tmp_word, sizeof(char), 1, ifp); 
       tmp_word &= 0xFF;
-      offset-=1;
       fseek(ifp, tmp_word, SEEK_CUR);
-      offset-=tmp_word;
+      offset-=(tmp_word + sizeof(char) + sizeof(uint32_t));
     }
     k++;
   }
 
-  //printf("N coeff R1CSA : %d\n", r1cs_hdr->R1CSA_nCoeff);
-  //printf("N coeff R1CSB : %d\n", r1cs_hdr->R1CSB_nCoeff);
-  //printf("N coeff R1CSC : %d\n", r1cs_hdr->R1CSC_nCoeff);
+  /*
+  printf("N coeff R1CSA : %d\n", r1cs_hdr->R1CSA_nCoeff);
+  printf("N coeff R1CSB : %d\n", r1cs_hdr->R1CSB_nCoeff);
+  printf("N coeff R1CSC : %d\n", r1cs_hdr->R1CSC_nCoeff);
   
-  //printf("end of constraints : %lld\n",ftell(ifp));
-  //fread(&offset, sizeof(uint32_t), 1, ifp); 
-  //printf("Lable section len : %lld\n",offset);
+  printf("end of constraints : %lld\n",ftell(ifp));
+  fread(&offset, sizeof(uint32_t), 1, ifp); 
+  printf("Lable section len : %lld\n",offset);
+  */
+
   fclose(ifp);
+
   return;
 }
   
@@ -851,24 +857,21 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
   //printf("constraint len : %lld\n",offset);
   fseek(ifp, r1cs->constraintOffset, SEEK_SET);
 
-  //while (!feof(ifp)){
   while (!offset){
     fread(&n_coeff, sizeof(uint32_t), 1, ifp); 
-    offset-=4;
+    offset-=sizeof(uint32_t);
     if (k%3 == r1cs_idx) {
       accum_coeffs+= ((uint32_t) n_coeff);
       samples[r1cs_offset++] = accum_coeffs;
       r1cs_val_offset += n_coeff;
       for (i=0; i< n_coeff; i++){
         fread(&samples[r1cs_coeff_offset++], sizeof(uint32_t), 1, ifp); 
-        offset-=4;
         fread(&tmp_word, 1,1, ifp);
 	tmp_word &= tmp_word & 0xFF;
-        offset-=1;
         for(j=0; j <tmp_word; j++){
            fread(&samples[r1cs_val_offset+j], 1, 1, ifp); 
         }
-        offset-=tmp_word;
+        offset-=(tmp_word + sizeof(char) + sizeof(uint32_t));
         r1cs_val_offset += NWORDS_256BIT;
       }
       r1cs_coeff_offset = r1cs_val_offset;
@@ -876,12 +879,10 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
     }  else {
       for (i=0; i< n_coeff; i++){
         fseek(ifp, 4, SEEK_CUR);
-        offset-=4;
         fread(&tmp_word, 1, 1, ifp); 
 	tmp_word &=0xFF;
-        offset-=1;
         fseek(ifp, tmp_word, SEEK_CUR);
-        offset-=tmp_word;
+        offset-=(tmp_word + sizeof(char) + sizeof(uint32_t));
       }
     }
     
@@ -3332,6 +3333,7 @@ void ec_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_o
       ndims = ECP_JAC_INDIMS;
    }
 
+   //printf("N Tables : %d\n",n_tables);
    #ifndef TEST_MODE
      #pragma omp parallel for if(parallelism_enabled)
    #endif
@@ -3340,12 +3342,13 @@ void ec_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_o
       memcpy(&ectable[(i*table_size)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
             &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
             sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
-      uint32_t k=0, last_pow2, n_els = 0;
+      uint32_t k=0, last_pow2, n_els=0;
       for (uint32_t j=1; j< table_size; j++){
          // if power of 2    
          if  ((j & (j-1)) == 0){
+             //printf("elems : %d,%d, %d, %d\n",n_els+i*U256_BSELM,n,j,i);
              last_pow2 = j;
-             if (n_els < n){
+             if (n_els + i*U256_BSELM < n){
                 memcpy(&ectable[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                    &x[(i*table_order+k)*NWORDS_256BIT*ndims],
                    sizeof(uint32_t) * ndims * NWORDS_256BIT);
@@ -3356,10 +3359,12 @@ void ec_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_o
                       sizeof(uint32_t) * NWORDS_256BIT);
                 }
              } else {
+		 //printf("Overflow : %d, %d\n", n_els+i*U256_BSELM, n);
                  memcpy(&ectable[(i*table_size+j)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                         &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT],
                         sizeof(uint32_t) * ECP_JAC_OUTDIMS * NWORDS_256BIT);
              }
+	     //printf("Table idx : %d\n",i*table_size+j);
              k++;
              n_els++;
          } else {
@@ -3367,6 +3372,7 @@ void ec_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_o
                           &ectable[(i*table_size+last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                           &ectable[(i*table_size+j-last_pow2)*NWORDS_256BIT*ECP_JAC_OUTDIMS],
                           pidx);
+	     //printf("Table idx : %d\n",i*table_size+j);
                            
          }      
       } 
@@ -3403,7 +3409,7 @@ void ec2_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_
          // if power of 2    
          if  ((j & (j-1)) == 0){
              last_pow2 = j;
-             if (n_els < n){
+             if (n_els +i*U256_BSELM < n){
                 memcpy(&ec_table[(i*table_size+j)*NWORDS_256BIT*ECP2_JAC_OUTDIMS],
                    &x[(i*table_order+k)*NWORDS_256BIT*ndims],
                    sizeof(uint32_t) * ndims * NWORDS_256BIT);
