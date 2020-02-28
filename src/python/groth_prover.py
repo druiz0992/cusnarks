@@ -461,7 +461,6 @@ class GrothProver(object):
                                          start_pidx=self.ec_type_dict['hExps'][2],
                                          ec_lable = self.ec_lable)
 
-
     def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape, pi_c2_eccf1_sh):
         logging.info(' Launching Poly Process Client')
         logging.info(' Evaluating QAP')
