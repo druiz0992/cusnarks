@@ -313,9 +313,10 @@ void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t
 void ec2_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
 void ec_jacscmulx1_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
 void ec2_jacscmulx1_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);
-void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t order, uint32_t pidx, uint32_t add_last);
+void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t order, uint32_t pidx, uint32_t add_last, uint32_t compute_table);
 void ec2_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t *ectable,
-	       	uint32_t n, uint32_t order,  uint32_t pidx, uint32_t add_last);
+	       	uint32_t n, uint32_t order,  uint32_t pidx, uint32_t add_last, uint32_t compute_table);
+void ec_loadtable_h(uint32_t *x, t_uint64 len, t_uint64 *offset, ecp_t ecp, FILE *ifp);
 void ec_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last);
 void ec2_inittable_h(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last);
 void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last);

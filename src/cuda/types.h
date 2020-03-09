@@ -47,6 +47,7 @@
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
 #define NBITS_BYTE (8)
+#define EC_JACREDUCE_TABLE_LEN (256)
 #define EC_JACREDUCE_BATCH_SIZE (1<<5)
 #define EC_JACREDUCE_FLAGS_INIT   (1)
 #define EC_JACREDUCE_FLAGS_FINISH (1<<1)
@@ -532,6 +533,7 @@ typedef struct{
   uint32_t *scl;
   uint32_t *x;
   uint32_t n;
+  uint32_t *ec_table;
   uint32_t pidx;
   uint32_t max_threads;
   uint32_t start_idx;
@@ -581,4 +583,15 @@ typedef enum{
    R1CS_SECTION_WIRE2LABELID = 3
 
 }r1cs_section_t;
+
+typedef enum{
+  ECP_T_A = 0,
+  ECP_T_B2,
+  ECP_T_B1,
+  ECP_T_C,
+  ECP_T_HEXPS,
+
+  ECP_T_N
+}ecp_t;
+
 #endif
