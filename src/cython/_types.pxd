@@ -187,11 +187,15 @@ cdef extern from "types.h":
     uint32_t *scl
     uint32_t *x
     uint32_t n
+    uint32_t *ec_table
     uint32_t pidx
     uint32_t max_threads
     uint32_t start_idx
     uint32_t last_idx
     uint32_t thread_id
+    uint32_t n_words
+    t_uint64 offset
+    char *filename
 
   ctypedef struct r1csv1_t:
     uint32_t magic_number

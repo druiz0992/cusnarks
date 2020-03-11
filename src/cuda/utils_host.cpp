@@ -110,8 +110,10 @@
 //MPROC VARS
 static  pthread_mutex_t utils_lock;
 static  pthread_barrier_t utils_barrier;
+static  pthread_cond_t utils_cond;
 static  uint32_t utils_nprocs = 1;
 static  uint32_t utils_mproc_init = 0;
+static  uint32_t utils_ectable_ready = 1;
 
 static uint32_t utils_N[MAX_NCORES_OMP * NWORDS_256BIT * ECP2_JAC_OUTDIMS];
 static uint32_t utils_zinv[2 * MAX_NCORES_OMP * NWORDS_256BIT];
@@ -214,13 +216,16 @@ static void _ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows
 static void montmult_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t pidx);
 static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t rstride, uint32_t direction, uint32_t pidx);
 static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows, uint32_t *mNcols, uint32_t nRows, uint32_t nCols);
-static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers, void *w_args, uint32_t size, uint32_t max_threads);
+static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers, void *w_args, uint32_t size, uint32_t max_threads, uint32_t detach);
 static void transpose_AB_h(void *args);
 static void transpose_A_h(void *args);
 static void ec_jacdouble_finish_h(void *args);
+static void ec_inittable_ready_h(void *args);
+static void ec_print_EPin(void *args);
 void *interpol_and_mul_h(void *args);
 void *ec_jacreduce_batch_h(void *args);
-void *ec_jacreduce2_batch_h(void *args);
+void *ec_jacreduce_batch_precomputed_h(void *args);
+void *ec_read_table_h(void *args);
 void ec_jacaddreduce_finish_h(void *args);
 
 #ifdef _CASM
@@ -321,13 +326,37 @@ inline void swapu256_h(uint32_t *x, uint32_t *y)
 
 inline void util_wait_h(uint32_t thread_id, void (*f_ptr) (void *), void * args)
 {
-  pthread_barrier_wait(&utils_barrier);
+   pthread_barrier_wait(&utils_barrier);
   if (f_ptr){
      if (thread_id == 0){
        f_ptr(args);
      }
-     pthread_barrier_wait(&utils_barrier);
   }
+}
+
+static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers, void *w_args, uint32_t size, uint32_t max_threads, uint32_t detach=0)
+{
+  uint32_t i;
+
+  for (i=0; i < max_threads; i++)
+  {
+     //printf("Thread %d : start_idx : %d, last_idx : %d . ptr : %x\n", i, w_args[i].start_idx,w_args[i].last_idx, f_ptr);
+     if ( pthread_create(&workers[i], NULL, f_ptr, (void *) w_args+i*size) ){
+       //printf("error\n");
+       return 0;
+     }
+    if (detach){
+      pthread_detach(workers[i]);
+    }
+  }
+
+  if (detach == 0){
+    //printf("Max threads : %d\n",w_args[0].max_threads);
+    for (i=0; i < max_threads; i++){
+      pthread_join(workers[i], NULL);
+    }
+  }
+  return 1;
 }
 
 /*
@@ -2287,25 +2316,6 @@ static void transpose_A_h(void *args)
   memcpy(M_mul,M_transpose, (1ull << (wargs->mNrows + wargs->mNcols + NWORDS_256BIT_SHIFT )) * sizeof(uint32_t));
 }
 
-static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers, void *w_args, uint32_t size, uint32_t max_threads)
-{
-  uint32_t i;
-
-  for (i=0; i < max_threads; i++)
-  {
-     //printf("Thread %d : start_idx : %d, last_idx : %d . ptr : %x\n", i, w_args[i].start_idx,w_args[i].last_idx, f_ptr);
-     if ( pthread_create(&workers[i], NULL, f_ptr, (void *) w_args+i*size) ){
-       //printf("error\n");
-       return 0;
-     }
-  }
-
-  //printf("Max threads : %d\n",w_args[0].max_threads);
-  for (i=0; i < max_threads; i++){
-    pthread_join(workers[i], NULL);
-  }
-  return 1;
-}
 
 
 static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows, uint32_t *mNcols, uint32_t Nrows, uint32_t Ncols)
@@ -2998,6 +3008,7 @@ void ec_jacaddmixed_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
                 &ECInf[(pidx * MISC_K_N+MISC_K_INF) * NWORDS_256BIT]) ) {
 
           memmove( z, y, sizeof(uint32_t) * NWORDS_256BIT * ECP_JAC_OUTDIMS);
+          //memmove(&z[2*NWORDS_256BIT], One, sizeof(uint32_t) * NWORDS_256BIT);
           return;
 
   } else if (ec_iseq_h( y,
@@ -4389,13 +4400,25 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
 {
   uint32_t start_idx, last_idx;
   uint32_t vars_per_thread = args->n;
-  args->max_threads = get_nprocs_h();
+  uint32_t max_threads = get_nprocs_h();
+  uint32_t compute_table = args->ec_table==NULL ? 1 : 0;
+
+  // configure max threads 
+  if (args->max_threads == 0){
+    args->max_threads = max_threads;
+  } else {
+    args->max_threads = MIN(args->max_threads, max_threads);
+  }
 
   // set number of threads and vars per thread depending on nvars
-  if (args->n >= args->max_threads*2*U256_BSELM){
-    vars_per_thread = args->n/args->max_threads;
-  } else {
-    args->max_threads = 1;
+  if (compute_table){
+    if (args->n >= args->max_threads*2*U256_BSELM){
+      vars_per_thread = args->n/args->max_threads;
+    } else {
+      args->max_threads = 1;
+    }
+  }  else {
+      vars_per_thread = EC_JACREDUCE_TABLE_LEN / (args->max_threads * U256_BSELM) * U256_BSELM;
   }
 
   if (!utils_mproc_init) {
@@ -4410,14 +4433,12 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   if (pthread_barrier_init(&utils_barrier, NULL, args->max_threads) != 0){
      exit(1);
   }
- 
-  /* 
+/* 
   printf("N threads : %d\n", args->max_threads);
   printf("N vars    : %d\n", args->n);
   printf("Vars per thread : %d\n", vars_per_thread);
   printf("pidx : %d\n", args->pidx);
-  */
- 
+*/
  
   /*
   for(uint32_t i=0; i<args->n; i++){
@@ -4430,8 +4451,12 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   for(uint32_t i=0; i< args->max_threads; i++){
      start_idx = i * vars_per_thread;
      last_idx = (i+1) * vars_per_thread;
-     if ( (i == args->max_threads - 1) && (last_idx != args->n) ){
-         last_idx = args->n;
+     if (i == args->max_threads - 1){
+       if (compute_table){
+          last_idx = args->n;
+       } else {
+          last_idx = EC_JACREDUCE_TABLE_LEN;
+       }
      }
      memcpy(&w_args[i], args, sizeof(jacadd_reduced_t));
 
@@ -4439,20 +4464,51 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
      w_args[i].last_idx = last_idx;
      w_args[i].thread_id = i;
     
-     /* 
+    /*      
      printf("Thread : %d, start_idx : %d, end_idx : %d\n",
              w_args[i].thread_id, 
              w_args[i].start_idx,
              w_args[i].last_idx);   
-     */
-    
+    */
   }
 
   parallelism_enabled = 0;
 
-  launch_client_h(ec_jacreduce_batch_h, workers,(void *) w_args, sizeof(jacadd_reduced_t), args->max_threads);
+  if (compute_table){
+    launch_client_h(ec_jacreduce_batch_h, workers,(void *) w_args, sizeof(jacadd_reduced_t), args->max_threads);
+  } else {
+    if (pthread_cond_init(&utils_cond, NULL) != 0){
+     exit(1);
+    }
+
+    pthread_t *workers_table;
+    ec_table_desc_t *w_table_args;
+
+    if (w_args->filename != NULL){
+      workers_table = (pthread_t *) malloc(1 * sizeof(pthread_t));
+      w_table_args  = (ec_table_desc_t *)malloc(1 * sizeof(ec_table_desc_t));
+      w_table_args->filename = w_args->filename;
+      w_table_args->ec_table = w_args->ec_table;
+      w_table_args->offset = w_args->offset;
+      w_table_args->n_words = w_args->n_words;
+ 
+      launch_client_h(ec_read_table_h, workers_table,(void *) w_table_args, sizeof(ec_table_desc_t), 1, 1);
+    }
+    memset(
+            utils_EPin, 0, ECP_JAC_OUTDIMS * NWORDS_256BIT * EC_JACREDUCE_TABLE_LEN * sizeof(uint32_t)
+          );
+    launch_client_h(ec_jacreduce_batch_precomputed_h, workers,(void *) w_args, sizeof(jacadd_reduced_t), args->max_threads);
+
+    pthread_cond_destroy(&utils_cond);
+
+    if (w_args->filename != NULL){
+      free(workers_table);
+      free(w_table_args);
+    }
+  }
 
   pthread_barrier_destroy(&utils_barrier);
+  
   free(workers);
   free(w_args);
 
@@ -4474,9 +4530,7 @@ void *ec_jacreduce_batch_h(void *args)
   //printf("[%d] - N batches : %d\n",wargs->thread_id, n_batches);
 
   for (uint32_t i=0; i < n_batches; i++){
-    table_ptr = compute_table == 1 ? 
-	           &utils_ectable[wargs->thread_id * EC_JACREDUCE_BATCH_SIZE*ECP_JAC_OUTDIMS<<(NWORDS_256BIT_SHIFT+U256_BSELM)] :
-	           &wargs->ec_table[(wargs->thread_id * n_batches * EC_JACREDUCE_BATCH_SIZE/U256_BSELM +i)*ECP_JAC_INDIMS<<(NWORDS_256BIT_SHIFT+U256_BSELM)];
+    table_ptr = &utils_ectable[wargs->thread_id * EC_JACREDUCE_BATCH_SIZE*ECP_JAC_OUTDIMS<<(NWORDS_256BIT_SHIFT+U256_BSELM)];
     /*
     if (wargs->thread_id == 0){
       printf("Pre : %d\n",i);
@@ -4491,7 +4545,7 @@ void *ec_jacreduce_batch_h(void *args)
            &wargs->x[(wargs->start_idx + EC_JACREDUCE_BATCH_SIZE*U256_BSELM*i)*ECP_JAC_INDIMS<<NWORDS_256BIT_SHIFT],
            table_ptr,
            MIN(wargs->last_idx - wargs->start_idx - i*EC_JACREDUCE_BATCH_SIZE, (wargs->last_idx - wargs->start_idx)/n_batches),
-           U256_BSELM, wargs->pidx, 1,compute_table);
+           U256_BSELM, wargs->pidx, 1,1);
 
    /* 
     if (wargs->thread_id == 0){
@@ -4513,184 +4567,169 @@ void *ec_jacreduce_batch_h(void *args)
   return NULL;
 }
 
-void ec_jacreduce2_server_h(jacadd_reduced_t *args)
+
+void *ec_read_table_h(void *args)
 {
-  uint32_t start_idx, last_idx;
-  uint32_t vars_per_thread = args->n;
-  args->max_threads = get_nprocs_h();
-
-  // set number of threads and vars per thread depending on nvars
-  if (args->n >= args->max_threads*2*U256_BSELM){
-    vars_per_thread = args->n/args->max_threads;
-  } else {
-    args->max_threads = 1;
-  }
-
-  if (!utils_mproc_init) {
-    exit(1);
-  }
-  #ifndef PARALLEL_EN
-    exit(1);
-  #endif
-
-  pthread_t *workers = (pthread_t *) malloc(args->max_threads * sizeof(pthread_t));
-  jacadd_reduced_t *w_args  = (jacadd_reduced_t *)malloc(args->max_threads * sizeof(jacadd_reduced_t));
-  if (pthread_barrier_init(&utils_barrier, NULL, args->max_threads) != 0){
-     exit(1);
-  }
- 
-   
-  printf("N threads : %d\n", args->max_threads);
-  printf("N vars    : %d\n", args->n);
-  printf("Vars per thread : %d\n", vars_per_thread);
-  printf("pidx : %d\n", args->pidx);
+  ec_table_desc_t *wargs = (ec_table_desc_t *)args;
+  uint32_t words_read = wargs->offset/sizeof(uint32_t);
+  uint32_t ec_table_offset[] = {0, EC_JACREDUCE_BATCH_SIZE * ECP_JAC_INDIMS * NWORDS_256BIT << U256_BSELM};
+  uint32_t ec_table_idx=1;
+  uint32_t not_done=1;
   
- 
- 
-  /*
-  for(uint32_t i=0; i<args->n; i++){
-    printf("%d\n",i);
-    printU256Number(&args->scl[i*NWORDS_256BIT]);
-    printU256Number(&args->x[i*NWORDS_256BIT*ECP_JAC_INDIMS]);
-    printU256Number(&args->x[i*NWORDS_256BIT*ECP_JAC_INDIMS+NWORDS_256BIT]);
-  }
-  */
-  for(uint32_t i=0; i< args->max_threads; i++){
-     start_idx = i * vars_per_thread;
-     last_idx = (i+1) * vars_per_thread;
-     if ( (i == args->max_threads - 1) && (last_idx != args->n) ){
-         last_idx = args->n;
+  // open file
+  FILE *ifp = fopen(wargs->filename,"rb");
+
+  // go to initial offset
+  fseek(ifp, wargs->offset * sizeof(char), SEEK_SET);
+  //printf("Initial offset (words) : %lld\n",words_read);
+
+  while (not_done){
+     //wait till ready
+     pthread_mutex_lock(&utils_lock);
+     //printf("Waiting for signal(%d-%d)...!\n",utils_ectable_ready, ec_table_idx);
+     while(utils_ectable_ready){
+       pthread_cond_wait(&utils_cond, &utils_lock);
      }
-     memcpy(&w_args[i], args, sizeof(jacadd_reduced_t));
-
-     w_args[i].start_idx = start_idx;
-     w_args[i].last_idx = last_idx;
-     w_args[i].thread_id = i;
-    
+     not_done = fread(&wargs->ec_table[ec_table_offset[ec_table_idx]], sizeof(uint32_t), wargs->n_words, ifp);
+     words_read += wargs->n_words;
+     //printf("Read %d words. Offset %d\n",wargs->n_words, words_read); 
+     ec_table_idx ^= 1;
+     utils_ectable_ready = 1;
+     pthread_cond_signal(&utils_cond);
+     pthread_mutex_unlock(&utils_lock);
       
-     printf("Thread : %d, start_idx : %d, end_idx : %d\n",
-             w_args[i].thread_id, 
-             w_args[i].start_idx,
-             w_args[i].last_idx);   
-     
-    
+     //printf("Signal received. Continue...!\n");
   }
-
-  parallelism_enabled = 0;
-
-  memset(
-         utils_EPin, 0, ECP_JAC_OUTDIMS * NWORDS_256BIT * EC_JACREDUCE_TABLE_LEN * args->max_threads * sizeof(uint32_t)
-        );
-
-  launch_client_h(ec_jacreduce2_batch_h, workers,(void *) w_args, sizeof(jacadd_reduced_t), args->max_threads);
-
-  pthread_barrier_destroy(&utils_barrier);
-  free(workers);
-  free(w_args);
-
-  parallelism_enabled = 1;
-
-  return; 
-
+  //printf("File read complete\n");
+  fclose(ifp);
 }
+//
 
-void *ec_jacreduce2_batch_h(void *args)
+void *ec_jacreduce_batch_precomputed_h(void *args)
 {
   jacadd_reduced_t *wargs = (jacadd_reduced_t *)args;
-  uint32_t i, msb, tmp_msb,b;
-  int32_t j;
-  uint32_t *utils_EPin_ptr = &utils_EPin[wargs->thread_id * ECP_JAC_OUTDIMS * NWORDS_256BIT * EC_JACREDUCE_TABLE_LEN];
-  uint32_t *utils_ectable_ptr = &wargs->ec_table[wargs->start_idx/U256_BSELM * ECP_JAC_INDIMS << (NWORDS_256BIT_SHIFT + U256_BSELM)];
+  uint32_t i,b, n_batches;
+  int32_t j, start_msb, last_msb;
+  uint32_t *utils_EPin_ptr = utils_EPin;
+  uint32_t ec_table_offset[] = {0, EC_JACREDUCE_BATCH_SIZE * ECP_JAC_INDIMS * NWORDS_256BIT << U256_BSELM};
+  uint32_t ec_table_idx=1;
+  uint32_t *utils_ectable_ptr = wargs->ec_table;  
 
   // init table
-  msb = 255;
-  for(j=0; j< U256_BSELM; j++){
-    tmp_msb = msbu256_h(&wargs->scl[wargs->start_idx*NWORDS_256BIT+j*NWORDS_256BIT]);
-    if (tmp_msb < msb){
-         msb = tmp_msb;
-    }
-    if (wargs->thread_id == 0){
-      printf("j = %d, tmp_msb = %d, msb = %d\n",j,tmp_msb, msb);
-      printU256Number(&wargs->scl[wargs->start_idx*NWORDS_256BIT+j*NWORDS_256BIT]);
-    }
+  last_msb = wargs->start_idx;
+  start_msb = wargs->last_idx-1;
+  const  uint32_t *One = CusnarksOneMontGet((mod_t)wargs->pidx);
+  for (j=start_msb; j>=last_msb; j--){
+        //b = getbitu256g_h(&wargs->scl[wargs->start_idx * NWORDS_256BIT], j, U256_BSELM);
+        /*
+        if (wargs->thread_id == 1){
+          printf("start_msb = %d, last_msb=%d, j=%d, b=%d\n",start_msb, last_msb, j,b);
+          printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
+          printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
+          printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+        }
+        */
+        //memcpy(
+          //&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
+          //&utils_ectable_ptr[b*ECP_JAC_INDIMS*NWORDS_256BIT],
+          //ECP_JAC_INDIMS * NWORDS_256BIT * sizeof (uint32_t));
+        memcpy(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT], One, NWORDS_256BIT * sizeof(uint32_t));
+        /*
+        if (wargs->thread_id == 0){
+          printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
+          printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
+          printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+        }
+        */
   }
+ 
+  for (i=0; i < wargs->n; i += U256_BSELM){
 
-  msb = 255 - msb;
-  for (j=msb; j>=0 ; j--){
-      b = getbitu256g_h(&wargs->scl[wargs->start_idx * NWORDS_256BIT], j, U256_BSELM);
-      if (wargs->thread_id == 0){
-        printf("msb = %d, j=%d, b=%d\n",msb,j,b);
-        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
-        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
-        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
-      }
-      memcpy(
-        &utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-        &utils_ectable_ptr[b*ECP_JAC_INDIMS*NWORDS_256BIT],
-        ECP_JAC_INDIMS * NWORDS_256BIT * sizeof (uint32_t));
-      if (wargs->thread_id == 0){
-        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
-        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
-        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
-      }
-  }
-
-  for (i=wargs->start_idx+U256_BSELM; i < wargs->last_idx; i += U256_BSELM){
-     msb = 255;
-     utils_ectable_ptr += ECP_JAC_INDIMS << (NWORDS_256BIT_SHIFT + U256_BSELM);
-
-     for(j=0; j< U256_BSELM; j++){
-       if (i + j < wargs->last_idx){
-          tmp_msb = msbu256_h(&wargs->scl[i*NWORDS_256BIT+j*NWORDS_256BIT]);
-          if (tmp_msb < msb){
-             msb = tmp_msb;
-          }
-       }
-       else {
-          printf("AAAAAAAAAAA i=%d, j=%d, last_idx = %d\n",i,j,wargs->last_idx);
-       }
+     if (i % (EC_JACREDUCE_BATCH_SIZE * U256_BSELM) == 0 && wargs->filename != NULL){
+        ec_table_idx ^= 1;
+        utils_ectable_ptr = &wargs->ec_table[ec_table_offset[ec_table_idx]];
+        //printf("Idx : %d-%d\n",wargs->thread_id, ec_table_idx);
+        util_wait_h(wargs->thread_id, ec_inittable_ready_h, wargs);
+        //load next data batch from tables
      }
-     msb = 255 - msb;
-     for (j=msb; j>=0 ; j--){
+     /*
+     if(i % (EC_JACREDUCE_BATCH_SIZE * U256_BSELM) == 0){
+       if (wargs->thread_id == 0){
+         printf("SCL idx: %d\n",i);
+       }
+       util_wait_h(wargs->thread_id, ec_print_EPin, wargs);
+     }
+     */
+ 
+     if (i <= wargs->n - U256_BSELM){
+       __builtin_prefetch(&wargs->scl[(i+1)*NWORDS_256BIT]);
+       __builtin_prefetch(&utils_ectable_ptr[i*ECP_JAC_INDIMS << (NWORDS_256BIT_SHIFT + U256_BSELM)]); 
+     }
+
+     // prefetch : wargs->scl, utils_ectable_ptr[ECP_JAC_INDIMS << ]
+     for (j=start_msb; j>=last_msb ; j--){
         b = getbitu256g_h(&wargs->scl[i * NWORDS_256BIT], j, U256_BSELM);
-   
+     
+      /*
+      if (wargs->thread_id == 0){
+        printf("Pre %d-%d, %d, %d\n",i,j, b, wargs->pidx);
+        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
+        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
+        printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+        printf("\n");
+        printU256Number(&utils_ectable_ptr[b*ECP_JAC_INDIMS*NWORDS_256BIT]);
+        printU256Number(&utils_ectable_ptr[b*ECP_JAC_INDIMS*NWORDS_256BIT+NWORDS_256BIT]);
+      } 
+      */
         ec_jacaddmixed_h(
           &utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-          &utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-          &utils_ectable_ptr[b*ECP_JAC_INDIMS*NWORDS_256BIT], wargs->pidx);
+          &utils_ectable_ptr[b*ECP_JAC_INDIMS*NWORDS_256BIT],
+          &utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT], wargs->pidx);
+
+      /*
       if (wargs->thread_id == 0){
+        printf("Post %d-%d\n",i,j);
         printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
         printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
         printU256Number(&utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
       }
+      */
+      
      }
+     utils_ectable_ptr += ECP_JAC_INDIMS << (NWORDS_256BIT_SHIFT + U256_BSELM);
   }
-  util_wait_h(wargs->thread_id, NULL, NULL);
-
-  for (i=1; i < wargs->max_threads; i++){
-    utils_EPin_ptr = &utils_EPin[i * ECP_JAC_OUTDIMS * NWORDS_256BIT * EC_JACREDUCE_TABLE_LEN];
-    for(j=wargs->thread_id * (EC_JACREDUCE_TABLE_LEN/wargs->max_threads) ; j < (wargs->thread_id + 1) * (EC_JACREDUCE_TABLE_LEN/wargs->max_threads); j++){
-        ec_jacadd_h(
-          &utils_EPin[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-          &utils_EPin[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-          &utils_EPin_ptr[j*ECP_JAC_OUTDIMS*NWORDS_256BIT],
-          wargs->pidx
-        );
-    }
-  }
-  util_wait_h(wargs->thread_id, NULL, NULL);
+  /*
   if (wargs->thread_id == 0){
-  printf("\n\n\n");
-  for (i=0;i<256;i++){
-        printf("%d\n",i);
-        printU256Number(&utils_EPin[i*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
-        printU256Number(&utils_EPin[i*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
-        printU256Number(&utils_EPin[i*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+      printf("SCL idx: %d\n",i);
   }
-  }
+  util_wait_h(wargs->thread_id, ec_print_EPin, wargs);
+  */
+
   util_wait_h(wargs->thread_id, ec_jacdouble_finish_h, wargs);
 
   return NULL;
+}
+
+static void ec_print_EPin(void *args)
+{
+       for (uint32_t j=0; j<256 ; j++){
+          printf("EP idx : %d\n",j);
+          printU256Number(&utils_EPin[j*ECP_JAC_OUTDIMS*NWORDS_256BIT]);
+          printU256Number(&utils_EPin[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+NWORDS_256BIT]);
+          printU256Number(&utils_EPin[j*ECP_JAC_OUTDIMS*NWORDS_256BIT+2*NWORDS_256BIT]);
+       }
+}
+static void ec_inittable_ready_h(void *args)
+{
+  //printf("Switching tables(%d)\n",utils_ectable_ready);
+  pthread_mutex_lock(&utils_lock);
+  while(!utils_ectable_ready){
+    pthread_cond_wait(&utils_cond, &utils_lock);
+  }
+  //printf("Table is ready\n");
+  utils_ectable_ready = 0;
+  pthread_cond_signal(&utils_cond);
+  pthread_mutex_unlock(&utils_lock);
 }
 
 static void ec_jacdouble_finish_h(void *args)
@@ -4698,11 +4737,30 @@ static void ec_jacdouble_finish_h(void *args)
   jacadd_reduced_t *wargs = (jacadd_reduced_t *)args;
   uint32_t i;
   uint32_t *P = &utils_EPin[(EC_JACREDUCE_TABLE_LEN - 1)*ECP_JAC_OUTDIMS * NWORDS_256BIT];
+
+  /*
+  printf("255\n");
+  printU256Number(P);
+  printU256Number(&P[NWORDS_256BIT]);
+  printU256Number(&P[2*NWORDS_256BIT]);
+  */
+
   for (i=EC_JACREDUCE_TABLE_LEN - 1; i>0 ; i--){
      ec_jacdouble_h( P, P, wargs->pidx );
      ec_jacadd_h( P, P, &utils_EPin[(i-1)*ECP_JAC_OUTDIMS * NWORDS_256BIT], wargs->pidx);
-  }
 
+  /*
+     printf("%d\n",i-1);
+     printU256Number(&utils_EPin[(i-1)*ECP_JAC_OUTDIMS * NWORDS_256BIT]);
+     printU256Number(&utils_EPin[(i-1)*ECP_JAC_OUTDIMS * NWORDS_256BIT+NWORDS_256BIT]);
+     printU256Number(&utils_EPin[(i-1)*ECP_JAC_OUTDIMS * NWORDS_256BIT+2*NWORDS_256BIT]);
+     printU256Number(P);
+     printU256Number(&P[NWORDS_256BIT]);
+     printU256Number(&P[2*NWORDS_256BIT]);
+  */
+
+  }
+  ec_jac2aff_h(wargs->out_ep, P, 1, wargs->pidx, 1);
 }
 
 void ec2_jacreduce_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last)
