@@ -4602,6 +4602,8 @@ void *ec_read_table_h(void *args)
   }
   //printf("File read complete\n");
   fclose(ifp);
+
+  return NULL;
 }
 //
 
