@@ -539,8 +539,19 @@ typedef struct{
   uint32_t start_idx;
   uint32_t last_idx;
   uint32_t thread_id;
+  uint32_t n_words;
+  t_uint64 offset;
+  char *filename;
 
 }jacadd_reduced_t;
+
+typedef struct{
+  char *filename;
+  t_uint64 offset;
+  uint32_t *ec_table;
+  uint32_t n_words;
+
+}ec_table_desc_t;
 
 typedef enum{
   KERNEL_T_ZPOLY = 0,

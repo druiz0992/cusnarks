@@ -333,7 +333,6 @@ void ec2_isinf(uint32_t *z, const uint32_t *x, const uint32_t n, const uint32_t 
 uint32_t ec2_jacreduce_init_h(uint32_t **ectable, uint32_t **scmul, uint32_t n, uint32_t order);
 void ec_jacreduce_del_h(uint32_t *ectable, uint32_t *scmul);
 void ec_jacreduce_server_h(jacadd_reduced_t *args);
-void ec_jacreduce2_server_h(jacadd_reduced_t *args);
 void ec2_jacreduce_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t to_aff, uint32_t add_in, uint32_t strip_last);
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last);
