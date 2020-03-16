@@ -96,6 +96,7 @@ def init():
     opt['reserved_cpus'] = 0
     opt['list'] = 1
     opt['table_f'] = None
+    opt['zero_knowledge']=1
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -226,6 +227,10 @@ def init():
     help_str = 'Output Table File. Default : ' +str(opt['table_f'])
     parser.add_argument(
        '-t', '--table_f', type=str, help=help_str, required=False)  
+
+    help_str = 'Zero Knowledge Enabled. Default : ' + str(opt['zero_knowledge'])
+    parser.add_argument(
+       '-zk', '--zero_knowledge', type=int, help=help_str, required=False)  
 
     return opt, parser
 
@@ -421,6 +426,9 @@ def run(opt, parser):
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
     
+      if args.zero_knowledge is not None:
+         opt['zero_knowledge'] = args.zero_knowledge
+
       if args.start_server is not None:
          opt['start_server'] = args.start_server
 
@@ -429,7 +437,7 @@ def run(opt, parser):
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], write_table_f=opt['table_f'])
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], write_table_f=opt['table_f'], zk=opt['zero_knowledge'])
           end = time.time() - start
           print("GP init : "+str(end))
 
