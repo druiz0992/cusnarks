@@ -264,6 +264,35 @@ __global__ void __launch_bounds__(128,5)scmulecjacopt_kernel(uint32_t *out_vecto
    logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
 }
 
+__global__ void scmulecjac_precomputed_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    unsigned int tid = threadIdx.x;
+    uint32_t poffset = 0;
+
+    uint32_t __restrict__ *scl = NULL;
+ 
+    if(idx >= params->padding_idx) {
+      return;
+    }
+
+    Z1_t xo;
+    Z1_t xr;
+    scl = (uint32_t *) in_vector;
+    poffset = params->padding_idx;
+    xo.assign(&in_vector[poffset]);
+    xr.assign(out_vector);
+
+    Z1_t sumX(xr.getsingleu256(idx*3));
+
+    Z1_t sumX2(xo.getu256(0));
+      
+    scmulecjac_precomputed<Z1_t, uint256_t>(&sumX,0,
+                           &sumX2, 2*idx<<U256_BSELM, 
+                           &scl[idx*NWORDS_256BIT *U256_BSELM],  params);
+   logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
+}
+
 __global__ void __launch_bounds__(128,4) scmulec2jacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -1690,6 +1719,33 @@ __device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoff
 }
 
 template<typename T1, typename T2>
+__device__ void scmulecjac_precomputed(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params)
+{
+  uint32_t i;
+
+  uint32_t msb = clzMu256(scl);
+  uint32_t  b;
+
+  T1 _inf;
+  infz(&_inf, params->midx);
+
+  T1 Q(zxr->getu256(zoffset));
+  T1 T(zx1->getu256(xoffset));
+
+  Q.setu256(0,&_inf, 0);
+  //logInfoBigNumberTid(3*T1::getN(),"Initial Q : \n",&Q);
+
+  //logInfoTid("msb : %d\n",msb);
+
+  scmulecjac_l3r3<T1,T2>(&Q, &T, scl, msb, params->midx);
+  logInfoBigNumberTid(3*T1::getN(),"Final Q : \n",&Q);
+
+  return;
+}
+
+
+
+template<typename T1, typename T2>
 __device__ void scmulecjac_l2r2(T1 *Q,T1 *N, uint32_t *scl, uint32_t msb,  mod_t midx )
 {
   uint32_t b;
@@ -1707,6 +1763,19 @@ __device__ void scmulecjac_l2r2(T1 *Q,T1 *N, uint32_t *scl, uint32_t msb,  mod_t
   }
 }
 
+template<typename T1, typename T2>
+__device__ void scmulecjac_l3r3(T1 *Q,T1 *N, uint32_t *scl, uint32_t msb,  mod_t midx )
+{
+  uint32_t b;
+  for (uint32_t i=msb; i< (1 << (NWORDS_256BIT)); i++){
+      b = bselMu256(scl,255-i);
+      doublecjac<T1, T2>(Q,Q, midx);
+
+      if (b){
+       addecjacmixed<T1, T2>(Q,0, N,b*2, Q,0, midx);
+   }
+  }
+}
 template<typename T1, typename T2>
 __device__ void scmulecjac_step_r2l(T1 *Q,T1 *N, uint32_t *scl, mod_t midx )
 {

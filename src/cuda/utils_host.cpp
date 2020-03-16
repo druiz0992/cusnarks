@@ -218,6 +218,8 @@ static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint
 static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows, uint32_t *mNcols, uint32_t nRows, uint32_t nCols);
 static uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers, void *w_args, uint32_t size, uint32_t max_threads, uint32_t detach);
 static void transpose_AB_h(void *args);
+static void transpose_AB1_h(void *args);
+static void transpose_AB2_h(void *args);
 static void transpose_A_h(void *args);
 static void ec_jacdouble_finish_h(void *args);
 static void ec_inittable_ready_h(void *args);
@@ -331,6 +333,7 @@ inline void util_wait_h(uint32_t thread_id, void (*f_ptr) (void *), void * args)
      if (thread_id == 0){
        f_ptr(args);
      }
+     pthread_barrier_wait(&utils_barrier);
   }
 }
 
@@ -380,11 +383,25 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
     }
   }
 }
+void transpose_h(uint32_t *mout, const uint32_t *min,  uint32_t start_row, uint32_t last_row, uint32_t in_nrows, uint32_t in_ncols)
+{
+  uint32_t i,j,k;
+
+  for (i=start_row; i<last_row; i++){
+    for(j=0; j<in_ncols; j++){
+      for (k=0; k<NWORDS_256BIT; k++){
+        //printf("OUT: %d, IN : %d\n",(j*in_nrows+i)*NWORDS_256BIT+k, (i*in_ncols+j)*NWORDS_256BIT+k);
+        mout[(j*in_nrows+i)*NWORDS_256BIT+k] = min[(i*in_ncols+j)*NWORDS_256BIT+k];
+      }
+    }
+  }
+}
 // input matrix mxn
 void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols)
 {
    uint32_t m = sizeof(uint32_t) * NBITS_BYTE - __builtin_clz(in_nrows) - 1;
    uint32_t n = sizeof(uint32_t) * NBITS_BYTE - __builtin_clz(in_ncols) - 1;
+   uint32_t nelems = in_nrows*in_ncols-2;
 
    if (in_nrows == in_ncols){
      transpose_square_h(min, in_nrows);
@@ -394,25 +411,31 @@ void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols)
 
    uint32_t idx = tt[m];
    const uint32_t N_1 = (1 << n) - 1;
+   const uint32_t NM_1 = nelems+1;
 
    uint32_t val[NWORDS_256BIT];
    uint32_t cur_pos = tt[idx++], trans_pos, step=tt[idx++];
    uint32_t max_count = tt[idx++], max_el = tt[idx++];
 
-   memcpy(val, &min[cur_pos * NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
-   for (uint32_t ccount=0; ccount < max_count; ccount++){
-     for (uint32_t elcount=0; elcount < max_el; elcount+=2){
-        trans_pos = (cur_pos >> n) + ((cur_pos & N_1) << m);
-        swapu256_h(&min[trans_pos * NWORDS_256BIT], val);
-        cur_pos = (trans_pos >> n ) + ((trans_pos & N_1) << m);
-        swapu256_h(&min[cur_pos * NWORDS_256BIT], val);
+   while (nelems > 0){
+     memcpy(val, &min[cur_pos * NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
+     for (uint32_t ccount=0; ccount < max_count; ccount++){
+       for (uint32_t elcount=0; elcount < max_el; elcount++){
+          trans_pos = (cur_pos >> n) + ((cur_pos & N_1) << m);
+          swapu256_h(&min[trans_pos * NWORDS_256BIT], val);
+          nelems--;
+          //cur_pos = (trans_pos >> n ) + ((trans_pos & N_1) << m);
+          //swapu256_h(&min[cur_pos * NWORDS_256BIT], val);
+          cur_pos = trans_pos;
+       }
+       cur_pos = (trans_pos + step) & NM_1;
+       memcpy(val, &min[cur_pos * NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
      }
-     cur_pos = trans_pos + step;
+     cur_pos = tt[idx++];
+     step = tt[idx++];
+     max_count = tt[idx++];
+     max_el = tt[idx++];
    }
-   cur_pos = tt[idx++];
-   step = tt[idx++];
-   max_count = tt[idx++];
-   max_el = tt[idx++];
 }
 
 void transpose_square_h(uint32_t *min, uint32_t in_nrows)
@@ -429,6 +452,33 @@ void transpose_square_h(uint32_t *min, uint32_t in_nrows)
         swapu256_h(&min[trans_pos << NWORDS_256BIT_SHIFT], &min[cur_pos << NWORDS_256BIT_SHIFT]);
     } 
   }
+}
+
+void transpose2_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t in_ncols)
+{
+    uint32_t block = 4;
+    for (uint32_t i = 0; i < in_nrows; i += block) {
+        for(uint32_t j = 0; j < in_ncols; ++j) {
+            for(uint32_t b = 0; b < block && i + b < in_nrows; ++b) {
+               for (uint32_t k=0; k< NWORDS_256BIT; k++){
+                  mout[(j*in_nrows + i + b)*NWORDS_256BIT+k] = min[((i + b)*in_ncols + j)*NWORDS_256BIT + k];
+               }
+            }
+        }
+    }
+}
+void transpose2_h(uint32_t *mout, uint32_t *min, uint32_t start_row, uint32_t last_row, uint32_t in_nrows, uint32_t in_ncols)
+{
+    uint32_t block = 4;
+    for (uint32_t i = start_row; i < last_row; i += block) {
+        for(uint32_t j = 0; j < in_ncols; ++j) {
+            for(uint32_t b = 0; b < block && i + b < last_row; ++b) {
+               for (uint32_t k=0; k< NWORDS_256BIT; k++){
+                  mout[(j*in_nrows + i + b)*NWORDS_256BIT+k] = min[((i + b)*in_ncols + j)*NWORDS_256BIT + k];
+               }
+            }
+        }
+    }
 }
 /*
    Initalize multiprocessing components
@@ -1996,6 +2046,24 @@ void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride
    _ntt_h(A, roots, levels, astride, rstride, direction, pidx);
 }
 
+void ntt2_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
+{
+  if (levels == 0){
+     return;
+  }
+
+  ntt2_h(A, roots, levels-1, 2*astride, rstride, direction, pidx);
+  ntt2_h(A, roots, levels-1, 2*astride, rstride, direction, pidx);
+  
+  uint32_t k;
+
+/*
+  for (k=0; k < levels-1; k++){
+     A[1<< (k + NWORDS_256BIT_SHIFT)] = 
+  }
+*/
+}
+
 static void _ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
 {
    uint32_t i,j,k ,s, t;
@@ -2165,7 +2233,7 @@ void interpol_odd_h(uint32_t *A, const uint32_t *roots, uint32_t levels,t_uint64
 void M_init_h(uint32_t nroots)
 {
   if (M_transpose == NULL){
-    M_transpose = (uint32_t *) malloc ( (t_uint64) nroots * NWORDS_256BIT * sizeof(uint32_t));
+    M_transpose = (uint32_t *) malloc ( (t_uint64) (nroots) * NWORDS_256BIT * sizeof(uint32_t));
   }
   if (M_mul == NULL){
     M_mul = (uint32_t *) malloc ( (t_uint64)(nroots+1) * NWORDS_256BIT * sizeof(uint32_t));
@@ -2191,6 +2259,11 @@ void M_free_h(void)
 uint32_t *get_Mmul_h()
 {
   return M_mul;
+}
+
+uint32_t *get_Mtranspose_h()
+{
+  return M_transpose;
 }
 
 void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, uint32_t pidx)
@@ -2296,9 +2369,28 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   free(workers);
   free(w_args);
 
-  return M_mul;
+  //return M_mul;
+  return M_transpose;
 }
 
+static void transpose_AB1_h(void *args)
+{
+  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
+
+  transpose_h(M_transpose,wargs->A,1<<wargs->Nrows, 1<<wargs->Ncols);
+  //memcpy(wargs->A,M_transpose, (1ull << (wargs->Nrows + wargs->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
+  transpose_h(&M_transpose[1ull<<(wargs->Nrows+wargs->Ncols + NWORDS_256BIT_SHIFT)],wargs->B,1<<wargs->Nrows, 1<<wargs->Ncols);
+  //memcpy(wargs->B,M_transpose, (1ull << (wargs->Nrows + wargs->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
+}
+static void transpose_AB2_h(void *args)
+{
+  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
+
+  transpose_h(wargs->A,M_transpose,1<<wargs->Nrows, 1<<wargs->Ncols);
+  //memcpy(wargs->A,M_transpose, (1ull << (wargs->Nrows + wargs->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
+  transpose_h(wargs->B,&M_transpose[1ull<<(wargs->Nrows+wargs->Ncols + NWORDS_256BIT_SHIFT)],1<<wargs->Nrows, 1<<wargs->Ncols);
+  //memcpy(wargs->B,M_transpose, (1ull << (wargs->Nrows + wargs->Ncols + NWORDS_256BIT_SHIFT)) * sizeof(uint32_t));
+}
 static void transpose_AB_h(void *args)
 {
   ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
@@ -2313,7 +2405,7 @@ static void transpose_A_h(void *args)
   ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
 
   transpose_h(M_transpose,M_mul,1<<wargs->mNrows, 1<<wargs->mNcols);
-  memcpy(M_mul,M_transpose, (1ull << (wargs->mNrows + wargs->mNcols + NWORDS_256BIT_SHIFT )) * sizeof(uint32_t));
+  //memcpy(M_mul,M_transpose, (1ull << (wargs->mNrows + wargs->mNcols + NWORDS_256BIT_SHIFT )) * sizeof(uint32_t));
 }
 
 
@@ -2338,6 +2430,7 @@ void *interpol_and_mul_h(void *args)
   uint32_t Anrows = 1 << wargs->Nrows;
   uint32_t Amncols = 1 << wargs->mNcols;
   uint32_t Amnrows = 1 << wargs->mNrows;
+  uint32_t *save_A, *save_B;
   const uint32_t *scaler_mont = CusnarksIScalerGet((fmt_t)1);
   const uint32_t *scaler_ext = CusnarksIScalerGet((fmt_t)0);
   int64_t ridx;
@@ -2390,7 +2483,22 @@ void *interpol_and_mul_h(void *args)
     ntt_h(&wargs->A[(i<<wargs->Ncols+NWORDS_256BIT_SHIFT)], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, -1, wargs->pidx);
     ntt_h(&wargs->B[(i<<wargs->Ncols+NWORDS_256BIT_SHIFT)], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, -1, wargs->pidx);
   }
-  util_wait_h(wargs->thread_id, transpose_AB_h, wargs);
+  #if TEST_FFT_XPUT
+  transpose2_h(M_transpose, wargs->A,
+              start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols);
+  transpose2_h(&M_transpose[1ull<<(wargs->Nrows+wargs->Ncols + NWORDS_256BIT_SHIFT)],
+              wargs->B, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols);
+  util_wait_h(wargs->thread_id, NULL, NULL);
+  #else
+
+  util_wait_h(wargs->thread_id, transpose_AB1_h, wargs);
+  #endif
+  save_A = wargs->A;
+  save_B = wargs->B;
+  wargs->A = M_transpose;
+  wargs->B = &M_transpose[1ull<<(wargs->Nrows+wargs->Ncols + NWORDS_256BIT_SHIFT)];
 
   // A = A * scaler * l3W; B = B * scaler * l3W
   //printf("intt1-scaler-l3mul [%d]\n", wargs->thread_id);
@@ -2441,7 +2549,18 @@ void *interpol_and_mul_h(void *args)
     ntt_h(&wargs->A[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, 1, wargs->pidx);
     ntt_h(&wargs->B[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], wargs->roots, wargs->Ncols,1, wargs->rstride<<wargs->Nrows, 1, wargs->pidx);
   }
-  util_wait_h(wargs->thread_id, transpose_AB_h, wargs);
+  wargs->A=save_A;
+  wargs->B=save_B;
+  #if TEST_FFT_XPUT
+    transpose2_h(wargs->A,M_transpose, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols);
+    transpose2_h(wargs->B,&M_transpose[1ull<<(wargs->Nrows+wargs->Ncols + NWORDS_256BIT_SHIFT)],
+                start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols);
+    util_wait_h(wargs->thread_id, NULL, NULL);
+  #else
+    util_wait_h(wargs->thread_id, transpose_AB2_h, wargs);
+  #endif
+
+
 
   //printf("multiply-odd [%d]\n", wargs->thread_id);
   // M_mul[2*i+1] = A * B
@@ -2486,7 +2605,12 @@ void *interpol_and_mul_h(void *args)
                  &M_mul[i<<NWORDS_256BIT_SHIFT],
                  &scaler_ext[(wargs->mNrows + wargs->mNcols)<<NWORDS_256BIT_SHIFT], wargs->pidx);
   }
-  util_wait_h(wargs->thread_id, transpose_A_h, wargs);
+  #if TEST_FFT_XPUT
+    transpose2_h(M_transpose,M_mul,start_row, last_row, 1<<wargs->mNrows, 1<<wargs->mNcols);
+    util_wait_h(wargs->thread_id, NULL, NULL);
+  #else
+    util_wait_h(wargs->thread_id, transpose_A_h, wargs);
+  #endif
 
   return NULL;
 }

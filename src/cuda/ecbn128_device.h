@@ -42,6 +42,7 @@ __global__ void sc1mulecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
 __global__ void madecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void madecjac_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void scmulecjacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void scmulecjac_precomputed_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void redecjac_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 
 __global__ void addec2jacaff_kernel(uint32_t   *out_vector, uint32_t *in_vector, kernel_params_t *params);
@@ -77,6 +78,8 @@ template<typename T1, typename T2>
 __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
 template<typename T1, typename T2>
 __device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
+template<typename T1, typename T2>
+__device__ void scmulecjac_precomputed(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
 template<typename T1, typename T2>
 __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane );
 template<typename T1, typename T2>

@@ -554,7 +554,8 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
      with nogil:
        uh.cntt_interpolandmul_server_h(args_c)
 
-     cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
+     cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mtranspose_h()
+     #cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
 
      free(args_c)
 
