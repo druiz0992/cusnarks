@@ -9171,30 +9171,34 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file)
 
 uint32_t test_transpose(void)
 {
-  //int min_m=3, max_m=14;
-  int min_m=3, max_m=11;
+  // 2x4 to 64x128
+  int min_m=1, max_m=10;
   int nrows, ncols;
   int n_errors=0;
   int i,j;
-  uint32_t *samples, *result;
+  uint32_t *samples, *samples2, *result;
   const uint32_t *N = CusnarksPGet((mod_t)1);
   uint32_t retval=0;
 
 
-  for (i=min_m=3; i< max_m; i++){
+  for (i=min_m; i< max_m; i++){
      nrows = 1 << i;
      ncols = 1 << (i+1);
     
      samples = (uint32_t *)malloc(nrows*ncols * NWORDS_256BIT * sizeof(uint32_t));
+     samples2 = (uint32_t *)malloc(nrows*ncols * NWORDS_256BIT * sizeof(uint32_t));
      result = (uint32_t *)malloc(nrows*ncols * NWORDS_256BIT * sizeof(uint32_t));
 
      setRandom256(samples,nrows*ncols, N); 
+
      transpose_h(result, samples, nrows, ncols);
+     transpose2_h(samples2, samples, nrows, ncols);
      transpose_h(samples, nrows, ncols);
-     
+    
+      
      n_errors=0;
      for(j=0; j< nrows*ncols; j++){
-       if (!equ256_h(&samples[i*NWORDS_256BIT], &result[i*NWORDS_256BIT])){
+       if (!equ256_h(&samples[j*NWORDS_256BIT], &result[j*NWORDS_256BIT])){
          n_errors++;
        }
      }
@@ -9202,10 +9206,34 @@ uint32_t test_transpose(void)
       printf("\033[1;31m");
      }
      printf("N errors(Transpose %dx%d) : %d/%d\n",nrows,ncols,n_errors, nrows*ncols);
+     
+     n_errors=0;
+     for(j=0; j< nrows*ncols; j++){
+       if (!equ256_h(&samples2[j*NWORDS_256BIT], &result[j*NWORDS_256BIT])){
+         n_errors++;
+       }
+     }
+     printf("\033[0m");
+     
+     /*
+     for(j=0; j< nrows*ncols; j++){
+       printU256Number(&result[j*NWORDS_256BIT]);
+     }
+     printf("\n\n");
+     for(j=0; j< nrows*ncols; j++){
+       printU256Number(&samples[j*NWORDS_256BIT]);
+     }
+     */
+     
+     if (n_errors){
+      printf("\033[1;31m");
+     }
+     printf("N errors(Transpose2 %dx%d) : %d/%d\n",nrows,ncols,n_errors, nrows*ncols);
      printf("\033[0m");
      retval += n_errors;
 
      free(samples);
+     free(samples2);
      free(result);
   }
   return retval;
@@ -9288,7 +9316,7 @@ int main()
   retval+=test_interpol_mul_randomsize();
 
   retval+=test_transpose_square();
-  //retval+=test_transpose();
+  retval+=test_transpose();
 
   retval+=test_sort();
 

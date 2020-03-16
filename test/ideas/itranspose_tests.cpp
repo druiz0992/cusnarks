@@ -73,19 +73,29 @@ void itranspose(Mat<TYPE>& A)
                         curr_pos = A_i*n + A_j;
                     }
                     //printf("\n");
+                    nel=0;
                 } else {
                   nel=0;
                 } 
             }
         }
+        
+        for (int i=0; i< idx; i++){
+           printf("%d-%d ",r[i], r1[i]);
+        }
+        printf("\n");
+        
+        uint32_t nn=0, nn2=0;
         unsigned int step = r[2] - r[1], first_el=r[1], group=1, ncyc=0, nit=0;
         for(unsigned int col=1; col < idx-1; col++){
-          if(r[col+1] - r[col] == step) {
+          nn2+=r1[col];
+          if(r[col+1] - r[col] == step && r1[col] == r1[col+1]) {
              group++;
           } else {
             ncyc +=4;
             nit++;
             printf("%d, %d, %d, %d,", first_el, step, group, r1[col]);
+            nn+=r1[col]*group;
             group=1;
             first_el = r[col+1];
             step = r[col+2] - r[col+1];
@@ -96,7 +106,7 @@ void itranspose(Mat<TYPE>& A)
           
         }
         free(r);
-        printf("\n%d\n",ncyc);
+        printf("\n%d %d %d\n",ncyc, nn, nn2);
     }
 }
 
@@ -145,8 +155,8 @@ BOOST_AUTO_TEST_CASE( transpose_column_matrix )
 {
     double start, end;
 
-    unsigned int min_m = 10;
-    unsigned int max_m = 11;
+    unsigned int min_m = 9;
+    unsigned int max_m = 10;
     unsigned int i;
 
     for(i=min_m; i< max_m; i++){
@@ -158,7 +168,15 @@ BOOST_AUTO_TEST_CASE( transpose_column_matrix )
     
       fmat A(m, n);
       A.randu();
-      
+     
+     /* 
+      for (unsigned int i = 0; i < m; i++) {
+          for (unsigned int j = 0; j < n; j++) {
+              printf("%f ",A(i,j));
+          }
+          printf("\n");
+      }
+     */
       start = (double)clock()/CLOCKS_PER_SEC;
       fmat B = A.t();
       end = (double)clock()/CLOCKS_PER_SEC;
@@ -171,10 +189,13 @@ BOOST_AUTO_TEST_CASE( transpose_column_matrix )
       end = (double)clock()/CLOCKS_PER_SEC;
       printf("Ix : %f\n", end-start);
       
+      printf("\n");
       for (unsigned int i = 0; i < n; i++) {
           for (unsigned int j = 0; j < m; j++) {
               BOOST_CHECK_CLOSE(B(i,j), A(i,j), 0.0001);
+              //printf("%f ",B(i,j));
           }
+          //printf("\n");
       }
    }
 }

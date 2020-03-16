@@ -345,6 +345,7 @@ typedef enum{
    CB_EC_JAC_MAD_SHFL,
    CB_EC_JAC_MUL_OPT,
    CB_EC_JAC_RED,
+   CB_EC_JAC_MUL_PRECOMP,
    CB_EC_N
 
 }ec_callback_t;

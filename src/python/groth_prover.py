@@ -535,7 +535,10 @@ class GrothProver(object):
            logging.info('Launching GP Server')
            p = Process(target=self.startServer, args = (self.port_first,0))
            p.start()
-           self.startServer(self.port_second, nVars)
+           try:
+              self.startServer(self.port_second, nVars)
+           except:
+              logging.info('Exception occurred. Server stopped')
 
     def startServer(self, port, nVars):    
            logging.info('Launching GP Server')

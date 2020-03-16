@@ -273,6 +273,7 @@ void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pid
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
 void montsquare__ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t L, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
+void ntt2_h(uint32_t *A, const uint32_t *roots, uint32_t L, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t L, t_uint64 rstride, uint32_t pidx);
 void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride,int32_t direction,uint32_t pidx);
 void intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t L, t_uint64 rstride, uint32_t pidx);
@@ -292,6 +293,8 @@ uint32_t * ntt_interpolandmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_
 uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args);
 void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
 void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols);
+void transpose_h(uint32_t *mout, const uint32_t *min,  uint32_t start_row, uint32_t last_row, uint32_t in_nrows, uint32_t in_ncols);
+void transpose2_h(uint32_t *mout, uint32_t *min, uint32_t n, uint32_t p);
 void transpose_square_h(uint32_t *min, uint32_t in_nrows);
 void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
 uint32_t zpoly_norm_h(uint32_t *pin, uint32_t n_coeff);
@@ -374,6 +377,7 @@ void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots);
 void init_h(void);
 void release_h(void);
 uint32_t *get_Mmul_h();
+uint32_t *get_Mtranspose_h();
 uint32_t get_nprocs_h();
 int createSharedMemBuf(void **shmem, shmem_t type);
 void destroySharedMemBuf(void *shmem, int shmid);
