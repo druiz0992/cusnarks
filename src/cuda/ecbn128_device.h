@@ -89,6 +89,8 @@ __device__ void scmulecjac_step_l2r(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset,
 template<typename T1, typename T2>
 __device__ void scmulecjac_l2r2(T1 *Q,T1 *N, uint32_t *scl, uint32_t msb, mod_t midx );
 template<typename T1, typename T2>
+__device__ void scmulecjac_l3r3(T1 *Q,T1 *N, uint32_t *scl, uint32_t msb, mod_t midx );
+template<typename T1, typename T2>
 __device__ void build_ec_table(T1 *d_out,T1 *d_in, uint32_t din_offset, uint32_t *scl, kernel_params_t *params);
 template<typename T1, typename T2>
 __device__ void toaff(T1 *zxr,  T1 *zx1, mod_t midx);

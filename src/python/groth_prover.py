@@ -49,7 +49,7 @@ import os.path
 import signal
 import numpy as np
 import time
-from subprocess import call
+from subprocess import call, run
 import logging
 from multiprocessing import RawArray, Process, Pipe
 from ctypes import c_uint32
@@ -82,7 +82,7 @@ class GrothProver(object):
     
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None, n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
-                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, reserved_cpus=0, batch_size=20, write_table_f=None):
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, reserved_cpus=0, batch_size=20, write_table_f=None, zk=1):
 
         # Check valid folder exists
         if keep_f is None:
@@ -301,6 +301,8 @@ class GrothProver(object):
         self.neg_rs_scl_sh = RawArray(c_uint32, NWORDS_256BIT)
         self.neg_rs_scl = np.frombuffer(self.neg_rs_scl_sh, dtype=np.uint32)
 
+        self.zk = zk
+
         logging.info('#################################### ')
         logging.info('Initializing Groth prover with the following parameters :')
         logging.info(' - curve : %s',curve)
@@ -320,6 +322,7 @@ class GrothProver(object):
         logging.info(' - table_f : %s', self.write_table_f)
         logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
         logging.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
+        logging.info(' - zero knowledge enabled : %s', self.zk)
         logging.info(' - N Constraints : %s', nVars)
         logging.info(' - Domain Size : %s', domainSize)
         logging.info(' - N Public : %s', nPublic)
@@ -411,17 +414,28 @@ class GrothProver(object):
         next_gpu_idx = 0
         first_stream_idx = min(self.n_streams-1,1)
 
+        if self.zk:
+          ec_lable_ph1 = np.asarray(['A', 'B1', 'C'])
+          ec_lable_ph2 = np.asarray(['A', 'B2', 'B1'])
+          n_els_ph1 = len(ec_lable_ph1)
+          n_els_ph2 = len(ec_lable_ph2)
+        else:
+          ec_lable_ph1 = np.asarray(['A', 'C'])
+          n_els_ph1 = len(ec_lable_ph1)
+          ec_lable_ph2 = np.asarray(['A', 'B2'])
+          n_els_ph2 = len(ec_lable_ph2)
+
         # EC reduce A, B2, B1 and C from nPublic+1 to end	
         self.dispatch_table_phase1 = buildDispatchTable( nbatches-1,
                                          #self.ec_type_dict['C'][2]+1,
-                                         3,
+                                         n_els_ph1,
                                          self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
                                          nPublic+1, nVars,
                                          start_pidx=self.ec_type_dict['A'][2],
                                          start_gpu_idx=next_gpu_idx,
                                          start_stream_idx=first_stream_idx,
                                          #ec_lable = self.ec_lable)
-                                         ec_lable = np.asarray(['A', 'B1', 'C']))
+                                         ec_lable = ec_lable_ph1)
 
         #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
         self.dispatch_table_phase1b = buildDispatchTable( nbatches-1,
@@ -437,13 +451,15 @@ class GrothProver(object):
 
         # EC reduce A, B2 and B1 from 0 to nPublic+1
         self.dispatch_table_phase2 = buildDispatchTable(1, 
-                                self.ec_type_dict['B1'][2]+1,
+                                #self.ec_type_dict['B1'][2]+1,
+                                n_els_ph2,
                                 self.n_gpu, self.n_streams, nPublic+1,
                                 0, nPublic+1,
                                 start_pidx=self.ec_type_dict['A'][2],
                                 start_gpu_idx=next_gpu_idx,
                                 start_stream_idx=first_stream_idx,
-                                ec_lable = self.ec_lable)
+                                #ec_lable = self.ec_lable)
+                                ec_lable = ec_lable_ph2)
 
         self.batch_size_mexp_phase3 = self.batch_size
         while True:
@@ -539,6 +555,7 @@ class GrothProver(object):
               self.startServer(self.port_second, nVars)
            except:
               logging.info('Exception occurred. Server stopped')
+              run(['killall', '-9', 'python3'])
 
     def startServer(self, port, nVars):    
            logging.info('Launching GP Server')
@@ -1069,20 +1086,29 @@ class GrothProver(object):
 
         ZField.set_field(MOD_FIELD)
 
-        # Init r and s scalars
-        np.copyto(
-              self.r_scl,
-              BigInt(
-                  random.randint(
-                       1,
-                       ZField.get_extended_p().as_long()-1)).as_uint256())
-
-        np.copyto(
-              self.s_scl,
-              BigInt(
+        if self.zk:
+          # Init r and s scalars
+          np.copyto(
+                self.r_scl,
+                BigInt(
                     random.randint(
-                           1,
-                           ZField.get_extended_p().as_long()-1)).as_uint256())
+                         1,
+                         ZField.get_extended_p().as_long()-1)).as_uint256())
+  
+          np.copyto(
+                self.s_scl,
+                BigInt(
+                      random.randint(
+                             1,
+                             ZField.get_extended_p().as_long()-1)).as_uint256())
+        else:
+          np.copyto(
+                self.r_scl,
+                np.asarray([0,0,0,0,0,0,0,0],dtype=np.uint32) )
+  
+          np.copyto(
+                self.s_scl,
+                np.asarray([0,0,0,0,0,0,0,0],dtype=np.uint32) )
 
         r_mont = to_montgomeryN_h(np.reshape(self.r_scl, -1), MOD_FIELD)
         np.copyto(
@@ -1116,16 +1142,21 @@ class GrothProver(object):
                                   change_s_scl_idx = [self.ec_type_dict['B2'][2]],
                                   sort_en=self.sort_en)
 
+        if self.zk:
+              n_els = self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2])
+        else:
+              n_els = self.dispatch_table_phase1.shape[0]-2
+
         self.findECPointsDispatch(
                                   self.dispatch_table_phase1,
                                   self.batch_size_mexp_phase1,
                                   #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]+1), pk_bin,
-                                  self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]), pk_bin,
+                                  #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]), pk_bin,
+                                  n_els, pk_bin,
                                   #change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
                                   change_s_scl_idx = [self.ec_type_dict['B1'][2]],
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
                                   sort_en=self.sort_en)
-
 
         if self.stop_client.value:
             self.p_CPU.terminate()
@@ -1200,6 +1231,15 @@ class GrothProver(object):
         return 
  
     def reduceLastMexp(self, delta):
+       EC_C_idx = self.ec_type_dict['C'][4]
+
+       a5 = ec_jacaddreduce_h(
+                           np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
+                           MOD_GROUP,
+                           1,   # to affine
+                           1,   # Add z coordinate to inout
+                           0)   # strip z coordinate from affine result
+       if self.zk:
            a1 = ec_jacscmul_h(
                  np.reshape(self.s_scl,-1),
                  np.reshape(self.pi_a_eccf1,-1),
@@ -1218,15 +1258,9 @@ class GrothProver(object):
            a4 = np.concatenate((self.pi_c2_eccf1,
                                 [ECC.one[ZUtils.FRDC].as_uint256()]))
 
-           EC_C_idx = self.ec_type_dict['C'][4]
-           a5 = ec_jacaddreduce_h(
-                           np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
-                           MOD_GROUP,
-                           1,   # to affine
-                           1,   # Add z coordinate to inout
-                           0)   # strip z coordinate from affine result
 
            a = np.concatenate((a1,a2,a3,a4,a5))
+
            np.copyto(
                     self.pi_c_eccf1,
                     ec_jacaddreduce_h(
@@ -1236,6 +1270,9 @@ class GrothProver(object):
                                       0,   # Add z coordinate to input
                                       1)   # strip z coordinate from affine result
                     )
+       else:
+           np.copyto(
+                   self.pi_c_eccf1, a5[:2])
 
     def assignECPvalues(self, compute_ECP=False):
 
