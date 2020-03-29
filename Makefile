@@ -49,6 +49,7 @@ PYSRC_PATH = $(CUSNARKS_PATH)/src/python
 PYTST_PATH = $(CUSNARKS_PATH)/test/python
 CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
 CTEST_PATH = $(CUSNARKS_PATH)/test/c
+CTEST_IDEAS_PATH = $(CUSNARKS_PATH)/test/ideas
 CONFIG_PATH= $(CUSNARKS_PATH)/config
 
 AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
@@ -60,8 +61,8 @@ PCG_INCLUDE = $(AUX_PATH)/pcg-cpp/include
 SNARKJS_PATH = $(AUX_PATH)/snarkjs
 SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
 
-RUST_CIRCOM_PATH = $(AUX_PATH)/rust-circom-experimental
-RUST_CIRCOM_REPO = http://github.com/adria0/rust-circom-experimental.git
+RUST_CIRCOM_PATH = $(AUX_PATH)/za
+RUST_CIRCOM_REPO = http://github.com/iden3/za.git
 
 CUSNARKS_LIB = libcusnarks.so
 CUBIN_NAME = cusnarks.cubin
@@ -109,9 +110,12 @@ AUX_REPOS := $(aux_repos)
 #             2 -> Warning
 #             1 -> Info
 #             0 -> Debug
-# 
+#
 
-DEFINES = -DPARALLEL_EN
+#DEFINES
+# -DPARALLEL_EN, -DCU_ASM, -DCU_ASM, -DCU_ASM_ECADD
+DEFINES = -DPARALLEL_EN  -DCU_ASM 
+DEFINES_DEBUG = -DCU_ASM
 
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
@@ -125,7 +129,8 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CUSNARKS_LIB=$(CUSNARKS_LIB)'           \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
               'AUX_INCLUDES=$(AUX_INCLUDES)'  \
-              'DEFINES=$(DEFINES)'  
+              'DEFINES=$(DEFINES)'   \
+              'DEFINES_DEBUG=$(DEFINES_DEBUG)'  
   
 build:
 	@for i in $(SUBDIRS); do \
@@ -142,13 +147,27 @@ test:
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
+test_cpu:   
+	@for i in $(CTEST_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
+test_gpu:   
+	@for i in $(PYTST_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
+debug_gpu:   
+	@for i in $(CTEST_IDEAS_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 config:   
 	@for i in $(CONFIG_SUBDIRS); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
 
 clean:
-	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(SCRIPTS_SUBDIRS); do \
+	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(SCRIPTS_SUBDIRS) $(CTEST_IDEAS_PATH); do \
 	echo "clearing all in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
@@ -166,9 +185,22 @@ third_party_libs:
 	@for i in $(AUX_RSUBDIRS); do \
 		(cd $$i; $(CARGO)); done
 
+clib:
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(PCG_REPO); do git clone $$j; done;  fi
+	@for i in $(AUX_CSUBDIRS); do \
+		(cd $$i; $(MAKE)); done
+	if ! test -d $(LIB_PATH); \
+		then mkdir $(LIB_PATH); fi
+	@for i in $(CUSRC_PATH); do \
+		echo "make build in $$i..."; \
+		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+
+	
 
 third_party_libs_clean:
 	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
 
-.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs
+.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_cpu test_gpu clib debug_gpu
 

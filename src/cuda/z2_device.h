@@ -46,6 +46,7 @@ class Z2_t {
      __device__ uint32_t *getu256(uint32_t offset);
      __device__ uint32_t *get2u256(uint32_t offset);
      __device__ uint32_t *getsingleu256(uint32_t offset);
+     __device__ void      setsingleu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset);
      __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset);
      __device__ void setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset);
      __device__ void setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize);
@@ -71,11 +72,16 @@ __device__ void addz(Z2_t *z, Z2_t *x, Z2_t *y, mod_t midx);
 __device__ void movz(Z2_t *x, uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t size);
 __device__ void movz(uint32_t *y, uint32_t yoffset, Z2_t *x, uint32_t xoffset, uint32_t size);
 __device__ void setkz(Z2_t *z, uint32_t offset, uint32_t *x);
+__device__ void invz(Z2_t *z,  Z2_t *x,  mod_t midx);
+__device__ void div2z(Z2_t *z, Z2_t *x);
 
 __device__ void xeccz(Z2_t *z, Z2_t *x);
 __device__ void yeccz(Z2_t *z, Z2_t *x);
 __device__ void zeccz(Z2_t *z, Z2_t *x);
 __device__ void infz(Z2_t *z, mod_t midx);
+__device__ void addecjacz(Z2_t *zxr, uint32_t zoffset, Z2_t *zx1, uint32_t x1offset, Z2_t *zx2, uint32_t x2offset, mod_t midx);
+__device__ void doublecjacz(Z2_t *zxr, Z2_t *zx1, mod_t midx);
+__device__ void scmulec_stepz(Z2_t *Q,Z2_t *N, uint32_t *scl, uint32_t msb,  mod_t midx );
 
 
 #endif

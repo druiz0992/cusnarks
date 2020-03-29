@@ -46,6 +46,16 @@ __forceinline__ __device__ uint32_t eq0u256(const uint32_t __restrict__ *x)
   }
 }
 #endif
+
+__device__ uint32_t equ256(const uint32_t __restrict__ *x, const uint32_t __restrict__ *y);
+__device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y);
+__device__ void mulu32lo(uint32_t __restrict__ *z, uint32_t x, uint32_t y);
+__device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);
+__device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y);
+__device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit);
+__device__ void propcu32_extend(uint32_t *x, uint32_t c);
+
+
 /*
    x == y for 256 bit numbers
 */
@@ -85,6 +95,18 @@ __forceinline__ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uin
       "cvt.u32.u64         %1,    %prod;    \n\t"
       "}                                    \n\t"
       : "=r"(z[0]), "=r"(z[1])
+      : "r"(x), "r"(y));
+}
+/*
+   x * y for 32 bit number. Returns low 32 bit number
+ */
+__forceinline__ __device__ void mulu32lo(uint32_t __restrict__ *z, uint32_t x, uint32_t y)
+{
+  // z[i] = x * y for 32 bit words
+  asm("{                                    \n\t"
+      "mul.lo.u32             %0, %1,    %2;\n\t"           
+      "}                                    \n\t"
+      : "=r"(z[0])
       : "r"(x), "r"(y));
 }
 
@@ -149,6 +171,5 @@ __forceinline__ __device__ void propcu32_extend(uint32_t *x, uint32_t c)
          : "r"(x[digit]), "r"(c));
    }
 }
-
 
 #endif

@@ -58,7 +58,8 @@ using namespace std;
 
 static kernel_cb ecbn128_kernel_callbacks[] = //{addecldr_kernel, doublecldr_kernel, scmulecldr_kernel, madecldr_kernel,
                                                {addecjacaff_kernel, addecjac_kernel, doublecjacaff_kernel, doublecjac_kernel, 
-                                                scmulecjac_kernel, sc1mulecjac_kernel, madecjac_kernel,  madecjac_shfl_kernel};
+                                                scmulecjac_kernel, sc1mulecjac_kernel, madecjac_kernel,  madecjac_shfl_kernel,
+					       scmulecjacopt_kernel, redecjac_kernel, scmulecjac_precomputed_kernel };
 
 ECBN128::ECBN128 (uint32_t len) : CUSnarks( len * (ECP_JAC_INDIMS+U256_NDIMS), NWORDS_256BIT * sizeof(uint32_t) * len *  (ECP_JAC_INDIMS+U256_NDIMS),
 		                            len * ECP_JAC_OUTDIMS,  NWORDS_256BIT * sizeof(uint32_t) * len * ECP_JAC_OUTDIMS, 
@@ -72,3 +73,9 @@ ECBN128::ECBN128 (uint32_t len, const uint32_t seed) :  CUSnarks(len * (ECP_JAC_
 {
 }
 
+ECBN128::ECBN128 (uint32_t inlen, uint32_t ntables, const uint32_t seed) :  CUSnarks(inlen * (ECP_JAC_INDIMS+U256_NDIMS) + ntables * ECP_JAC_INDIMS,
+	                                                                             inlen * NWORDS_256BIT * sizeof(uint32_t) * (ECP_JAC_INDIMS+U256_NDIMS) + ntables * NWORDS_256BIT * sizeof(uint32_t) * ECP_JAC_INDIMS,
+				                                 inlen * ECP_JAC_OUTDIMS, NWORDS_256BIT * sizeof(uint32_t) * inlen * ECP_JAC_OUTDIMS,
+						       ecbn128_kernel_callbacks, seed)
+{
+}
