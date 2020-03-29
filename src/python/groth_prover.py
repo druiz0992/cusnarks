@@ -535,9 +535,9 @@ class GrothProver(object):
 
         end1 = time.time()
 
-        start2 = time.time()
 
         if self.compute_first_mexp_gpu is False:
+          start2 = time.time()
           self.logger.info(' Process server - Starting First Mexp...')
           pk_bin2 = pkbin_get(self.pk,['A','B2','B1','C','nPublic'])
           nPublic = pk_bin2[4][0]
@@ -589,10 +589,10 @@ class GrothProver(object):
                     )
             self.logger.info(' Process server - Mexp B1  Done...')
 
-        end2 = time.time()
+          end2 = time.time()
 
-        self.t_GP['Mexp1'] = (end2 - start2)
-        self.logger.info(' Process server - Completed First Mexp...')
+          self.t_GP['Mexp1'] = (end2 - start2)
+          self.logger.info(' Process server - Completed First Mexp...')
 
         start3 = time.time()
 
