@@ -9194,11 +9194,6 @@ int main()
 {
   uint32_t retval;
 
-  retval+=test_ec_jacreduce_opt(0);   // EC1
-  //retval+=test_ec_jacreduce_opt(1);   // EC2
-  //retval+=test_ec_jacreduce_precompute(1,0);   // EC1
-  //retval+=test_ec_jacreduce_precompute(1,1);   // EC1
-  #if 0
   retval+=test_mul_prof();  // Profile montgomery mul 
   retval+=test_mul_ext_prof();  // Profile montgomery mul 
   retval+=test_interpol_mul_randomsize_prof();
@@ -9255,7 +9250,6 @@ int main()
   retval+=test_ec_jacreduce_precompute(0,1);   // EC1
   retval+=test_ec_jacreduce_precompute(1,0);   // EC2
   retval+=test_ec_jacreduce_precompute(1,1);   // EC2
-  #endif
 
   if (retval){
     printf("\033[1;31m");
