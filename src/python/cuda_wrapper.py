@@ -50,7 +50,10 @@ import time
 import math
 from subprocess import call, Popen, PIPE
 import multiprocessing as mp
-import nvgpu
+try:
+  import nvgpu
+except ImportError:
+  pass
 
 
 from zutils import ZUtils
@@ -1562,19 +1565,25 @@ def get_shfl_blockD(nsamples, max_block_size=8):
    return blockD[::-1]
     
 def get_gpu_affinity_cuda():
-   available_gpus = nvgpu.available_gpus()
-   n_cores = mp.cpu_count()
    gpu_affinity = {}
-   for gpu in available_gpus:
-     gpu_affinity[gpu] = []
-   for core in xrange(n_cores):
-      r = call(['nvidia-smi' , 'topo', '-c' , str(core)])
-      gpu_affinity[str(r)].append(core)
+   try:
+     available_gpus = nvgpu.available_gpus()
+     n_cores = mp.cpu_count()
+     for gpu in available_gpus:
+       gpu_affinity[gpu] = []
+     for core in xrange(n_cores):
+        r = call(['nvidia-smi' , 'topo', '-c' , str(core)])
+        gpu_affinity[str(r)].append(core)
+     return gpu_affinity
 
-   return gpu_affinity
+   except:
+     return gpu_affinity
 
 def get_ngpu(max_used_percent=20.):
-   return len(nvgpu.available_gpus(max_used_percent))
+   try:
+     return len(nvgpu.available_gpus(max_used_percent))
+   except :
+     return 0
 
 def get_nstreams():
     return (N_STREAMS_PER_GPU)

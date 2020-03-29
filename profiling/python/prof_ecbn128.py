@@ -95,7 +95,7 @@ def profile_ecbn128():
     #my_kernels = [CB_EC_JAC_ADD]
     #my_kernels = [CB_EC_JAC_MUL_OPT]
     #my_kernels = [CB_EC_JAC_MAD_SHFL]
-    my_kernels = [CB_EC_JAC_RED]
+    #my_kernels = [CB_EC_JAC_RED]
 
     for k in my_kernels:
       kernel_params = {}

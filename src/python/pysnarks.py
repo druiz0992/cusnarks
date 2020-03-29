@@ -25,7 +25,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : pysnarks
+// File name  : pysnasks: 
 //
 // Date       : 11/07/2019
 //

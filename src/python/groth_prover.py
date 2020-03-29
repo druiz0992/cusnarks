@@ -51,6 +51,7 @@ import numpy as np
 import time
 from subprocess import call, run
 import logging
+import logging.handlers as handlers
 from multiprocessing import RawArray, Process, Pipe
 from ctypes import c_uint32
 
@@ -81,22 +82,35 @@ import cusnarks_config as cfg
 class GrothProver(object):
     
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128',
-                 out_pk_f=None, out_pk_format=FMT_MONT, test_f=None, n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
-                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0, keep_f=None, reserved_cpus=0, batch_size=20, write_table_f=None, zk=1):
+                 out_pk_f=None, out_pk_format=FMT_MONT, test_f=None,
+                 n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
+                 benchmark_f=None, seed=None, snarkjs=None, verify_en=0,
+                 keep_f=None, reserved_cpus=0, batch_size=20, write_table_f=None, zk=1):
 
         # Check valid folder exists
         if keep_f is None:
             print ("Repo directory needs to be provided\n")
             sys.exit(1)
 
+        timestamp = str(int(time.time()))
         self.keep_f = gen_reponame(keep_f, sufix="_PROVER")
 
-        logging.basicConfig(filename=self.keep_f + '/log', filemode='w',
-                format='%(asctime)s - %(levelname)s - %(message)s',
-                level=logging.INFO, datefmt='%d-%b-%y %H:%M:%S')
+        self.logger = logging.getLogger('cusnarks')
+        self.logger.setLevel(logging.INFO)
+
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        # Create new log file every day. Keep latest 7
+        logHandler = handlers.TimedRotatingFileHandler(
+                                self.keep_f + '/log'+'_'+timestamp,
+                                when='D',
+                                interval=1,
+                                backupCount=7)
+        logHandler.setLevel(logging.INFO)
+        logHandler.setFormatter(formatter)
+        self.logger.addHandler(logHandler)
 
         if not use_pycusnarks :
-          logging.error('PyCUSnarks shared library not found. Exiting...')
+          self.logger.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
 
         if seed is not None:
@@ -109,7 +123,8 @@ class GrothProver(object):
 
         self.sort_en = 0
         self.compute_ntt_gpu = False
-        self.compute_last_mexp_gpu = True
+        self.compute_first_mexp_gpu = False
+        self.compute_last_mexp_gpu = False
 
         self.write_table_en = False
         self.write_table_f = write_table_f
@@ -125,11 +140,21 @@ class GrothProver(object):
 
         self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
 
-        self.ecbn128  = ECBN128(self.batch_size,   seed=self.seed)
-        self.ec2bn128 =\
-                EC2BN128(int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * self.batch_size), seed=self.seed)
+        if self.compute_first_mexp_gpu or self.compute_last_mexp_gpu:
+          self.ecbn128  = ECBN128(self.batch_size,   seed=self.seed)
+          self.ec2bn128 =\
+                EC2BN128(
+                              int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * self.batch_size),
+                              seed=self.seed
+                        )
+        else:
+          self.ecbn128  = None
+          self.ec2bn128 = None
+         
         if self.compute_ntt_gpu:
             self.cuzpoly = ZCUPoly(5*self.batch_size  + 2, seed=self.seed)
+        else:
+            self.cuzpoly = None
     
         self.out_proving_key_f = out_pk_f
         self.out_proving_key_format = out_pk_format
@@ -150,22 +175,35 @@ class GrothProver(object):
         self.pk = getPK()
         self.verify = 2
         self.stop_client = mp.Value('i',0)
+        self.active_client = mp.Value('i',0)
+
+        if n_streams > get_nstreams():
+          self.n_streams = get_nstreams()
+        else :
+          self.n_streams = n_streams
 
         self.n_gpu = min(get_ngpu(max_used_percent=99.),n_gpus)
-        if 'CUDA_VISIBLE_DEVICES' in os.environ and len(os.environ['CUDA_VISIBLE_DEVICES']) > 0:
-           self.n_gpu = min(self.n_gpu,len(os.environ['CUDA_VISIBLE_DEVICES'].split(',')))
+        if 'CUDA_VISIBLE_DEVICES' in os.environ and \
+           len(os.environ['CUDA_VISIBLE_DEVICES']) > 0:
+              self.n_gpu = min(
+                                 self.n_gpu,
+                                 len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
+                              )
 
-        if self.n_gpu == 0:
-          logging.error('No available GPUs')
-          sys.exit(1)
+        if self.n_gpu == 0 :
+          self.logger.info('No available GPUs')
+          self.compute_ntt_gpu = False
+          self.compute_first_mexp_gpu = False
+          self.compute_last_mexp_gpu = False
+        elif not self.compute_ntt_gpu and not \
+                 self.compute_first_mexp_gpu and not self.compute_ntt_gpu:
+          self.n_gpu = 0
+          self.n_streams = 1
 
         self.public_signals = None
         self.witness_f = None
         self.snarkjs = snarkjs
         self.verify_en = None
-
-        #self.affinity = get_affinity(r_cpu=reserved_cpus)
-        #print(self.affinity)
 
         ZField.set_field(MOD_FIELD)
         self.t_GP = {}
@@ -176,12 +214,6 @@ class GrothProver(object):
         self.scl_array = None
         self.sorted_scl_array = None
         self.sorted_scl_array_idx = None
-
-
-        if n_streams > get_nstreams():
-          self.n_streams = get_nstreams()
-        else :
-          self.n_streams = n_streams
 
         #copy_input_files([proving_key_f, verification_key_f], self.keep_f)
         if test_f is None:
@@ -198,17 +230,17 @@ class GrothProver(object):
            self.pk_short = pkvars_to_bin(FMT_MONT, EC_T_AFFINE, self.pk, ext=False)
 
         # Initialize shared memory
-        logging.info('Initializing memories...')
+        self.logger.info('Initializing memories...')
 
         # PK_BIN
         pkbin_nWords = int(os.path.getsize(self.proving_key_f)/4)
         self.pk_sh = RawArray(c_uint32, pkbin_nWords)
         self.pk = np.frombuffer(self.pk_sh, dtype=np.uint32)
-        logging.info('Reading Proving Key...')
+        self.logger.info('Reading Proving Key...')
         readU256PKFileTo_h(self.proving_key_f.encode("UTF-8"), self.pk)
              
         pkbin_vars = pkbin_get(self.pk,['nVars','domainSize', 'delta_1', 'hExps', 'nPublic'])
-        nVars = int(pkbin_vars[0][0])
+        self.nVars = int(pkbin_vars[0][0])
         domainSize = int(pkbin_vars[1][0])
         delta_1 = pkbin_vars[2]
         hExps = pkbin_vars[3]
@@ -286,7 +318,7 @@ class GrothProver(object):
                  np.frombuffer( self.pi_b1_eccf1_sh,
                                 dtype=np.uint32).reshape(ECP_JAC_INDIMS, NWORDS_256BIT)  
 
-        self.init_ec_val_sh = RawArray(c_uint32, (3*ECP_JAC_INDIMS+ECP2_JAC_INDIMS)*self.n_gpu*self.n_streams*NWORDS_256BIT)
+        self.init_ec_val_sh = RawArray(c_uint32, (3*ECP_JAC_INDIMS+ECP2_JAC_INDIMS)*max(self.n_gpu,1)*self.n_streams*NWORDS_256BIT)
         self.init_ec_val = \
                  np.frombuffer( self.init_ec_val_sh,
                                 dtype=np.uint32)
@@ -303,40 +335,41 @@ class GrothProver(object):
 
         self.zk = zk
 
-        logging.info('#################################### ')
-        logging.info('Initializing Groth prover with the following parameters :')
-        logging.info(' - curve : %s',curve)
-        logging.info(' - proving_key_f : %s', proving_key_f)
-        logging.info(' - verification_key_f : %s',verification_key_f)
-        logging.info(' - out_pk_f : %s',out_pk_f)
-        logging.info(' - out_pk_format : %s',out_pk_format) 
-        logging.info(' - test_f : %s',self.test_f)
-        logging.info(' - benchmark_f : %s', benchmark_f)
-        logging.info(' - seed : %s', self.seed)
-        logging.info(' - snarkjs : %s', snarkjs)
-        logging.info(' - keep_f : %s', keep_f)
-        logging.info(' - n available GPUs : %s', self.n_gpu)
-        logging.info(' - n available CPUs : %s', get_nprocs_h())
-        logging.info(' - sort enable : %s', self.sort_en)
-        logging.info(' - write_table_en : %s', self.write_table_en)
-        logging.info(' - table_f : %s', self.write_table_f)
-        logging.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
-        logging.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
-        logging.info(' - zero knowledge enabled : %s', self.zk)
-        logging.info(' - N Constraints : %s', nVars)
-        logging.info(' - Domain Size : %s', domainSize)
-        logging.info(' - N Public : %s', nPublic)
-        logging.info('#################################### ')
+        self.logger.info('#################################### ')
+        self.logger.info('Initializing Groth prover with the following parameters :')
+        self.logger.info(' - curve : %s',curve)
+        self.logger.info(' - proving_key_f : %s', proving_key_f)
+        self.logger.info(' - verification_key_f : %s',verification_key_f)
+        self.logger.info(' - out_pk_f : %s',out_pk_f)
+        self.logger.info(' - out_pk_format : %s',out_pk_format) 
+        self.logger.info(' - test_f : %s',self.test_f)
+        self.logger.info(' - benchmark_f : %s', benchmark_f)
+        self.logger.info(' - seed : %s', self.seed)
+        self.logger.info(' - snarkjs : %s', snarkjs)
+        self.logger.info(' - keep_f : %s', keep_f)
+        self.logger.info(' - n available GPUs : %s', self.n_gpu)
+        self.logger.info(' - n available CPUs : %s', get_nprocs_h())
+        self.logger.info(' - sort enable : %s', self.sort_en)
+        self.logger.info(' - write_table_en : %s', self.write_table_en)
+        self.logger.info(' - table_f : %s', self.write_table_f)
+        self.logger.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
+        self.logger.info(' - compute first Mexp in GPU : %s', self.compute_first_mexp_gpu)
+        self.logger.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
+        self.logger.info(' - zero knowledge enabled : %s', self.zk)
+        self.logger.info(' - N Constraints : %s', self.nVars)
+        self.logger.info(' - Domain Size : %s', domainSize)
+        self.logger.info(' - N Public : %s', nPublic)
+        self.logger.info('#################################### ')
  
         if self.write_table_f:
-          logging.info('#################################### ')
-          logging.info('..')
+          self.logger.info('#################################### ')
+          self.logger.info('..')
           Tables = readU256DataFile_h(self.write_table_f.encode("UTF-8"), 
-                  int(nVars*2*6*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM), 
-                  int(nVars*2*5*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM))
-          logging.info('# Reading Tables (%s Bytes)...', Tables.shape)
-          logging.info('..')
-          logging.info('#################################### ')
+                  int(self.nVars*2*6*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM), 
+                  int(self.nVars*2*5*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM))
+          self.logger.info('# Reading Tables (%s Bytes)...', Tables.shape)
+          self.logger.info('..')
+          self.logger.info('#################################### ')
            
         if self.out_proving_key_f is not None:
              if self.out_proving_key_f.endswith('.json'):
@@ -376,25 +409,17 @@ class GrothProver(object):
         # Init CPU process
         self.init_p_CPU()
 
-        # Init Mexp process
-        self.init_p_Mexp()
+        if self.compute_last_mexp_gpu or self.compute_first_mexp_gpu:
+          # Init Mexp process
+          self.init_p_Mexp()
 
         if not start_server:
-           self.startProcesses(nVars)
+           self.startProcesses(self.nVars)
 
     def init_p_CPU(self):
         self.parent_conn_CPU, self.child_conn_CPU = Pipe()
 
     def init_p_Mexp(self):
-        self.parent_conn_Mexp = []
-        self.child_conn_Mexp = []
-        self.p_Mexp = []
-        for gpu_idx in range(self.n_gpu+1):
-           p_conn, c_conn = Pipe()
-           self.parent_conn_Mexp.append(p_conn)
-           self.child_conn_Mexp.append(c_conn)
-
-
         pk_bin = pkbin_get(self.pk,['nVars', 'nPublic', 'domainSize'])
 
         nVars = pk_bin[0][0]
@@ -427,38 +452,32 @@ class GrothProver(object):
 
         # EC reduce A, B2, B1 and C from nPublic+1 to end	
         self.dispatch_table_phase1 = buildDispatchTable( nbatches-1,
-                                         #self.ec_type_dict['C'][2]+1,
                                          n_els_ph1,
                                          self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
                                          nPublic+1, nVars,
                                          start_pidx=self.ec_type_dict['A'][2],
                                          start_gpu_idx=next_gpu_idx,
                                          start_stream_idx=first_stream_idx,
-                                         #ec_lable = self.ec_lable)
                                          ec_lable = ec_lable_ph1)
 
-        #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
         self.dispatch_table_phase1b = buildDispatchTable( nbatches-1,
-                                         #self.ec_type_dict['C'][2]+1,
                                          1,
                                          self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
                                          nPublic+1, nVars,
                                          start_pidx=0,
                                          start_gpu_idx=next_gpu_idx,
                                          start_stream_idx=first_stream_idx,
-                                         #ec_lable = self.ec_lable)
                                          ec_lable = np.asarray(['B2']))
+
 
         # EC reduce A, B2 and B1 from 0 to nPublic+1
         self.dispatch_table_phase2 = buildDispatchTable(1, 
-                                #self.ec_type_dict['B1'][2]+1,
                                 n_els_ph2,
                                 self.n_gpu, self.n_streams, nPublic+1,
                                 0, nPublic+1,
                                 start_pidx=self.ec_type_dict['A'][2],
                                 start_gpu_idx=next_gpu_idx,
                                 start_stream_idx=first_stream_idx,
-                                #ec_lable = self.ec_lable)
                                 ec_lable = ec_lable_ph2)
 
         self.batch_size_mexp_phase3 = self.batch_size
@@ -472,74 +491,162 @@ class GrothProver(object):
        
         # EC reduce hExps
         self.dispatch_table_phase3 = buildDispatchTable( nbatches, 1,
-                                         self.n_gpu, self.n_streams, self.batch_size_mexp_phase3-1,
+                                         1, self.n_streams, self.batch_size_mexp_phase3-1,
                                          0, domainSize-1,
                                          start_pidx=self.ec_type_dict['hExps'][2],
                                          ec_lable = self.ec_lable)
 
     def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape, pi_c2_eccf1_sh):
-        logging.info(' Launching Poly Process Client')
-        logging.info(' Evaluating QAP')
+        self.logger.info(' Launching Poly Process Client')
+        self.logger.info(' Evaluating QAP')
         pk = self.pk
-        #w = self.scl_array[:wnElems]
         w = np.frombuffer(w_sh, dtype=np.uint32).reshape(w_shape)
         pA_T = np.frombuffer(pA_T_sh, dtype=np.uint32).reshape(pA_T_shape)
         pB_T = np.frombuffer(pB_T_sh, dtype=np.uint32).reshape(pB_T_shape)
         pi_c2_eccf1 = np.frombuffer(pi_c2_eccf1_sh, dtype=np.uint32).reshape(-1,NWORDS_256BIT)
-        #print("ProcessServer : "+str(pk.shape[0]))
         start = time.time()
 
-        #ZField.set_field(MOD_FIELD)
         pk_bin = pkbin_get(pk,['nVars', 'domainSize', 'polsA', 'polsB','hExps'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
 
-        logging.info(' Process server - Evaluating Poly A...')
+        self.logger.info(' Process server - Evaluating Poly A...')
         np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FIELD))
-        logging.info(' Process server - Evaluating Poly B...')
+        self.logger.info(' Process server - Evaluating Poly B...')
         np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FIELD))
-        logging.info(' Process server - Completed Evaluating Poly B...')
+        self.logger.info(' Process server - Completed Evaluating Poly B...')
         end = time.time()
 
         start1 = time.time()
         if self.compute_ntt_gpu is False:
-          logging.info(' Process server - Calculate H...')
+          self.logger.info(' Process server - Calculate H...')
           ifft_params = ntt_build_h(self.pA_T.shape[0])
-          polH = ntt_interpolandmul_h(np.reshape(self.pA_T,-1),
-                                     np.reshape(self.pB_T,-1),
-                                     np.reshape(self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,-1), 2, MOD_FIELD)
+          polH = ntt_interpolandmul_h(
+                     np.reshape(self.pA_T,-1),
+                     np.reshape(self.pB_T,-1),
+                     np.reshape(
+            self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,
+                    -1
+                               ),
+                     2,
+                     MOD_FIELD)
 
         end1 = time.time()
 
         start2 = time.time()
 
-        if self.compute_last_mexp_gpu is False:
-          logging.info(' Process server - Starting Last Mexp...')
-          # vector needs to be power of two, so i add one last element
-          polH[-1] = np.asarray([0,0,0,0,0,0,0,0],dtype=np.uint32)
-          np.copyto(pi_c2_eccf1,
+        if self.compute_first_mexp_gpu is False:
+          self.logger.info(' Process server - Starting First Mexp...')
+          pk_bin2 = pkbin_get(self.pk,['A','B2','B1','C','nPublic'])
+          nPublic = pk_bin2[4][0]
+          np.copyto(self.pi_a_eccf1,
                     ec_jacreduce_h(
-                         np.reshape(polH[m:],-1),
-                         pk_bin[4][:m*NWORDS_256BIT*ECP_JAC_INDIMS],
+                         np.reshape(
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.r_scl] )),
+                                    -1),
+                         pk_bin2[0][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS],
                          MOD_GROUP, 1, 1, 1)
                     )
-          logging.info(' Process server - Completed Last Mexp...')
+          self.logger.info(' Process server - Mexp A Done... ')
+
+          np.copyto(self.pi_b_eccf2,
+                    ec2_jacreduce_h(
+                         np.reshape(
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.s_scl] )),
+                                    -1),
+                         pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS],
+                         MOD_GROUP, 1, 1, 1)
+                   )
+          self.logger.info(' Process server - Mexp B2 Done...')
+
+          np.copyto(self.pi_c_eccf1,
+                    ec_jacreduce_h(
+                         np.reshape(w[nPublic+1:nVars],-1),
+                         pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS],
+                         MOD_GROUP, 1, 1, 1)
+                   )
+          self.logger.info(' Process server - Mexp C Done...')
+
+          if self.zk:
+            np.copyto(self.pi_b1_eccf1,
+                    ec_jacreduce_h(
+                         np.reshape(
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.s_scl] )),
+                              -1),
+                         pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS],
+                         MOD_GROUP, 1, 1, 1)
+                    )
+            self.logger.info(' Process server - Mexp B1  Done...')
+
+        end2 = time.time()
+
+        self.t_GP['Mexp1'] = (end2 - start2)
+        self.logger.info(' Process server - Completed First Mexp...')
+
+        start3 = time.time()
+
+        if self.compute_last_mexp_gpu is False:
+          pk_bin2 = pkbin_get(self.pk,['delta_1'])
+          delta_1 = pk_bin2[0]
+          self.logger.info(' Process server - Starting Last Mexp...')
+          scalar_vector = np.concatenate((
+                                   np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                   polH[m:-1],
+                                   [self.s_scl],
+                                   [self.r_scl],
+                                   [self.neg_rs_scl]
+                                  ))
+          EP_vector =  np.concatenate((
+                                   self.pi_c_eccf1,
+                                   np.reshape(pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],(-1,NWORDS_256BIT)),
+                                   self.pi_a_eccf1,
+                                   self.pi_b1_eccf1,
+                                   np.reshape(delta_1, (-1, NWORDS_256BIT)) 
+                               ))
+          if self.zk == 0:
+             scalar_vector = scalar_vector[:-3]
+             EP_vector = EP_vector[:-3*ECP_JAC_INDIMS]
+
+          np.copyto(self.pi_c_eccf1,
+                      ec_jacreduce_h(
+                        np.reshape( scalar_vector, -1),
+                        np.reshape( EP_vector, -1),
+                        MOD_GROUP, 1, 1, 1)
+                    )
+          self.logger.info(' Process server - Completed Last Mexp...')
+          
         else:
-          logging.info(' Process server - Waiting for Mexp to be completed...')
+          self.logger.info(' Process server - Waiting for Mexp to be completed...')
 
           #write polH once MEXP is done (not before)
-          conn.recv()
+          if conn is not None:
+            conn.recv()
           if self.compute_ntt_gpu is False:
             np.copyto(w[:m-1], polH[m:-1])
-            logging.info(' Process server - Copying polH...')
+            self.logger.info(' Process server - Copying polH...')
   
-        end2 = time.time()
+        end3 = time.time()
+
         # t poly prep, t1, NTT t2 : last Mexp
-        conn.send([end-start, end1-start1, end2-start2])
-        logging.info(' Process server - Completed')
-        conn.close()
+        if conn is not None:
+          conn.send([end-start, end1-start1, end3-start3])
+          conn.close()
+        else:
+          self.t_GP['H'] = end1 - start1
+          self.t_GP['Mexp2'] = end3 - start3
+
+        self.logger.info(' Process server - Completed')
 
     def startGPServer(self):    
            self.port_first = 8192
@@ -548,17 +655,17 @@ class GrothProver(object):
            self.proof_repo = []
            pkbin_vars = pkbin_get(self.pk,['nVars','domainSize'])
            nVars = int(pkbin_vars[0][0])
-           logging.info('Launching GP Server')
+           self.logger.info('Launching GP Server')
            p = Process(target=self.startServer, args = (self.port_first,0))
            p.start()
            try:
               self.startServer(self.port_second, nVars)
            except:
-              logging.info('Exception occurred. Server stopped')
+              self.logger.info('Exception occurred. Server stopped')
               run(['killall', '-9', 'python3'])
 
     def startServer(self, port, nVars):    
-           logging.info('Launching GP Server')
+           self.logger.info('Launching GP Server')
            jsocket = json_socket.jsonSocket(port=port)
 
            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -567,15 +674,13 @@ class GrothProver(object):
            s.listen(1)
            print('Server listening on port ' +str(port) +' ready...')
            while True: # Accept connections from multiple clients
-               #logging.info('Waiting for client at port %s...', port)
                conn, addr = s.accept()
-               #logging.info('New connecton from address %s port %s', addr, port)
                msg = jsocket.receive_message(conn)
                if len(msg):
                  # Call some action and return results
                  parsed_dict = ast.literal_eval(json.loads(json.dumps(msg)))
                  if 'stop_server' in parsed_dict and parsed_dict['stop_server'] == 1:
-                    logging.info('Stopping server')
+                    self.logger.info('Stopping server')
                     os.kill(os.getppid(), signal.SIGTERM)
                     sys.exit(1)
                  elif 'is_alive' in parsed_dict:
@@ -587,7 +692,7 @@ class GrothProver(object):
 
                  elif 'stop_client' in parsed_dict:
                      self.stop_client.value = 1
-                     logging.info('Stopping client...')
+                     self.logger.info('Stopping client...')
                      conn.close()
 
                  elif 'status' in parsed_dict:
@@ -606,18 +711,28 @@ class GrothProver(object):
                      conn.close()
                      
                  elif 'witness_f' in parsed_dict and nVars==0:
-                     query = { 'witness_f' : parsed_dict['witness_f'], 'proof_f' : parsed_dict['proof_f'],
-                             'public_data_f' : parsed_dict['public_data_f'], 'verify_en' : parsed_dict['verify_en'], 'proof_id' : self.proof_id, 'result' : -1 }
-                     self.proof_id+=1
-                     logging.info('Request for new proof received in primary server')
-                     self.proof_repo.append(query)
+                     if self.active_client.value:
+                       self.logger.info("Proof ongoing. Discarding new request")
+                     else:
+                        query = {
+                              'witness_f' : parsed_dict['witness_f'],
+                              'proof_f' : parsed_dict['proof_f'],
+                              'public_data_f' : parsed_dict['public_data_f'],
+                              'verify_en' : parsed_dict['verify_en'],
+                              'proof_id' : self.proof_id,
+                              'result' : -1
+                             }
+                        self.proof_id+=1
+                        self.logger.info('Request for new proof received in primary server')
+                        self.proof_repo.append(query)
 
-                     p = json_socket.jsonSocket(port=self.port_second)
-                     p.send_message(query)
+                        p = json_socket.jsonSocket(port=self.port_second)
+                        p.send_message(query)
+
                      conn.close()
 
                  elif 'witness_f' in parsed_dict and nVars:
-                   logging.info('Request for new proof received in secondary server')
+                   self.logger.info('Request for new proof received in secondary server')
                    conn.close()
                    # Initialize CPU Process
                    self.startProcesses(nVars)
@@ -635,17 +750,20 @@ class GrothProver(object):
    
 
     def startProcesses(self, nVars):
-          logging.info('Starting Processes...')
-          self.p_CPU = \
-                      Process(
-                            target=self.pysnarkP_CPU,
-                               args = (
-                                      self.child_conn_CPU,
-                                      nVars,
-                                      self.scl_array_sh, self.scl_array.shape,
-                                      self.pA_T_sh,self.pA_T.shape,
-                                      self.pB_T_sh, self.pB_T.shape,
-                                      self.pi_c2_eccf1))
+            self.logger.info('Starting Processes...')
+            if self.n_gpu > 0:
+              self.p_CPU = \
+                        Process(
+                              target=self.pysnarkP_CPU,
+                                 args = (
+                                        self.child_conn_CPU,
+                                        nVars,
+                                        self.scl_array_sh, self.scl_array.shape,
+                                        self.pA_T_sh,self.pA_T.shape,
+                                        self.pB_T_sh, self.pB_T.shape,
+                                        self.pi_c2_eccf1))
+            else:
+              self.p_CPU = None
 
     def initECVal(self):
         np.copyto( 
@@ -691,15 +809,16 @@ class GrothProver(object):
                        (-1,NWORDS_256BIT)) )
 
 
-        self.init_ec_val = np.tile( np.asarray(
-                                                  [self.pi_a_eccf1, self.pi_b_eccf2, self.pi_b1_eccf1, self.pi_c_eccf1], 
-                                                  dtype=np.object), 
-                                  (self.n_gpu, self.n_streams, 1))
+        self.init_ec_val = np.tile( 
+                             np.asarray([ self.pi_a_eccf1,
+                                          self.pi_b_eccf2,
+                                          self.pi_b1_eccf1,
+                                          self.pi_c_eccf1], dtype=np.object), 
+                             (max(self.n_gpu,1), self.n_streams, 1))
 
 
     def __del__(self):
        release_h()
-       logging.shutdown()
 
     def read_witness_data(self):
        ## Open and parse witness data
@@ -729,21 +848,6 @@ class GrothProver(object):
                           [BigInt(c).as_uint256() for c in f]),(-1,NWORDS_256BIT))
                      )
 
-             #from txt to json
-             """
-             w_arr = []
-             with open(self.witness_f, 'r') as f:
-               for w in f:
-                  w_arr.append(w.rstrip())
-               w_json = json.dumps(w_arr, indent=4)
-             w_file = self.witness_f.replace('txt','json')
-             f = open(w_file, 'w')
-             print(w_json, file=f)
-             f.close()
-             del w_json
-             del w_arr
-             """
-
            elif self.witness_f.endswith('.bin'):
              np.copyto(
                 self.scl_array[:nVars],
@@ -757,24 +861,11 @@ class GrothProver(object):
              np.copyto(
                 self.scl_array[:nVars],
                 readWitnessShmem_h(nVars) )
-             """
-             if self.witness_f.endswith('.txt'):
-               w_file = self.witness_f.replace('txt','bin')
-             elif self.witness_f.endswith('.json'):
-               w_file = self.witness_f.replace('json','bin')
-
-             writeWitnessFile_h(np.reshape(self.scl_array,-1),self.w_file.encode("UTF-8"))
-             """
 
        else:
-          logging.error('Witness file %s doesn\'t exist', self.witness_f)
+          self.logger.error('Witness file %s doesn\'t exist', self.witness_f)
           sys.exit(1)
 
-       #self.sorted_scl_array_idx = \
-              #sortu256_idx_h(self.scl_array, sort_en)
-       #self.sorted_scl_array = \
-              #self.scl_array[self.sorted_scl_array_idx]
-       
     def load_pkdata(self):
        if self.proving_key_f.endswith('npz'):
           npzfile = np.load(self.proving_key_f)
@@ -815,15 +906,15 @@ class GrothProver(object):
           self.pk = pkbin_to_vars(pk_bin)
           del pk_bin
 
-       logging.info('')
-       logging.info('')
-       logging.info('#################################### ')
-       logging.info(' - nVars      : %s', self.pk['nVars'])
-       logging.info(' - nPublic    : %s', self.pk['nPublic'])
-       logging.info(' - domainBits : %s', self.pk['domainBits'])
-       logging.info('#################################### ')
-       logging.info('')
-       logging.info('')
+       self.logger.info('')
+       self.logger.info('')
+       self.logger.info('#################################### ')
+       self.logger.info(' - nVars      : %s', self.pk['nVars'])
+       self.logger.info(' - nPublic    : %s', self.pk['nPublic'])
+       self.logger.info(' - domainBits : %s', self.pk['domainBits'])
+       self.logger.info('#################################### ')
+       self.logger.info('')
+       self.logger.info('')
 
     def logTimeResults(self):
     
@@ -836,21 +927,21 @@ class GrothProver(object):
       self.t_GP['Eval'] = [round(self.t_GP['Eval'],4), round(100*self.t_GP['Eval']/self.t_GP['Proof'],2)] 
       self.t_GP['H'] = [round(self.t_GP['H'],4), round(100*self.t_GP['H']/self.t_GP['Proof'],2)] 
       self.t_GP['Proof'] = round(self.t_GP['Proof'],4)
-      logging.info('')
-      logging.info('')
-      logging.info('#################################### ')
-      logging.info('Total Time to generate proof : %s seconds', self.t_GP['Proof'])
-      logging.info('')
-      logging.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + ' %)')
-      logging.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + ' %)')
-      logging.info('------ Time Multi-exp.         : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + ' %)')
-      logging.info('------ Time Multi-exp 1.         : %s ', str(self.t_GP['Mexp1'][0]) + ' sec.(' + str(self.t_GP['Mexp1'][1]) + ' %)')
-      logging.info('------ Time Multi-exp 2.         : %s ', str(self.t_GP['Mexp2'][0]) + ' sec.(' + str(self.t_GP['Mexp2'][1]) + ' %)')
-      logging.info('------ Time Poly Calculation   : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + ' %)')
-      logging.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + ' %)')
-      logging.info('#################################### ')
-      logging.info('')
-      logging.info('')
+      self.logger.info('')
+      self.logger.info('')
+      self.logger.info('#################################### ')
+      self.logger.info('Total Time to generate proof : %s seconds', self.t_GP['Proof'])
+      self.logger.info('')
+      self.logger.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + ' %)')
+      self.logger.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + ' %)')
+      self.logger.info('------ Time Multi-exp          : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + ' %)')
+      self.logger.info('------ * Time Multi-exp 1      : %s ', str(self.t_GP['Mexp1'][0]) + ' sec.(' + str(self.t_GP['Mexp1'][1]) + ' %)')
+      self.logger.info('------ * Time Multi-exp 2      : %s ', str(self.t_GP['Mexp2'][0]) + ' sec.(' + str(self.t_GP['Mexp2'][1]) + ' %)')
+      self.logger.info('------ Time Poly Calculation   : %s ', str(self.t_GP['Eval'][0]) + ' sec. (' + str(self.t_GP['Eval'][1]) + ' %)')
+      self.logger.info('------ Time Compute Poly H     : %s ', str(self.t_GP['H'][0]) + 'sec. (' + str(self.t_GP['H'][1]) + ' %)')
+      self.logger.info('#################################### ')
+      self.logger.info('')
+      self.logger.info('')
 
     def proof(self, witness_f, out_proof_f , out_public_f, verify_en=0):
 
@@ -865,6 +956,10 @@ class GrothProver(object):
       self.t_GP = {}
       self.stop_client.value = 0
 
+      if self.active_client.value :
+          return
+      self.active_client.value = 1
+
       if (self.verify_en):
         self.verify = 0
       else :
@@ -872,18 +967,18 @@ class GrothProver(object):
 
       self.initECVal()
 
-      logging.info('#################################### ')
-      logging.info("Starting new proof...")
-      logging.info(' - out_proof_f : %s',out_proof_f)
-      logging.info(' - out_public_f : %s',out_public_f)
-      logging.info(' - witness_f : %s',witness_f)
-      logging.info(' - verify_en : %s', verify_en)
-      logging.info(' - batch_size : %s', self.batch_size)
-      logging.info(' - gpus used : %s', self.n_gpu)
-      logging.info(' - streams used: %s', self.n_streams)
-      logging.info('#################################### ')
-      logging.info('')
-      logging.info('')
+      self.logger.info('#################################### ')
+      self.logger.info("Starting new proof...")
+      self.logger.info(' - out_proof_f : %s',out_proof_f)
+      self.logger.info(' - out_public_f : %s',out_public_f)
+      self.logger.info(' - witness_f : %s',witness_f)
+      self.logger.info(' - verify_en : %s', verify_en)
+      self.logger.info(' - batch_size : %s', self.batch_size)
+      self.logger.info(' - gpus used : %s', self.n_gpu)
+      self.logger.info(' - streams used: %s', self.n_streams)
+      self.logger.info('#################################### ')
+      self.logger.info('')
+      self.logger.info('')
 
       self.t_GP['init'] = time.time() - start
       ##### Starting proof
@@ -891,13 +986,14 @@ class GrothProver(object):
       self.gen_proof()
       
       if self.stop_client.value:
+          self.active_client.value = 0
           self.verify = -2
           return self.verify
 
       self.t_GP['Proof'] = time.time() - start
 
-      logging.info(" Proof completed" )
-      logging.info('#################################### ')
+      self.logger.info(" Proof completed" )
+      self.logger.info('#################################### ')
       
       self.logTimeResults()
 
@@ -912,6 +1008,7 @@ class GrothProver(object):
 
       #copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
 
+      self.active_client.value = 0
       return self.verify
 
     def test_results(self):
@@ -919,7 +1016,7 @@ class GrothProver(object):
       snarkjs = {}
       snarkjs['verify'] = 0
       if self.test_f is not None:
-        logging.info("Calling snarkjs proof to compare computed proving and verification keys")
+        self.logger.info("Calling snarkjs proof to compare computed proving and verification keys")
         # Write rand json
         randout_dict={}
         randout_dict['r'] = str(BigInt.from_uint256(self.r_scl).as_long())
@@ -933,26 +1030,26 @@ class GrothProver(object):
         pd_r = pysnarks_compare(self.out_public_f, snarkjs['pd_f'], None, 0)
         proof_r = p_r and pd_r
         if proof_r:
-          logging.info("Compared keys are equal")
+          self.logger.info("Compared keys are equal")
         elif p_r:
-          logging.info("Verification keys are different")
+          self.logger.info("Verification keys are different")
         elif pd_r:
-          logging.info("Proving keys are different")
+          self.logger.info("Proving keys are different")
         else:
-          logging.info("Verification and Proving keys are different")
+          self.logger.info("Verification and Proving keys are different")
 
       if self.verify_en:
-        logging.info('#################################### ')
-        logging.info("Calling snarkjs verify to verify proof ....")
-        logging.info("")
+        self.logger.info('#################################### ')
+        self.logger.info("Calling snarkjs verify to verify proof ....")
+        self.logger.info("")
         snarkjs = self.launch_snarkjs("verify")
         if snarkjs['verify'] == 0:
-          logging.info("Verification SUCCEDED")
+          self.logger.info("Verification SUCCEDED")
           self.verify = 1
         else:
-          logging.info("Verification FAILED")
+          self.logger.info("Verification FAILED")
           self.verify = 0
-        logging.info('#################################### ')
+        self.logger.info('#################################### ')
 
       return
 
@@ -973,14 +1070,13 @@ class GrothProver(object):
                witness_file = self.witness_f
                proving_key_file = self.proving_key_f.replace('.json','_cpy.json')
             proving_key_file = self.keep_f + '/' + proving_key_file.rsplit('/', 1)[1]
-            #proving_key_file = self.keep_f + proving_key_file
             pk_dict = pkvars_to_json(FMT_EXT,EC_T_AFFINE, self.pk)
             pk_json = json.dumps(pk_dict, indent=4, sort_keys=True)
             f = open(proving_key_file, 'w')
             print(pk_json, file=f)
             f.close()
           else:
-            logging.error(' Witness file %s needs to be .json', self.witness_f)
+            self.logger.error(' Witness file %s needs to be .json', self.witness_f)
             sys.exit(1)
 
           if self.test_f is not None:
@@ -998,7 +1094,7 @@ class GrothProver(object):
           if self.verification_key_f is not None and self.verification_key_f.endswith('.json') :
              verification_key_file = self.verification_key_f
           else :
-             logging.error(' To launch snarkjs, verification file %s needs to be a json file', self.verification_key_f)
+             self.logger.error(' To launch snarkjs, verification file %s needs to be a json file', self.verification_key_f)
              sys.exit(1)
         
           snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
@@ -1006,88 +1102,9 @@ class GrothProver(object):
         return snarkjs
 
     def gen_proof(self ):
-        """
-          public_signals, pi_a_eccf1, pi_b_eccf2, pi_c_eccf1 
 
-            inputs  : Witness from file 
-            Outputs : Bin witnes (2)
-
-          1 - Read all witness data -> CPU. When batch samples available,
-                  start process 3
-
-          ------------------------
-            inputs  : Witness (1)
-            Outputs : pi's (final result),  pi_c (4).
-
-          2.1 - get witness batch  
-          2.2 - sort witness1 batch [0-nVars] -> CPU
-          2.3 - EC multi expo with batch A/B1/B2 and witnesss1 -> pi_a, pi_b, pib -> GPU
-          2.4 - sort witness2 batch [nPublic+1,nVars]
-          2.5 - EC multi expo with batch C and witnesss2 -> pi_c
-          ------------------------
-       
-            inputs  : pols from file
-                      witness (1). But reqiures all witness read
-            Outputs : pX_T (I can't start 4 until all poool is availlable)
-
-          3.1  Evaluate pols pA, pB and pC. Complete poly needs to be evaluated
-                 before starting FFTs. CPU cores can work in this. Ideally,
-                 multiple cores help evaluate pA. When it is done, repeat for pB,...
-                 polsA   ----> polA_T  ----> delete polsA. I need mutexes. Modify 
-                 C routine to do this
-          ------------------------
-
-            inputs  : pX_T (3)A
-            output  : pH at the end of process (5). 
-
-          4.1   Get polA_T, polB_T and polB_T batch
-          4.2   perform 3xIFFT, 1 poly MUL and 1 poly SUB. Dedicate GPUs to do partial IFFT
-                and CPU to combine results to do 3-step fft. Complete  IFFT-A, IFFT-B, IFFT-C,
-                 FFT-A, FFT-B, FFT-AxFFT-B, IFFTAxB, SUB and finaly get pH
-          -----------------------
-            
-            Input : pH (4), hExps (file), pi_c (2)
-            Output : pi_c
-
-          5.1 - EC multi expo with batch hExps and shorted pH -
- 
-         
-         ------
-          
-            1 1 1 1 1 1 1 1 1  (CPU)
-                  2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 (CPU/GPU ecbn/ec2bn)
-                            3 3 3 3 3 3 pA done 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 (CPU)
-                                               StartIFFT PA 4 4 4 4 4 4 4 4 4 4 4 4 PH Done (GPU Zpoly)
-                                                                                     5 5 5 5 5 5 5 5 5 5 5 5 5 5 (CPU/GPU ecbn/ec2bn) 
-
-
-
-        """
-        ######################
-        # Beginning of P1 - Read Witness
-        ######################
-        start = time.time()
-        # Read witness info
-        logging.info(' Reading Witness...')
-        self.read_witness_data()
-
-        end = time.time()
-        self.t_GP['Read_W'] = end - start
-       
-        start = time.time()
-        self.p_CPU.start()
-        self.t_GP['Eval'] = time.time()-start
- 
-        ######################
-        # Beginning of P2 
-        #   - Get witness batch, sort and EC Multiexp
-        ######################
-        start = time.time()
-
-        ZField.set_field(MOD_FIELD)
-
+        # Intialize r & s
         if self.zk:
-          # Init r and s scalars
           np.copyto(
                 self.r_scl,
                 BigInt(
@@ -1117,13 +1134,42 @@ class GrothProver(object):
                              np.reshape(r_mont, -1),
                              np.reshape(self.s_scl, -1), MOD_FIELD))
 
-        logging.info('#################################### ')
-        logging.info(' Random numbers :')
-        logging.info(' - r : %s',str(BigInt.from_uint256(self.r_scl).as_long()) )
-        logging.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
-        logging.info('#################################### ')
+        self.logger.info('#################################### ')
+        self.logger.info(' Random numbers :')
+        self.logger.info(' - r : %s',str(BigInt.from_uint256(self.r_scl).as_long()) )
+        self.logger.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
+        self.logger.info('#################################### ')
 
-        logging.info(' Starting First Mexp...')
+
+        ######################
+        # Beginning of P1 - Read Witness
+        ######################
+        start = time.time()
+        # Read witness info
+        self.logger.info(' Reading Witness...')
+        self.read_witness_data()
+
+        end = time.time()
+        self.t_GP['Read_W'] = end - start
+        self.t_GP['Eval'] = 0
+       
+        start = time.time()
+        if self.p_CPU is not None:
+          self.p_CPU.start()
+          self.t_GP['Eval'] = time.time()-start
+        else:
+         self.pysnarkP_CPU(None,
+                           self.nVars,
+                           self.scl_array_sh, self.scl_array.shape,
+                           self.pA_T_sh,self.pA_T.shape,
+                           self.pB_T_sh, self.pB_T.shape,
+                           self.pi_c2_eccf1)
+
+        ######################
+        # Beginning of P2 
+        #   - Get witness batch, sort and EC Multiexp
+        ######################
+        start = time.time()
 
         pk_bin = pkbin_get(self.pk,['nPublic', 'domainSize'])
         nPublic = pk_bin[0][0]
@@ -1131,10 +1177,10 @@ class GrothProver(object):
         self.public_signals = np.copy(self.scl_array[1:nPublic+1])
 
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps','delta_1'])
-
  
-        #TODO : trying to separate  G2 MExp from G1 Mexp in phase 1 to check if some time is gained
-        self.findECPointsDispatch(
+        if self.compute_first_mexp_gpu:
+          self.logger.info(' Starting First Mexp...')
+          self.findECPointsDispatch(
                                   self.dispatch_table_phase1b,
                                   self.batch_size_mexp_phase1,
                                   self.dispatch_table_phase1b.shape[0]-1, pk_bin,
@@ -1142,47 +1188,43 @@ class GrothProver(object):
                                   change_s_scl_idx = [self.ec_type_dict['B2'][2]],
                                   sort_en=self.sort_en)
 
-        if self.zk:
+          if self.zk:
               n_els = self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2])
-        else:
+          else:
               n_els = self.dispatch_table_phase1.shape[0]-2
 
-        self.findECPointsDispatch(
+          self.findECPointsDispatch(
                                   self.dispatch_table_phase1,
                                   self.batch_size_mexp_phase1,
-                                  #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]+1), pk_bin,
-                                  #self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2]), pk_bin,
                                   n_els, pk_bin,
-                                  #change_s_scl_idx = [self.ec_type_dict['B2'][2], self.ec_type_dict['B1'][2]],
                                   change_s_scl_idx = [self.ec_type_dict['B1'][2]],
                                   change_r_scl_idx = [self.ec_type_dict['A'][2]],
                                   sort_en=self.sort_en)
 
-        if self.stop_client.value:
-            self.p_CPU.terminate()
-            self.p_CPU.join()
-            logging.info('Client stopped...')
-            return
+          if self.stop_client.value and self.p_CPU is not None:
+              self.p_CPU.terminate()
+              self.p_CPU.join()
+              self.logger.info('Client stopped...')
+              return
 
-        #print(self.dispatch_table_phase2, self.dispatch_table_phase2.shape[0]+1)
-        self.findECPointsDispatch(
+          self.findECPointsDispatch(
                              self.dispatch_table_phase2,
                              nPublic+2,
                              self.dispatch_table_phase2.shape[0]+1, pk_bin,
                              sort_en = self.sort_en)
 
-        if self.stop_client.value:
-            self.p_CPU.terminate()
-            self.p_CPU.join()
-            logging.info('Client stopped...')
-            return
+          if self.stop_client.value and self.p_CPU is not None:
+              self.p_CPU.terminate()
+              self.p_CPU.join()
+              self.logger.info('Client stopped...')
+              return
 
-        # Assign collected values to pi's
-        self.assignECPvalues(compute_ECP=False)
-        logging.info(' First Mexp completed...')
+          # Assign collected values to pi's
+          self.assignECPvalues(compute_ECP=False)
+          self.logger.info(' First Mexp completed...')
 
-        end = time.time()
-        self.t_GP['Mexp1'] = (end - start)
+          end = time.time()
+          self.t_GP['Mexp1'] = (end - start)
 
         ######################
         # Beginning of P3 and P4
@@ -1194,14 +1236,15 @@ class GrothProver(object):
         if self.compute_last_mexp_gpu:
           self.parent_conn_CPU.send([])
 
-        t = self.parent_conn_CPU.recv()
-        self.t_GP['Eval'] += t[0]
-        self.p_CPU.terminate()
-        self.p_CPU.join()
+        if self.p_CPU is not None:
+          t = self.parent_conn_CPU.recv()
+          self.p_CPU.terminate()
+          self.p_CPU.join()
+          self.t_GP['Eval'] += t[0]
 
         if self.compute_ntt_gpu:
           self.t_GP['H'] = self.calculateH()
-        else:
+        elif self.p_CPU is not None:
           self.t_GP['H'] = t[1]
 
         ######################
@@ -1211,7 +1254,7 @@ class GrothProver(object):
         start = time.time()
 
         if self.compute_last_mexp_gpu:
-           logging.info(' Starting Last Mexp...')
+           self.logger.info(' Starting Last Mexp...')
            self.findECPointsDispatch(
                                   self.dispatch_table_phase3,
                                   self.batch_size_mexp_phase3,
@@ -1222,57 +1265,14 @@ class GrothProver(object):
         
            self.assignECPvalues(compute_ECP=True)
         else:
-           self.t_GP['Mexp2'] = t[2]
-           self.reduceLastMexp(pk_bin[5])
+           if self.p_CPU is not None:
+             self.t_GP['Mexp2'] = t[2]
 
         end = time.time()
-        self.t_GP['Mexp2'] = (end - start)
+        self.t_GP['Mexp2']+= (end - start)
      
         return 
  
-    def reduceLastMexp(self, delta):
-       EC_C_idx = self.ec_type_dict['C'][4]
-
-       a5 = ec_jacaddreduce_h(
-                           np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
-                           MOD_GROUP,
-                           1,   # to affine
-                           1,   # Add z coordinate to inout
-                           0)   # strip z coordinate from affine result
-       if self.zk:
-           a1 = ec_jacscmul_h(
-                 np.reshape(self.s_scl,-1),
-                 np.reshape(self.pi_a_eccf1,-1),
-                 MOD_GROUP,1)
-
-           a2 = ec_jacscmul_h(
-                 np.reshape(self.r_scl,-1),
-                 np.reshape(self.pi_b1_eccf1,-1),
-                 MOD_GROUP,1)
-
-           a3 = ec_jacscmul_h(
-                 np.reshape(self.neg_rs_scl,-1),
-                 np.reshape(delta,-1),
-                 MOD_GROUP,1)
-
-           a4 = np.concatenate((self.pi_c2_eccf1,
-                                [ECC.one[ZUtils.FRDC].as_uint256()]))
-
-
-           a = np.concatenate((a1,a2,a3,a4,a5))
-
-           np.copyto(
-                    self.pi_c_eccf1,
-                    ec_jacaddreduce_h(
-                                      np.reshape(a,-1),
-                                      MOD_GROUP,
-                                      1,   # to affine
-                                      0,   # Add z coordinate to input
-                                      1)   # strip z coordinate from affine result
-                    )
-       else:
-           np.copyto(
-                   self.pi_c_eccf1, a5[:2])
 
     def assignECPvalues(self, compute_ECP=False):
 
@@ -1332,40 +1332,6 @@ class GrothProver(object):
             elif stream_id == 0:
               ecp = ec_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
 
-            """
-            # Debug code to test result
-            enable=0
-            if enable:
-              total_samples = int(ecp.shape[0]/3)
-              offset = int((int(in_v.shape[0]/3) - K.shape[0] + 1)/128)
-              first_v_sample = int((int(in_v.shape[0]/3) - K.shape[0] + 1)%128)
-              
-              start_idx = offset
-              n_samples = total_samples - start_idx
-              #p1 = ec_jacscmul_h(in_v[start_idx:start_idx+n_samples].reshape(-1), in_v[total_samples+2*start_idx:total_samples+2*(start_idx+n_samples)].reshape(-1),MOD_GROUP, add_last=1)
-              #p1 = ec_jac2aff_h(p1.reshape(-1),MOD_GROUP)
-              #r1 = all(np.concatenate(p1 == ecp[3*start_idx:3*(start_idx+n_samples)]))
-              p = []
-              p.append(ecp[start_idx*3:start_idx*3+3])
-              #p_ec = ECC.from_uint256(p[-1], in_ectype=2,out_ectype=2,reduced=True)[0]
-              for idx in range(start_idx+1,total_samples):
-                 p.append(ec_jacadd_h(p[-1].reshape(-1), ecp[3*idx:3*idx+3].reshape(-1), MOD_GROUP))
-                 #p1_ec = ECC.from_uint256(p1[3*idx:3*idx+3], in_ectype=2,out_ectype=2,reduced=True)[0]
-                 #p_ec = p_ec + p1_ec
-                 #pr_ec = ECC.from_uint256(p[-1], in_ectype=1,out_ectype=2,reduced=True)[0]
-                 #if p_ec != pr_ec:
-                     #printf(idx)
-                     #break
-              p2 = ec_jac2aff_h(np.reshape(np.asarray(p[-1]),-1),MOD_GROUP)
-              #a = ECC.from_uint256(p2,in_ectype=2, out_ectype=2, reduced=True)
-              #b = [x.extend().as_str() for x in a]
-              #j = json.dumps(b)
-              #f = open('../../circuits/pib1_t2.json', 'w')
-              #print(j,file=f)
-              #f.close()
-            """
-                
-
             if ec2:
               return ecp[0:6], t
             else:
@@ -1381,11 +1347,6 @@ class GrothProver(object):
           gpu_id = p[3]
           stream_id = p[4]
           result, t = cuda_ec128.streamSync(gpu_id,stream_id)
-          """
-          print("Results : gpu_id : "+str(gpu_id) + " stream_id : "+ str(stream_id) + " ec2 : " + str(step==4))
-          print("Results prev")
-          print(self.init_ec_val[gpu_id][stream_id][pidx])
-          """
           if step==4:
              self.init_ec_val[gpu_id][stream_id][pidx] =\
                             ec2_jac2aff_h(
@@ -1398,12 +1359,6 @@ class GrothProver(object):
                               result.reshape(-1),
                               MOD_GROUP,
                               strip_last=1) 
-          #self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
-          """
-          print("Results after")
-          print(self.init_ec_val[gpu_id][stream_id][pidx])
-          print("\n\n\n")
-          """
 
     def init_EC_P(self, batch_size):
        nsamples = np.product(get_shfl_blockD(batch_size))
@@ -1515,16 +1470,12 @@ class GrothProver(object):
               step == 4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
 
 
-          """
-          result = ec_jacreduce_h(np.reshape(EC_P[ecidx][:nsamples],-1),
-                  np.reshape(EC_P[ecidx][nsamples:],-1), MOD_GROUP, 1, 1, 1)
-          """
           if stream_id == 0:
              self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
              try:
                cuda_ec128.streamDel(gpu_id, stream_id)
              except ValueError:
-               logging.error('Exception occurred when getting EC results. Exiting program...')
+               self.logger.error('Exception occurred when getting EC results. Exiting program...')
                sys.exit(1)
                
           else :
@@ -1539,12 +1490,14 @@ class GrothProver(object):
                  try:
                     self.getECResults(pending_dispatch_table)
                  except ValueError:
-                    logging.error('Exception occurred when getting EC results. Exiting program...')
+                    self.logger.error('Exception occurred when getting EC results. Exiting program...')
                     sys.exit(1)
                  pending_dispatch_table = []
 
           if self.stop_client.value:
-              return
+             # Collect final results
+             self.getECResults(pending_dispatch_table)
+             return
 
        # Collect final results
        self.getECResults(pending_dispatch_table)
@@ -1621,20 +1574,16 @@ class GrothProver(object):
         pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
-        """
-        pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-        pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-        """
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
 
         start = time.time()
-        logging.info(' Calculating H...')
+        self.logger.info(' Calculating H...')
 
         ifft_params = ntt_build_h(self.pA_T.shape[0])
 
         if self.n_bits_roots < ifft_params['levels']:
-          logging.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
+          self.logger.error('Insufficient number of roots in ' + self.roots_f + 'Required number of roots is '+ str(1<< ifft_params['levels']))
           sys.exit(1)
     
         # TEST Vectors

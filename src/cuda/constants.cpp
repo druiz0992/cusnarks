@@ -129,6 +129,12 @@ static const uint32_t OneMont[] = {
          3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // 1 group
          1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // 1 field
 };
+static const uint32_t OneMont2[] = {
+         3314486685, 3546104717, 4123462461,  175696680, 2021213740, 1718526831, 2584207151,  235567041,    // 1 group
+         0, 0, 0, 0,0,0,0,0,
+         1342177275, 2895524892, 2673921321,  922515093, 2021213742, 1718526831, 2584207151,  235567041,   // 1 field
+         0, 0, 0, 0,0,0,0,0
+};
 
 
 // Group
@@ -5409,6 +5415,10 @@ const uint32_t * CusnarksOneMontGet(uint32_t pidx)
   return &OneMont[pidx*NWORDS_256BIT];
 }
 
+const uint32_t * CusnarksOneMont2Get(uint32_t pidx)
+{
+  return &OneMont2[pidx*NWORDS_256BIT];
+}
 const uint32_t * CusnarksEcbn128ParamsGet(void)
 {
   return ecbn128_params_init;

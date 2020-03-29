@@ -46,9 +46,11 @@
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
+#define TRANSPOSE_BLOCK_SIZE  (32)
+#define U256_BSELM  (8)
 #define NBITS_BYTE (8)
 #define EC_JACREDUCE_TABLE_LEN (256)
-#define EC_JACREDUCE_BATCH_SIZE (1<<5)
+#define EC_JACREDUCE_BATCH_SIZE (U256_BSELM<<2)
 #define EC_JACREDUCE_FLAGS_INIT   (1)
 #define EC_JACREDUCE_FLAGS_FINISH (1<<1)
 #define EC_JACREDUCE_FLAGS_REDUCTION (1<<2)
@@ -73,7 +75,6 @@
 
 #define WITNESS_HEADER_LEN_NWORDS (WITNESS_HEADER_W_OFFSET_NWORDS)
 
-#define U256_BSELM  (8)
 #define WARP_SIZE  (32)
 #define WARP_HALF_SIZE (16)
 #define WARP_DOUBLE_SIZE_NBITS (6)
@@ -534,6 +535,7 @@ typedef struct{
   uint32_t *scl;
   uint32_t *x;
   uint32_t n;
+  uint32_t ec2;
   uint32_t *ec_table;
   uint32_t pidx;
   uint32_t max_threads;
@@ -551,6 +553,7 @@ typedef struct{
   t_uint64 offset;
   uint32_t *ec_table;
   uint32_t n_words;
+  uint32_t ec2;
 
 }ec_table_desc_t;
 
