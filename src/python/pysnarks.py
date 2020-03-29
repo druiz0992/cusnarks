@@ -25,7 +25,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : pysnarks
+// File name  : pysnasks: 
 //
 // Date       : 11/07/2019
 //
@@ -43,6 +43,7 @@ import argparse
 import os
 import sys
 import time
+import ast
 from subprocess import call
 
 from groth_prover import *
@@ -53,6 +54,7 @@ CUMODE_SETUP  = 0
 CUMODE_PROOF  = 1
 
 PORT = 8192
+PORT2 = 8193
 
 sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
@@ -88,9 +90,13 @@ def init():
     opt['out_proving_key_f'] = None
     opt['verify'] = 0
     opt['batch_size'] = 20
-    opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),2)
+    opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),4)
     opt['max_streams'] = get_nstreams()
     opt['start_server'] = 1
+    opt['reserved_cpus'] = 0
+    opt['list'] = 1
+    opt['table_f'] = None
+    opt['zero_knowledge']=1
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -202,6 +208,29 @@ def init():
     parser.add_argument(
        '-stop_server', '--stop_server', required=False)  
 
+    help_str = 'Stop proof client' 
+    parser.add_argument(
+       '-stop_client', '--stop_client', required=False)  
+
+    help_str = 'Is proof server alive' 
+    parser.add_argument(
+       '-alive', '--is_alive', required=False)  
+
+    help_str = 'Return last N proof results ' + str(opt['list']) 
+    parser.add_argument(
+       '-l', '--list', required=False)  
+
+    help_str = 'Reserved N CPUs' + str(opt['reserved_cpus'])
+    parser.add_argument(
+       '-r_cpus', '--reserved_cpus', type=int, help=help_str, required=False)  
+
+    help_str = 'Output Table File. Default : ' +str(opt['table_f'])
+    parser.add_argument(
+       '-t', '--table_f', type=str, help=help_str, required=False)  
+
+    help_str = 'Zero Knowledge Enabled. Default : ' + str(opt['zero_knowledge'])
+    parser.add_argument(
+       '-zk', '--zero_knowledge', type=int, help=help_str, required=False)  
 
     return opt, parser
 
@@ -241,10 +270,40 @@ def run(opt, parser):
     if args.stop_server is not None :
       if is_port_in_use(PORT):
           query = { 'stop_server' : 1 }
-          jsocket = jsonSocket()
+          jsocket = jsonSocket(port = PORT)
           result = jsocket.send_message(query)
           print("Stopping proof server")
       return
+
+    if args.stop_client is not None :
+      if is_port_in_use(PORT):
+          query = { 'stop_client' : 1 }
+          jsocket = jsonSocket()
+          result = jsocket.send_message(query)
+          print("Stopping proof client")
+      return
+
+    if args.is_alive is not None :
+      if is_port_in_use(PORT2):
+          query = { 'is_alive' : 1 }
+          jsocket = jsonSocket(port = PORT2)
+          result = jsocket.send_message(query)
+          print(result)
+          return 1
+      else: 
+        return 0
+
+    if args.list is not None:
+        opt['list'] = args.list
+        if is_port_in_use(PORT):
+            query = {'list' : opt['list']}
+            jsocket = jsonSocket()
+            result = jsocket.send_message(query)
+            print(result)
+            return 1
+        else:
+          return 0
+
 
     if args.mode != "s" and args.mode != 'setup' and \
         args.mode != 'p' and args.mode != 'proof' :
@@ -263,6 +322,13 @@ def run(opt, parser):
         else:
            opt['verification_key_f'] = opt['data_f'] + args.verification_key
 
+    if args.table_f is not None:
+        if '/' in args.table_f:
+           opt['table_f'] = args.table_f
+        else:
+           opt['table_f'] = opt['data_f'] + args.table_f
+
+
     if args.seed is not None:
          opt['seed'] = args.seed
 
@@ -273,6 +339,9 @@ def run(opt, parser):
          opt['debug_f'] = None
     else:
          opt['debug_f'] = opt['debug_f']
+
+    if args.reserved_cpus is not None:
+         opt['reserved_cpus'] = args.reserved_cpus
 
 
     if args.mode == 's' or args.mode == 'setup':
@@ -317,7 +386,7 @@ def run(opt, parser):
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
-                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'])
+                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'], write_table_f=opt['table_f'])
       
       GS.setup()
 
@@ -357,32 +426,44 @@ def run(opt, parser):
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
     
+      if args.zero_knowledge is not None:
+         opt['zero_knowledge'] = args.zero_knowledge
+
       if args.start_server is not None:
          opt['start_server'] = args.start_server
 
       if not is_port_in_use(PORT) :
           start = time.time()
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
-                      out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
+                      out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
+                      n_streams=opt['max_streams'], start_server=opt['start_server'],
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], write_table_f=opt['table_f'], zk=opt['zero_knowledge'])
           end = time.time() - start
           print("GP init : "+str(end))
 
           if opt['start_server']:
               GP.startGPServer()
           else:
-             GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], batch_size=opt['batch_size'], verify_en=opt['verify'],
-                      n_gpus=opt['max_gpus'], n_streams=opt['max_streams'])
+             GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'])
+                      
 
       else :
           query = { 'witness_f' : opt['witness_f'], 'proof_f' : opt['proof_f'],
                     'public_data_f' : opt['public_data_f'],
-                    'batch_size' : opt['batch_size'], 'verify_en' : opt['verify'],
-                    'n_gpus' : opt['max_gpus'], 'n_streams' : opt['max_streams'] }
-          jsocket = jsonSocket()
-          result = jsocket.send_message(query)
-          print(result)
+                    'verify_en' : opt['verify'] }
 
+          jsocket = jsonSocket()
+          jsocket.send_message(query)
+          query = {'list' : -1}
+          jsocket = jsonSocket()
+          while(True):
+            time.sleep(5)
+            result = jsocket.send_message(query)
+            result_dict = ast.literal_eval(result)
+            if result_dict['result'] != -1:
+                break
+
+          print(result)
 
 def isOpen(ip,port):
    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -65,9 +65,14 @@ IF CUDA_DEF:
              self.in_size = in_len * sizeof(ct.uint32_t) * ct.NWORDS_256BIT
           if out_size == 0:
              self.out_size = self.out_dim * sizeof(ct.uint32_t) *ct.NWORDS_256BIT
- 
+
+      def elapsedTime(self):
+          return self._cusnarks_ptr.elapsedTime()
+
       def kernelLaunch(self, np.ndarray[ndim=2, dtype=np.uint32_t] in_vec, dict config, dict params, ct.uint32_t gpu_id=0,
                        ct.uint32_t stream_id=0, ct.uint32_t n_kernels=1):
+          cdef double start_k = self._cusnarks_ptr.elapsedTime()
+          cdef double end_k
           cdef ct.uint32_t i=0
           cdef ct.vector_t out_v
           cdef ct.vector_t in_v
@@ -194,7 +199,10 @@ IF CUDA_DEF:
             else:
               kparams[i].as_mont = 1
 
+          end_k = self._cusnarks_ptr.elapsedTime() - start_k
+
           cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
+          start_k = self._cusnarks_ptr.elapsedTime()
           cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
 
           if stream_id == -1:  
@@ -202,7 +210,8 @@ IF CUDA_DEF:
 
           free(kconfig)
   
-          return np.copy(np.asarray(kdata).reshape(-1,in_vec.shape[1])), exec_time
+          end_k = end_k + self._cusnarks_ptr.elapsedTime() - start_k
+          return np.copy(np.asarray(kdata).reshape(-1,in_vec.shape[1])), exec_time + end_k
 
       def streamDel(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
           self._cusnarks_ptr.streamDel(gpu_id, stream_id)
@@ -401,7 +410,7 @@ def subm_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dty
         return out_vec
 
 def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.t_uint64 astride, ct.t_uint64 rstride, ct.int32_t direction, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef ct.uint32_t L = int(np.log2(len(in_roots)))
@@ -412,12 +421,12 @@ def ntt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_h(&in_A_flat[0], &in_roots_flat[0], L, pidx)
+      uh.cntt_h(&in_A_flat[0], &in_roots_flat[0], L, astride, rstride, direction,pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
 def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t fmat, ct.uint32_t pidx):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.t_uint64 rstride, ct.uint32_t fmat, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef ct.uint32_t L = int(np.log2(len(in_roots)))
@@ -428,7 +437,7 @@ def intt_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], fmat, L, pidx)
+      uh.cintt_h(&in_A_flat[0], &in_roots_flat[0], fmat, L, rstride, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
@@ -440,8 +449,8 @@ def find_roots_h (np.ndarray[ndim=1, dtype=np.uint32_t] in_proot, ct.uint32_t nr
       return np.reshape(out_roots_flat,(-1, len(in_proot)), 0)
 
 def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.uint32_t pidx,
-          ct.uint32_t mode=0):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t Ncols, ct.t_uint64 rstride, ct.int32_t direction, ct.fft_mode_t fft_mode, ct.uint32_t pidx):
+          
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
@@ -450,12 +459,12 @@ def ntt_parallel_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, pidx, mode)
+      uh.cntt_parallel_h(&in_A_flat[0], &in_roots_flat[0], Nrows, Ncols, rstride, direction, fft_mode, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
 def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A, 
-          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.uint32_t pidx, ct.uint32_t mode=0):
+          np.ndarray[ndim=2, dtype=np.uint32_t] in_roots, ct.uint32_t Nrows, ct.uint32_t fft_Ny, ct.uint32_t Ncols, ct.uint32_t fft_Nx, ct.t_uint64 rstride, ct.int32_t direction, ct.uint32_t pidx):
 
       cdef ct.uint32_t n = in_A.shape[1]
       cdef np.ndarray[ndim=1, dtype=np.uint32_t] in_roots_flat = np.zeros(in_roots.shape[0] * in_roots.shape[1], dtype=np.uint32)
@@ -464,7 +473,7 @@ def ntt_parallel2D_h(np.ndarray[ndim=2, dtype=np.uint32_t] in_A,
       in_roots_flat = np.concatenate(in_roots)
       in_A_flat = np.concatenate(in_A)
 
-      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, pidx, mode)
+      uh.cntt_parallel2D_h(&in_A_flat[0], &in_roots_flat[0], Nrows, fft_Ny, Ncols, fft_Nx, rstride, direction, pidx)
 
       return np.reshape(in_A_flat,(-1,n))
 
@@ -525,6 +534,36 @@ def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=
 
      return np.reshape(outd,(-1,8))
 
+def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[ndim=1, dtype=np.uint32_t] invb,
+                         np.ndarray[ndim=1, dtype=np.uint32_t] invroots, ct.uint32_t rstride, ct.uint32_t pidx):
+
+     cdef ct.ntt_interpolandmul_t *args_c = <ct.ntt_interpolandmul_t *> malloc(sizeof(ct.ntt_interpolandmul_t))
+     cdef ct.uint32_t Nrows = np.log2(inva.shape[0]/NWORDS_256BIT)/2
+     cdef ct.uint32_t Ncols = np.log2(inva.shape[0]/NWORDS_256BIT) - Nrows
+
+     args_c.A = &inva[0]
+     args_c.B = &invb[0]
+     args_c.roots = &invroots[0]
+     args_c.Nrows = Nrows
+     args_c.Ncols = Ncols
+     args_c.nroots = Nrows+Ncols
+     args_c.rstride = rstride
+     args_c.pidx = pidx
+     args_c.max_threads = MAX_NCORES_OMP
+
+     with nogil:
+       uh.cntt_interpolandmul_server_h(args_c)
+
+     cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mtranspose_h()
+     #cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
+
+     free(args_c)
+
+     return np.reshape(M,(1<<(Nrows+Ncols+1),NWORDS_256BIT))
+
+def get_nprocs_h():
+    return uh.cget_nprocs_h()
+
 def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
     cdef ct.uint32_t ncoeff = pin_data.shape[0]
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(ncoeff * pin_data.shape[1],dtype=np.uint32)
@@ -533,7 +572,7 @@ def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
 
     return idx
 
-def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
+def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin, ct.uint32_t sort_en):
     if len(vin)==0:
       return np.asarray([],dtype=np.uint32)
 
@@ -544,13 +583,18 @@ def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin):
     vin_flat = np.reshape(vin,-1)
 
     with nogil:
-      uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0])
+      uh.csortu256_idx_h(&idx_flat[0],&vin_flat[0],vin.shape[0], sort_en)
 
     return idx_flat
 
 def writeU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     cdef unsigned long long nWords = np.uint64(vin.shape[0])
     uh.cwriteU256DataFile_h(&vin[0], <char *>fname, nWords)
+
+def appendU256DataFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
+    cdef unsigned long long nWords = np.uint64(vin.shape[0])
+    uh.cappendU256DataFile_h(&vin[0], <char *>fname, nWords)
+
 
 def writeWitnessFile_h(np.ndarray[ndim=1, dtype=np.uint32_t] vin, bytes fname):
     cdef unsigned long long vlen = vin.shape[0]/NWORDS_256BIT
@@ -638,6 +682,7 @@ def readR1CSFile_h(bytes filename):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csB_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_B * (NWORDS_256BIT + 1),dtype=np.uint32)
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] r1csC_samples = np.zeros(1 + r1cs_header.nConstraints + ncoeff_C * (NWORDS_256BIT + 1),dtype=np.uint32)
 
+    #print(r1cs_header.nConstraints, ncoeff_A, ncoeff_B, ncoeff_C)
     uh.creadR1CSFile_h(&r1csA_samples[0], filename, r1cs_header, ct.R1CSA_IDX)
     uh.creadR1CSFile_h(&r1csB_samples[0], filename, r1cs_header, ct.R1CSB_IDX)
     uh.creadR1CSFile_h(&r1csC_samples[0], filename, r1cs_header, ct.R1CSC_IDX)
@@ -708,6 +753,26 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
     #ncoeff = int(np.sum(pout[1:pout[0]+1])*(NWORDS_256BIT+2)+1)
     return pout
 
+def readWitnessShmem_h(ct.uint32_t nVars):
+        cdef ct.uint32_t **w_ptr = NULL
+        cdef ct.uint32_t flag, shmid
+
+        if (nVars < (1 << 25)):
+            flag = SHMEM_T_WITNESS_32M
+        elif (nVars < (1 << 26)):
+            flag = SHMEM_T_WITNESS_64M
+        else:
+            flag = SHMEM_T_WITNESS_128M
+
+        shmid = uh.ccreateSharedMemBuf(<void **>w_ptr, <ct.shmem_t> flag)
+        cdef ct.uint32_t [:] kdata = <ct.uint32_t [:nVars * NWORDS_256BIT]>w_ptr[0]
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_witness = np.zeros((nVars*NWORDS_256BIT), dtype=np.uint32)
+        out_witness = np.copy(np.asarray(kdata).reshape(-1,NWORDS_256BIT))
+
+        uh.cdestroySharedMemBuf(w_ptr[0], shmid)
+
+        return out_witness
+
 def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
                   np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t nVars, ct.uint32_t pidx):
         cdef np.ndarray[ndim=2, dtype=np.uint32_t] out_vec = np.zeros((nVars,NWORDS_256BIT), dtype=np.uint32)
@@ -734,11 +799,6 @@ def mpoly_madd_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca,
            uh.cmontmult_h(&out_vec[j,0], &out_vec[j,0], &one[0], pidx)
            v_offset += NWORDS_256BIT
            c_offset = v_offset
-        #TODO I could add n constraints here and not affect previous calculation
-        """
-        for j in xrange(nVars-1):
-            in_veca[j+2]+= in_veca[j+1]
-        """
 
         return out_vec
 
@@ -798,12 +858,12 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
      return out_vec
 
 def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
-     cdef ct.uint32_t out_len
+     cdef ct.uint32_t lenv = <unsigned int>(len(in_v)/(NWORDS_256BIT*ECP_JAC_OUTDIMS))
+     cdef unsigned long long out_len
      if strip_last == 0:
-         out_len = <int>len(in_v)
+         out_len = <unsigned long long int>len(in_v)
      else:
-         out_len = <int> (lenv * 2 * NWORDS_256BIT)
+         out_len = <unsigned long long int> (lenv * 2 * NWORDS_256BIT)
 
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
     
@@ -813,12 +873,12 @@ def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, c
      return out_vec.reshape((-1,NWORDS_256BIT))
 
 def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
-     cdef ct.uint32_t lenv = <int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
-     cdef ct.uint32_t out_len
+     cdef ct.uint32_t lenv = <unsigned int>(len(in_v)/(NWORDS_256BIT*ECP2_JAC_OUTDIMS))
+     cdef unsigned long long out_len
      if strip_last == 0:
-         out_len = <int>len(in_v)
+         out_len = <unsigned long long int>len(in_v)
      else:
-         out_len = <int> (lenv * 4 * NWORDS_256BIT)
+         out_len = <unsigned long long int> (lenv * 4 * NWORDS_256BIT)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(out_len, dtype=np.uint32)
    
      with nogil: 
@@ -854,11 +914,78 @@ def ec_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
+def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     if add_last:
+        n= <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_INDIMS) )
+     else:
+        n = <int> (in_eca.shape[0]/(NWORDS_256BIT*ECP2_JAC_OUTDIMS) )
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec2_jacscmul_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec_jacscmulx1_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     n= <int> (in_scl.shape[0]/NWORDS_256BIT) 
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec_jacscmulx1_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
+def ec2_jacscmulx1_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     n= <int> (in_scl.shape[0]/NWORDS_256BIT) 
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
+
+     uh.cec2_jacscmulx1_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
 def ec_isoncurve_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_p, ct.uint32_t is_affine, ct.uint32_t ec2, ct.uint32_t pidx):
      if ec2:
        return uh.cec2_isoncurve_h(&in_p[0], is_affine, pidx)
      else:
        return uh.cec_isoncurve_h(&in_p[0], is_affine, pidx)
+
+def ec_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order, ct.uint32_t pidx, ct.uint32_t add_last):
+    cdef ct.uint32_t indims=ECP_JAC_OUTDIMS
+    cdef ct.uint32_t n, table_size, n_elems
+
+    if add_last:
+        indims=ECP_JAC_INDIMS
+
+    n= <int> (in_v.shape[0]/NWORDS_256BIT/indims) 
+    n_elems = <int> ((n + order - 1) / order)
+    table_size = <int> ((1<<order) * (n_elems * NWORDS_256BIT * ECP_JAC_OUTDIMS))
+
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_table = np.zeros(table_size, dtype=np.uint32)
+
+    uh.cec_inittable_h(&in_v[0], &out_table[0], n, order, pidx, add_last)
+
+    return np.reshape(out_table,(-1,NWORDS_256BIT))
+
+def ec2_inittable_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t order, ct.uint32_t pidx, ct.uint32_t add_last):
+    cdef ct.uint32_t indims=ECP2_JAC_OUTDIMS
+    cdef ct.uint32_t n, table_size, n_elems
+
+    if add_last:
+        indims=ECP2_JAC_INDIMS
+
+    n= <int> (in_v.shape[0]/NWORDS_256BIT/indims) 
+    n_elems = <int> ((n + order - 1) / order)
+    table_size = <int> ((1<<order) * n_elems * NWORDS_256BIT * ECP2_JAC_OUTDIMS)
+
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_table = np.zeros(table_size, dtype=np.uint32)
+
+    uh.cec2_inittable_h(&in_v[0], &out_table[0], n, order, pidx, add_last)
+
+    return np.reshape(out_table,(-1,NWORDS_256BIT))
 
 
 def ec_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
@@ -904,6 +1031,93 @@ def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
   return np.reshape(outv,(-1, NWORDS_256BIT))
 
 
+def ec2_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP2_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.x = &inv[0]
+  args_c.n = n
+  args_c.ec2 = 1
+  args_c.ec_table = NULL;
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.x = &inv[0]
+  args_c.n = n
+  args_c.ec2 = 0
+  args_c.ec_table = NULL;
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
+                               np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, ct.uint32_t n_words, ct.t_uint64 offset, 
+                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                             ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+  cdef char *fname_c = fname
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.x = &inv[0]
+  args_c.n = n
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+  args_c.ec_table = &intbl[0]
+  args_c.filename = fname_c
+  args_c.offset = offset
+  args_c.n_words = n_words
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]
@@ -970,6 +1184,22 @@ def ec2_stripc_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v):
      uh.cec2_stripc_h(&out_v[0], &in_v[0], <int>(n/(4*NWORDS_256BIT)))
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
+
+def ec_isinf(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx):
+    cdef ct.uint32_t n = <unsigned int>len(in_v)/(ECP_JAC_INDIMS *NWORDS_256BIT)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
+
+    uh.cec_isinf(&out_v[0], &in_v[0], n, pidx)
+
+    return (out_v)
+
+def ec2_isinf(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx):
+    cdef ct.uint32_t n = <unsigned int>len(in_v)/(ECP2_JAC_INDIMS *NWORDS_256BIT)
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
+
+    uh.cec2_isinf(&out_v[0], &in_v[0], n, pidx)
+
+    return (out_v)
 
 def field_roots_compute_h(ct.uint32_t nbits):
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros((1<<nbits) * NWORDS_256BIT, dtype=np.uint32)

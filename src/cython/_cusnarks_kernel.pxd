@@ -68,6 +68,7 @@ cdef extern from "../cuda/cusnarks_kernel.h":
         ct.uint32_t  streamGetOutputDataLen(ct.uint32_t gpu_id, ct.uint32_t stream_id)
         void streamDel(ct.uint32_t gpu_id, ct.uint32_t stream_id)
         void getDeviceInfo()
+        double elapsedTime()
 
 cdef extern from "../cuda/u256.h":
     cdef cppclass C_U256 "U256" (C_CUSnarks) :

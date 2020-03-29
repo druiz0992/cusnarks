@@ -40,6 +40,7 @@ class ECBN128 : public CUSnarks {
 
         ECBN128(uint32_t len);
         ECBN128(uint32_t len, uint32_t seed);
+        ECBN128(uint32_t inlen, uint32_t ntables, uint32_t seed);
         
 };
 

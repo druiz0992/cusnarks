@@ -25,9 +25,9 @@ LOG_LEVEL=$(LOG_LEVEL)
 
 CC  = g++
 CFLAGS=-c -g  -DLINUXINTEL64 -std=c++11 -I $(INCLUDE_PATH)  -w
-EXTRA_CFLAGS2=-I $(AUX_INCLUDES) 
+EXTRA_CFLAGS2=-fopenmp -I $(AUX_INCLUDES) 
 LINKFLAGS2=-L $(LIB_PATH)
-LDFLAGS2=-lm -lcusnarks
+LDFLAGS2=-lm -lcusnarks -lgomp
 
 CSRC = test_utils_host.cpp
 

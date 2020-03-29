@@ -40,7 +40,7 @@ import re
 
 CUSNARKS_CONFIG = os.path.dirname(os.path.realpath(__file__))+'/'
 CUSNARKS_HOME = CUSNARKS_CONFIG.replace('config/','')
-CUSNARKS_REPO = CUSNARKS_HOME.replace('cusnarks/','')
+CUSNARKS_REPO = CUSNARKS_HOME
 CUSNARKS_ROOTS = CUSNARKS_HOME + 'data/'
 CUSNARKS_CIRCUITS = CUSNARKS_HOME + 'circuits/'
 
@@ -59,9 +59,9 @@ snarkjs = {
 }
 
 rust_circom = {
-    'url'   :  'http://github.com/adria0/rust-circom-experimental.git',
-    'folder' :  CUSNARKS_REPO + 'third_party_libs/rust-circom-experimental',
-    'Q1'     : '\n\n\nrust-circom-experimental is used to accelerate the compilation of snarks circuits.\n'+ \
+    'url'   :  'http://github.com/iden3/za.git',
+    'folder' :  CUSNARKS_REPO + 'third_party_libs/za',
+    'Q1'     : '\n\n\nza is used to accelerate the compilation of snarks circuits.\n'+ \
                '\n\nCusnarks uses adria0\'s fork. Do you want to download it now [Y/N] - Y?\n',
     'Q2'     : 'Have you downloaded rust_circom already?\n' + \
                'If so, please enter the directory location. [N/<directory location>] - N?\n',
@@ -145,6 +145,9 @@ def get_circuits_folder():
 def get_snarkjs_folder():
     return parse_configfile(config['folder'],'SNARKJS')
 
+def get_cusnarks_folder():
+    return CUSNARKS_HOME
+
 def get_rust_folder():
     return parse_configfile(config['folder'],'RUST-CIRCOM')
 
@@ -202,7 +205,7 @@ def generate_roots():
             os.makedirs(folder)
           roots['folder'] = b_root
      """
-     if not os.path.exists(CUSNARKS_ROOTS):
+    if not os.path.exists(CUSNARKS_ROOTS):
           os.makedirs(CUSNARKS_ROOTS)
     sys.stdout.write('Generating 2^'+str(roots['nbits']) + ' roots of unity in ' +roots['folder']+'\n')
     command = "./gen_roots " + str(roots['nbits']) + " " + roots['folder']

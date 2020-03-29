@@ -28,7 +28,8 @@
 # ------------------------------------------------------------------
 
 PYTHON=python3
-PYTHON_TESTS = $(shell find -name 'test_*.py')
+#PYTHON_TESTS = $(shell find -name 'test_*.py')
+PYTHON_TESTS = $(shell find -name 'test_cusnarks*.py')
 
 test:
 	@for i in $(PYTHON_TESTS); do \

@@ -78,7 +78,7 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None):
  
         # Check valid folder exists
         if keep_f is None:
@@ -149,6 +149,13 @@ class GrothSetup(object):
 
         copy_input_files([in_circuit_f], self.keep_f)
 
+        self.write_table_en = False
+        self.write_table_f = write_table_f
+        if write_table_f is not None:
+          self.write_table_en = True
+
+        self.sort_en = 1
+
         logging.info('#################################### ')
         logging.info('Staring Groth setup with the follwing arguments :')
         logging.info(' - curve : %s',curve)
@@ -165,6 +172,9 @@ class GrothSetup(object):
         logging.info(' - snarkjs : %s', snarkjs)
         logging.info(' - keep_f : %s', keep_f)
         logging.info(' - bs : %s', batch_size)
+        logging.info(' - sort enable : %s', self.sort_en)
+        logging.info(' - write_table_en : %s', self.write_table_en)
+        logging.info(' - table_f : %s', self.write_table_f)
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
@@ -194,6 +204,7 @@ class GrothSetup(object):
 
     def __del__(self):
        release_h()
+       logging.shutdown()
 
     def circuitRead(self):
         # cir Json to u256
@@ -285,6 +296,18 @@ class GrothSetup(object):
         self.t_S['cal Crypto'] = end_s - start
 
         logging.info('')
+        logging.info('#################################### ')
+        logging.info('')
+        logging.info('EC P Density')
+        logging.info('A      : %s',round(self.pk['A_density'],2))
+        logging.info('B1     : %s',round(self.pk['B1_density'],2))
+        logging.info('B2     : %s',round(self.pk['B2_density'],2))
+        logging.info('C      : %s',round(self.pk['C_density'],2))
+        logging.info('hExps  : %s',round(self.pk['hExps_density'],2))
+        logging.info('')
+        logging.info('#################################### ')
+
+        logging.info('')
         logging.info('Setup completed')
         logging.info('')
         logging.info('#################################### ')
@@ -293,8 +316,15 @@ class GrothSetup(object):
 
         self.logTimeResults()
 
+        # TODO : The idea is to do some precalculations to compute multiexp later during
+        # proof. However, the way is is laid out it takes to much space. I comment this part
+        # for now until I come up with a better way
+        if self.write_table_en:
+          self.write_tables()
+
         self.write_pk()
         self.write_vk()
+
         copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
         self.test_results()
 
@@ -502,7 +532,7 @@ class GrothSetup(object):
       self.t_S['init k'] = end - start
       start = time.time()
       # a_t, b_t and c_t are in ext
-      sorted_idx = sortu256_idx_h(a_t_u256)
+      sorted_idx = sortu256_idx_h(a_t_u256,self.sort_en)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point A to Affine coordinates')
@@ -514,6 +544,8 @@ class GrothSetup(object):
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
       self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
+      infv = ec_isinf(np.reshape(self.pk['A'],-1), ZField.get_field())
+      self.pk['A_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
       end = time.time()
       self.t_S['A'] = end - start
@@ -523,7 +555,7 @@ class GrothSetup(object):
 
     
       logging.info(' Computing EC Point B1')
-      sorted_idx = sortu256_idx_h(b_t_u256)
+      sorted_idx = sortu256_idx_h(b_t_u256,self.sort_en)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point B1 to Affine coordinates')
@@ -535,6 +567,9 @@ class GrothSetup(object):
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
+
+      infv = ec_isinf(np.reshape(self.pk['B1'],-1), ZField.get_field())
+      self.pk['B1_density'] = 100.0  - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
       end= time.time()
       self.t_S['B1 gpu'] = t1
@@ -556,6 +591,9 @@ class GrothSetup(object):
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
       self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
 
+      infv = ec2_isinf(np.reshape(self.pk['B2'],-1), ZField.get_field())
+      self.pk['B2_density'] = 100.0 - 100 * np.count_nonzero(infv == 1) / len(infv)
+
       self.t_S['B2 gpu'] = t1
       end= time.time()
       self.t_S['B2'] = end - start
@@ -571,7 +609,7 @@ class GrothSetup(object):
                                       a_t_u256, b_t_u256, c_t_u256, self.pk['nPublic']+1, self.pk['nVars'], pidx )
 
       ZField.set_field(MOD_GROUP)
-      sorted_idx = sortu256_idx_h(ps_u256)
+      sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point C to Affine coordinates')
@@ -583,6 +621,9 @@ class GrothSetup(object):
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
       self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
+
+      infv = ec_isinf(np.reshape(self.pk['C'],-1), ZField.get_field())
+      self.pk['C_density'] = 100.0 - 100.0 * np.count_nonzero(infv == 1) / len(infv)
 
       del ps_u256
 
@@ -602,7 +643,7 @@ class GrothSetup(object):
       eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), np.reshape(zod_u256,-1), maxH, pidx)
 
       ZField.set_field(MOD_GROUP)
-      sorted_idx = sortu256_idx_h(eT_u256)
+      sorted_idx = sortu256_idx_h(eT_u256,self.sort_en)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point hExps to Affine coordinates')
@@ -618,6 +659,9 @@ class GrothSetup(object):
       self.t_S['hExps'] =end - start 
       self.t_S['hExps gpu'] = t1
 
+      infv = ec_isinf(np.reshape(self.pk['hExps'],-1), ZField.get_field())
+      self.pk['hExps_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
+
       del eT_u256
 
       start = time.time()
@@ -629,7 +673,7 @@ class GrothSetup(object):
                                       toxic_invGamma.reduce().as_uint256(),
                                       a_t_u256, b_t_u256, c_t_u256, 0, self.pk['nPublic']+1, pidx )
       ZField.set_field(MOD_GROUP)
-      sorted_idx = sortu256_idx_h(ps_u256)
+      sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point IC to Affine coordinates')
@@ -699,6 +743,98 @@ class GrothSetup(object):
                   'R1CSB_nWords' : self.cir['R1CSB_nWords'],
                   'R1CSC_nWords' : self.cir['R1CSC_nWords']}
 
+    def write_tables(self):
+       logging.info('#################################### ')
+       logging.info('')
+       logging.info('Writing Table files')
+
+       domainSize   =  int(self.pk['domainSize'])
+       nPublic =  int(self.pk['nPublic'])
+
+       logging.info(' Computing EC Point A Tables')
+       self.pk['A_table1'] = ec_inittable_h(np.reshape(self.pk['A'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['A_table1'] = ec_jac2aff_h(np.reshape(self.pk['A_table1'],-1),MOD_GROUP,1)
+       self.pk['A_table2'] = ec_inittable_h(np.reshape(self.pk['A'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['A_table2'] = ec_jac2aff_h(np.reshape(self.pk['A_table2'],-1),MOD_GROUP,1)
+       logging.info(' Done computing EC Point A Tables')
+
+       logging.info(' Computing EC Point B2 Tables')
+       self.pk['B2_table1'] = ec2_inittable_h(np.reshape(self.pk['B2'][4*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['B2_table1'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table1'],-1),MOD_GROUP,1)
+       self.pk['B2_table2'] = ec2_inittable_h(np.reshape(self.pk['B2'][:4*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['B2_table2'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table2'],-1),MOD_GROUP,1)
+       logging.info(' Done computing EC Point B2 Tables')
+
+       logging.info(' Computing EC Point B1 Tables')
+       self.pk['B1_table1'] = ec_inittable_h(np.reshape(self.pk['B1'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['B1_table1'] = ec_jac2aff_h(np.reshape(self.pk['B1_table1'],-1),MOD_GROUP,1)
+       self.pk['B1_table2'] = ec_inittable_h(np.reshape(self.pk['B1'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['B1_table2'] = ec_jac2aff_h(np.reshape(self.pk['B1_table2'],-1),MOD_GROUP,1)
+       logging.info(' Done computing EC Point B1 Tables')
+
+       logging.info(' Computing EC Point C Tables')
+       self.pk['C_table1'] = ec_inittable_h(np.reshape(self.pk['C'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['C_table1'] = ec_jac2aff_h(np.reshape(self.pk['C_table1'],-1),MOD_GROUP,1)
+       logging.info(' Done computing EC Point C Tables')
+
+       logging.info(' Computing EC Point hExps Tables')
+       self.pk['hExps_table1'] = ec_inittable_h(np.reshape(self.pk['hExps'][:2*(domainSize-1)],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['hExps_table1'] = ec_jac2aff_h(np.reshape(self.pk['hExps_table1'],-1),MOD_GROUP,1)
+       logging.info(' Done computing EC Point hExps Tables')
+
+       logging.info('')
+       logging.info('Table1 A     : %s elements', self.pk['A_table1'].shape[0])
+       logging.info('Table2 A     : %s elements', self.pk['A_table2'].shape[0])
+       logging.info('Table1 B2    : %s elements', self.pk['B2_table1'].shape[0])
+       logging.info('Table2 B2    : %s elements', self.pk['B2_table2'].shape[0])
+       logging.info('Table1 B1    : %s elements', self.pk['B1_table1'].shape[0])
+       logging.info('Table2 B1    : %s elements', self.pk['B1_table2'].shape[0])
+       logging.info('Table1 C     : %s elements', self.pk['C_table1'].shape[0])
+       logging.info('Table1 hExps : %s elements', self.pk['hExps_table1'].shape[0])
+
+       nWords_offset = 19
+
+       nWords_offset_dw = dw2w(nWords_offset)
+       nWords1_A = self.pk['A_table1'].shape[0] * NWORDS_256BIT + nWords_offset
+       nWords1_A_dw = dw2w(nWords1_A)
+       nWords2_A = self.pk['A_table2'].shape[0] * NWORDS_256BIT + nWords1_A
+       nWords2_A_dw = dw2w(nWords2_A)
+       nWords1_B2 = self.pk['B2_table1'].shape[0] * NWORDS_256BIT + nWords2_A
+       nWords1_B2_dw = dw2w(nWords1_B2)
+       nWords2_B2 = self.pk['B2_table2'].shape[0] * NWORDS_256BIT + nWords1_B2
+       nWords2_B2_dw = dw2w(nWords2_B2)
+       nWords1_B1 = self.pk['B1_table1'].shape[0] * NWORDS_256BIT + nWords2_B2
+       nWords1_B1_dw = dw2w(nWords1_B1)
+       nWords2_B1 = self.pk['B1_table2'].shape[0] * NWORDS_256BIT + nWords1_B1
+       nWords2_B1_dw = dw2w(nWords2_B1)
+       nWords1_C = self.pk['C_table1'].shape[0] * NWORDS_256BIT + nWords2_B1
+       nWords1_C_dw = dw2w(nWords1_C)
+       nWords1_hExps = self.pk['hExps_table1'].shape[0] * NWORDS_256BIT + nWords1_C
+       nWords1_hExps_dw = dw2w(nWords1_hExps)
+
+       nWords = np.concatenate(([np.uint32(U256_BSELM)], nWords_offset_dw, 
+                                nWords1_A_dw,  nWords2_A_dw,
+                                nWords1_B2_dw, nWords2_B2_dw,
+                                nWords1_B1_dw, nWords2_B1_dw,
+                                nWords1_C_dw,  nWords1_hExps_dw))
+
+       tables = np.concatenate((self.pk['A_table1'], self.pk['A_table2'],
+                                self.pk['B2_table1'], self.pk['B2_table2'],
+                                self.pk['B1_table1'], self.pk['B1_table2'],
+                                self.pk['C_table1'], self.pk['hExps_table1']))
+
+       print (nWords)
+       writeU256DataFile_h(nWords, self.write_table_f.encode("UTF-8"))
+       appendU256DataFile_h(np.reshape(tables,-1), self.write_table_f.encode("UTF-8"))
+       del tables, self.pk['A_table1'], self.pk['A_table2'], \
+                   self.pk['B2_table1'], self.pk['B2_table2'], \
+                   self.pk['B1_table1'], self.pk['B1_table2'], \
+                   self.pk['C_table1'], self.pk['hExps_table1']
+
+       logging.info('')
+       logging.info('')
+       logging.info('#################################### ')
+     
     def write_pk(self):
 
        logging.info('#################################### ')
@@ -714,8 +850,7 @@ class GrothSetup(object):
          f.close()
 
        elif self.out_pk_f.endswith('bin') :
-         pk_bin = pkvars_to_bin(self.out_k_binformat, self.out_k_ecformat, self.pk)
-         writeU256DataFile_h(pk_bin, self.out_pk_f.encode("UTF-8"))
+         pkvars_to_file(self.out_k_binformat, self.out_k_ecformat, self.pk, self.out_pk_f, ext=True)
 
        else :
          logging.info ("No valid proving key file  %s provided", self.out_pk_f)

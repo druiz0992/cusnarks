@@ -40,6 +40,8 @@ cdef extern from "types.h":
   # Types
   ctypedef unsigned int uint32_t
   ctypedef int int32_t
+  ctypedef unsigned long long int t_uint64
+  ctypedef long long int t_int64
 
   #Constants 
   cdef uint32_t NWORDS_256BIT
@@ -47,6 +49,8 @@ cdef extern from "types.h":
   cdef uint32_t MAX_R1CSPOLYTMP_NWORDS
   cdef uint32_t N_STREAMS_PER_GPU
   cdef uint32_t GROTH_PROOF_N_ECPOINTS
+  cdef uint32_t MAX_NCORES_OMP
+  cdef uint32_t U256_BSELM
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -65,6 +69,9 @@ cdef extern from "types.h":
 
   ctypedef enum mod_t:
       MOD_FIELD, MOD_GROUP, MOD_N 
+
+  ctypedef enum fft_mode_t:
+      FFT_T_DIT, FFT_T_DIF, FFT_T_MODE_N
 
   ctypedef enum fft_size_t:
      FFT_SIZE_2 = 1, FFT_SIZE_4, FFT_SIZE_8, FFT_SIZE_16, FFT_SIZE_32, FFT_SIZE_1024, FFT_SIZE_1M, FFT_SIZE_N
@@ -100,14 +107,14 @@ cdef extern from "types.h":
 
 
   ctypedef enum u256_callback_t:
-     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_ADDM_REDUCE,  CB_U256_ADDM_REDUCE_SHFL, CB_U256_SHR1, CB_U256_SHL1, CB_U256_N
+     CB_U256_ADDM , CB_U256_SUBM, CB_U256_MOD, CB_U256_MULM, CB_U256_ADDM_REDUCE,  CB_U256_ADDM_REDUCE_SHFL, CB_U256_SHR1, CB_U256_SHL1, CB_U256_SHL, CB_U256_ALMINV, CB_U256_MULM2, CB_U256_N
 
   ctypedef enum ec_callback_t:
    #CB_EC_LDR_ADD, CB_EC_LDR_DOUBLE, CB_EC_LDR_MUL, CB_EC_LDR_MAD, CB_EC_JAC_ADD, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MAD, CB_EC_N
-   CB_EC_JACAFF_ADD, CB_EC_JAC_ADD, CB_EC_JACAFF_DOUBLE, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MUL1, CB_EC_JAC_MAD, CB_EC_JAC_MAD_SHFL, CB_EC_N
+   CB_EC_JACAFF_ADD, CB_EC_JAC_ADD, CB_EC_JACAFF_DOUBLE, CB_EC_JAC_DOUBLE, CB_EC_JAC_MUL, CB_EC_JAC_MUL1, CB_EC_JAC_MAD, CB_EC_JAC_MAD_SHFL, CB_EC_JAC_MUL_OPT, CB_EC_JAC_RED, CB_EC_JAC_MUL_PRECOMP, CB_EC_N
   
   ctypedef enum ec2_callback_t:
-   CB_EC2_JACAFF_ADD, CB_EC2_JAC_ADD, CB_EC2_JACAFF_DOUBLE, CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MUL1, CB_EC2_JAC_MAD, CB_EC2_JAC_MAD_SHFL, CB_EC2_N
+   CB_EC2_JACAFF_ADD, CB_EC2_JAC_ADD, CB_EC2_JACAFF_DOUBLE, CB_EC2_JAC_DOUBLE, CB_EC2_JAC_MUL, CB_EC2_JAC_MUL1, CB_EC2_JAC_MAD, CB_EC2_JAC_MAD_SHFL, CB_EC2_JAC_MUL_OPT, CB_EC2_JAC_RED, CB_EC2_N
       
   ctypedef enum zpoly_callback_t:
    CB_ZPOLY_FFT32, CB_ZPOLY_IFFT32, CB_ZPOLY_MUL32, CB_ZPOLY_FFTN, CB_ZPOLY_IFFTN, CB_ZPOLY_MULN, 
@@ -159,6 +166,38 @@ cdef extern from "types.h":
     uint32_t thread_id
     uint32_t pidx
 
+  ctypedef struct ntt_interpolandmul_t:
+    uint32_t *A
+    uint32_t *B
+    uint32_t *roots
+    uint32_t Nrows
+    uint32_t Ncols
+    uint32_t mNrows
+    uint32_t mNcols
+    uint32_t nroots
+    uint32_t rstride
+    uint32_t pidx
+    uint32_t max_threads
+    uint32_t start_idx
+    uint32_t last_idx
+    uint32_t thread_id
+
+  ctypedef struct jacadd_reduced_t:
+    uint32_t *out_ep
+    uint32_t *scl
+    uint32_t *x
+    uint32_t n
+    uint32_t ec2
+    uint32_t *ec_table
+    uint32_t pidx
+    uint32_t max_threads
+    uint32_t start_idx
+    uint32_t last_idx
+    uint32_t thread_id
+    uint32_t n_words
+    t_uint64 offset
+    char *filename
+
   ctypedef struct r1csv1_t:
     uint32_t magic_number
     uint32_t version
@@ -167,11 +206,14 @@ cdef extern from "types.h":
     uint32_t nPubOutputs
     uint32_t nPubInputs
     uint32_t nPrivInputs
+    uint32_t nLabels
     uint32_t nConstraints
 
     uint32_t R1CSA_nCoeff
     uint32_t R1CSB_nCoeff
     uint32_t R1CSC_nCoeff
+    uint32_t constraintOffset
+    t_int64  constraintLen;
 
   ctypedef enum r1cs_idx_t:
      R1CSA_IDX=0, R1CSB_IDX, R1CSC_IDX, R1CS_N_IDX
@@ -179,6 +221,8 @@ cdef extern from "types.h":
   ctypedef enum misc_const_len_t:
     MISC_K_1 = 0, MISC_K_INF = 2, MISC_K_INF2 = 5, MISC_K_N = 11 
   
+  ctypedef enum shmem_t:
+      SHMEM_T_WITNESS_32M = 0, SHMEM_T_WITNESS_64M, SHMEM_T_WITNESS_128M, SHMEM_T_N
 
   ctypedef enum snarks_file_t:
       SNARKSFILE_T_CIRCUIT = 0, SNARKSFILE_T_PK, SNARKSFILE_T_VK, SNARKSFILE_T_WITNESS,
@@ -197,7 +241,9 @@ cdef extern from "types.h":
      KERNEL_T_ZPOLY = 0, KERNEL_T_ECBN128_T, KERNEL_T_EC2BN128_T, KERNEL_T_N
 
 _NWORDS_256BIT = NWORDS_256BIT
+_MAX_NCORES_OMP = MAX_NCORES_OMP
 _MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
 _MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS
 _NSTREAMS_PER_GPU = N_STREAMS_PER_GPU
 _GROTH_PROOF_N_ECPOINTS = GROTH_PROOF_N_ECPOINTS
+_U256_BSELM = U256_BSELM

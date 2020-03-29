@@ -39,6 +39,7 @@
 #include "utils_device.h"
 #include "u256_device.h"
 #include "z1_device.h"
+#include "asm_device.h"
 
 __device__ Z1_t::Z1_t() {}
 __device__ Z1_t::Z1_t(uint32_t *x) : el(x) {}
@@ -76,6 +77,10 @@ __device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
     //memcpy(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
 }
 __device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset, uint32_t ysize)
+{ 
+   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+}
+__device__ void Z1_t::setsingleu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
 { 
    movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
 }
@@ -128,9 +133,18 @@ __device__ void mulz(Z1_t *z,  Z1_t *x, Z1_t *y, mod_t midx)
   mulmontu256(z->getu256(), x->getu256(), y->getu256(), midx);  
 }
 
+__device__ void invz(Z1_t *z,  Z1_t *x,  mod_t midx)
+{
+  invmontu256(z->getu256(), x->getu256(), midx );
+}
+
 __device__ void mul2z(Z1_t *z,  Z1_t *x, mod_t midx)
 {
   addmu256(z->getu256(), x->getu256(), x->getu256(), midx);    
+}
+__device__ void div2z(Z1_t *z,  Z1_t *x)
+{
+  div2u256(z->getu256(), x->getu256());
 }
 __device__ void mul3z(Z1_t *z,  Z1_t *x, mod_t midx)
 {
@@ -196,3 +210,39 @@ __device__ void infz(Z1_t *z, mod_t midx)
 {
   z->assign(misc_const_ct[midx]._inf);
 }
+
+__device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1offset, Z1_t *zx2, uint32_t x2offset, mod_t midx)
+{
+  uint32_t *xr, *x1, *x2;
+  uint32_t *_1 = misc_const_ct[midx]._1;
+  uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+  uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+
+  xr = zxr->getu256(zoffset);
+  x1 = zx1->getu256(x1offset);
+  x2 = zx2->getu256(x2offset);
+
+  asm(ASM_ADDECJAC_INIT
+      ASM_ECJACADD
+      ASM_ECFINSH 
+      ASM_ECJACADD_PACK );
+
+  return;
+}
+
+#if 0
+__device__ void scmulec_stepz(Z1_t *Q,Z1_t *N, uint32_t *scl, uint32_t msb,  mod_t midx )
+{
+  uint32_t *xr, *x1, *x2;
+  uint32_t *_1 = misc_const_ct[midx]._1;
+  uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+  uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+
+  xr = Q->getu256(0);
+  x2 = Q->getu256(0);
+  x1 = N->getu256(0);
+
+  asm(ASM_ADDECJAC_INIT
+      ASM_ECJACADD);
+}
+#endif
