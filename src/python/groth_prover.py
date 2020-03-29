@@ -491,7 +491,7 @@ class GrothProver(object):
        
         # EC reduce hExps
         self.dispatch_table_phase3 = buildDispatchTable( nbatches, 1,
-                                         1, self.n_streams, self.batch_size_mexp_phase3-1,
+                                         self.n_gpu, self.n_streams, self.batch_size_mexp_phase3-1,
                                          0, domainSize-1,
                                          start_pidx=self.ec_type_dict['hExps'][2],
                                          ec_lable = self.ec_lable)
@@ -1251,9 +1251,9 @@ class GrothProver(object):
         # Beginning of P5
         #   - Final EC MultiExp
         ######################
-        start = time.time()
 
         if self.compute_last_mexp_gpu:
+           start = time.time()
            self.logger.info(' Starting Last Mexp...')
            self.findECPointsDispatch(
                                   self.dispatch_table_phase3,
@@ -1264,12 +1264,12 @@ class GrothProver(object):
                                   sort_en=self.sort_en)
         
            self.assignECPvalues(compute_ECP=True)
+           end = time.time()
+           self.t_GP['Mexp2'] = (end - start)
+
         else:
            if self.p_CPU is not None:
              self.t_GP['Mexp2'] = t[2]
-
-        end = time.time()
-        self.t_GP['Mexp2']+= (end - start)
      
         return 
  
