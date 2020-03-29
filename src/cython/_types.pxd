@@ -187,6 +187,7 @@ cdef extern from "types.h":
     uint32_t *scl
     uint32_t *x
     uint32_t n
+    uint32_t ec2
     uint32_t *ec_table
     uint32_t pidx
     uint32_t max_threads
