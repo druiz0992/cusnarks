@@ -123,8 +123,8 @@ class GrothProver(object):
 
         self.sort_en = 0
         self.compute_ntt_gpu = False
-        self.compute_first_mexp_gpu = False
-        self.compute_last_mexp_gpu = False
+        self.compute_first_mexp_gpu = True
+        self.compute_last_mexp_gpu = True
 
         self.write_table_en = False
         self.write_table_f = write_table_f
@@ -139,6 +139,29 @@ class GrothProver(object):
             batch_size = 20
 
         self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
+
+        if n_streams > get_nstreams():
+          self.n_streams = get_nstreams()
+        else :
+          self.n_streams = n_streams
+
+        self.n_gpu = min(get_ngpu(max_used_percent=99.),n_gpus)
+        if 'CUDA_VISIBLE_DEVICES' in os.environ and \
+           len(os.environ['CUDA_VISIBLE_DEVICES']) > 0:
+              self.n_gpu = min(
+                                 self.n_gpu,
+                                 len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
+                              )
+
+        if self.n_gpu == 0 :
+          self.logger.info('No available GPUs')
+          self.compute_ntt_gpu = False
+          self.compute_first_mexp_gpu = False
+          self.compute_last_mexp_gpu = False
+        elif not self.compute_ntt_gpu and not \
+                 self.compute_first_mexp_gpu and not self.compute_ntt_gpu:
+          self.n_gpu = 0
+          self.n_streams = 1
 
         if self.compute_first_mexp_gpu or self.compute_last_mexp_gpu:
           self.ecbn128  = ECBN128(self.batch_size,   seed=self.seed)
@@ -176,29 +199,6 @@ class GrothProver(object):
         self.verify = 2
         self.stop_client = mp.Value('i',0)
         self.active_client = mp.Value('i',0)
-
-        if n_streams > get_nstreams():
-          self.n_streams = get_nstreams()
-        else :
-          self.n_streams = n_streams
-
-        self.n_gpu = min(get_ngpu(max_used_percent=99.),n_gpus)
-        if 'CUDA_VISIBLE_DEVICES' in os.environ and \
-           len(os.environ['CUDA_VISIBLE_DEVICES']) > 0:
-              self.n_gpu = min(
-                                 self.n_gpu,
-                                 len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
-                              )
-
-        if self.n_gpu == 0 :
-          self.logger.info('No available GPUs')
-          self.compute_ntt_gpu = False
-          self.compute_first_mexp_gpu = False
-          self.compute_last_mexp_gpu = False
-        elif not self.compute_ntt_gpu and not \
-                 self.compute_first_mexp_gpu and not self.compute_ntt_gpu:
-          self.n_gpu = 0
-          self.n_streams = 1
 
         self.public_signals = None
         self.witness_f = None
