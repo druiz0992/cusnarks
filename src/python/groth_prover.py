@@ -247,6 +247,11 @@ class GrothProver(object):
         hExps[2*(domainSize+1)*NWORDS_256BIT:2*(domainSize+2)*NWORDS_256BIT] = delta_1
         nPublic = int(pkbin_vars[4][0])
 
+        if domainSize > 1<<self.n_bits_roots:
+          self.logger.error('Insufficient number of roots (%s) for a domainSize of %s',
+                            1<<self.n_bits_roots, domainSize)
+          sys.exit(1)
+
         # scl_array
         self.scl_array_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)     
         self.scl_array = np.frombuffer(
@@ -1266,6 +1271,7 @@ class GrothProver(object):
            self.assignECPvalues(compute_ECP=True)
            end = time.time()
            self.t_GP['Mexp2'] = (end - start)
+           self.logger.info(' Last Mexp completed')
 
         else:
            if self.p_CPU is not None:
