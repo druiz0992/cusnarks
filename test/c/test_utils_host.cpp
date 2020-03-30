@@ -7291,22 +7291,31 @@ uint32_t test_subm_prof(void)
 }
 
 
-uint32_t test_mul5(void)
+uint32_t test_square(uint32_t extf)
 {
-   uint32_t r[NWORDS_256BIT]; 
+   uint32_t r[2*NWORDS_256BIT]; 
 
    int i;
-   int pidx=1;
    int n_errors=0;
-   uint32_t a[NWORDS_256BIT], b[NWORDS_256BIT], c[NWORDS_256BIT];
+   uint32_t a[2*NWORDS_256BIT], c[2*NWORDS_256BIT];
    uint32_t retval=0;
+   uint32_t *N0 = (uint32_t *)CusnarksPGet((mod_t)0);
+   uint32_t *N1 = (uint32_t *)CusnarksPGet((mod_t)1);
+   uint32_t *N[2];
+   N[0] = N0; N[1]=N1;
+   void (*mulm_cb)(uint32_t *, const uint32_t *, const uint32_t *, uint32_t) = &montmult_h;
+   void (*sqm_cb)(uint32_t *, const uint32_t *, uint32_t) = &montsquare_h;
 
-   for (i=0; i < MAX_ITER*1000; i++){
-     setRandom(a, NWORDS_256BIT);
-     a[NWORDS_256BIT-1] &= 0x7FFFFFF;
+   if (extf){
+     mulm_cb = &montmult_ext_h;
+     sqm_cb  = &montsquare_ext_h;
+   }
+
+   for (i=0; i < MAX_ITER*10000; i++){
+     setRandom256(a,2, N[i%2]);
      
-     montmult_h(r, a, a, pidx);
-     montsquare_h(c, a, pidx);
+     mulm_cb(r, a, a, i%2);
+     sqm_cb(c, a, i%2);
 
      if (compu256_h(r,c)){
         n_errors++;
@@ -7315,7 +7324,7 @@ uint32_t test_mul5(void)
    if (n_errors){
      printf("\033[1;31m");
    }
-   printf("N errors(Test_Mul : Montgomery Squaring FIOS) : %d/%d\n",n_errors, i);
+   printf("N errors(Test_Square - extF : %d) : %d/%d\n",extf,n_errors, i);
    printf("\033[0m");
    retval = n_errors;
    return retval;
@@ -9100,7 +9109,7 @@ uint32_t test_transpose(void)
      setRandom256(samples,nrows*ncols, N); 
 
      transpose_h(result, samples, nrows, ncols);
-     transpose2_h(samples2, samples, nrows, ncols);
+     transposeBlock_h(samples2, samples, nrows, ncols, TRANSPOSE_BLOCK_SIZE);
      transpose_h(samples, nrows, ncols);
     
       
@@ -9202,7 +9211,8 @@ int main()
 
   retval+=test_mul();  // test montgomery mul with predefined results
 
-  //test_mul5(); // test FIOS impl of montgomery squaring
+  retval+=test_square(0); // test FIOS impl of montgomery squaring
+  retval+=test_square(1); // test FIOS impl of montgomery squaring
   retval+=test_findroots();
   retval+=test_ntt();
   retval+=test_ntt_parallel();

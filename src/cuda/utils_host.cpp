@@ -230,9 +230,11 @@ void ec2_jacaddreduce_finish_h(void *args);
 extern "C" void rawAddLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
 extern "C" void rawSubLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
 extern "C" void rawMontgomeryMul_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawMontgomerySquare_R(uint32_t *r, const uint32_t *x);
 extern "C" void rawAddLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
 extern "C" void rawSubLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
 extern "C" void rawMontgomeryMul_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void rawMontgomerySquare_Q(uint32_t *r, const uint32_t *x);
 #endif
 //////
 
@@ -1622,6 +1624,7 @@ void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t 
   uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
   uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
 
+ #ifndef _CASM
   montmult_h(t0,x,y,pidx);
   montmult_h(t1,&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
 
@@ -1631,18 +1634,70 @@ void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t 
   subm_h(z,t0,t1,pidx);
   addm_h(&z[NWORDS_256BIT],t0,t1,pidx);
   subm_h(&z[NWORDS_256BIT],t2,&z[NWORDS_256BIT],pidx);
+ #else
+  void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawSubLL_Q;
+  void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawAddLL_Q;
+  void (*mulm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawMontgomeryMul_Q;
+
+  if (pidx == MOD_GROUP){
+     subm_cb = &rawSubLL_R;
+     addm_cb = &rawAddLL_R;
+     mulm_cb = &rawMontgomeryMul_R;
+  } 
+  
+  mulm_cb(t0,x,y);
+  mulm_cb(t1,&x[NWORDS_256BIT],&y[NWORDS_256BIT]);
+
+  addm_cb(t2,x,&x[NWORDS_256BIT]);
+  addm_cb(t3,y,&y[NWORDS_256BIT]);
+  mulm_cb(t2,t2,t3);
+  subm_cb(z,t0,t1);
+  addm_cb(&z[NWORDS_256BIT],t0,t1);
+  subm_cb(&z[NWORDS_256BIT],t2,&z[NWORDS_256BIT]);
+ #endif
   
 }
 
 // I am leaving this as a separate function to test both implementations are equal
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
-  montmult_h(U,A,A,pidx);
+  #ifndef _CASM
+    montmult_h(U,A,A,pidx);
+  #else
+    if (pidx == MOD_GROUP){
+      rawMontgomerySquare_R(U,A);
+    } else {
+      rawMontgomerySquare_Q(U,A);
+    }
+  #endif
 }
 
 void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
-  montmult_ext_h(U,A,A,pidx);
+  #ifndef _CASM
+    montmult_ext_h(U,A,A,pidx);
+  #else
+    uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
+    uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
+    void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawSubLL_Q;
+    void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawAddLL_Q;
+    void (*sqm_cb)(uint32_t *, const uint32_t *) = &rawMontgomerySquare_Q;
+
+    if (pidx == MOD_GROUP){
+     subm_cb = &rawSubLL_R;
+     addm_cb = &rawAddLL_R;
+     sqm_cb = &rawMontgomerySquare_R;
+    } 
+    sqm_cb(t0,A);
+    sqm_cb(t1,&A[NWORDS_256BIT]);
+
+    addm_cb(t2,A,&A[NWORDS_256BIT]);
+    sqm_cb(t2,t2);
+    subm_cb(U,t0,t1);
+    addm_cb(&U[NWORDS_256BIT],t0,t1);
+    subm_cb(&U[NWORDS_256BIT],t2,&U[NWORDS_256BIT]);
+    
+  #endif
 }
 
 #if 0
