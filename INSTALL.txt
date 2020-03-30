@@ -1,6 +1,0 @@
-python
-cython : pip install Cython
-pip : sudo apt install python-pip
-numpy : pip install numpy
-cuda :
-c++

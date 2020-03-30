@@ -168,6 +168,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
        pysnark.streamDel(gpu_id,stream_id)
    
     else:
+      start = time.time()
       new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
       result = np.zeros(((nsamples-indims) * outdims ,NWORDS_256BIT), dtype=np.uint32)
       t=0.0
@@ -184,11 +185,32 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
             [int((kernel_config['blockD'][0] +
                    min(batch_size-indims, nsamples-start_idx-indims)-1) /
                                          kernel_config['blockD'][0])]
-          result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
+
+          if pysnark is not None:
+            result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
                  pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
-          pysnark.streamDel(gpu_id,stream_id)
-          t+=t1
+            pysnark.streamDel(gpu_id,stream_id)
+            t+=t1
+          elif ec2:
+            result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims]= \
+                 ec2_jacsc1mul_h(
+                          np.reshape(
+                                   new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], 
+                                   -1),
+                          fidx,
+                          1)
+          else:
+            result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims]= \
+                 ec_jacsc1mul_h(
+                          np.reshape(
+                                 new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims],
+                                 -1),
+                          fidx,
+                          1)
             
+    end = time.time()
+    if t == 0.0:
+      t = end - start
     return result,t
 
 def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0, separate_k=0):
