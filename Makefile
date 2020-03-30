@@ -133,6 +133,8 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'DEFINES_DEBUG=$(DEFINES_DEBUG)'  
   
 build:
+	if ! test -d $(LIB_PATH); \
+		then mkdir $(LIB_PATH); fi
 	@for i in $(SUBDIRS); do \
 		echo "make build in $$i..."; \
 		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
