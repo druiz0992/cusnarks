@@ -42,6 +42,14 @@ The trusted setup is currently very slow. Implementation has been done using a s
 ## Installation
 1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called *$CUSNARKS_HOME*
 
+2. Change to *$CUSNARKS_HOME* directory and execute ./cusnarks_build.sh script
+```sh
+ cd $CUSNARKS_HOME
+ ./cusnarks_build.sh
+```
+
+Alternatively, you can install Cusnarks manually:
+
 2. Ensure that all [dependencies][] are installed. 
 
 Tested versions of required libraries and programs are provided below for reference.
