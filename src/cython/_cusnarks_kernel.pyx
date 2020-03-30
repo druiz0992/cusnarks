@@ -914,6 +914,20 @@ def ec_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
+def ec_jacsc1mul_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+     cdef ct.uint32_t n
+     if add_last:
+        n= <int> ((in_eca.shape[0]-NWORDS_256BIT*ECP_JAC_INDIMS)/NWORDS_256BIT)
+     else:
+        n = <int> ((in_eca.shape[0]-NWORDS_256BIT*ECP_JAC_OUTDIMS)/NWORDS_256BIT)
+
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n*ECP_JAC_OUTDIMS*NWORDS_256BIT, dtype=np.uint32)
+
+     with nogil:
+       uh.cec_jacsc1mul_h(&out_ecz[0], &in_eca[0], n, pidx, add_last)
+
+     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
+
 def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
                 np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
      cdef ct.uint32_t n
@@ -927,23 +941,16 @@ def ec2_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl,
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
-def ec_jacscmulx1_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
-                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
+def ec2_jacsc1mul_h( np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
      cdef ct.uint32_t n
-     n= <int> (in_scl.shape[0]/NWORDS_256BIT) 
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP_JAC_OUTDIMS, dtype=np.uint32)
+     if add_last:
+        n= <int> ((in_eca.shape[0]-NWORDS_256BIT*ECP2_JAC_INDIMS)/NWORDS_256BIT)
+     else:
+        n = <int> ((in_eca.shape[0]-NWORDS_256BIT*ECP2_JAC_OUTDIMS )/NWORDS_256BIT)
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n*ECP2_JAC_OUTDIMS*NWORDS_256BIT, dtype=np.uint32)
 
-     uh.cec_jacscmulx1_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
-
-     return np.reshape(out_ecz,(-1, NWORDS_256BIT))
-
-def ec2_jacscmulx1_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
-                np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
-     cdef ct.uint32_t n
-     n= <int> (in_scl.shape[0]/NWORDS_256BIT) 
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(n * NWORDS_256BIT * ECP2_JAC_OUTDIMS, dtype=np.uint32)
-
-     uh.cec2_jacscmulx1_h(&out_ecz[0], &in_scl[0], &in_eca[0], n, pidx, add_last)
+     with nogil:
+       uh.cec2_jacsc1mul_h(&out_ecz[0], &in_eca[0], n, pidx, add_last)
 
      return np.reshape(out_ecz,(-1, NWORDS_256BIT))
 
