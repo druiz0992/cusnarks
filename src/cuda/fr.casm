@@ -20,6 +20,7 @@
         global rawAddLL_R
         global rawSubLL_R
         global rawMontgomeryMul_R
+        global rawMontgomerySquare_R
 
         DEFAULT REL
 
@@ -96,6 +97,344 @@ u64toLong_adjust_neg:
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;
+; rawMontgomerySquare_R
+;;;;;;;;;;;;;;;;;;;;;;
+; Square an element
+; Params:
+;   rsi <= Pointer to the long data of element 1
+;   rdi <= Pointer to the long data of result
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+
+rawMontgomerySquare_R:
+        sub     rsp, 32  ; Reserve space for ms
+        mov     rcx, rdx            ; rdx is needed for multiplications so keep it in cx
+        mov     r11, 0x87d20782e4866389 ; np
+        xor     r8,r8
+        xor     r9,r9
+        xor     r10,r10
+
+
+
+        mov     rax, [rsi + 0]
+        mul     rax
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+
+
+
+
+        mov     rax, r8
+        mul     r11
+        mov     [rsp + 0], rax
+        mul     qword [q]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+        mov     rax, [rsi + 0]
+        mul     qword [rsi + 8]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+
+
+
+
+
+
+        mov     rax, [rsp + 0]
+        mul     qword [q + 8]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+
+
+        mov     rax, r9
+        mul     r11
+        mov     [rsp + 8], rax
+        mul     qword [q]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+
+
+        mov     rax, [rsi + 0]
+        mul     qword [rsi + 16]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+
+
+        mov     rax, [rsi + 8]
+        mul     rax
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+
+
+
+
+        mov     rax, [rsp + 8]
+        mul     qword [q + 8]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+        mov     rax, [rsp + 0]
+        mul     qword [q + 16]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+
+
+        mov     rax, r10
+        mul     r11
+        mov     [rsp + 16], rax
+        mul     qword [q]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+
+
+        mov     rax, [rsi + 0]
+        mul     qword [rsi + 24]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+        mov     rax, [rsi + 8]
+        mul     qword [rsi + 16]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+
+
+
+
+        mov     rax, [rsp + 16]
+        mul     qword [q + 8]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+        mov     rax, [rsp + 8]
+        mul     qword [q + 16]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+        mov     rax, [rsp + 0]
+        mul     qword [q + 24]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+        mov     rax, r8
+        mul     r11
+        mov     [rsp + 24], rax
+        mul     qword [q]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+        mov     rax, [rsi + 8]
+        mul     qword [rsi + 24]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+
+
+        mov     rax, [rsi + 16]
+        mul     rax
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+
+
+
+
+        mov     rax, [rsp + 24]
+        mul     qword [q + 8]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+        mov     rax, [rsp + 16]
+        mul     qword [q + 16]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+        mov     rax, [rsp + 8]
+        mul     qword [q + 24]
+        add     r9, rax
+        adc     r10, rdx
+        adc     r8, 0x0
+
+
+
+        mov     [rdi + 0 ], r9
+        xor     r9,r9
+
+
+
+        mov     rax, [rsi + 16]
+        mul     qword [rsi + 24]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+
+
+
+
+
+
+        mov     rax, [rsp + 24]
+        mul     qword [q + 16]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+        mov     rax, [rsp + 16]
+        mul     qword [q + 24]
+        add     r10, rax
+        adc     r8, rdx
+        adc     r9, 0x0
+
+
+
+        mov     [rdi + 8 ], r10
+        xor     r10,r10
+
+
+
+
+
+        mov     rax, [rsi + 24]
+        mul     rax
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+
+
+        mov     rax, [rsp + 24]
+        mul     qword [q + 24]
+        add     r8, rax
+        adc     r9, rdx
+        adc     r10, 0x0
+
+
+
+        mov     [rdi + 16 ], r8
+        xor     r8,r8
+
+
+
+
+
+
+
+
+
+
+
+        mov     [rdi + 24 ], r9
+        xor     r9,r9
+
+
+
+        test    r10, r10
+        jnz     rawMontgomerySquare_mulM_sq
+        ; Compare with q
+
+        mov rax, [rdi + 24]
+        cmp rax, [q + 24]
+        jc rawMontgomerySquare_mulM_done        ; q is bigget so done.
+        jnz rawMontgomerySquare_mulM_sq         ; q is lower
+
+        mov rax, [rdi + 16]
+        cmp rax, [q + 16]
+        jc rawMontgomerySquare_mulM_done        ; q is bigget so done.
+        jnz rawMontgomerySquare_mulM_sq         ; q is lower
+
+        mov rax, [rdi + 8]
+        cmp rax, [q + 8]
+        jc rawMontgomerySquare_mulM_done        ; q is bigget so done.
+        jnz rawMontgomerySquare_mulM_sq         ; q is lower
+
+        mov rax, [rdi + 0]
+        cmp rax, [q + 0]
+        jc rawMontgomerySquare_mulM_done        ; q is bigget so done.
+        jnz rawMontgomerySquare_mulM_sq         ; q is lower
+
+        ; If equal substract q
+
+rawMontgomerySquare_mulM_sq:
+
+        mov rax, [q + 0]
+        sub [rdi + 0], rax
+
+        mov rax, [q + 8]
+        sbb [rdi + 8], rax
+
+        mov rax, [q + 16]
+        sbb [rdi + 16], rax
+
+        mov rax, [q + 24]
+        sbb [rdi + 24], rax
+
+
+rawMontgomerySquare_mulM_done:
+        mov rdx, rcx            ; recover rdx to its original place.
+        add rsp, 32   ; recover rsp
+        ret
 
 
 ;;;;;;;;;;;;;;;;;;;;;;

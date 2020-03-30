@@ -271,7 +271,7 @@ void montmultN_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 //void montmult_sos_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
-void montsquare__ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
+void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t L, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 void ntt2_h(uint32_t *A, const uint32_t *roots, uint32_t L, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t L, t_uint64 rstride, uint32_t pidx);
