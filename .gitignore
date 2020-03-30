@@ -1,8 +1,12 @@
 # Opened filed 
 *.sw*
 
+# Hidden
+.log
+
 # Prerequisites
-*.d
+.build.log
+.init
 
 # Compiled Object files
 *.slo
