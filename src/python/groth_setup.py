@@ -101,6 +101,8 @@ class GrothSetup(object):
 
         random.seed(self.seed) 
 
+        self.n_gpu = get_ngpu(max_used_percent=99.)
+
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group
         ZField(self.curve_data['prime'])
@@ -154,7 +156,7 @@ class GrothSetup(object):
         if write_table_f is not None:
           self.write_table_en = True
 
-        self.sort_en = 1
+        self.sort_en = 0
 
         logging.info('#################################### ')
         logging.info('Staring Groth setup with the follwing arguments :')
@@ -175,6 +177,7 @@ class GrothSetup(object):
         logging.info(' - sort enable : %s', self.sort_en)
         logging.info(' - write_table_en : %s', self.write_table_en)
         logging.info(' - table_f : %s', self.write_table_f)
+        logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
@@ -508,24 +511,75 @@ class GrothSetup(object):
 
       # vk coeff MONT
       logging.info(' Computing alfas')
-      self.pk['alfa_1'] = G1 * self.toxic['kalfa']
-      self.pk['beta_1'] = G1 * self.toxic['kbeta']
-      self.pk['delta_1'] = G1 * self.toxic['kdelta']
-
-      self.pk['alfa_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['alfa_1']).reshape(-1),ZField.get_field(),1)
-      self.pk['beta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['beta_1']).reshape(-1),ZField.get_field(),1)
-      self.pk['delta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['delta_1']).reshape(-1),ZField.get_field(),1)
     
-      self.pk['beta_2'] = G2 * self.toxic['kbeta']
-      self.pk['delta_2'] = G2 * self.toxic['kdelta']
-      self.pk['gamma_2'] = G2 * self.toxic['kgamma']
+      self.pk['alfa_1'] = ec_jac2aff_h(
+                 np.reshape(
+                     ec_jacscmul_h(
+                              self.toxic['kalfa'].as_uint256().reshape(-1), 
+                              G1.as_uint256(G1).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['beta_1'] = ec_jac2aff_h(
+                 np.reshape(
+                     ec_jacscmul_h(
+                              self.toxic['kbeta'].as_uint256().reshape(-1), 
+                              G1.as_uint256(G1).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['delta_1'] = ec_jac2aff_h(
+                 np.reshape(
+                     ec_jacscmul_h(
+                              self.toxic['kdelta'].as_uint256().reshape(-1), 
+                              G1.as_uint256(G1).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
     
-      self.pk['beta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['beta_2']).reshape(-1),ZField.get_field(),1)
-      self.pk['delta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['delta_2']).reshape(-1),ZField.get_field(),1)
-      self.pk['gamma_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['gamma_2']).reshape(-1),ZField.get_field(),1)
+      self.pk['beta_2'] = ec2_jac2aff_h(
+                 np.reshape(
+                     ec2_jacscmul_h(
+                              self.toxic['kbeta'].as_uint256().reshape(-1), 
+                              G2.as_uint256(G2).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['delta_2'] = ec2_jac2aff_h(
+                 np.reshape(
+                     ec2_jacscmul_h(
+                              self.toxic['kdelta'].as_uint256().reshape(-1), 
+                              G2.as_uint256(G2).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['gamma_2'] = ec2_jac2aff_h(
+                 np.reshape(
+                     ec2_jacscmul_h(
+                              self.toxic['kgamma'].as_uint256().reshape(-1), 
+                              G2.as_uint256(G2).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
 
-      self.ecbn128    =  ECBN128(self.batch_size,seed=self.seed)
-      self.ec2bn128    = EC2BN128(self.batch_size,seed=self.seed)
+      if self.n_gpu :
+        self.ecbn128    =  ECBN128(self.batch_size,seed=self.seed)
+        self.ec2bn128    = EC2BN128(self.batch_size,seed=self.seed)
+      else :
+        self.ecbn128    =  None
+        self.ec2bn128    = None
 
       logging.info(' Computing EC Point A')
       end = time.time()
@@ -537,8 +591,7 @@ class GrothSetup(object):
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point A to Affine coordinates')
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('A', samples= ecbn128_samples)
+      self.assert_isoncurve('A', samples= ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
@@ -560,8 +613,7 @@ class GrothSetup(object):
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point B1 to Affine coordinates')
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('B1', samples=ecbn128_samples)
+      self.assert_isoncurve('B1', samples=ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
@@ -582,8 +634,7 @@ class GrothSetup(object):
       self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True, batch_size=self.batch_size)
       logging.info(' Converting EC Point B2 to Affine coordinates')
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('B2', samples = ec2bn128_samples)
+      self.assert_isoncurve('B2', samples = ec2bn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
       #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
@@ -614,8 +665,7 @@ class GrothSetup(object):
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point C to Affine coordinates')
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('C', samples=ecbn128_samples)
+      self.assert_isoncurve('C', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
@@ -648,8 +698,7 @@ class GrothSetup(object):
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point hExps to Affine coordinates')
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('hExps', samples=ecbn128_samples)
+      self.assert_isoncurve('hExps', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
@@ -678,8 +727,7 @@ class GrothSetup(object):
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point IC to Affine coordinates')
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('IC', samples = ecbn128_samples)
+      self.assert_isoncurve('IC', samples = ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
@@ -689,6 +737,9 @@ class GrothSetup(object):
       self.t_S['IC gpu'] = t1
 
     def assert_isoncurve(self, ec_str, max_fails=5, samples=None):
+      if self.test_f is None:
+          return
+
       dim2=2
       ec2=0
       if ec_str=='B2':
