@@ -107,7 +107,7 @@ if [ ! -f ${INIT_FILE} ]; then
   echo 1 > ${INIT_FILE}
 fi
      
-export LD_LIBRARY_PATH="$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="${CUSNARKS_HOME}/lib:$LD_LIBRARY_PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 #MAKE CUSNARKS
