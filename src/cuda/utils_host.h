@@ -383,7 +383,7 @@ void release_h(void);
 uint32_t *get_Mmul_h();
 uint32_t *get_Mtranspose_h();
 uint32_t get_nprocs_h();
-int createSharedMemBuf(void **shmem, shmem_t type);
+int createSharedMemBuf(void **shmem, unsigned long long size);
 void destroySharedMemBuf(void *shmem, int shmid);
 
 #endif

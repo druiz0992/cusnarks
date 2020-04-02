@@ -5091,21 +5091,12 @@ void release_h(void)
   M_free_h();
 }
 
-int createSharedMemBuf(void **shmem, shmem_t type)
+int createSharedMemBuf(void **shmem, unsigned long long size)
 {
   int shmid;
   // give your shared memory an id, anything will do
   key_t key = SHMEM_WITNESS_KEY;
-  unsigned long long size;
-
-  if (type == SHMEM_T_WITNESS_32M) {
-	  size = (1ull << 25) * sizeof (unsigned int) * 8;
-  } else if (type == SHMEM_T_WITNESS_64M) { 
-	  size = (1ull << 26) * sizeof (unsigned int) * 8;
-  } else{
-	  size = (1ull << 27) * sizeof (unsigned int) * 8;
-  }
-
+ 
   // Setup shared memory
   if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0)
   {

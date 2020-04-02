@@ -756,15 +756,9 @@ def r1cs_to_mpoly_h(np.ndarray[ndim=1, dtype=np.uint32_t] plen,
 def readWitnessShmem_h(ct.uint32_t nVars):
         cdef ct.uint32_t **w_ptr = NULL
         cdef ct.uint32_t flag, shmid
+        cdef unsigned long long size = nVars * sizeof(ct.uint32_t)*NWORDS_256BIT
 
-        if (nVars < (1 << 25)):
-            flag = SHMEM_T_WITNESS_32M
-        elif (nVars < (1 << 26)):
-            flag = SHMEM_T_WITNESS_64M
-        else:
-            flag = SHMEM_T_WITNESS_128M
-
-        shmid = uh.ccreateSharedMemBuf(<void **>w_ptr, <ct.shmem_t> flag)
+        shmid = uh.ccreateSharedMemBuf(<void **>w_ptr, size)
         cdef ct.uint32_t [:] kdata = <ct.uint32_t [:nVars * NWORDS_256BIT]>w_ptr[0]
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_witness = np.zeros((nVars*NWORDS_256BIT), dtype=np.uint32)
         out_witness = np.copy(np.asarray(kdata).reshape(-1,NWORDS_256BIT))
