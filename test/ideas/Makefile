@@ -33,8 +33,7 @@ CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
 
 
 ifeq ($(CUDA_INSTALLED),)
-	echo "can't find CUDA"
-	exit
+:
 else
   EXE= $(CSRC:.cu=.out)
 endif
