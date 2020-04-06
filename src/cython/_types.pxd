@@ -194,8 +194,9 @@ cdef extern from "types.h":
     uint32_t start_idx
     uint32_t last_idx
     uint32_t thread_id
-    uint32_t n_words
     t_uint64 offset
+    t_uint64 total_words 
+    uint32_t order
     char *filename
 
   ctypedef struct r1csv1_t:
@@ -213,7 +214,16 @@ cdef extern from "types.h":
     uint32_t R1CSB_nCoeff
     uint32_t R1CSC_nCoeff
     uint32_t constraintOffset
-    t_int64  constraintLen;
+    t_int64  constraintLen
+
+  ctypedef struct ec_table_offset_t:
+    uint32_t table_order
+    t_uint64 woffset_A
+    t_uint64 woffset_B2
+    t_uint64 woffset_B1
+    t_uint64 woffset_C
+    t_uint64 woffset_hExps
+    t_uint64 nwords_tdata
 
   ctypedef enum r1cs_idx_t:
      R1CSA_IDX=0, R1CSB_IDX, R1CSC_IDX, R1CS_N_IDX

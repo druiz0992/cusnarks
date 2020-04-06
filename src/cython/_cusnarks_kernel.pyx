@@ -607,6 +607,14 @@ def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
 
     return vout.reshape((-1,NWORDS_256BIT))
 
+def readU256DataFileFromOffset_h(bytes fname, ct.t_uint64 woffset, ct.t_uint64 nwords):
+    cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(nwords * NWORDS_256BIT,dtype=np.uint32)
+
+    uh.creadU256DataFileFromOffset_h(&vout[0], <char *>fname, woffset, nwords)
+
+    return vout.reshape((-1,NWORDS_256BIT))
+
+
 def readWitnessFile_h(bytes fname, ct.uint32_t fmt, unsigned long long insize):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(insize * NWORDS_256BIT,dtype=np.uint32)
 
@@ -706,6 +714,21 @@ def readR1CSFile_h(bytes filename):
 
     return header, r1csA_samples, r1csB_samples, r1csC_samples
   
+def readECTablesNElementsFile_h(bytes fname):
+    cdef ct.ec_table_offset_t table_header
+    uh.creadECTablesNElementsFile_h(&table_header, <char *>fname)
+   
+    table_header_d = {'table_order' : np.uint32(table_header.table_order),
+                      'woffset_A'  : table_header.woffset_A,
+                      'woffset_B2'  : table_header.woffset_B2,
+                      'woffset_B1'  : table_header.woffset_B1,
+                      'woffset_C'  :  table_header.woffset_C,
+                      'woffset_hExps'  : table_header.woffset_hExps,
+                      'nwords_tdata'   : table_header.nwords_tdata }
+                    
+
+    return table_header_d
+
 def r1cs_to_mpoly_len_h(np.ndarray[ndim=1, dtype=np.uint32_t] r1cs_len, dict header, ct.uint32_t extend):
     cdef ct.cirbin_hfile_t *header_c = <ct.cirbin_hfile_t *> malloc(sizeof(ct.cirbin_hfile_t))
 
@@ -1034,7 +1057,7 @@ def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
 
 def ec2_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                             ct.uint32_t strip_last):
+                             ct.uint32_t strip_last, ct.uint32_t order=U256_BSELM):
 
   cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
 
@@ -1053,6 +1076,7 @@ def ec2_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[nd
   args_c.ec_table = NULL;
   args_c.pidx = pidx
   args_c.max_threads = MAX_NCORES_OMP
+  args_c.order = order
 
   with nogil:
      uh.cec_jacreduce_server_h(args_c)
@@ -1062,7 +1086,7 @@ def ec2_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[nd
 
 def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
                              ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                             ct.uint32_t strip_last):
+                             ct.uint32_t strip_last, ct.uint32_t order=U256_BSELM):
 
   cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
 
@@ -1081,6 +1105,7 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndi
   args_c.ec_table = NULL;
   args_c.pidx = pidx
   args_c.max_threads = MAX_NCORES_OMP
+  args_c.order = order
 
   with nogil:
      uh.cec_jacreduce_server_h(args_c)
@@ -1088,10 +1113,11 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndi
 
   return np.reshape(outv,(-1, NWORDS_256BIT))
 
-def ec_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
-                               np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, ct.uint32_t n_words, ct.t_uint64 offset, 
-                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                             ct.uint32_t strip_last):
+def ec_jacreduce_precomputed_file_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
+                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, 
+                  ct.t_uint64 offset, ct.t_uint64 total_words, ct.uint32_t order,
+                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                  ct.uint32_t strip_last):
 
   cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
 
@@ -1105,20 +1131,125 @@ def ec_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np
 
   args_c.out_ep = &outv[0]
   args_c.scl = &inscl[0]
-  args_c.x = &inv[0]
   args_c.n = n
   args_c.pidx = pidx
   args_c.max_threads = MAX_NCORES_OMP
   args_c.ec_table = &intbl[0]
   args_c.filename = fname_c
-  args_c.offset = offset
-  args_c.n_words = n_words
+  args_c.offset = offset * sizeof(ct.uint32_t)
+  args_c.order = order
+  args_c.ec2 = 0
+  args_c.total_words = total_words
 
   with nogil:
      uh.cec_jacreduce_server_h(args_c)
   free(args_c)
 
   return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec2_jacreduce_precomputed_file_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
+                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, 
+                  ct.t_uint64 offset, ct.t_uint64 total_words, ct.uint32_t order,
+                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                  ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP2_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+  cdef char *fname_c = fname
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.n = n
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+  args_c.ec_table = &intbl[0]
+  args_c.filename = fname_c
+  args_c.offset = offset * sizeof(ct.uint32_t)
+  args_c.order = order
+  args_c.ec2 = 1
+  args_c.total_words = total_words 
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+
+def ec_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
+                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl,
+                  ct.uint32_t order,
+                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                  ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.n = n
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+  args_c.ec_table = &intbl[0]
+  args_c.order = order
+  args_c.ec2 = 0
+
+  args_c.filename = NULL
+  args_c.offset = 0
+  args_c.total_words = 0
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
+def ec2_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
+                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl,
+                  ct.uint32_t order,
+                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
+                  ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
+
+  if strip_last:
+      outdims = ECP2_JAC_INDIMS
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.n = n
+  args_c.pidx = pidx
+  args_c.max_threads = MAX_NCORES_OMP
+  args_c.ec_table = &intbl[0]
+  args_c.ec2 = 1
+  args_c.order = order
+
+  args_c.filename = NULL
+  args_c.offset = 0
+  args_c.total_words = 0
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_256BIT))
+
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]

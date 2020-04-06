@@ -78,6 +78,11 @@ cdef extern from "../cuda/utils_host.h" nogil:
                                                   const char *filename, ct.uint32_t insize,
                                                   ct.uint32_t outsize)
 
+    void creadU256DataFileFromOffset_h "readU256DataFileFromOffset_h"(ct.uint32_t *samples, 
+                                                  const char *filename, ct.t_uint64 woffset,
+                                                  ct.t_uint64 nwords)
+
+
     void creadWitnessFile_h "readWitnessFile_h"(ct.uint32_t *samples, const char *filename, ct.uint32_t fmt, const unsigned long long inlen)
 
     void cwriteU256DataFile_h "writeU256DataFile_h"(ct.uint32_t *samples, 
@@ -110,6 +115,9 @@ cdef extern from "../cuda/utils_host.h" nogil:
 
     void creadR1CSFile_h "readR1CSFile_h"(ct.uint32_t *samples, const char *filename,
                                           ct.r1csv1_t *r1cs, ct.r1cs_idx_t r1cs_idx )
+
+    void creadECTablesNElementsFile_h "readECTablesNElementsFile_h" (ct.ec_table_offset_t *table_offset,
+                                                                     const char *filename)
 
     void *cmpoly_eval_h "mpoly_eval_h" (ct.mpoly_eval_t *args)
 

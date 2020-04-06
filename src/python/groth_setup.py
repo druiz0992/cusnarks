@@ -803,24 +803,41 @@ class GrothSetup(object):
        nPublic =  int(self.pk['nPublic'])
 
        logging.info(' Computing EC Point A Tables')
-       self.pk['A_table1'] = ec_inittable_h(np.reshape(self.pk['A'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['A_table1'] = ec_inittable_h(
+                                             np.reshape(
+                                                     np.concatenate((
+                                                               self.pk['A'],
+                                                               self.pk['alfa_1'],
+                                                               self.pk['delta_1'] 
+                                                                    )),
+                                                     -1), U256_BSELM, MOD_GROUP, 1)
        self.pk['A_table1'] = ec_jac2aff_h(np.reshape(self.pk['A_table1'],-1),MOD_GROUP,1)
-       self.pk['A_table2'] = ec_inittable_h(np.reshape(self.pk['A'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['A_table2'] = ec_jac2aff_h(np.reshape(self.pk['A_table2'],-1),MOD_GROUP,1)
+       #self.pk['A_table2'] = ec_inittable_h(np.reshape(self.pk['A'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
+       #self.pk['A_table2'] = ec_jac2aff_h(np.reshape(self.pk['A_table2'],-1),MOD_GROUP,1)
        logging.info(' Done computing EC Point A Tables')
 
        logging.info(' Computing EC Point B2 Tables')
-       self.pk['B2_table1'] = ec2_inittable_h(np.reshape(self.pk['B2'][4*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['B2_table1'] = ec2_inittable_h(
+                                              np.reshape(
+                                                  np.concatenate((
+                                                       self.pk['B2'],
+                                                       self.pk['beta_2'],
+                                                       self.pk['delta_2'],
+                                                              )),
+                                                  -1), U256_BSELM, MOD_GROUP, 1)
        self.pk['B2_table1'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table1'],-1),MOD_GROUP,1)
-       self.pk['B2_table2'] = ec2_inittable_h(np.reshape(self.pk['B2'][:4*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['B2_table2'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table2'],-1),MOD_GROUP,1)
        logging.info(' Done computing EC Point B2 Tables')
 
        logging.info(' Computing EC Point B1 Tables')
-       self.pk['B1_table1'] = ec_inittable_h(np.reshape(self.pk['B1'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['B1_table1'] = ec_inittable_h(
+                                        np.reshape(
+                                                np.concatenate((
+                                                          self.pk['B1'],
+                                                          self.pk['beta_1'],
+                                                          self.pk['delta_1'],
+                                                             )),
+                                               -1), U256_BSELM, MOD_GROUP, 1)
        self.pk['B1_table1'] = ec_jac2aff_h(np.reshape(self.pk['B1_table1'],-1),MOD_GROUP,1)
-       self.pk['B1_table2'] = ec_inittable_h(np.reshape(self.pk['B1'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['B1_table2'] = ec_jac2aff_h(np.reshape(self.pk['B1_table2'],-1),MOD_GROUP,1)
        logging.info(' Done computing EC Point B1 Tables')
 
        logging.info(' Computing EC Point C Tables')
@@ -829,57 +846,53 @@ class GrothSetup(object):
        logging.info(' Done computing EC Point C Tables')
 
        logging.info(' Computing EC Point hExps Tables')
-       self.pk['hExps_table1'] = ec_inittable_h(np.reshape(self.pk['hExps'][:2*(domainSize-1)],-1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['hExps_table1'] = ec_jac2aff_h(np.reshape(self.pk['hExps_table1'],-1),MOD_GROUP,1)
+       self.pk['hExps_table1'] = ec_inittable_h(
+                                       np.reshape(
+                                               np.concatenate((
+                                                      self.pk['hExps'][:2*(domainSize-1)],
+                                                      self.pk['delta_1'] )),
+                                               -1), U256_BSELM, MOD_GROUP, 1)
+       self.pk['hExps_table1'] = ec_jac2aff_h(np.reshape( self.pk['hExps_table1'],-1),MOD_GROUP,1)
        logging.info(' Done computing EC Point hExps Tables')
 
        logging.info('')
        logging.info('Table1 A     : %s elements', self.pk['A_table1'].shape[0])
-       logging.info('Table2 A     : %s elements', self.pk['A_table2'].shape[0])
        logging.info('Table1 B2    : %s elements', self.pk['B2_table1'].shape[0])
-       logging.info('Table2 B2    : %s elements', self.pk['B2_table2'].shape[0])
        logging.info('Table1 B1    : %s elements', self.pk['B1_table1'].shape[0])
-       logging.info('Table2 B1    : %s elements', self.pk['B1_table2'].shape[0])
        logging.info('Table1 C     : %s elements', self.pk['C_table1'].shape[0])
        logging.info('Table1 hExps : %s elements', self.pk['hExps_table1'].shape[0])
 
-       nWords_offset = 19
+       nWords_offset = ECTABLE_DATA_OFFSET_BYTES
 
        nWords_offset_dw = dw2w(nWords_offset)
        nWords1_A = self.pk['A_table1'].shape[0] * NWORDS_256BIT + nWords_offset
        nWords1_A_dw = dw2w(nWords1_A)
-       nWords2_A = self.pk['A_table2'].shape[0] * NWORDS_256BIT + nWords1_A
-       nWords2_A_dw = dw2w(nWords2_A)
-       nWords1_B2 = self.pk['B2_table1'].shape[0] * NWORDS_256BIT + nWords2_A
+       nWords1_B2 = self.pk['B2_table1'].shape[0] * NWORDS_256BIT + nWords1_A
        nWords1_B2_dw = dw2w(nWords1_B2)
-       nWords2_B2 = self.pk['B2_table2'].shape[0] * NWORDS_256BIT + nWords1_B2
-       nWords2_B2_dw = dw2w(nWords2_B2)
-       nWords1_B1 = self.pk['B1_table1'].shape[0] * NWORDS_256BIT + nWords2_B2
+       nWords1_B1 = self.pk['B1_table1'].shape[0] * NWORDS_256BIT + nWords1_B2
        nWords1_B1_dw = dw2w(nWords1_B1)
-       nWords2_B1 = self.pk['B1_table2'].shape[0] * NWORDS_256BIT + nWords1_B1
-       nWords2_B1_dw = dw2w(nWords2_B1)
-       nWords1_C = self.pk['C_table1'].shape[0] * NWORDS_256BIT + nWords2_B1
+       nWords1_C = self.pk['C_table1'].shape[0] * NWORDS_256BIT + nWords1_B1
        nWords1_C_dw = dw2w(nWords1_C)
        nWords1_hExps = self.pk['hExps_table1'].shape[0] * NWORDS_256BIT + nWords1_C
        nWords1_hExps_dw = dw2w(nWords1_hExps)
 
        nWords = np.concatenate(([np.uint32(U256_BSELM)], nWords_offset_dw, 
-                                nWords1_A_dw,  nWords2_A_dw,
-                                nWords1_B2_dw, nWords2_B2_dw,
-                                nWords1_B1_dw, nWords2_B1_dw,
+                                nWords1_A_dw,  
+                                nWords1_B2_dw, 
+                                nWords1_B1_dw, 
                                 nWords1_C_dw,  nWords1_hExps_dw))
 
-       tables = np.concatenate((self.pk['A_table1'], self.pk['A_table2'],
-                                self.pk['B2_table1'], self.pk['B2_table2'],
-                                self.pk['B1_table1'], self.pk['B1_table2'],
+       tables = np.concatenate((self.pk['A_table1'], 
+                                self.pk['B2_table1'], 
+                                self.pk['B1_table1'],
                                 self.pk['C_table1'], self.pk['hExps_table1']))
 
-       print (nWords)
+       logging.info('Table Desc : %s ', nWords)
        writeU256DataFile_h(nWords, self.write_table_f.encode("UTF-8"))
        appendU256DataFile_h(np.reshape(tables,-1), self.write_table_f.encode("UTF-8"))
-       del tables, self.pk['A_table1'], self.pk['A_table2'], \
-                   self.pk['B2_table1'], self.pk['B2_table2'], \
-                   self.pk['B1_table1'], self.pk['B1_table2'], \
+       del tables, self.pk['A_table1'], \
+                   self.pk['B2_table1'], \
+                   self.pk['B1_table1'], \
                    self.pk['C_table1'], self.pk['hExps_table1']
 
        logging.info('')
