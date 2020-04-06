@@ -50,7 +50,7 @@
 #define U256_BSELM  (8)
 #define NBITS_BYTE (8)
 #define EC_JACREDUCE_TABLE_LEN (256)
-#define EC_JACREDUCE_BATCH_SIZE (U256_BSELM<<2)
+#define EC_JACREDUCE_BATCH_SIZE (2)
 #define EC_JACREDUCE_FLAGS_INIT   (1)
 #define EC_JACREDUCE_FLAGS_FINISH (1<<1)
 #define EC_JACREDUCE_FLAGS_REDUCTION (1<<2)
@@ -74,6 +74,8 @@
 #define WITNESS_HEADER_OTHER_LEN_NWORDS (1)
 
 #define WITNESS_HEADER_LEN_NWORDS (WITNESS_HEADER_W_OFFSET_NWORDS)
+
+#define ECTABLE_DATA_OFFSET_BYTES (13) 
 
 #define WARP_SIZE  (32)
 #define WARP_HALF_SIZE (16)
@@ -542,8 +544,9 @@ typedef struct{
   uint32_t start_idx;
   uint32_t last_idx;
   uint32_t thread_id;
-  uint32_t n_words;
   t_uint64 offset;
+  t_uint64 total_words;
+  uint32_t order;
   char *filename;
 
 }jacadd_reduced_t;
@@ -551,11 +554,23 @@ typedef struct{
 typedef struct{
   char *filename;
   t_uint64 offset;
+  t_uint64 total_words;
   uint32_t *ec_table;
-  uint32_t n_words;
+  uint32_t order;
   uint32_t ec2;
 
 }ec_table_desc_t;
+
+typedef struct{
+  uint32_t table_order;
+  t_uint64 woffset_A;
+  t_uint64 woffset_B2;
+  t_uint64 woffset_B1;
+  t_uint64 woffset_C;
+  t_uint64 woffset_hExps;
+  t_uint64 nwords_tdata;
+
+}ec_table_offset_t;
 
 typedef enum{
   KERNEL_T_ZPOLY = 0,

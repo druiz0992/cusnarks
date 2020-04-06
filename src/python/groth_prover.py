@@ -85,7 +85,7 @@ class GrothProver(object):
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None,
                  n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
                  benchmark_f=None, seed=None, snarkjs=None, verify_en=0,
-                 keep_f=None, reserved_cpus=0, batch_size=20, write_table_f=None, zk=1):
+                 keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1):
 
         # Check valid folder exists
         if keep_f is None:
@@ -126,10 +126,10 @@ class GrothProver(object):
         self.compute_first_mexp_gpu = True
         self.compute_last_mexp_gpu = True
 
-        self.write_table_en = False
-        self.write_table_f = write_table_f
-        if write_table_f is not None:
-          self.write_table_en = True
+        self.read_table_en = False
+        self.read_table_f = read_table_f
+        if read_table_f is not None:
+          self.read_table_en = True
 
         self.roots_f = cfg.get_roots_file()
         self.n_bits_roots = cfg.get_n_roots()
@@ -355,8 +355,8 @@ class GrothProver(object):
         self.logger.info(' - n available GPUs : %s', self.n_gpu)
         self.logger.info(' - n available CPUs : %s', get_nprocs_h())
         self.logger.info(' - sort enable : %s', self.sort_en)
-        self.logger.info(' - write_table_en : %s', self.write_table_en)
-        self.logger.info(' - table_f : %s', self.write_table_f)
+        self.logger.info(' - read_table_en : %s', self.read_table_en)
+        self.logger.info(' - table_f : %s', self.read_table_f)
         self.logger.info(' - compute NTT in GPU : %s', self.compute_ntt_gpu)
         self.logger.info(' - compute first Mexp in GPU : %s', self.compute_first_mexp_gpu)
         self.logger.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
@@ -366,13 +366,46 @@ class GrothProver(object):
         self.logger.info(' - N Public : %s', nPublic)
         self.logger.info('#################################### ')
  
-        if self.write_table_f:
+        self.ect_A = 0
+        self.ect_B2 = 0
+        self.ect_C = 0
+        self.ect_B1 = 0
+        self.ect_hExps = 0
+        self.ect_G1_woffset = 0
+        self.ect_G2_woffset = 0
+        self.ec_table = 0
+
+        if self.read_table_f:
           self.logger.info('#################################### ')
           self.logger.info('..')
-          Tables = readU256DataFile_h(self.write_table_f.encode("UTF-8"), 
-                  int(self.nVars*2*6*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM), 
-                  int(self.nVars*2*5*(1<<U256_BSELM)/U256_BSELM) + int(domainSize*2*(1<<U256_BSELM)/U256_BSELM))
-          self.logger.info('# Reading Tables (%s Bytes)...', Tables.shape)
+          self.ec_table = readECTablesNElementsFile_h(self.read_table_f.encode("UTF-8"))
+          self.logger.info('# Reading Tables (%s Words)...', self.ec_table['nwords_tdata'])
+          self.ect_G1_woffset = ((self.ec_table['table_order'] << EC_JACREDUCE_BATCH_SIZE) * 2 * NWORDS_256BIT) << self.ec_table['table_order']
+          self.ect_G2_woffset = ((self.ec_table['table_order'] << EC_JACREDUCE_BATCH_SIZE) * 4 * NWORDS_256BIT) << self.ec_table['table_order']
+          self.ect_A = readU256DataFileFromOffset_h(
+                               self.read_table_f.encode("UTF-8"),
+                               self.ec_table['woffset_A'],    # Offset
+                               self.ect_G1_woffset )            # N words
+          self.ect_B2 = readU256DataFileFromOffset_h(
+                               self.read_table_f.encode("UTF-8"),
+                               self.ec_table['woffset_B2'],    # Offset
+                               self.ect_G2_woffset )            # N words
+          self.ect_C = readU256DataFileFromOffset_h(
+                               self.read_table_f.encode("UTF-8"),
+                               self.ec_table['woffset_C'],    # Offset
+                               self.ect_G1_woffset )            # N words
+          self.ect_B1 = readU256DataFileFromOffset_h(
+                               self.read_table_f.encode("UTF-8"),
+                               self.ec_table['woffset_B1'],    # Offset
+                               self.ect_G1_woffset )            # N words
+          self.ect_hExps = readU256DataFileFromOffset_h(
+                               self.read_table_f.encode("UTF-8"),
+                               self.ec_table['woffset_hExps'],    # Offset
+                               self.ect_G1_woffset )            # N words
+          self.ect_G1_woffset += self.ec_table['woffset_A'] 
+          self.ect_G2_woffset += self.ec_table['woffset_B2'] 
+                              
+
           self.logger.info('..')
           self.logger.info('#################################### ')
            
@@ -546,8 +579,9 @@ class GrothProver(object):
           self.logger.info(' Process server - Starting First Mexp...')
           pk_bin2 = pkbin_get(self.pk,['A','B2','B1','C','nPublic'])
           nPublic = pk_bin2[4][0]
-          np.copyto(self.pi_a_eccf1,
-                    ec_jacreduce_h(
+          if not self.read_table_en:
+             np.copyto(self.pi_a_eccf1,
+                      ec_jacreduce_h(
                          np.reshape(
                               np.concatenate((
                                               w[:nVars],
@@ -557,11 +591,27 @@ class GrothProver(object):
                          pk_bin2[0][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS],
                          MOD_GROUP, 1, 1, 1)
                     )
+          else :
+             np.copyto(self.pi_a_eccf1,
+                    ec_jacreduce_precomputed_file_h(
+                            np.reshape( 
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.r_scl] )),
+                                    -1),
+                            np.reshape(self.ect_A,-1),
+                            self.read_table_f.encode("UTF-8"),
+                            self.ect_G1_woffset,
+                            self.ec_table['woffset_B2'] - self.ect_G1_woffset,
+                            self.ec_table['table_order'],
+                            MOD_GROUP, 1, 1, 1)
+                    )
           self.logger.info(' Process server - Mexp A Done... ')
-
-          np.copyto(self.pi_b_eccf2,
+          if not self.read_table_en:
+              np.copyto(self.pi_b_eccf2,
                     ec2_jacreduce_h(
-                         np.reshape(
+                          np.reshape(
                               np.concatenate((
                                               w[:nVars],
                                               np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
@@ -570,18 +620,50 @@ class GrothProver(object):
                          pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS],
                          MOD_GROUP, 1, 1, 1)
                    )
+          else:
+            np.copyto(self.pi_b_eccf2,
+                 ec2_jacreduce_precomputed_file_h(
+                            np.reshape( 
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.s_scl] )),
+                                    -1),
+                            np.reshape(self.ect_B2,-1),
+                            self.read_table_f.encode("UTF-8"),
+                            self.ect_G2_woffset,
+                            self.ec_table['woffset_B1'] - self.ect_G2_woffset,
+                            self.ec_table['table_order'],
+                            MOD_GROUP, 1, 1, 1)
+                    )
           self.logger.info(' Process server - Mexp B2 Done...')
 
-          np.copyto(self.pi_c_eccf1,
+          if not self.read_table_en:
+            np.copyto(self.pi_c_eccf1,
                     ec_jacreduce_h(
                          np.reshape(w[nPublic+1:nVars],-1),
                          pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS],
                          MOD_GROUP, 1, 1, 1)
                    )
+          else :
+             self.ect_G1_woffset -= self.ec_table['woffset_A'] 
+             self.ect_G1_woffset += self.ec_table['woffset_C'] 
+             np.copyto(self.pi_c_eccf1,
+                    ec_jacreduce_precomputed_file_h(
+                            np.reshape( w[nPublic+1:nVars], -1),
+                            np.reshape(self.ect_C,-1),
+                            self.read_table_f.encode("UTF-8"),
+                            self.ect_G1_woffset,
+                            self.ec_table['woffset_hExps'] - self.ect_G1_woffset,
+                            self.ec_table['table_order'],
+                            MOD_GROUP, 1, 1, 1)
+                    )
+
           self.logger.info(' Process server - Mexp C Done...')
 
           if self.zk:
-            np.copyto(self.pi_b1_eccf1,
+            if not self.read_table_en:
+              np.copyto(self.pi_b1_eccf1,
                     ec_jacreduce_h(
                          np.reshape(
                               np.concatenate((
@@ -592,6 +674,26 @@ class GrothProver(object):
                          pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS],
                          MOD_GROUP, 1, 1, 1)
                     )
+            else:
+             self.ect_G1_woffset -= self.ec_table['woffset_C'] 
+             self.ect_G1_woffset += self.ec_table['woffset_B1'] 
+             np.copyto(self.pi_b1_eccf1,
+                    ec_jacreduce_precomputed_file_h(
+                         np.reshape(
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.s_scl] )),
+                              -1),
+                              np.reshape(self.ect_B1,-1),
+                              self.read_table_f.encode("UTF-8"),
+                              self.ect_G1_woffset,
+                              self.ec_table['woffset_C'] - self.ect_G1_woffset,
+                              self.ec_table['table_order'],
+                              MOD_GROUP, 1, 1, 1)
+                    )
+             self.ect_G1_woffset -= self.ec_table['woffset_B1'] 
+             self.ect_G1_woffset += self.ec_table['woffset_hExps'] 
             self.logger.info(' Process server - Mexp B1  Done...')
 
           end2 = time.time()
@@ -605,30 +707,60 @@ class GrothProver(object):
           pk_bin2 = pkbin_get(self.pk,['delta_1'])
           delta_1 = pk_bin2[0]
           self.logger.info(' Process server - Starting Last Mexp...')
-          scalar_vector = np.concatenate((
-                                   np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
-                                   polH[m:-1],
-                                   [self.s_scl],
-                                   [self.r_scl],
-                                   [self.neg_rs_scl]
-                                  ))
-          EP_vector =  np.concatenate((
-                                   self.pi_c_eccf1,
-                                   np.reshape(pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],(-1,NWORDS_256BIT)),
-                                   self.pi_a_eccf1,
-                                   self.pi_b1_eccf1,
-                                   np.reshape(delta_1, (-1, NWORDS_256BIT)) 
-                               ))
-          if self.zk == 0:
-             scalar_vector = scalar_vector[:-3]
-             EP_vector = EP_vector[:-3*ECP_JAC_INDIMS]
+          self.logger.info(' Process server - hExps Mexp common part started ...')
+          scalar_vector = np.reshape(
+                                 np.concatenate((
+                                      polH[m:-1],
+                                     [self.neg_rs_scl]
+                                    )),-1)
 
-          np.copyto(self.pi_c_eccf1,
-                      ec_jacreduce_h(
-                        np.reshape( scalar_vector, -1),
-                        np.reshape( EP_vector, -1),
-                        MOD_GROUP, 1, 1, 1)
+          if not self.read_table_en:
+            EP_vector =  np.concatenate((
+                                  pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],
+                                  delta_1,
+                             ))
+            np.copyto(self.pi_c2_eccf1,
+                    ec_jacreduce_h(
+                              scalar_vector,
+                              EP_vector,
+                              MOD_GROUP, 1, 1, 1)
                     )
+          else:
+
+            EP_vector =   np.reshape(self.ect_hExps,-1)
+            np.copyto(self.pi_c2_eccf1,
+                  ec_jacreduce_precomputed_file_h(
+                         scalar_vector,
+                         EP_vector,
+                         self.read_table_f.encode("UTF-8"),
+                         self.ect_G1_woffset,
+                         self.ec_table['nwords_tdata'] - self.ect_G1_woffset,
+                         self.ec_table['table_order'],
+                         MOD_GROUP, 1, 1, 1)
+                     )
+          self.logger.info(' Process server - hExps Mexp common part completed ...')
+
+          if self.zk == 1:
+             self.logger.info(' Process server - hExps Mexp ZK part started ...')
+             np.copyto(self.pi_c_eccf1,
+                 ec_jacreduce_precomputed_h(
+                         np.reshape(
+                              np.concatenate((
+                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       [self.s_scl],
+                                       [self.r_scl] )),
+                              -1),
+                              np.reshape(
+                                 np.concatenate((
+                                       self.pi_c2_eccf1,
+                                       self.pi_c_eccf1,
+                                       self.pi_a_eccf1,
+                                       self.pi_b1_eccf1 )),
+                                 -1),
+                                 1, MOD_GROUP, 1, 1, 1)
+                    )
+             self.logger.info(' Process server - hExps Mexp ZK part completed ...')
           self.logger.info(' Process server - Completed Last Mexp...')
           
         else:

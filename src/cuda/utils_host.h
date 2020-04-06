@@ -350,6 +350,7 @@ void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
 void printU256Number(const uint32_t *x);
 void printU256Number(const char *, const uint32_t *x);
 void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
+void readU256DataFileFromOffset_h(uint32_t *samples, const char *filename, t_uint64 woffset, t_uint64 nwrods);
 void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt, const unsigned long long insize);
 void writeU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);
 void appendU256DataFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);
@@ -360,6 +361,7 @@ void readU256PKFileHeader_h(pkbin_hfile_t *hfile, const char *filename);
 void readU256PKFile_h(uint32_t *samples, const char *filename, unsigned long long nwords);
 void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename);
 void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1cs_idx_t r1cs_idx );
+void readECTablesNElementsFile_h(ec_table_offset_t *table_offset, const char *filename);
 
 void mpoly_eval_server_h(mpoly_eval_t *mpoly_args);
 void *mpoly_eval_h(void *args);

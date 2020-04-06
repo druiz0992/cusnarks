@@ -8901,6 +8901,9 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
    uint32_t retval=0;
+   uint32_t max_order = U256_BSELM;
+   uint32_t min_order = 1;
+
    if (ec2) {
         indims = ECP2_JAC_INDIMS;
         outdims = ECP2_JAC_OUTDIMS;
@@ -8942,8 +8945,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
 
    scl = samples;
    in_ecp = &samples[nec_points * NWORDS_256BIT];
-
-   // Multiply points
+  
    args->out_ep = out_ecp1;
    args->scl = scl;
    args->x = in_ecp;
@@ -8952,23 +8954,29 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    args->pidx = 0;
    args->max_threads = 0;
    args->ec2 = ec2;
-   clock_gettime(CLOCK_MONOTONIC, &start);
-   ec_jacreduce_server_h(args);
-   clock_gettime(CLOCK_MONOTONIC, &end);
-   elapsed = (double) (end.tv_sec - start.tv_sec);
-   elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
 
-   if (memcmp(r_aff, out_ecp1,
-              indims*NWORDS_256BIT*sizeof(uint32_t)) ){
-        n_errors++;
+   for (uint32_t i=max_order; i >= min_order; i--){
+     // Multiply points
+     args->order = i;
+     clock_gettime(CLOCK_MONOTONIC, &start);
+     ec_jacreduce_server_h(args);
+     clock_gettime(CLOCK_MONOTONIC, &end);
+     elapsed = (double) (end.tv_sec - start.tv_sec);
+     elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  
+     if (memcmp(r_aff, out_ecp1,
+                indims*NWORDS_256BIT*sizeof(uint32_t)) ){
+          n_errors++;
+     }
+  
+     if (n_errors){
+      printf("\033[1;31m");
+     }
+     printf("N errors(JACREDUCE_OPT-EC2 : %d : N points : %d, Order : %d) : %d - Time : %f\n",ec2,nec_points,i,n_errors, elapsed);
+     printf("\033[0m");
+     retval += n_errors;
+     n_errors = 0;
    }
-
-   if (n_errors){
-    printf("\033[1;31m");
-   }
-   printf("N errors(JACREDUCE_OPT %d : %d) : %d - Time : %f\n",ec2,nec_points,n_errors, elapsed);
-   printf("\033[0m");
-   retval += n_errors;
 
    free(samples);
    free(out_ecp1);
@@ -9003,16 +9011,15 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file)
    uint32_t n_tables;
    uint32_t i;
    uint32_t n_errors=0;
+   uint32_t max_order = U256_BSELM;
+   uint32_t min_order = 1;
 
    init_h();
 
-   n_tables = (nec_points + U256_BSELM - 1) / U256_BSELM;
    samples = (uint32_t *) malloc( nec_points * outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
    out_ecp1 = (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
    r_aff =  (uint32_t *) malloc( outdims * NWORDS_256BIT * sizeof(uint32_t)) ;
    jacadd_reduced_t *args = (jacadd_reduced_t *)malloc(sizeof(jacadd_reduced_t));
-   ec_table = (uint32_t *) malloc( (1 << U256_BSELM) * (n_tables * NWORDS_256BIT * outdims) * sizeof(uint32_t) );
-   ec_table2 = (uint32_t *) malloc( (1 << U256_BSELM) * (n_tables * NWORDS_256BIT * outdims) * sizeof(uint32_t) );
 
    if (ec2){
      readU256DataFile_h(samples, input2_test_scmul_filename,
@@ -9029,59 +9036,70 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file)
    scl = samples;
    in_ecp = &samples[nec_points * NWORDS_256BIT];
 
-   //printf("N Points : %d, N tables : %d\n",nec_points, n_tables);
-   if (ec2){
-     ec2_inittable_h(in_ecp, ec_table, nec_points, U256_BSELM, 0, 1);
-     ec2_jac2aff_h(ec_table2, ec_table, (1<<U256_BSELM) * n_tables , 0, 1);
-   } else { 
-     ec_inittable_h(in_ecp, ec_table, nec_points, U256_BSELM, 0, 1);
-     ec_jac2aff_h(ec_table2, ec_table, (1<<U256_BSELM) * n_tables , 0, 1);
-   }
-
    // Multiply points
    args->out_ep = out_ecp1;
    args->scl = scl;
-   args->x = in_ecp;
    args->n = nec_points;
    args->ec2 = ec2;
    args->pidx = 0;
-   args->ec_table = ec_table2;
    args->filename = NULL;
    args->max_threads = 0;
 
-   if (file){
-     FILE *ifp = fopen(ec_table_filename,"wb");
-     fwrite(ec_table2, sizeof(uint32_t),n_tables * (1<<U256_BSELM) * NWORDS_256BIT * indims,ifp);
-     fclose(ifp);
-     args->filename = ec_table_filename;
-     args->offset = EC_JACREDUCE_BATCH_SIZE *indims * NWORDS_256BIT *sizeof(uint32_t)<< U256_BSELM;
-     args->n_words = EC_JACREDUCE_BATCH_SIZE * indims * NWORDS_256BIT << U256_BSELM;
+   for (uint32_t i=max_order; i >= min_order; i--){
+     n_tables = (nec_points + i - 1) / i;
+     ec_table = (uint32_t *) malloc( (1 << i) * (n_tables * NWORDS_256BIT * outdims) * sizeof(uint32_t) );
+     ec_table2 = (uint32_t *) malloc( (1 << i) * (n_tables * NWORDS_256BIT * outdims) * sizeof(uint32_t) );
+
+     //printf("N Points : %d, N tables : %d\n",nec_points, n_tables);
+     if (ec2){
+       ec2_inittable_h(in_ecp, ec_table, nec_points, i, 0, 1);
+       ec2_jac2aff_h(ec_table2, ec_table, (1<<i) * n_tables , 0, 1);
+     } else { 
+       ec_inittable_h(in_ecp, ec_table, nec_points, i, 0, 1);
+       ec_jac2aff_h(ec_table2, ec_table, (1<<i) * n_tables , 0, 1);
+     }
+  
+  
+     args->ec_table = ec_table2;
+     args->order = i;
+  
+     if (file){
+       FILE *ifp = fopen(ec_table_filename,"wb");
+       fwrite(ec_table2, sizeof(uint32_t),n_tables * (1<<i) * NWORDS_256BIT * indims,ifp);
+       fclose(ifp);
+       args->filename = ec_table_filename;
+       args->offset = (i << EC_JACREDUCE_BATCH_SIZE) *indims * NWORDS_256BIT *sizeof(uint32_t)<< i;
+       args->total_words = 1ull<<31;
+     } else if (i==1){
+        args->ec_table = in_ecp;
+     }
+
+     clock_gettime(CLOCK_MONOTONIC, &start);
+     ec_jacreduce_server_h(args);
+     clock_gettime(CLOCK_MONOTONIC, &end);
+     elapsed = (double) (end.tv_sec - start.tv_sec);
+     elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+  
+     if (memcmp(r_aff, out_ecp1,
+                indims*NWORDS_256BIT*sizeof(uint32_t)) ){
+          n_errors++;
+     }
+  
+     if (n_errors){
+      printf("\033[1;31m");
+     }
+     printf("N errors(JACREDUCE_OPT [EC2 : %d, File : %d, N Points : %d, Order : %d]) : %d - Time : %f\n",ec2,file,nec_points,i,n_errors, elapsed);
+     printf("\033[0m");
+     retval += n_errors;
+     n_errors = 0;
+     free(ec_table);
+     free(ec_table2);
    }
-
-   clock_gettime(CLOCK_MONOTONIC, &start);
-   ec_jacreduce_server_h(args);
-   clock_gettime(CLOCK_MONOTONIC, &end);
-   elapsed = (double) (end.tv_sec - start.tv_sec);
-   elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
-
-   if (memcmp(r_aff, out_ecp1,
-              indims*NWORDS_256BIT*sizeof(uint32_t)) ){
-        n_errors++;
-   }
-
-   if (n_errors){
-    printf("\033[1;31m");
-   }
-   printf("N errors(JACREDUCE_OPT [EC2 : %d, File : %d, N Points : %d]) : %d - Time : %f\n",ec2,file,nec_points,n_errors, elapsed);
-   printf("\033[0m");
-   retval += n_errors;
-
+  
    free(samples);
    free(out_ecp1);
    free(r_aff);
    free(args);
-   free(ec_table);
-   free(ec_table2);
    release_h();
    return retval;
 }

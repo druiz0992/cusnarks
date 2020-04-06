@@ -857,21 +857,14 @@ Precomputed table binary file has the following format:
 |Field | Bit size | Description |
 |------|----------|-------------|
 |Order|32 bit| Table generation order. Tables will have 2^Order elements |
-|Offset T1 A|64 bit| Offset in 32 bit words of A Table 1 in file|
-|Offset T2 A|64 bit| Offset in 32 bit words of A Table 2 in file|
-|Offset T1 B2|64 bit| Offset in 32 bit words of B2 Table 1 in file|
-|Offset T2 B2|64 bit| Offset in 32 bit words of B2 Table 2 in file|
-|Offset T1 B1|64 bit| Offset in 32 bit words of B1 Table 1 in file|
-|Offset T2 B1|64 bit| Offset in 32 bit words of B1 Table 2 in file|
-|Offset T1 C|64 bit| Offset in 32 bit words  of C Table 1 in file|
-|Offset T1 hExps|64 bit| Offset in 32 bit words  of hExps Table 1 in file|
-|Last word Offset T1 hExps|64 bit| Offset in 32 bit words of last word hExps Table 1 in file|
-|T1 A|Var| A Table 1 (from nPublic+1 to nVars) |
-|T2 A|Var| A Table 2 (from 0 to nPublic+1)|
-|T1 B2|Var| B2 Table 1 (from nPublic+1 to nVars)|
-|T2 B2|Var| B2 Table 2 (from 0 to nPublic+1)|
-|T1 B1|Var| B1 Table 1 (from nPublic+1 to nVars)|
-|T2 B1|Var| B1 Table 2 (from 0 to nPublic+1)|
+|Offset T A|64 bit| Offset in 32 bit words of A Table 1 in file|
+|Offset T B2|64 bit| Offset in 32 bit words of B2 Table 1 in file|
+|Offset T B1|64 bit| Offset in 32 bit words of B1 Table 1 in file|
+|Offset T C|64 bit| Offset in 32 bit words  of C Table 1 in file|
+|Offset T hExps|64 bit| Offset in 32 bit words  of hExps Table 1 in file|
+|T1 A|Var| A Table  (from 0 to nVars) |
+|T1 B2|Var| B2 Table  (from 0 to nVars)|
+|T1 B1|Var| B1 Table 1 (from 0 to nVars)|
 |T1 C|Var| C Table 1 (from nPublic+1 to nVars)|
 |T1 hExps|Var| hhExps Table 1 (from 0 to domainSize-1)| 
 
