@@ -262,7 +262,7 @@ inline int32_t ec2_iseq_h(const uint32_t *x, const uint32_t *y)
 	   (compu256_h(&x[3*NWORDS_256BIT], &y[3*NWORDS_256BIT])==0) );
 }
 
-
+extern "C" void fail_h();
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);
 void mulN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx);

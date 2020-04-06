@@ -29,6 +29,7 @@ CC  = g++
 ASM = nasm
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
 DEBUG=0
+ADX_SUPPORT=$(shell cat /proc/cpuinfo | grep -m1 -oP 'adx')
 ifeq ($(DEBUG),1)
   CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE $(DEFINES_DEBUG) -std=c++11 -I $(INCLUDE_PATH) -w
   CUFLAGS=-rdc=true -G -O3 --source-in-ptx -keep --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v -Xptxas -maxrregcount=120 --cudart shared $(GENCODE_ARCH_COMPUTE)
@@ -67,8 +68,13 @@ CSRC = rng.cpp \
        constants.cpp \
        log.cpp
 
+ifeq ($(ADX_SUPPORT),adx)
+CASMSRC = fr_adx.casm \
+	 fq_adx.casm
+else
 CASMSRC = fr.casm \
 	 fq.casm
+endif
 
 #Check if CUDA tools are installed.
 CUDA_INSTALLED = $(shell which $(NVCC))
@@ -127,3 +133,4 @@ endif
 
 %.o : %.casm
 	$(ASM) $(ASMFLAGS) $*.casm -o $*.o	
+
