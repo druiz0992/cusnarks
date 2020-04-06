@@ -8373,7 +8373,7 @@ uint32_t test_sort(void)
 
   sortu256_idx_h(idx_v,samples,LEN,1);
   for (uint32_t i=0; i< LEN-1; i++){
-    if(compu256_h(&samples[idx_v[i]*NWORDS_256BIT],&samples[idx_v[i+1]*NWORDS_256BIT]) > 0) {
+    if(samples[idx_v[i]*NWORDS_256BIT+NWORDS_256BIT-1] > samples[idx_v[i+1]*NWORDS_256BIT+NWORDS_256BIT-1]) {
        n_errors++;
     }
   }
@@ -8479,7 +8479,6 @@ uint32_t test_interpol_mul_randomsize_prof(void)
    setRandom256(X1, cusnarks_nroots/2, N);
    setRandom256(Y1, cusnarks_nroots/2, N);
 
-   printf("Starting log2 N constraints: %d\n",min_k-1);
    for (k=min_k; k <= max_k; k++){
      clock_gettime(CLOCK_MONOTONIC, &start);
      npoints_raw = 1 << k;
@@ -8498,7 +8497,7 @@ uint32_t test_interpol_mul_randomsize_prof(void)
      elapsed = (double) (end.tv_sec - start.tv_sec);
      elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
      //printf("Time(FFTMUL-PARALLEL-SERVER - %d) Time : %f\n", 1 << (Nrows+Ncols), elapsed);
-     printf("%lld\n",(long long unsigned int) (elapsed*1000));
+     printf("Log2 Constraints : %d, Time : %lld\n",k,(long long unsigned int) (elapsed*1000));
     }
     
     

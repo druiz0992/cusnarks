@@ -228,14 +228,22 @@ void ec_jacaddreduce_finish_h(void *args);
 void ec2_jacaddreduce_finish_h(void *args);
 
 #ifdef _CASM
-extern "C" void rawAddLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
-extern "C" void rawSubLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
-extern "C" void rawMontgomeryMul_R(uint32_t *r, const uint32_t *, const uint32_t *b);
-extern "C" void rawMontgomerySquare_R(uint32_t *r, const uint32_t *x);
-extern "C" void rawAddLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
-extern "C" void rawSubLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
-extern "C" void rawMontgomeryMul_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
-extern "C" void rawMontgomerySquare_Q(uint32_t *r, const uint32_t *x);
+//extern "C" void rawAddLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void Fr_rawAdd(uint32_t *r, const uint32_t *, const uint32_t *b);
+//extern "C" void rawSubLL_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void Fr_rawSub(uint32_t *r, const uint32_t *, const uint32_t *b);
+//extern "C" void rawMontgomeryMul_R(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void Fr_rawMMul(uint32_t *r, const uint32_t *, const uint32_t *b);
+//extern "C" void rawMontgomerySquare_R(uint32_t *r, const uint32_t *x);
+extern "C" void Fr_rawMSquare(uint32_t *r, const uint32_t *x);
+//extern "C" void rawAddLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void Fq_rawAdd(uint32_t *r, const uint32_t *, const uint32_t *b);
+//extern "C" void rawSubLL_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void Fq_rawSub(uint32_t *r, const uint32_t *, const uint32_t *b);
+//extern "C" void rawMontgomeryMul_Q(uint32_t *r, const uint32_t *, const uint32_t *b);
+extern "C" void Fq_rawMMul(uint32_t *r, const uint32_t *, const uint32_t *b);
+//extern "C" void rawMontgomerySquare_Q(uint32_t *r, const uint32_t *x);
+extern "C" void Fq_rawMSquare(uint32_t *r, const uint32_t *x);
 #endif
 //////
 
@@ -1655,9 +1663,9 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 
  #else
     if (pidx == MOD_GROUP ){
-       rawMontgomeryMul_R(U, A, B);
+       Fr_rawMMul(U, A, B);
     } else {
-       rawMontgomeryMul_Q(U, A, B);
+       Fq_rawMMul(U, A, B);
     }
  #endif
 }
@@ -1678,14 +1686,14 @@ void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t 
   addm_h(&z[NWORDS_256BIT],t0,t1,pidx);
   subm_h(&z[NWORDS_256BIT],t2,&z[NWORDS_256BIT],pidx);
  #else
-  void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawSubLL_Q;
-  void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawAddLL_Q;
-  void (*mulm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawMontgomeryMul_Q;
+  void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawSub;
+  void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawAdd;
+  void (*mulm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawMMul;
 
   if (pidx == MOD_GROUP){
-     subm_cb = &rawSubLL_R;
-     addm_cb = &rawAddLL_R;
-     mulm_cb = &rawMontgomeryMul_R;
+     subm_cb = &Fr_rawSub;
+     addm_cb = &Fr_rawAdd;
+     mulm_cb = &Fr_rawMMul;
   } 
   
   mulm_cb(t0,x,y);
@@ -1708,9 +1716,9 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
     montmult_h(U,A,A,pidx);
   #else
     if (pidx == MOD_GROUP){
-      rawMontgomerySquare_R(U,A);
+      Fr_rawMSquare(U,A);
     } else {
-      rawMontgomerySquare_Q(U,A);
+      Fq_rawMSquare(U,A);
     }
   #endif
 }
@@ -1722,14 +1730,14 @@ void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
   #else
     uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
     uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
-    void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawSubLL_Q;
-    void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &rawAddLL_Q;
-    void (*sqm_cb)(uint32_t *, const uint32_t *) = &rawMontgomerySquare_Q;
+    void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawSub;
+    void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawAdd;
+    void (*sqm_cb)(uint32_t *, const uint32_t *) = &Fq_rawMSquare;
 
     if (pidx == MOD_GROUP){
-     subm_cb = &rawSubLL_R;
-     addm_cb = &rawAddLL_R;
-     sqm_cb = &rawMontgomerySquare_R;
+     subm_cb = &Fr_rawSub;
+     addm_cb = &Fr_rawAdd;
+     sqm_cb = &Fr_rawMSquare;
     } 
     sqm_cb(t0,A);
     sqm_cb(t1,&A[NWORDS_256BIT]);
@@ -2774,9 +2782,9 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
    }
    #else
     if (pidx == MOD_GROUP ){
-       rawAddLL_R(z, x, y);
+       Fr_rawAdd(z, x, y);
     } else {
-       rawAddLL_Q(z, x, y);
+       Fq_rawAdd(z, x, y);
     }
 	
    #endif
@@ -2811,9 +2819,9 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
    //memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
   #else
     if (pidx == MOD_GROUP ){
-       rawSubLL_R(z, x, y);
+       Fr_rawSub(z, x, y);
     } else {
-       rawSubLL_Q(z, x, y);
+       Fq_rawSub(z, x, y);
     }
   #endif
 }
@@ -5153,4 +5161,8 @@ void destroySharedMemBuf(void *shmem, int shmid)
    shmctl(shmid, IPC_RMID, NULL);
 }
 	
+void fail_h(void)
+{
+  assert(NULL);
+}
 

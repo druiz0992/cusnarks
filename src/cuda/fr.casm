@@ -18,9 +18,13 @@
         global Fr_q
 
         global rawAddLL_R
+        global Fr_rawAdd
         global rawSubLL_R
+        global Fr_rawSub
         global rawMontgomeryMul_R
+        global Fr_rawMMul
         global rawMontgomerySquare_R
+        global Fr_rawMSquare
 
         DEFAULT REL
 
@@ -109,6 +113,7 @@ u64toLong_adjust_neg:
 ;;;;;;;;;;;;;;;;;;;;;;
 
 rawMontgomerySquare_R:
+Fr_rawMSquare:
         sub     rsp, 32  ; Reserve space for ms
         mov     rcx, rdx            ; rdx is needed for multiplications so keep it in cx
         mov     r11, 0x87d20782e4866389 ; np
@@ -450,6 +455,7 @@ rawMontgomerySquare_mulM_done:
 ;;;;;;;;;;;;;;;;;;;;;;
 
 rawMontgomeryMul_R:
+Fr_rawMMul:
         sub     rsp, 32  ; Reserve space for ms
         mov     rcx, rdx            ; rdx is needed for multiplications so keep it in cx
         mov     r11, 0x87d20782e4866389 ; np
@@ -1621,6 +1627,7 @@ add_l1ml2m:
 ;    rax
 ;;;;;;;;;;;;;;;;;;;;;;
 rawAddLL_R:
+Fr_rawAdd:
         ; Add component by component with carry
 
         mov rax, [rsi + 0]
@@ -2147,6 +2154,7 @@ rawSubSL_done:
 ;    rax
 ;;;;;;;;;;;;;;;;;;;;;;
 rawSubLL_R:
+Fr_rawSub:
         ; Substract first digit
 
         mov rax, [rsi + 0]
