@@ -276,7 +276,7 @@ Fq_rawMMul:
     mov rdx,[rsi + 0]
     mulx rax,r11,[rcx]
     mulx r8,r12,[rcx +8]
-    adox r12,rax
+    adcx r12,rax
     mulx rax,r13,[rcx +16]
     adcx r13,r8
     mulx r8,r14,[rcx +24]
