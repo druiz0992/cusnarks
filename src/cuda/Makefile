@@ -69,14 +69,10 @@ CSRC = rng.cpp \
        log.cpp
 
 ifeq ($(ADX_SUPPORT),adx)
-#change these files - TODO
 CASMSRC = fr.casm \
 	 fq.casm
-#CASMSRC = fr_adx.casm \
-#	 fq_adx.casm
-else
-CASMSRC = fr.casm \
-	 fq.casm
+CASMSRC = fr_adx.casm \
+	 fq_adx.casm
 endif
 
 #Check if CUDA tools are installed.
