@@ -139,12 +139,12 @@ In the example above, there are 3 GPUs numbered 0,1,2.
 
 To launch GPU tests on GPUS 1 and 2 you need the following command: 
 ```sh
-CUDA_VISIBLE_DEVICES=1,2 make test_gpu
+CUDA_VISIBLE_DEVICES=1,2 make test_system
 ```
-To launch CPU tests you need the following command:
+To launch unit tests on CPU you need the following command:
 
 ```sh
-make test_cpu
+make test_unit
 ```
 ## Launching Cusnarks
 Launch setup and proof generation by running pysnarks.py. Following command displays help menu.

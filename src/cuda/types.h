@@ -60,8 +60,9 @@
 #define R1CS_HDR_START_OFFSET_NWORDS (8)
 
 #define R1CS_SECTION_LEN_NBYTES (12)
+#define R1CS_HDR_SECTION_TYPE (1)
 #define R1CS_HDR_START_HDR_NBYTES (12)
-#define R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES (R1CS_HDR_START_HDR_NBYTES + R1CS_HDR_START_HDR_NBYTES)
+#define R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES (R1CS_HDR_START_HDR_NBYTES + R1CS_SECTION_LEN_NBYTES)
 #define R1CS_CONST_START_OFFSET_NWORDS (R1CS_HDR_START_HDR_NBYTES/4)
 
 #define WITNESS_HEADER_N_OFFSET_NWORDS (0)
@@ -583,12 +584,13 @@ typedef enum{
 typedef struct {
   uint32_t magic_number;
   uint32_t version;
+  uint32_t nsections;
   uint32_t word_width_bytes;
   uint32_t nVars;
   uint32_t nPubOutputs;
   uint32_t nPubInputs;
   uint32_t nPrivInputs;
-  uint32_t nLabels;
+  t_uint64 nLabels;
   uint32_t nConstraints;
 
   uint32_t R1CSA_nCoeff;

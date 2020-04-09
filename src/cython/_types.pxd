@@ -202,12 +202,13 @@ cdef extern from "types.h":
   ctypedef struct r1csv1_t:
     uint32_t magic_number
     uint32_t version
+    uint32_t nsections
     uint32_t word_width_bytes
     uint32_t nVars
     uint32_t nPubOutputs
     uint32_t nPubInputs
     uint32_t nPrivInputs
-    uint32_t nLabels
+    t_uint64 nLabels
     uint32_t nConstraints
 
     uint32_t R1CSA_nCoeff
