@@ -149,12 +149,12 @@ test:
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
-test_cpu:   
+test_unit:   
 	@for i in $(CTEST_PATH); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
-test_gpu:   
+test_system:   
 	@for i in $(PYTST_PATH); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
@@ -204,5 +204,5 @@ clib:
 third_party_libs_clean:
 	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
 
-.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_cpu test_gpu clib debug_gpu
+.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_unit test_system clib debug_gpu
 
