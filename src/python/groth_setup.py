@@ -323,7 +323,7 @@ class GrothSetup(object):
         # proof. However, the way is is laid out it takes to much space. I comment this part
         # for now until I come up with a better way
         if self.write_table_en:
-          self.write_tables()
+          self.write_tables(all_tables=0)
 
         self.write_pk()
         self.write_vk()
@@ -794,7 +794,7 @@ class GrothSetup(object):
                   'R1CSB_nWords' : self.cir['R1CSB_nWords'],
                   'R1CSC_nWords' : self.cir['R1CSC_nWords']}
 
-    def write_tables(self):
+    def write_tables(self, all_tables=1):
        logging.info('#################################### ')
        logging.info('')
        logging.info('Writing Table files')
@@ -802,8 +802,9 @@ class GrothSetup(object):
        domainSize   =  int(self.pk['domainSize'])
        nPublic =  int(self.pk['nPublic'])
 
-       logging.info(' Computing EC Point A Tables')
-       self.pk['A_table1'] = ec_inittable_h(
+       if all_tables == 1:
+         logging.info(' Computing EC Point A Tables')
+         self.pk['A_table1'] = ec_inittable_h(
                                              np.reshape(
                                                      np.concatenate((
                                                                self.pk['A'],
@@ -811,13 +812,13 @@ class GrothSetup(object):
                                                                self.pk['delta_1'] 
                                                                     )),
                                                      -1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['A_table1'] = ec_jac2aff_h(np.reshape(self.pk['A_table1'],-1),MOD_GROUP,1)
-       #self.pk['A_table2'] = ec_inittable_h(np.reshape(self.pk['A'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
-       #self.pk['A_table2'] = ec_jac2aff_h(np.reshape(self.pk['A_table2'],-1),MOD_GROUP,1)
-       logging.info(' Done computing EC Point A Tables')
-
-       logging.info(' Computing EC Point B2 Tables')
-       self.pk['B2_table1'] = ec2_inittable_h(
+         self.pk['A_table1'] = ec_jac2aff_h(np.reshape(self.pk['A_table1'],-1),MOD_GROUP,1)
+         #self.pk['A_table2'] = ec_inittable_h(np.reshape(self.pk['A'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
+         #self.pk['A_table2'] = ec_jac2aff_h(np.reshape(self.pk['A_table2'],-1),MOD_GROUP,1)
+         logging.info(' Done computing EC Point A Tables')
+  
+         logging.info(' Computing EC Point B2 Tables')
+         self.pk['B2_table1'] = ec2_inittable_h(
                                               np.reshape(
                                                   np.concatenate((
                                                        self.pk['B2'],
@@ -825,11 +826,11 @@ class GrothSetup(object):
                                                        self.pk['delta_2'],
                                                               )),
                                                   -1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['B2_table1'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table1'],-1),MOD_GROUP,1)
-       logging.info(' Done computing EC Point B2 Tables')
+         self.pk['B2_table1'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table1'],-1),MOD_GROUP,1)
+         logging.info(' Done computing EC Point B2 Tables')
 
-       logging.info(' Computing EC Point B1 Tables')
-       self.pk['B1_table1'] = ec_inittable_h(
+         logging.info(' Computing EC Point B1 Tables')
+         self.pk['B1_table1'] = ec_inittable_h(
                                         np.reshape(
                                                 np.concatenate((
                                                           self.pk['B1'],
@@ -837,13 +838,13 @@ class GrothSetup(object):
                                                           self.pk['delta_1'],
                                                              )),
                                                -1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['B1_table1'] = ec_jac2aff_h(np.reshape(self.pk['B1_table1'],-1),MOD_GROUP,1)
-       logging.info(' Done computing EC Point B1 Tables')
+         self.pk['B1_table1'] = ec_jac2aff_h(np.reshape(self.pk['B1_table1'],-1),MOD_GROUP,1)
+         logging.info(' Done computing EC Point B1 Tables')
 
-       logging.info(' Computing EC Point C Tables')
-       self.pk['C_table1'] = ec_inittable_h(np.reshape(self.pk['C'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['C_table1'] = ec_jac2aff_h(np.reshape(self.pk['C_table1'],-1),MOD_GROUP,1)
-       logging.info(' Done computing EC Point C Tables')
+         logging.info(' Computing EC Point C Tables')
+         self.pk['C_table1'] = ec_inittable_h(np.reshape(self.pk['C'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
+         self.pk['C_table1'] = ec_jac2aff_h(np.reshape(self.pk['C_table1'],-1),MOD_GROUP,1)
+         logging.info(' Done computing EC Point C Tables')
 
        logging.info(' Computing EC Point hExps Tables')
        self.pk['hExps_table1'] = ec_inittable_h(
@@ -856,23 +857,31 @@ class GrothSetup(object):
        logging.info(' Done computing EC Point hExps Tables')
 
        logging.info('')
-       logging.info('Table1 A     : %s elements', self.pk['A_table1'].shape[0])
-       logging.info('Table1 B2    : %s elements', self.pk['B2_table1'].shape[0])
-       logging.info('Table1 B1    : %s elements', self.pk['B1_table1'].shape[0])
-       logging.info('Table1 C     : %s elements', self.pk['C_table1'].shape[0])
+       if all_tables:
+         logging.info('Table1 A     : %s elements', self.pk['A_table1'].shape[0])
+         logging.info('Table1 B2    : %s elements', self.pk['B2_table1'].shape[0])
+         logging.info('Table1 B1    : %s elements', self.pk['B1_table1'].shape[0])
+         logging.info('Table1 C     : %s elements', self.pk['C_table1'].shape[0])
        logging.info('Table1 hExps : %s elements', self.pk['hExps_table1'].shape[0])
 
        nWords_offset = ECTABLE_DATA_OFFSET_BYTES
 
        nWords_offset_dw = dw2w(nWords_offset)
-       nWords1_A = self.pk['A_table1'].shape[0] * NWORDS_256BIT + nWords_offset
-       nWords1_A_dw = dw2w(nWords1_A)
-       nWords1_B2 = self.pk['B2_table1'].shape[0] * NWORDS_256BIT + nWords1_A
-       nWords1_B2_dw = dw2w(nWords1_B2)
-       nWords1_B1 = self.pk['B1_table1'].shape[0] * NWORDS_256BIT + nWords1_B2
-       nWords1_B1_dw = dw2w(nWords1_B1)
-       nWords1_C = self.pk['C_table1'].shape[0] * NWORDS_256BIT + nWords1_B1
-       nWords1_C_dw = dw2w(nWords1_C)
+       if all_tables:
+         nWords1_A = self.pk['A_table1'].shape[0] * NWORDS_256BIT + nWords_offset
+         nWords1_A_dw = dw2w(nWords1_A)
+         nWords1_B2 = self.pk['B2_table1'].shape[0] * NWORDS_256BIT + nWords1_A
+         nWords1_B2_dw = dw2w(nWords1_B2)
+         nWords1_B1 = self.pk['B1_table1'].shape[0] * NWORDS_256BIT + nWords1_B2
+         nWords1_B1_dw = dw2w(nWords1_B1)
+         nWords1_C = self.pk['C_table1'].shape[0] * NWORDS_256BIT + nWords1_B1
+         nWords1_C_dw = dw2w(nWords1_C)
+       else:
+         nWords1_A_dw = dw2w(0)
+         nWords1_B2_dw = dw2w(0)
+         nWords1_B1_dw = dw2w(0)
+         nWords1_C_dw = dw2w(0)
+
        nWords1_hExps = self.pk['hExps_table1'].shape[0] * NWORDS_256BIT + nWords1_C
        nWords1_hExps_dw = dw2w(nWords1_hExps)
 
@@ -882,18 +891,24 @@ class GrothSetup(object):
                                 nWords1_B1_dw, 
                                 nWords1_C_dw,  nWords1_hExps_dw))
 
-       tables = np.concatenate((self.pk['A_table1'], 
+       if all_tables:
+         tables = np.concatenate((self.pk['A_table1'], 
                                 self.pk['B2_table1'], 
                                 self.pk['B1_table1'],
                                 self.pk['C_table1'], self.pk['hExps_table1']))
+       else:
+         tables =  self.pk['hExps_table1']
 
        logging.info('Table Desc : %s ', nWords)
        writeU256DataFile_h(nWords, self.write_table_f.encode("UTF-8"))
        appendU256DataFile_h(np.reshape(tables,-1), self.write_table_f.encode("UTF-8"))
-       del tables, self.pk['A_table1'], \
+       if all_tables:
+          del tables, self.pk['A_table1'], \
                    self.pk['B2_table1'], \
                    self.pk['B1_table1'], \
                    self.pk['C_table1'], self.pk['hExps_table1']
+       else:
+          del self.pk['hExps_table1']
 
        logging.info('')
        logging.info('')

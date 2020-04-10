@@ -740,28 +740,6 @@ class GrothProver(object):
                      )
           self.logger.info(' Process server - hExps Mexp common part completed ...')
 
-          if self.zk == 1:
-             self.logger.info(' Process server - hExps Mexp ZK part started ...')
-             np.copyto(self.pi_c_eccf1,
-                 ec_jacreduce_precomputed_h(
-                         np.reshape(
-                              np.concatenate((
-                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
-                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
-                                       [self.s_scl],
-                                       [self.r_scl] )),
-                              -1),
-                              np.reshape(
-                                 np.concatenate((
-                                       self.pi_c2_eccf1,
-                                       self.pi_c_eccf1,
-                                       self.pi_a_eccf1,
-                                       self.pi_b1_eccf1 )),
-                                 -1),
-                                 1, MOD_GROUP, 1, 1, 1)
-                    )
-             self.logger.info(' Process server - hExps Mexp ZK part completed ...')
-          self.logger.info(' Process server - Completed Last Mexp...')
           
         else:
           self.logger.info(' Process server - Waiting for Mexp to be completed...')
@@ -1358,6 +1336,8 @@ class GrothProver(object):
 
           # Assign collected values to pi's
           self.assignECPvalues(compute_ECP=False)
+          if self.compute_last_mexp_gpu == False:
+             self.assignECPvalues(compute_ECP=True)
           self.logger.info(' First Mexp completed...')
 
           end = time.time()
@@ -1406,7 +1386,29 @@ class GrothProver(object):
            self.logger.info(' Last Mexp completed')
 
         else:
-           if self.p_CPU is not None:
+          if self.zk == 1:
+             self.logger.info(' Process server - hExps Mexp ZK part started ...')
+             np.copyto(self.pi_c_eccf1,
+                 ec_jacreduce_precomputed_h(
+                         np.reshape(
+                              np.concatenate((
+                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       [self.s_scl],
+                                       [self.r_scl] )),
+                              -1),
+                              np.reshape(
+                                 np.concatenate((
+                                       self.pi_c2_eccf1,
+                                       self.pi_c_eccf1,
+                                       self.pi_a_eccf1,
+                                       self.pi_b1_eccf1 )),
+                                 -1),
+                                 1, MOD_GROUP, 1, 1, 1)
+                    )
+             self.logger.info(' Process server - hExps Mexp ZK part completed ...')
+          self.logger.info(' Process server - Completed Last Mexp...')
+          if self.p_CPU is not None:
              self.t_GP['Mexp2'] = t[2]
      
         return 
