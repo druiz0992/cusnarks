@@ -8147,14 +8147,10 @@ uint32_t test_nttmul_randomsize(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
-   uint32_t min_k=6, max_k = CusnarksGetNRoots();
+   uint32_t min_k=6, max_k = CusnarksGetNRoots()-1;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f)); 
    init_h();
-
-   if (max_k > 21) {
-     max_k = 21;
-   }
 
    for (k=min_k; k < max_k; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
@@ -8260,11 +8256,8 @@ uint32_t test_interpol_mul_randomsize(void)
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
    time_t start2, end2, start3, end3;
-   uint32_t min_k=6, max_k = CusnarksGetNRoots();
+   uint32_t min_k=6, max_k = CusnarksGetNRoots()-1;
 
-   if (max_k > 22) {
-     max_k = 22;
-   }
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
 
    init_h();
@@ -8459,7 +8452,7 @@ uint32_t test_interpol_mul_randomsize_prof(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
-   uint32_t min_k=22, max_k = CusnarksGetNRoots();
+   uint32_t min_k=22, max_k = CusnarksGetNRoots()-1;
    struct timespec start, end;
    double elapsed=0.0;
      

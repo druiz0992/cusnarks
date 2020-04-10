@@ -127,7 +127,7 @@ fi
 cd ${CUSNARKS_HOME};
 
 #Launch test
-make test_gpu
+make test_system
 
 
   
