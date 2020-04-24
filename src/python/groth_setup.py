@@ -78,7 +78,8 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None,
+                 grouping=U256_BSELM):
  
         # Check valid folder exists
         if keep_f is None:
@@ -102,6 +103,7 @@ class GrothSetup(object):
         random.seed(self.seed) 
 
         self.n_gpu = get_ngpu(max_used_percent=99.)
+        self.grouping = grouping
 
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group
@@ -802,113 +804,137 @@ class GrothSetup(object):
        domainSize   =  int(self.pk['domainSize'])
        nPublic =  int(self.pk['nPublic'])
 
-       if all_tables == 1:
-         logging.info(' Computing EC Point A Tables')
-         self.pk['A_table1'] = ec_inittable_h(
-                                             np.reshape(
-                                                     np.concatenate((
-                                                               self.pk['A'],
-                                                               self.pk['alfa_1'],
-                                                               self.pk['delta_1'] 
-                                                                    )),
-                                                     -1), U256_BSELM, MOD_GROUP, 1)
-         self.pk['A_table1'] = ec_jac2aff_h(np.reshape(self.pk['A_table1'],-1),MOD_GROUP,1)
-         #self.pk['A_table2'] = ec_inittable_h(np.reshape(self.pk['A'][:2*(nPublic+1)],-1), U256_BSELM, MOD_GROUP, 1)
-         #self.pk['A_table2'] = ec_jac2aff_h(np.reshape(self.pk['A_table2'],-1),MOD_GROUP,1)
-         logging.info(' Done computing EC Point A Tables')
-  
-         logging.info(' Computing EC Point B2 Tables')
-         self.pk['B2_table1'] = ec2_inittable_h(
-                                              np.reshape(
-                                                  np.concatenate((
-                                                       self.pk['B2'],
-                                                       self.pk['beta_2'],
-                                                       self.pk['delta_2'],
-                                                              )),
-                                                  -1), U256_BSELM, MOD_GROUP, 1)
-         self.pk['B2_table1'] = ec2_jac2aff_h(np.reshape(self.pk['B2_table1'],-1),MOD_GROUP,1)
-         logging.info(' Done computing EC Point B2 Tables')
-
-         logging.info(' Computing EC Point B1 Tables')
-         self.pk['B1_table1'] = ec_inittable_h(
-                                        np.reshape(
-                                                np.concatenate((
-                                                          self.pk['B1'],
-                                                          self.pk['beta_1'],
-                                                          self.pk['delta_1'],
-                                                             )),
-                                               -1), U256_BSELM, MOD_GROUP, 1)
-         self.pk['B1_table1'] = ec_jac2aff_h(np.reshape(self.pk['B1_table1'],-1),MOD_GROUP,1)
-         logging.info(' Done computing EC Point B1 Tables')
-
-         logging.info(' Computing EC Point C Tables')
-         self.pk['C_table1'] = ec_inittable_h(np.reshape(self.pk['C'][2*(nPublic+1):],-1), U256_BSELM, MOD_GROUP, 1)
-         self.pk['C_table1'] = ec_jac2aff_h(np.reshape(self.pk['C_table1'],-1),MOD_GROUP,1)
-         logging.info(' Done computing EC Point C Tables')
-
-       logging.info(' Computing EC Point hExps Tables')
-       self.pk['hExps_table1'] = ec_inittable_h(
-                                       np.reshape(
-                                               np.concatenate((
-                                                      self.pk['hExps'][:2*(domainSize-1)],
-                                                      self.pk['delta_1'] )),
-                                               -1), U256_BSELM, MOD_GROUP, 1)
-       self.pk['hExps_table1'] = ec_jac2aff_h(np.reshape( self.pk['hExps_table1'],-1),MOD_GROUP,1)
-       logging.info(' Done computing EC Point hExps Tables')
-
-       logging.info('')
-       if all_tables:
-         logging.info('Table1 A     : %s elements', self.pk['A_table1'].shape[0])
-         logging.info('Table1 B2    : %s elements', self.pk['B2_table1'].shape[0])
-         logging.info('Table1 B1    : %s elements', self.pk['B1_table1'].shape[0])
-         logging.info('Table1 C     : %s elements', self.pk['C_table1'].shape[0])
-       logging.info('Table1 hExps : %s elements', self.pk['hExps_table1'].shape[0])
-
-       nWords_offset = ECTABLE_DATA_OFFSET_BYTES
-
+       nWords_offset = ECTABLE_DATA_OFFSET_WORDS
        nWords_offset_dw = dw2w(nWords_offset)
+
        if all_tables:
-         nWords1_A = self.pk['A_table1'].shape[0] * NWORDS_256BIT + nWords_offset
+         nTables_A = int((self.pk['A'].shape[0] / ECP_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping) 
+         nWords1_A = (nTables_A << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords_offset
          nWords1_A_dw = dw2w(nWords1_A)
-         nWords1_B2 = self.pk['B2_table1'].shape[0] * NWORDS_256BIT + nWords1_A
+         nTables_B2 = int((self.pk['B2'].shape[0] / ECP2_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping) 
+         nWords1_B2 = (nTables_B2 << self.grouping ) * NWORDS_256BIT * ECP2_JAC_INDIMS + nWords1_A
          nWords1_B2_dw = dw2w(nWords1_B2)
-         nWords1_B1 = self.pk['B1_table1'].shape[0] * NWORDS_256BIT + nWords1_B2
+         nTables_B1 = int((self.pk['B1'].shape[0] / ECP_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping)
+         nWords1_B1 = (nTables_B1 << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_B2
          nWords1_B1_dw = dw2w(nWords1_B1)
-         nWords1_C = self.pk['C_table1'].shape[0] * NWORDS_256BIT + nWords1_B1
+         nTables_C = int((self.pk['C'][2*(nPublic+1):].shape[0] / ECP_JAC_INDIMS + self.grouping - 1)/self.grouping)
+         nWords1_C = (nTables_C << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_B1
          nWords1_C_dw = dw2w(nWords1_C)
        else:
-         nWords1_A_dw = dw2w(0)
-         nWords1_B2_dw = dw2w(0)
-         nWords1_B1_dw = dw2w(0)
-         nWords1_C_dw = dw2w(0)
+         nWords1_A_dw = dw2w(nWords_offset)
+         nWords1_B2_dw = dw2w(nWords_offset)
+         nWords1_B1_dw = dw2w(nWords_offset)
+         nWords1_C_dw = dw2w(nWords_offset)
+         nTables_A = 0
+         nTables_B2 = 0
+         nTables_B1 = 0
+         nTables_C = 0
+         nWords1_C = 0
 
-       nWords1_hExps = self.pk['hExps_table1'].shape[0] * NWORDS_256BIT + nWords1_C
+       nTables_hExps = int((domainSize + self.grouping - 1)/self.grouping) 
+       nWords1_hExps = (nTables_hExps << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_C
        nWords1_hExps_dw = dw2w(nWords1_hExps)
 
-       nWords = np.concatenate(([np.uint32(U256_BSELM)], nWords_offset_dw, 
+       nWords = np.concatenate(([np.uint32(self.grouping)], nWords_offset_dw, 
                                 nWords1_A_dw,  
                                 nWords1_B2_dw, 
                                 nWords1_B1_dw, 
                                 nWords1_C_dw,  nWords1_hExps_dw))
 
-       if all_tables:
-         tables = np.concatenate((self.pk['A_table1'], 
-                                self.pk['B2_table1'], 
-                                self.pk['B1_table1'],
-                                self.pk['C_table1'], self.pk['hExps_table1']))
-       else:
-         tables =  self.pk['hExps_table1']
-
-       logging.info('Table Desc : %s ', nWords)
        writeU256DataFile_h(nWords, self.write_table_f.encode("UTF-8"))
-       appendU256DataFile_h(np.reshape(tables,-1), self.write_table_f.encode("UTF-8"))
+       write_group_size = 1000
+
+       if all_tables == 1:
+         logging.info(' Computing EC Point A Tables')
+         super_group =  np.concatenate((
+                                             self.pk['A'],
+                                             self.pk['alfa_1'],
+                                             self.pk['delta_1'] 
+                                     ))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         
+         logging.info(' Done computing EC Point A Tables')
+  
+         logging.info(' Computing EC Point B2 Tables')
+         super_group =  np.concatenate((
+                                             self.pk['B2'],
+                                             self.pk['beta_2'],
+                                             self.pk['delta_2'] 
+                                     ))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP2_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec2_inittable_h(
+                              np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                   -1), self.grouping, MOD_GROUP, 1)
+           table = ec2_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         logging.info(' Done computing EC Point B2 Tables')
+
+         logging.info(' Computing EC Point B1 Tables')
+         super_group =  np.concatenate((
+                                             self.pk['B1'],
+                                             self.pk['beta_1'],
+                                             self.pk['delta_1'] 
+                                     ))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         logging.info(' Done computing EC Point B1 Tables')
+
+         logging.info(' Computing EC Point C Tables')
+         super_group =  self.pk['C'][2*(nPublic+1):]
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         logging.info(' Done computing EC Point C Tables')
+
+       logging.info(' Computing EC Point hExps Tables')
+       super_group =  np.concatenate((
+                                             self.pk['hExps'][:2*(domainSize-1)],
+                                             self.pk['delta_1'] 
+                                     ))
+
+       groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+       groups = np.append(groups, len(super_group)+1)
+       for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         
+       logging.info(' Done computing EC Point hExps Tables')
+
+       logging.info('')
        if all_tables:
-          del tables, self.pk['A_table1'], \
-                   self.pk['B2_table1'], \
-                   self.pk['B1_table1'], \
-                   self.pk['C_table1'], self.pk['hExps_table1']
-       else:
-          del self.pk['hExps_table1']
+         logging.info('Table1 A     : %s elements', nTables_A)
+         logging.info('Table1 B2    : %s elements', nTables_B2)
+         logging.info('Table1 B1    : %s elements', nTables_B1)
+         logging.info('Table1 C     : %s elements', nTables_C)
+       logging.info('Table1 hExps : %s elements', nTables_hExps)
+
 
        logging.info('')
        logging.info('')

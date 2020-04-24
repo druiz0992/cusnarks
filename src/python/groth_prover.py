@@ -579,7 +579,8 @@ class GrothProver(object):
           self.logger.info(' Process server - Starting First Mexp...')
           pk_bin2 = pkbin_get(self.pk,['A','B2','B1','C','nPublic'])
           nPublic = pk_bin2[4][0]
-          if not self.read_table_en:
+          print(self.ec_table)
+          if not self.read_table_en or self.ec_table['woffset_A'] == self.ec_table['woffset_B2']:
              np.copyto(self.pi_a_eccf1,
                       ec_jacreduce_h(
                          np.reshape(
@@ -608,7 +609,7 @@ class GrothProver(object):
                             MOD_GROUP, 1, 1, 1)
                     )
           self.logger.info(' Process server - Mexp A Done... ')
-          if not self.read_table_en:
+          if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
               np.copyto(self.pi_b_eccf2,
                     ec2_jacreduce_h(
                           np.reshape(
@@ -638,7 +639,7 @@ class GrothProver(object):
                     )
           self.logger.info(' Process server - Mexp B2 Done...')
 
-          if not self.read_table_en:
+          if not self.read_table_en or self.ec_table['woffset_C'] == self.ec_table['woffset_hExps']:
             np.copyto(self.pi_c_eccf1,
                     ec_jacreduce_h(
                          np.reshape(w[nPublic+1:nVars],-1),
@@ -662,7 +663,7 @@ class GrothProver(object):
           self.logger.info(' Process server - Mexp C Done...')
 
           if self.zk:
-            if not self.read_table_en:
+            if not self.read_table_en or self.ec_table['woffset_B1'] == self.ec_table['woffset_C']:
               np.copyto(self.pi_b1_eccf1,
                     ec_jacreduce_h(
                          np.reshape(
@@ -714,7 +715,7 @@ class GrothProver(object):
                                      [self.neg_rs_scl]
                                     )),-1)
 
-          if not self.read_table_en:
+          if not self.read_table_en or self.ec_table['woffset_hExps'] == self.ec_table['nwords_tdata']:
             EP_vector =  np.concatenate((
                                   pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],
                                   delta_1,
