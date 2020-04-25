@@ -579,7 +579,6 @@ class GrothProver(object):
           self.logger.info(' Process server - Starting First Mexp...')
           pk_bin2 = pkbin_get(self.pk,['A','B2','B1','C','nPublic'])
           nPublic = pk_bin2[4][0]
-          print(self.ec_table)
           if not self.read_table_en or self.ec_table['woffset_A'] == self.ec_table['woffset_B2']:
              np.copyto(self.pi_a_eccf1,
                       ec_jacreduce_h(
@@ -1387,29 +1386,43 @@ class GrothProver(object):
            self.logger.info(' Last Mexp completed')
 
         else:
-          if self.zk == 1:
-             self.logger.info(' Process server - hExps Mexp ZK part started ...')
-             np.copyto(self.pi_c_eccf1,
-                 ec_jacreduce_precomputed_h(
-                         np.reshape(
+           if self.zk == 0:
+             scalar_v = np.reshape(
+                              np.concatenate((
+                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32)
+                                       )), 
+                              -1)
+             ep_v     = np.reshape(
+                                 np.concatenate((
+                                       self.pi_c2_eccf1,
+                                       self.pi_c_eccf1
+                                 )),
+                          -1)
+           else :  
+             scalar_v =  np.reshape(
                               np.concatenate((
                                        np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
                                        np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
                                        [self.s_scl],
                                        [self.r_scl] )),
-                              -1),
-                              np.reshape(
-                                 np.concatenate((
+                              -1)
+             ep_v = np.reshape(
+                              np.concatenate((
                                        self.pi_c2_eccf1,
                                        self.pi_c_eccf1,
                                        self.pi_a_eccf1,
                                        self.pi_b1_eccf1 )),
-                                 -1),
+                                 -1)
+           self.logger.info(' Process server - hExps Mexp ZK part started ...')
+           np.copyto(self.pi_c_eccf1,
+               ec_jacreduce_precomputed_h( 
+                                          scalar_v,
+                                          ep_v,
                                  1, MOD_GROUP, 1, 1, 1)
                     )
-             self.logger.info(' Process server - hExps Mexp ZK part completed ...')
-          self.logger.info(' Process server - Completed Last Mexp...')
-          if self.p_CPU is not None:
+           self.logger.info(' Process server - hExps Mexp ZK part completed ...')
+           if self.p_CPU is not None:
              self.t_GP['Mexp2'] = t[2]
      
         return 
