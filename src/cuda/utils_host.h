@@ -349,6 +349,7 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx);
 void printU256Number(const uint32_t *x);
 void printU256Number(const char *, const uint32_t *x);
+void printU256M(const char *, uint32_t nrows, uint32_t ncols);
 void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
 void readU256DataFileFromOffset_h(uint32_t *samples, const char *filename, t_uint64 woffset, t_uint64 nwrods);
 void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt, const unsigned long long insize);
