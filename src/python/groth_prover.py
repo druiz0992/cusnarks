@@ -85,7 +85,7 @@ class GrothProver(object):
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None,
                  n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
                  benchmark_f=None, seed=None, snarkjs=None, verify_en=0,
-                 keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1):
+                 keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1, grouping=U256_BSELM):
 
         # Check valid folder exists
         if keep_f is None:
@@ -122,6 +122,7 @@ class GrothProver(object):
         random.seed(self.seed) 
 
         self.sort_en = 0
+        self.grouping = grouping
         self.compute_ntt_gpu = False
         self.compute_first_mexp_gpu = True
         self.compute_last_mexp_gpu = True
@@ -286,16 +287,45 @@ class GrothProver(object):
                 np.zeros((domainSize, NWORDS_256BIT), dtype=np.uint32))
 
         # Roots
-        self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
-        self.roots_rdc_u256 =\
+        if self.compute_ntt_gpu:
+          self.roots_rdc_u256_sh = RawArray(c_uint32,  (1 << self.n_bits_roots) * NWORDS_256BIT)
+          self.roots_rdc_u256 =\
                 np.frombuffer(
                         self.roots_rdc_u256_sh,
-                        dtype=np.uint32).reshape((1<<self.n_bits_roots, NWORDS_256BIT))
-        np.copyto(
+                        dtype=np.uint32).reshape(( (1<<self.n_bits_roots), NWORDS_256BIT))
+          np.copyto(
                 self.roots_rdc_u256,
                 readU256DataFile_h(
                     self.roots_f.encode("UTF-8"),
                     1<<self.n_bits_roots, 1<<self.n_bits_roots) )
+        else:
+          ifft_params = ntt_build_h(self.pA_T.shape[0])
+          nroots = ifft_params['levels'] + 1
+          nroots2 = int(nroots/2)
+          if int(nroots) % 2 :
+            nroots3 = nroots2+1
+          else:
+            nroots3 = nroots2-1
+          self.roots_rdc_u256_sh = RawArray(c_uint32,  ((1 << nroots) + (1<< nroots2) + (1 << nroots3)) * NWORDS_256BIT)
+          self.roots_rdc_u256 =\
+                np.frombuffer(
+                        self.roots_rdc_u256_sh,
+                        dtype=np.uint32).reshape(( (1<< nroots) + (1 << nroots2) + (1 << nroots3), NWORDS_256BIT))
+          np.copyto(
+                self.roots_rdc_u256[:1<<nroots],
+                readU256DataFile_h(
+                    self.roots_f.encode("UTF-8"),
+                    1<<self.n_bits_roots, 1<<nroots) )
+          np.copyto(
+                self.roots_rdc_u256[1<<nroots:(1<<nroots)+(1<<nroots2)],
+                readU256DataFile_h(
+                    self.roots_f.encode("UTF-8"),
+                    1<<self.n_bits_roots, 1<<nroots2) )
+          np.copyto(
+                self.roots_rdc_u256[(1<<nroots)+(1<<nroots2):(1<<nroots)+(1<<nroots2)+(1<<nroots3)],
+                readU256DataFile_h(
+                    self.roots_f.encode("UTF-8"),
+                    1<<self.n_bits_roots, 1<<nroots3) )
 
         # pis
         self.pi_a_eccf1_sh = RawArray(c_uint32, ECP_JAC_INDIMS * NWORDS_256BIT)
@@ -361,6 +391,7 @@ class GrothProver(object):
         self.logger.info(' - compute first Mexp in GPU : %s', self.compute_first_mexp_gpu)
         self.logger.info(' - compute last Mexp in GPU : %s', self.compute_last_mexp_gpu)
         self.logger.info(' - zero knowledge enabled : %s', self.zk)
+        self.logger.info(' - grouping : %s', self.grouping)
         self.logger.info(' - N Constraints : %s', self.nVars)
         self.logger.info(' - Domain Size : %s', domainSize)
         self.logger.info(' - N Public : %s', nPublic)
@@ -565,7 +596,7 @@ class GrothProver(object):
                      np.reshape(self.pA_T,-1),
                      np.reshape(self.pB_T,-1),
                      np.reshape(
-            self.roots_rdc_u256[::1<<(self.n_bits_roots - ifft_params['levels']-1)] ,
+            self.roots_rdc_u256,
                     -1
                                ),
                      2,
@@ -589,7 +620,7 @@ class GrothProver(object):
                                               [self.r_scl] )),
                                     -1),
                          pk_bin2[0][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS],
-                         MOD_GROUP, 1, 1, 1)
+                         MOD_GROUP, 1, 1, 1, self.grouping)
                     )
           else :
              np.copyto(self.pi_a_eccf1,
@@ -618,7 +649,7 @@ class GrothProver(object):
                                               [self.s_scl] )),
                                     -1),
                          pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS],
-                         MOD_GROUP, 1, 1, 1)
+                         MOD_GROUP, 1, 1, 1, self.grouping)
                    )
           else:
             np.copyto(self.pi_b_eccf2,
@@ -643,7 +674,7 @@ class GrothProver(object):
                     ec_jacreduce_h(
                          np.reshape(w[nPublic+1:nVars],-1),
                          pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS],
-                         MOD_GROUP, 1, 1, 1)
+                         MOD_GROUP, 1, 1, 1, self.grouping)
                    )
           else :
              self.ect_G1_woffset -= self.ec_table['woffset_A'] 
@@ -672,7 +703,7 @@ class GrothProver(object):
                                               [self.s_scl] )),
                               -1),
                          pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS],
-                         MOD_GROUP, 1, 1, 1)
+                         MOD_GROUP, 1, 1, 1, self.grouping)
                     )
             else:
              self.ect_G1_woffset -= self.ec_table['woffset_C'] 
@@ -723,7 +754,7 @@ class GrothProver(object):
                     ec_jacreduce_h(
                               scalar_vector,
                               EP_vector,
-                              MOD_GROUP, 1, 1, 1)
+                              MOD_GROUP, 1, 1, 1, self.grouping)
                     )
           else:
 

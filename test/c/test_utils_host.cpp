@@ -42,6 +42,14 @@
 #include <omp.h>
 #include "types.h"
 #include "constants.h"
+#include "uint256.h"
+#include "bigint.h"
+#include "ff.h"
+#include "ntt.h"
+#include "ec.h"
+#include "init.h"
+#include "file_utils.h"
+#include "transpose.h"
 #include "utils_host.h"
 
 #define NROOTS 128
@@ -8147,7 +8155,7 @@ uint32_t test_nttmul_randomsize(void)
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
    uint32_t npoints_raw, npoints, nroots;
    uint32_t retval=0;
-   uint32_t min_k=6, max_k = CusnarksGetNRoots()-1;
+   uint32_t min_k=6, max_k = 11;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f)); 
    init_h();
@@ -8253,12 +8261,14 @@ uint32_t test_interpol_mul_randomsize(void)
    ntt_interpolandmul_t *args;
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
-   uint32_t npoints_raw, npoints, nroots;
+   uint32_t npoints_raw, npoints, nroots, nroots2;
    uint32_t retval=0;
    time_t start2, end2, start3, end3;
+   //uint32_t min_k=6, max_k = 7;//CusnarksGetNRoots()-1;
    uint32_t min_k=6, max_k = CusnarksGetNRoots()-1;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
+   nroots2 = CusnarksGetNRoots()/2;
 
    init_h();
    X1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
@@ -8267,21 +8277,26 @@ uint32_t test_interpol_mul_randomsize(void)
    Y2 = (uint32_t *)malloc((cusnarks_nroots)* NWORDS_256BIT * sizeof(uint32_t));
    X3 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
    Y3 = (uint32_t *)malloc((cusnarks_nroots)* NWORDS_256BIT * sizeof(uint32_t));
-   roots = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   roots = (uint32_t *)malloc((cusnarks_nroots + (1<<nroots2) + (1<<(nroots2+1))) * NWORDS_256BIT * sizeof(uint32_t));
    args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
 
    args->A = X3; args->B = Y3; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
    args->rstride=2;
-   for (k=min_k; k < max_k; k++){
+   for (k=min_k; k <= max_k; k++){
    //for (k=23; k < 24; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
      
      ntt_build_h(&fft_params, npoints_raw);
      npoints = npoints_raw + fft_params.padding;
      nroots = npoints;
-
+     nroots2 = k/2;
      readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
-
+     readU256DataFile_h(&roots[nroots*NWORDS_256BIT],roots_f, cusnarks_nroots, 1<<nroots2 );
+     if (k % 2 == 1){
+       readU256DataFile_h(&roots[(nroots+(1<<nroots2))*NWORDS_256BIT],roots_f, cusnarks_nroots, 1<<(nroots2+1));
+     } else {
+       readU256DataFile_h(&roots[(nroots+(1<<nroots2))*NWORDS_256BIT],roots_f, cusnarks_nroots, 1<<(nroots2-1));
+     }
      memset(X1,0, NWORDS_256BIT * sizeof(uint32_t) * npoints); 
      memset(Y1,0, NWORDS_256BIT * sizeof(uint32_t) * npoints); 
      setRandom256(X1, npoints/2, N);
@@ -8450,18 +8465,20 @@ uint32_t test_interpol_mul_randomsize_prof(void)
    ntt_interpolandmul_t *args;
    char roots_f[1000];
    int cusnarks_nroots = 1 << CusnarksGetNRoots();
-   uint32_t npoints_raw, npoints, nroots;
+   uint32_t npoints_raw, npoints, nroots, nroots2;
    uint32_t retval=0;
+   //uint32_t min_k=6, max_k = 6;//CusnarksGetNRoots()-1;
    uint32_t min_k=22, max_k = CusnarksGetNRoots()-1;
    struct timespec start, end;
    double elapsed=0.0;
      
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
+   nroots2 = CusnarksGetNRoots()/2;
 
    init_h();
    X1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
    Y1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
-   roots = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_256BIT * sizeof(uint32_t));
+   roots = (uint32_t *)malloc((cusnarks_nroots + (1<<nroots2) + (1<<(nroots2+1))) * NWORDS_256BIT * sizeof(uint32_t));
    args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
 
    args->A = X1; args->B = Y1; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();

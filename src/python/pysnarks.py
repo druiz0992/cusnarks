@@ -347,6 +347,10 @@ def run(opt, parser):
     if args.reserved_cpus is not None:
          opt['reserved_cpus'] = args.reserved_cpus
 
+    if args.grouping is not None:
+         opt['grouping'] = args.grouping
+
+
 
     if args.mode == 's' or args.mode == 'setup':
 
@@ -369,10 +373,6 @@ def run(opt, parser):
       
       if args.keys_format is not None:
         opt['keys_format'] = args.keys_format
-
-      if args.grouping is not None:
-         opt['grouping'] = args.grouping
-
 
       if args.benchmark is not None:
         # Compile circuit if it doesnt exist
@@ -446,7 +446,7 @@ def run(opt, parser):
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], read_table_f=opt['table_f'], zk=opt['zero_knowledge'])
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], read_table_f=opt['table_f'], zk=opt['zero_knowledge'], grouping=opt['grouping'])
           end = time.time() - start
           print("GP init : "+str(end))
 

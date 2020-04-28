@@ -47,7 +47,7 @@
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
 #define TRANSPOSE_BLOCK_SIZE  (32)
-#define U256_BSELM  (8)
+#define U256_BSELM  (12)
 #define NBITS_BYTE (8)
 #define EC_JACREDUCE_TABLE_LEN (256)
 #define EC_JACREDUCE_BATCH_SIZE (5)
@@ -135,6 +135,22 @@ typedef long long int t_int64;
 
 typedef unsigned int uint256_t[NWORDS_256BIT];
 typedef unsigned int uint512_t[2*NWORDS_256BIT];
+
+typedef void (*t_subm) (uint32_t *, const uint32_t *, const uint32_t *);
+typedef void (*t_addm) (uint32_t *, const uint32_t *, const uint32_t *);
+typedef void (*t_mulm) (uint32_t *, const uint32_t *, const uint32_t *);
+typedef void (*t_sqm)  (uint32_t *, const uint32_t *);
+typedef void (*t_tomont)  (uint32_t *, const uint32_t *);
+typedef void (*t_frommont)  (uint32_t *, const uint32_t *);
+typedef void (t_ntt) (uint32_t *, const uint32_t *roots, uint32_t, t_uint64, t_uint64, int32_t);
+
+typedef struct{
+  t_subm subm_cb;
+  t_addm addm_cb;
+  t_mulm mulm_cb;
+  t_sqm  sqm_cb;
+
+}t_ff;
 
 // prime number info for finite fields
 typedef struct {
@@ -284,14 +300,6 @@ typedef struct{
   uint32_t levels;
   
 }fft_params_t;
-
-typedef struct{
-  uint32_t *x0;
-  uint32_t *x1;
-  uint32_t *x2;
-  uint32_t *x3;
-  uint32_t *x4;
-}inv_t;
 
 // kernel input parameters
 typedef struct{

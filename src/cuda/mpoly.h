@@ -15,48 +15,32 @@
 
     You should have received a copy of the GNU General Public License along with
     cusnarks. If not, see <https://www.gnu.org/licenses/>.
-*/
 
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : gen_roots.cpp
+// File name  : ff.h
 //
-// Date       : 6/03/2019
+// Date       : 06/03/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Generate roots
-//
+//  Implementation 
 // ------------------------------------------------------------------
 
+*/
+#ifndef _MPOLY_H_
+#define _MPOLY_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <cmath>
-
-#include "types.h"
-#include "file_utils.h"
-#include "ntt.h"
-
-
-void test_gen_roots(uint32_t nbits, char *filename)
-{
-  uint32_t nsamples = (1<<nbits) * NWORDS_256BIT;
-  uint32_t *roots = (uint32_t *)malloc( nsamples * sizeof(uint32_t));
-
-  computeRoots_h(roots,nbits);
-
-  writeU256DataFile_h(roots, filename, nsamples);
-}
+void mpoly_eval_server_h(mpoly_eval_t *mpoly_args);
+void *mpoly_eval_h(void *args);
+void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint32_t to_mont, uint32_t pidx, uint32_t extend);
+void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
+void mpoly_from_montgomery_h(uint32_t *x, uint32_t pidx);
+void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx);
 
 
-int main(int argc, char **argv )
-{
-  char *n;
-  test_gen_roots(strtol(argv[1], &n,10),argv[2]);
-  return 1;
-}
+#endif
+
 

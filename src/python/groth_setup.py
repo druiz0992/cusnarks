@@ -179,6 +179,7 @@ class GrothSetup(object):
         logging.info(' - sort enable : %s', self.sort_en)
         logging.info(' - write_table_en : %s', self.write_table_en)
         logging.info(' - table_f : %s', self.write_table_f)
+        logging.info(' - grouping : %s', self.grouping)
         logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info('#################################### ')
         logging.info('')
