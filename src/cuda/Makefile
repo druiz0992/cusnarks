@@ -66,7 +66,16 @@ CUSRC = cusnarks_kernel.cu \
 CSRC = rng.cpp \
        utils_host.cpp \
        constants.cpp \
-       log.cpp
+       log.cpp \
+       bigint.cpp \
+       ff.cpp \
+       ntt.cpp \
+       ec.cpp \
+       file_utils.cpp \
+       mpoly.cpp \
+       transpose.cpp \
+       inplace_transpose_data.cpp \
+       init.cpp
 
 ifeq ($(ADX_SUPPORT),adx)
 CASMSRC = fr_adx.casm \

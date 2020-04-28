@@ -53,6 +53,7 @@ const uint32_t * CusnarksPrimitiveRootsFieldGet(uint32_t nbits);
 uint32_t CusnarksGetNRoots(void);
 void CusnarksGetFRoots(char *filename, uint32_t sizeof_f);
 const uint32_t * CusnarksTidxGet(void);
+void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots);
 
 #endif
 

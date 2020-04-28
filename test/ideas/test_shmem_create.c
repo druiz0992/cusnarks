@@ -37,7 +37,7 @@ int main()
    }
 
    // write access
-   createSharedMemBuf((void **) &shmp, size);
+   shared_new_h((void **) &shmp, size);
 
    printf("\nShared mem created\n");
 

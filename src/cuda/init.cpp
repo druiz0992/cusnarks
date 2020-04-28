@@ -1,18 +1,15 @@
+
 /*
     Copyright 2018 0kims association.
-
     This file is part of cusnarks.
-
     cusnarks is a free software: you can redistribute it and/or
     modify it under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your option)
     any later version.
-
     cusnarks is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
     or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
     more details.
-
     You should have received a copy of the GNU General Public License along with
     cusnarks. If not, see <https://www.gnu.org/licenses/>.
 */
@@ -20,43 +17,44 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : gen_roots.cpp
+// File name  : init.cpp
 //
 // Date       : 6/03/2019
 //
 // ------------------------------------------------------------------
 //
 // Description:
-//   Generate roots
+//  Init and Release Host resources
 //
 // ------------------------------------------------------------------
-
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <cmath>
+#include <pthread.h>
 
 #include "types.h"
-#include "file_utils.h"
+#include "utils_host.h"
+#include "constants.h"
+#include "bigint.h"
+#include "ec.h"
 #include "ntt.h"
+#include "init.h"
 
 
-void test_gen_roots(uint32_t nbits, char *filename)
+/*
+  General initialization function. To be called at the beginning of program
+*/
+void init_h(void)
 {
-  uint32_t nsamples = (1<<nbits) * NWORDS_256BIT;
-  uint32_t *roots = (uint32_t *)malloc( nsamples * sizeof(uint32_t));
-
-  computeRoots_h(roots,nbits);
-
-  writeU256DataFile_h(roots, filename, nsamples);
+  utils_init_h();
+  ec_init_h();
+  ntt_init_h(1<< CusnarksGetNRoots());
 }
 
-
-int main(int argc, char **argv )
+/*
+  Release resources
+*/
+void release_h(void)
 {
-  char *n;
-  test_gen_roots(strtol(argv[1], &n,10),argv[2]);
-  return 1;
+  utils_free_h();
+  ec_free_h();
+  ntt_free_h();
 }
 

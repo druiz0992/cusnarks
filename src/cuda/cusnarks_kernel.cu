@@ -38,8 +38,8 @@
 #include "constants.h"
 #include "cuda.h"
 #include "log.h"
-//#include "rng.h"
-#include "utils_host.h"
+#include "bigint.h"
+#include "ff.h"
 #include "cusnarks_kernel.h"
 
 

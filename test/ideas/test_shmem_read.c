@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
      printU256Number(&buffer[i*NWORDS_256BIT]);
    }
 
-   int32_t shmid = createSharedMemBuf((void **) &buffer, size);
+   int32_t shmid = shared_new((void **) &buffer, size);
    if (shmid == -1)
    {
      printf("Error");
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
    }
 
    if (argc > 1){
-     destroySharedMemBuf((void *) buffer, shmid);
+     shared_free((void *) buffer, shmid);
    }
 
    return 1;

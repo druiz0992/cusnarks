@@ -114,28 +114,6 @@ IF CUDA_DEF:
              else:
                  kconfig[i].in_offset = 0
   
-          #Template case. Not working, but leave for now
-          """
-          print("allocating async buffer in_vec\n");
-          cdef C_AsyncBuf [ct.uint32_t] *in_vec_flat = new C_AsyncBuf[ct.uint32_t](in_v.length  * in_vec.shape[1])
-          print("Assigning value\n")
-          in_vec_flat.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
-          print("storing\n")
-          in_v.data  = <ct.uint32_t *>in_vec_flat.getBuf()
-  
-          print("allocating async buffer out_vec\n");
-          cdef C_AsyncBuf [ct.uint32_t] *out_vec_flat = new C_AsyncBuf[ct.uint32_t](out_v.length  * in_vec.shape[1])
-          out_v.data = <ct.uint32_t *>out_vec_flat.getBuf()
-  
-          # TODO :I am trying to represent input data as ndarray. I don't
-          # know how other way to do this but to overwrite ndarray with input data
-  
-          # create kernel params data
-          #cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
-          print("allocating async buffer params\n");
-          cdef C_AsyncBuf [ct.kernel_params_t] *kparams_buffer = new C_AsyncBuf[ct.kernel_params_t](n_kernels)
-          cdef ct.kernel_params_t *kparams = <ct.kernel_params_t *>kparams_buffer.getBuf()
-          """
           # create kernel params data
           cdef ct.kernel_params_t *kparams
 
@@ -325,42 +303,6 @@ IF CUDA_DEF:
       def __dealloc__(self):
           del self._zpoly_ptr
   
-  # C_AsyncBuf class cython wrapper
-  """
-  cdef class AsyncBuf:
-      cdef void* buffer
-      cdef ct.uint32_t max_nelems
-      cdef ct.uint32_t el_size
-
-      cdef C_AsyncBuf* _async_buffer_ptr
-  
-      def __cinit__(self, ct.uint32_t nelems, ct.uint32_t el_size):
-          self._async_buffer_ptr = new C_AsyncBuf(nelems, el_size)
-  
-      def __dealloc__(self):
-          if self._async_buffer_ptr != NULL:
-            del self._async_buffer_ptr
-
-      def  getBufUint32(self):
-        cdef ct.uint32_t n_elems = self._async_buffer_ptr.getNelems()
-        cdef ct.uint32_t [:] r= <ct.uint32_t [:n_elems]>self._async_buffer_ptr.getBuf()
-
-        return np.asarray(r)
-        
-      def getBufKernelParams(self):       
-        cdef ct.kernel_params_t *kparams = self._async_buffer_ptr.getBuf()
-        dict kparams_dict = {}
-
-        return kparams_dict
-
-      def  getNelems(self):
-        return self._async_buffer_ptr.getNelems()
-
-  
-      def  setBuf(self, np.ndarray[ndim=1, dtype=np.uint32_t] in_data, ct.uint32_t nelems):
-        return self._async_buffer_ptr.setBuf(&in_data[0], nelems)
-      """
-
 def montsquare_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, ct.uint32_t pidx):
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
 
@@ -538,8 +480,8 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
                          np.ndarray[ndim=1, dtype=np.uint32_t] invroots, ct.uint32_t rstride, ct.uint32_t pidx):
 
      cdef ct.ntt_interpolandmul_t *args_c = <ct.ntt_interpolandmul_t *> malloc(sizeof(ct.ntt_interpolandmul_t))
-     cdef ct.uint32_t Nrows = np.log2(inva.shape[0]/NWORDS_256BIT)/2
-     cdef ct.uint32_t Ncols = np.log2(inva.shape[0]/NWORDS_256BIT) - Nrows
+     cdef ct.uint32_t Ncols = np.log2(inva.shape[0]/NWORDS_256BIT)/2
+     cdef ct.uint32_t Nrows = np.log2(inva.shape[0]/NWORDS_256BIT) - Ncols
 
      args_c.A = &inva[0]
      args_c.B = &invb[0]
@@ -563,14 +505,6 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
 
 def get_nprocs_h():
     return uh.cget_nprocs_h()
-
-def zpoly_norm_h(np.ndarray[ndim=2, dtype=np.uint32_t] pin_data):
-    cdef ct.uint32_t ncoeff = pin_data.shape[0]
-    cdef np.ndarray[ndim=1, dtype=np.uint32_t] pin_data_flat = np.zeros(ncoeff * pin_data.shape[1],dtype=np.uint32)
-    pin_data_flat = np.reshape(pin_data,-1)
-    cdef ct.uint32_t idx = uh.czpoly_norm_h(&pin_data_flat[0],ncoeff)
-
-    return idx
 
 def sortu256_idx_h(np.ndarray[ndim=2, dtype=np.uint32_t] vin, ct.uint32_t sort_en):
     if len(vin)==0:
@@ -781,12 +715,12 @@ def readWitnessShmem_h(ct.uint32_t nVars):
         cdef ct.uint32_t flag, shmid
         cdef unsigned long long size = nVars * sizeof(ct.uint32_t)*NWORDS_256BIT
 
-        shmid = uh.ccreateSharedMemBuf(<void **>w_ptr, size)
+        shmid = uh.cshared_new_h(<void **>w_ptr, size)
         cdef ct.uint32_t [:] kdata = <ct.uint32_t [:nVars * NWORDS_256BIT]>w_ptr[0]
         cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_witness = np.zeros((nVars*NWORDS_256BIT), dtype=np.uint32)
         out_witness = np.copy(np.asarray(kdata).reshape(-1,NWORDS_256BIT))
 
-        uh.cdestroySharedMemBuf(w_ptr[0], shmid)
+        uh.cshared_free_h(w_ptr[0], shmid)
 
         return out_witness
 
@@ -1301,22 +1235,6 @@ def from_montgomeryN_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_v, ct.uint32_t pi
 
      return out_v.reshape((-1,ct.NWORDS_256BIT))
 
-def ec_stripc_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v):
-     cdef ct.uint32_t n = <int>(in_v.shape[0]*2/3)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
-
-     uh.cec_stripc_h(&out_v[0], &in_v[0], <int>(n/(2*NWORDS_256BIT)))
-
-     return out_v.reshape((-1,ct.NWORDS_256BIT))
-
-def ec2_stripc_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v):
-     cdef ct.uint32_t n = <int>(in_v.shape[0]*4/6)
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
-
-     uh.cec2_stripc_h(&out_v[0], &in_v[0], <int>(n/(4*NWORDS_256BIT)))
-
-     return out_v.reshape((-1,ct.NWORDS_256BIT))
-
 def ec_isinf(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx):
     cdef ct.uint32_t n = <unsigned int>len(in_v)/(ECP_JAC_INDIMS *NWORDS_256BIT)
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros(n, dtype=np.uint32)
@@ -1332,13 +1250,6 @@ def ec2_isinf(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx):
     uh.cec2_isinf(&out_v[0], &in_v[0], n, pidx)
 
     return (out_v)
-
-def field_roots_compute_h(ct.uint32_t nbits):
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_v = np.zeros((1<<nbits) * NWORDS_256BIT, dtype=np.uint32)
-     
-     uh.cfield_roots_compute_h(&out_v[0], nbits)
-     return out_v.reshape((-1,ct.NWORDS_256BIT))
-     
 
 def mpoly_to_montgomery_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_vec, ct.uint32_t pidx):
      uh.cmpoly_to_montgomery_h(&in_vec[0], pidx)

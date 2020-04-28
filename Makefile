@@ -114,8 +114,8 @@ AUX_REPOS := $(aux_repos)
 
 #DEFINES
 # -DPARALLEL_EN, -DCU_ASM, -DCU_ASM, -DCU_ASM_ECADD
-DEFINES = -DPARALLEL_EN  -DCU_ASM 
-DEFINES_DEBUG = -DPARALLEL_EN -DCU_ASM
+DEFINES = -DPARALLEL_EN  -DCU_ASM  -D_CASM
+DEFINES_DEBUG = -DPARALLEL_EN -DCU_ASM -D_CASM
 
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
@@ -152,7 +152,7 @@ test:
 test_unit:   
 	@for i in $(CTEST_PATH); do \
 	echo "make test in $$i..."; \
-	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean test); done
 
 test_system:   
 	@for i in $(PYTST_PATH); do \
