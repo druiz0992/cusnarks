@@ -89,9 +89,11 @@ if [ ! -f ${INIT_FILE} ]; then
   ${PIP_INSTALL} ${PYLIB} >> ${LOG} 
   
   #Rust
-  ${CURL}  ${RUST_ADDR} ${CURL_OPT} > ${CURL_INST}
-  [ -e ${CURL_INST} ] && chmod 777 ${CURL_INST} && ./${CURL_INST}
-  [ -e ${CURL_INST} ] && rm ${CURL_INST}
+  if [ ! -d ${HOME}/.cargo]; then
+    ${CURL}  ${RUST_ADDR} ${CURL_OPT} > ${CURL_INST}
+    [ -e ${CURL_INST} ] && chmod 777 ${CURL_INST} && ./${CURL_INST}
+    [ -e ${CURL_INST} ] && rm ${CURL_INST}
+  fi
   . ${HOME}/.cargo/env
   
   #JS
