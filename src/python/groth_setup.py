@@ -326,7 +326,7 @@ class GrothSetup(object):
         # proof. However, the way is is laid out it takes to much space. I comment this part
         # for now until I come up with a better way
         if self.write_table_en:
-          self.write_tables(all_tables=0)
+          self.write_tables(all_tables=1)
 
         self.write_pk()
         self.write_vk()
