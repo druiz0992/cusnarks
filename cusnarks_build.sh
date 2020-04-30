@@ -118,10 +118,10 @@ cd ${CUSNARKS_CONFIG_DIR}
 if [ "$arg1" = "force" ]; then
   [ -e ${CUSNARKS_CONFIG_F} ] && rm ${CUSNARKS_CONFIG_F}
 fi
-
+export NROOTS=20
 if [ ! -f ${CUSNARKS_CONFIG_F} ]; then
   cd ${CUSNARKS_HOME};
-  make config
+  export LD_LIBRARY_PATH=$(pwd)/lib:$LD_LIBRARY_PATH; make config
 fi
 cd ${CUSNARKS_HOME};
 
