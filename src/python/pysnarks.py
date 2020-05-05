@@ -97,7 +97,7 @@ def init():
     opt['list'] = 1
     opt['table_f'] = None
     opt['zero_knowledge']=1
-    opt['grouping'] = U256_BSELM
+    opt['grouping'] = DEFAULT_U256_BSELM
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')

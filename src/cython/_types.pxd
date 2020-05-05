@@ -50,7 +50,8 @@ cdef extern from "types.h":
   cdef uint32_t N_STREAMS_PER_GPU
   cdef uint32_t GROTH_PROOF_N_ECPOINTS
   cdef uint32_t MAX_NCORES_OMP
-  cdef uint32_t U256_BSELM
+  cdef uint32_t MAX_U256_BSELM
+  cdef uint32_t DEFAULT_U256_BSELM
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -188,6 +189,7 @@ cdef extern from "types.h":
     uint32_t *x
     uint32_t n
     uint32_t ec2
+    uint32_t compute_table
     uint32_t *ec_table
     uint32_t pidx
     uint32_t max_threads
@@ -257,4 +259,5 @@ _MAX_R1CSPOLY_NWORDS = MAX_R1CSPOLY_NWORDS
 _MAX_R1CSPOLYTMP_NWORDS = MAX_R1CSPOLYTMP_NWORDS
 _NSTREAMS_PER_GPU = N_STREAMS_PER_GPU
 _GROTH_PROOF_N_ECPOINTS = GROTH_PROOF_N_ECPOINTS
-_U256_BSELM = U256_BSELM
+_MAX_U256_BSELM = MAX_U256_BSELM
+_DEFAULT_U256_BSELM = DEFAULT_U256_BSELM

@@ -79,7 +79,7 @@ class GrothSetup(object):
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
                  benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None,
-                 grouping=U256_BSELM):
+                 grouping=DEFAULT_U256_BSELM):
  
         # Check valid folder exists
         if keep_f is None:
@@ -326,7 +326,7 @@ class GrothSetup(object):
         # proof. However, the way is is laid out it takes to much space. I comment this part
         # for now until I come up with a better way
         if self.write_table_en:
-          self.write_tables(all_tables=0)
+          self.write_tables(all_tables=1)
 
         self.write_pk()
         self.write_vk()

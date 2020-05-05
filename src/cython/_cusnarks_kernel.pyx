@@ -989,74 +989,26 @@ def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
   return np.reshape(outv,(-1, NWORDS_256BIT))
 
 
-def ec2_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
-                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                             ct.uint32_t strip_last, ct.uint32_t order=U256_BSELM):
-
-  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
-
-  if strip_last:
-      outdims = ECP2_JAC_INDIMS
-
-  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
-  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
-  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
-
-  args_c.out_ep = &outv[0]
-  args_c.scl = &inscl[0]
-  args_c.x = &inv[0]
-  args_c.n = n
-  args_c.ec2 = 1
-  args_c.ec_table = NULL;
-  args_c.pidx = pidx
-  args_c.max_threads = MAX_NCORES_OMP
-  args_c.order = order
-
-  with nogil:
-     uh.cec_jacreduce_server_h(args_c)
-  free(args_c)
-
-  return np.reshape(outv,(-1, NWORDS_256BIT))
-
-def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl, np.ndarray[ndim=1, dtype = np.uint32_t] inv,
-                             ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                             ct.uint32_t strip_last, ct.uint32_t order=U256_BSELM):
-
-  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
-
-  if strip_last:
-      outdims = ECP_JAC_INDIMS
-
-  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
-  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
-  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
-
-  args_c.out_ep = &outv[0]
-  args_c.scl = &inscl[0]
-  args_c.x = &inv[0]
-  args_c.n = n
-  args_c.ec2 = 0
-  args_c.ec_table = NULL;
-  args_c.pidx = pidx
-  args_c.max_threads = MAX_NCORES_OMP
-  args_c.order = order
-
-  with nogil:
-     uh.cec_jacreduce_server_h(args_c)
-  free(args_c)
-
-  return np.reshape(outv,(-1, NWORDS_256BIT))
-
-def ec_jacreduce_precomputed_file_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
+def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
                   np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, 
-                  ct.t_uint64 offset, ct.t_uint64 total_words, ct.uint32_t order,
+                  ct.t_uint64 offset, ct.t_uint64 total_words,
+                  ct.uint32_t order, ct.uint32_t ec2,
                   ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
                   ct.uint32_t strip_last):
 
   cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+  cdef ct.uint32_t indims = ECP_JAC_INDIMS
 
   if strip_last:
       outdims = ECP_JAC_INDIMS
+
+  if ec2 :
+    indims = ECP2_JAC_INDIMS
+    if strip_last:
+      outdims = ECP2_JAC_INDIMS
+    else :
+      outdims = ECP2_JAC_OUTDIMS
+    
 
   cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
   cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
@@ -1068,122 +1020,32 @@ def ec_jacreduce_precomputed_file_h(np.ndarray[ndim=1, dtype = np.uint32_t] insc
   args_c.n = n
   args_c.pidx = pidx
   args_c.max_threads = MAX_NCORES_OMP
-  args_c.ec_table = &intbl[0]
-  args_c.filename = fname_c
+  if len(fname) == 0:
+    # Compute table 0 -> each thread computes ectable and then does mexp
+    # Compute table = 1 -> one thread computes ectable and all do mexp
+    args_c.compute_table = 0
+    args_c.x = &intbl[0]
+    args_c.ec_table = NULL
+    args_c.filename = NULL
+    args_c.total_words = int((len(intbl)/(indims * NWORDS_256BIT) + order - 1) /order)
+  else :
+    args_c.compute_table = 0
+    args_c.filename = fname_c
+    args_c.ec_table = &intbl[0]
+    args_c.total_words = total_words
   args_c.offset = offset * sizeof(ct.uint32_t)
   args_c.order = order
-  args_c.ec2 = 0
-  args_c.total_words = total_words
+  if ec2:
+    args_c.ec2 = 1
+  else :
+    args_c.ec2 = 0
 
   with nogil:
      uh.cec_jacreduce_server_h(args_c)
+
   free(args_c)
 
   return np.reshape(outv,(-1, NWORDS_256BIT))
-
-def ec2_jacreduce_precomputed_file_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
-                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, 
-                  ct.t_uint64 offset, ct.t_uint64 total_words, ct.uint32_t order,
-                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                  ct.uint32_t strip_last):
-
-  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
-
-  if strip_last:
-      outdims = ECP2_JAC_INDIMS
-
-  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
-  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
-  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
-  cdef char *fname_c = fname
-
-  args_c.out_ep = &outv[0]
-  args_c.scl = &inscl[0]
-  args_c.n = n
-  args_c.pidx = pidx
-  args_c.max_threads = MAX_NCORES_OMP
-  args_c.ec_table = &intbl[0]
-  args_c.filename = fname_c
-  args_c.offset = offset * sizeof(ct.uint32_t)
-  args_c.order = order
-  args_c.ec2 = 1
-  args_c.total_words = total_words 
-
-  with nogil:
-     uh.cec_jacreduce_server_h(args_c)
-  free(args_c)
-
-  return np.reshape(outv,(-1, NWORDS_256BIT))
-
-
-def ec_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
-                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl,
-                  ct.uint32_t order,
-                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                  ct.uint32_t strip_last):
-
-  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
-
-  if strip_last:
-      outdims = ECP_JAC_INDIMS
-
-  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
-  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
-  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
-
-  args_c.out_ep = &outv[0]
-  args_c.scl = &inscl[0]
-  args_c.n = n
-  args_c.pidx = pidx
-  args_c.max_threads = MAX_NCORES_OMP
-  args_c.ec_table = &intbl[0]
-  args_c.order = order
-  args_c.ec2 = 0
-
-  args_c.filename = NULL
-  args_c.offset = 0
-  args_c.total_words = 0
-
-  with nogil:
-     uh.cec_jacreduce_server_h(args_c)
-  free(args_c)
-
-  return np.reshape(outv,(-1, NWORDS_256BIT))
-
-def ec2_jacreduce_precomputed_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
-                  np.ndarray[ndim=1, dtype = np.uint32_t] intbl,
-                  ct.uint32_t order,
-                  ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                  ct.uint32_t strip_last):
-
-  cdef ct.uint32_t outdims = ECP2_JAC_OUTDIMS
-
-  if strip_last:
-      outdims = ECP2_JAC_INDIMS
-
-  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_256BIT, dtype=np.uint32)
-  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_256BIT  )
-  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
-
-  args_c.out_ep = &outv[0]
-  args_c.scl = &inscl[0]
-  args_c.n = n
-  args_c.pidx = pidx
-  args_c.max_threads = MAX_NCORES_OMP
-  args_c.ec_table = &intbl[0]
-  args_c.ec2 = 1
-  args_c.order = order
-
-  args_c.filename = NULL
-  args_c.offset = 0
-  args_c.total_words = 0
-
-  with nogil:
-     uh.cec_jacreduce_server_h(args_c)
-  free(args_c)
-
-  return np.reshape(outv,(-1, NWORDS_256BIT))
-
 
 def mpoly_to_sparseu256_h(np.ndarray[ndim=1, dtype=np.uint32_t]in_mpoly):
     cdef list sp_poly_list=[]
