@@ -47,7 +47,8 @@
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
 #define TRANSPOSE_BLOCK_SIZE  (32)
-#define U256_BSELM  (12)
+#define MAX_U256_BSELM  (12)
+#define DEFAULT_U256_BSELM  (6)
 #define NBITS_BYTE (8)
 #define EC_JACREDUCE_TABLE_LEN (256)
 #define EC_JACREDUCE_BATCH_SIZE (5)
@@ -547,6 +548,7 @@ typedef struct{
   uint32_t *x;
   uint32_t n;
   uint32_t ec2;
+  uint32_t compute_table;
   uint32_t *ec_table;
   uint32_t pidx;
   uint32_t max_threads;
@@ -565,6 +567,8 @@ typedef struct{
   t_uint64 offset;
   t_uint64 total_words;
   uint32_t *ec_table;
+  uint32_t *indata;
+  uint32_t pidx;
   uint32_t order;
   uint32_t ec2;
 

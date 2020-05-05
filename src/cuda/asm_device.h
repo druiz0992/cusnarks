@@ -1112,7 +1112,7 @@
 	"shr.u32 	hi, m, 5;\n\t"
 	"and.b32  	lo, m, 31;\n\t"
 
-	for(i=0; i< U256_BSELM; i++){
+	for(i=0; i< DEFAULT_U256_BSELM; i++){
 "START_BSELU256:\n\t"
         "setp.lt.u32      p1, t0, 8;\n\t"
         "@!p1  bra END_BSELU256;\n\t"   -> End of loop to start addition

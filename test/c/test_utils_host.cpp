@@ -8910,7 +8910,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
    uint32_t retval=0;
-   uint32_t max_order = U256_BSELM;
+   uint32_t max_order = MAX_U256_BSELM;
    uint32_t min_order = 1;
 
    if (ec2) {
@@ -8961,10 +8961,10 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    args->n = nec_points;
    args->ec_table = NULL;
    args->pidx = 0;
-   args->max_threads = 0;
    args->ec2 = ec2;
 
    for (uint32_t i=max_order; i >= min_order; i--){
+     args->max_threads = get_nprocs_conf();
      // Multiply points
      args->order = i;
      clock_gettime(CLOCK_MONOTONIC, &start);
@@ -8995,7 +8995,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    return retval;
 }
 
-uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file)
+uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file, uint32_t compute_table=0)
 {
    uint32_t indims = ECP_JAC_INDIMS;
    uint32_t outdims = ECP_JAC_OUTDIMS;
@@ -9020,7 +9020,7 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file)
    uint32_t n_tables;
    uint32_t i;
    uint32_t n_errors=0;
-   uint32_t max_order = U256_BSELM;
+   uint32_t max_order = MAX_U256_BSELM;
    uint32_t min_order = 1;
 
    init_h();
@@ -9054,31 +9054,39 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file)
    args->filename = NULL;
    args->max_threads = 0;
 
+   if (compute_table) {
+     min_order = 2;
+   }
    for (uint32_t i=max_order; i >= min_order; i--){
      n_tables = (nec_points + i - 1) / i;
      ec_table = (uint32_t *) malloc( (1 << i) * (n_tables * NWORDS_256BIT * outdims) * sizeof(uint32_t) );
      ec_table2 = (uint32_t *) malloc( (1 << i) * (n_tables * NWORDS_256BIT * outdims) * sizeof(uint32_t) );
 
      //printf("N Points : %d, N tables : %d\n",nec_points, n_tables);
-     if (ec2){
-       ec2_inittable_h(in_ecp, ec_table, nec_points, i, 0, 1);
-       ec2_jac2aff_h(ec_table2, ec_table, (1<<i) * n_tables , 0, 1);
-     } else { 
-       ec_inittable_h(in_ecp, ec_table, nec_points, i, 0, 1);
-       ec_jac2aff_h(ec_table2, ec_table, (1<<i) * n_tables , 0, 1);
+     if (!compute_table){
+       if (ec2){
+         ec2_inittable_h(in_ecp, ec_table, nec_points, i, 0, 1);
+         ec2_jac2aff_h(ec_table2, ec_table, (1<<i) * n_tables , 0, 1);
+       } else { 
+         ec_inittable_h(in_ecp, ec_table, nec_points, i, 0, 1);
+         ec_jac2aff_h(ec_table2, ec_table, (1<<i) * n_tables , 0, 1);
+       }
      }
-  
-  
+ 
      args->ec_table = ec_table2;
      args->order = i;
-  
+     args->compute_table=0;
      if (file){
        FILE *ifp = fopen(ec_table_filename,"wb");
        fwrite(ec_table2, sizeof(uint32_t),n_tables * (1<<i) * NWORDS_256BIT * indims,ifp);
+       args->offset = (i << EC_JACREDUCE_BATCH_SIZE) *indims * NWORDS_256BIT *sizeof(uint32_t)<< i;
        fclose(ifp);
        args->filename = ec_table_filename;
-       args->offset = (i << EC_JACREDUCE_BATCH_SIZE) *indims * NWORDS_256BIT *sizeof(uint32_t)<< i;
-       args->total_words = 1ull<<31;
+       args->total_words = (1 << i) * (n_tables * NWORDS_256BIT * indims);
+     } else if (compute_table) {
+       args->compute_table = 1;
+       args->total_words =  n_tables;
+       args->x = in_ecp;
      } else if (i==1){
         args->ec_table = in_ecp;
      }
@@ -9283,9 +9291,13 @@ int main()
   retval+=test_ec_jacreduce_opt(0);   // EC1
   retval+=test_ec_jacreduce_opt(1);   // EC2
   
-  retval+=test_ec_jacreduce_precompute(0,0);   // EC1
+  retval+=test_ec_jacreduce_precompute(0,0,0);   // EC1
+  retval+=test_ec_jacreduce_precompute(1,0,0);   // EC2
+
+  retval+=test_ec_jacreduce_precompute(0,0,1);   // EC1
+  retval+=test_ec_jacreduce_precompute(1,0,1);   // EC2
+
   retval+=test_ec_jacreduce_precompute(0,1);   // EC1
-  retval+=test_ec_jacreduce_precompute(1,0);   // EC2
   retval+=test_ec_jacreduce_precompute(1,1);   // EC2
 
   if (retval){
