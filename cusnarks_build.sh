@@ -89,9 +89,11 @@ if [ ! -f ${INIT_FILE} ]; then
   ${PIP_INSTALL} ${PYLIB} >> ${LOG} 
   
   #Rust
-  ${CURL}  ${RUST_ADDR} ${CURL_OPT} > ${CURL_INST}
-  [ -e ${CURL_INST} ] && chmod 777 ${CURL_INST} && ./${CURL_INST}
-  [ -e ${CURL_INST} ] && rm ${CURL_INST}
+  if [ ! -d ${HOME}/.cargo]; then
+    ${CURL}  ${RUST_ADDR} ${CURL_OPT} > ${CURL_INST}
+    [ -e ${CURL_INST} ] && chmod 777 ${CURL_INST} && ./${CURL_INST}
+    [ -e ${CURL_INST} ] && rm ${CURL_INST}
+  fi
   . ${HOME}/.cargo/env
   
   #JS
@@ -107,9 +109,6 @@ if [ ! -f ${INIT_FILE} ]; then
   echo 1 > ${INIT_FILE}
 fi
      
-export LD_LIBRARY_PATH="${CUSNARKS_HOME}/lib:$LD_LIBRARY_PATH"
-export PATH="$HOME/.cargo/bin:$PATH"
-
 #MAKE CUSNARKS
 make third_party_libs
 make build
@@ -119,15 +118,13 @@ cd ${CUSNARKS_CONFIG_DIR}
 if [ "$arg1" = "force" ]; then
   [ -e ${CUSNARKS_CONFIG_F} ] && rm ${CUSNARKS_CONFIG_F}
 fi
-
+export NROOTS=20
 if [ ! -f ${CUSNARKS_CONFIG_F} ]; then
   cd ${CUSNARKS_HOME};
-  make config
+  export LD_LIBRARY_PATH=$(pwd)/lib:$LD_LIBRARY_PATH; make config
 fi
 cd ${CUSNARKS_HOME};
 
-#Launch test
-make test_system
 
 
   

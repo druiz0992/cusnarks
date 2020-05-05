@@ -88,7 +88,10 @@ def run():
     sys.stdout.write('Configuring cusnarks....\n\n')
 
     #download_repos([snarkjs, rust_circom])
-    generate_roots()
+    if len(sys.argv) > 1:
+      generate_roots(nroots = int(sys.argv[1]))
+    else:
+      generate_roots()
     generate_circuit_folder()
     generate_config_f()
 
@@ -166,28 +169,31 @@ def parse_configfile(fname, label):
         return match.group(1)
    
 
-def generate_roots():
-    sys.stdout.write('####################################\n\n')
-    sys.stdout.write('Generating roots of unity....\n\n')
-    sys.stdout.write('Number of roots of unity imposes a limit on the maximum number of constraints\n')
-    sys.stdout.write('in your circuit. Default number roots of unity is 2^'+str(roots['nbits'])+'.\n')
-    sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
-    sys.stdout.flush()
-    b_root= sys.stdin.readline().rstrip()
-    if b_root != '':
-        while True:
-          try :
-             # Try until input is valid
-             if int(b_root) > 28 or int(b_root) < 20 :
+def generate_roots(nroots=None):
+    if nroots is None:
+      sys.stdout.write('####################################\n\n')
+      sys.stdout.write('Generating roots of unity....\n\n')
+      sys.stdout.write('Number of roots of unity imposes a limit on the maximum number of constraints\n')
+      sys.stdout.write('in your circuit. Default number roots of unity is 2^'+str(roots['nbits'])+'.\n')
+      sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
+      sys.stdout.flush()
+      b_root= sys.stdin.readline().rstrip()
+      if b_root != '':
+          while True:
+            try :
+               # Try until input is valid
+               if int(b_root) > 28 or int(b_root) < 20 :
+                  sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
+                  b_root= sys.stdin.readline().rstrip()
+               else:
+                  break
+            except :
                 sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
                 b_root= sys.stdin.readline().rstrip()
-             else:
-                break
-          except :
-                sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
-                b_root= sys.stdin.readline().rstrip()
+      else:
+        b_root = roots['nbits']
     else:
-      b_root = roots['nbits']
+        b_root = nroots
 
     roots['nbits'] = int(b_root)
 
