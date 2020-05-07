@@ -258,6 +258,7 @@ uint32_t msbu256_h(uint32_t *x);
 void setbitu256_h(uint32_t *x, uint32_t n);
 uint32_t getbitu256_h(uint32_t *x, uint32_t n);
 uint32_t getbitu256_h(uint32_t *x, uint32_t n, uint32_t group_size);
+uint32_t getbitu32_h(uint32_t *x, uint32_t n, uint32_t group_size);
 
 inline void mulu64_h(t_uint64 p[2], const t_uint64 *x, const t_uint64 *y)
 {

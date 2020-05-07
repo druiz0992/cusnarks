@@ -98,6 +98,7 @@ def init():
     opt['table_f'] = None
     opt['zero_knowledge']=1
     opt['grouping'] = DEFAULT_U256_BSELM
+    opt['pippen_conf'] = DEFAULT_PIPPENGERS_CONF
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -236,6 +237,10 @@ def init():
     help_str = 'Table Grouping. Default : ' + str(opt['grouping'])
     parser.add_argument(
        '-g', '--grouping', type=int, help=help_str, required=False)  
+
+    help_str = 'Pippengers Configuration. Default : ' + str(opt['pippen_conf'])
+    parser.add_argument(
+       '-pippenger', '--pippenger', type=int, help=help_str, required=False)  
     return opt, parser
 
 def run(opt, parser):
@@ -441,12 +446,15 @@ def run(opt, parser):
       if args.start_server is not None:
          opt['start_server'] = args.start_server
 
+      if args.pippenger is not None:
+          opt['pippen_conf'] = args.pippenger
+
       if not is_port_in_use(PORT) :
           start = time.time()
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], read_table_f=opt['table_f'], zk=opt['zero_knowledge'], grouping=opt['grouping'])
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'], read_table_f=opt['table_f'], zk=opt['zero_knowledge'], grouping=opt['grouping'], pippen_conf=opt['pippen_conf'])
           end = time.time() - start
           print("GP init : "+str(end))
 

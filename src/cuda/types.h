@@ -49,6 +49,8 @@
 #define TRANSPOSE_BLOCK_SIZE  (32)
 #define MAX_U256_BSELM  (12)
 #define DEFAULT_U256_BSELM  (6)
+#define MAX_PIPPENGERS_CONF (20)
+#define DEFAULT_PIPPENGERS_CONF (0)
 #define NBITS_BYTE (8)
 #define EC_JACREDUCE_TABLE_LEN (256)
 #define EC_JACREDUCE_BATCH_SIZE (5)
@@ -555,6 +557,7 @@ typedef struct{
   uint32_t start_idx;
   uint32_t last_idx;
   uint32_t thread_id;
+  uint32_t pippen;
   t_uint64 offset;
   t_uint64 total_words;
   uint32_t order;
