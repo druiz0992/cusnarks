@@ -8912,6 +8912,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    uint32_t retval=0;
    uint32_t max_order = MAX_U256_BSELM;
    uint32_t min_order = 1;
+   uint32_t max_pippen = MAX_PIPPENGERS_CONF;
 
    if (ec2) {
         indims = ECP2_JAC_INDIMS;
@@ -8963,28 +8964,31 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    args->pidx = 0;
    args->ec2 = ec2;
 
-   for (uint32_t i=max_order; i >= min_order; i--){
-     args->max_threads = get_nprocs_conf();
-     // Multiply points
-     args->order = i;
-     clock_gettime(CLOCK_MONOTONIC, &start);
-     ec_jacreduce_server_h(args);
-     clock_gettime(CLOCK_MONOTONIC, &end);
-     elapsed = (double) (end.tv_sec - start.tv_sec);
-     elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
-  
-     if (memcmp(r_aff, out_ecp1,
-                indims*NWORDS_256BIT*sizeof(uint32_t)) ){
-          n_errors++;
+   for (uint32_t k=0; k <= max_pippen; k++) {
+     args->pippen = k;
+     for (uint32_t i=max_order; i >= min_order; i--){
+       args->max_threads = get_nprocs_conf();
+       // Multiply points
+       args->order = i;
+       clock_gettime(CLOCK_MONOTONIC, &start);
+       ec_jacreduce_server_h(args);
+       clock_gettime(CLOCK_MONOTONIC, &end);
+       elapsed = (double) (end.tv_sec - start.tv_sec);
+       elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+    
+       if (memcmp(r_aff, out_ecp1,
+                  indims*NWORDS_256BIT*sizeof(uint32_t)) ){
+            n_errors++;
+       }
+    
+       if (n_errors){
+        printf("\033[1;31m");
+       }
+       printf("N errors(JACREDUCE_OPT-EC2 : %d : N points : %d, Order : %d, Pippen : %d) : %d - Time : %f\n",ec2,nec_points,i, k,n_errors, elapsed);
+       printf("\033[0m");
+       retval += n_errors;
+       n_errors = 0;
      }
-  
-     if (n_errors){
-      printf("\033[1;31m");
-     }
-     printf("N errors(JACREDUCE_OPT-EC2 : %d : N points : %d, Order : %d) : %d - Time : %f\n",ec2,nec_points,i,n_errors, elapsed);
-     printf("\033[0m");
-     retval += n_errors;
-     n_errors = 0;
    }
 
    free(samples);

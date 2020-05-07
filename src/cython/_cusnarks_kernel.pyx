@@ -994,7 +994,7 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
                   ct.t_uint64 offset, ct.t_uint64 total_words,
                   ct.uint32_t order, ct.uint32_t ec2,
                   ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                  ct.uint32_t strip_last):
+                  ct.uint32_t strip_last, ct.uint32_t pippen_conf):
 
   cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
   cdef ct.uint32_t indims = ECP_JAC_INDIMS
@@ -1028,11 +1028,16 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
     args_c.ec_table = NULL
     args_c.filename = NULL
     args_c.total_words = int((len(intbl)/(indims * NWORDS_256BIT) + order - 1) /order)
+    if args_c.total_words > 10:
+       args_c.pippen = pippen_conf
+    else:
+       args_c.pippen = 0
   else :
     args_c.compute_table = 0
     args_c.filename = fname_c
     args_c.ec_table = &intbl[0]
     args_c.total_words = total_words
+    args_c.pippen = 0
   args_c.offset = offset * sizeof(ct.uint32_t)
   args_c.order = order
   if ec2:

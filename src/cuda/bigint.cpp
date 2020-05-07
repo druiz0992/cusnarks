@@ -200,6 +200,18 @@ uint32_t getbitu256_h(uint32_t *x, uint32_t n, uint32_t group_size)
 
   return val;
 }
+uint32_t getbitu32_h(uint32_t *x, uint32_t n, uint32_t group_size)
+{
+  uint32_t w, b,i, val=0;
+  
+  b = n & NBITS_WORD_MOD;
+
+  for (i = 0; i < group_size; i++){
+    val |= (( (x[i] >> b) & 0x1) << i);
+  }
+
+  return val;
+}
 
 uint32_t msbu256_h(uint32_t *x)
 {

@@ -85,7 +85,8 @@ class GrothProver(object):
                  out_pk_f=None, out_pk_format=FMT_MONT, test_f=None,
                  n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
                  benchmark_f=None, seed=None, snarkjs=None, verify_en=0,
-                 keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1, grouping=DEFAULT_U256_BSELM):
+                 keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1, grouping=DEFAULT_U256_BSELM,
+                 pippen_conf=DEFAULT_PIPPENGERS_CONF):
 
         # Check valid folder exists
         if keep_f is None:
@@ -123,6 +124,7 @@ class GrothProver(object):
 
         self.sort_en = 0
         self.grouping = grouping
+        self.pippen_conf  = pippen_conf
         self.compute_ntt_gpu = False
         self.compute_first_mexp_gpu = True
         self.compute_last_mexp_gpu = True
@@ -637,7 +639,8 @@ class GrothProver(object):
                             total_words,
                             self.grouping,
                             0,
-                            MOD_GROUP, 1, 1, 1))
+                            MOD_GROUP, 1, 1, 1,
+                            self.pippen_conf))
 
           self.logger.info(' Process server - Mexp A Done... ')
           if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
@@ -661,7 +664,7 @@ class GrothProver(object):
                             total_words,
                             self.grouping,
                             1,
-                            MOD_GROUP, 1, 1, 1)
+                            MOD_GROUP, 1, 1, 1, self.pippen_conf)
                     )
           self.logger.info(' Process server - Mexp B2 Done...')
 
@@ -683,7 +686,7 @@ class GrothProver(object):
                             total_words,
                             self.grouping,
                             0,
-                            MOD_GROUP, 1, 1, 1)
+                            MOD_GROUP, 1, 1, 1, self.pippen_conf)
                     )
 
           self.logger.info(' Process server - Mexp C Done...')
@@ -712,7 +715,8 @@ class GrothProver(object):
                               total_words,
                               self.grouping,
                               0,
-                              MOD_GROUP, 1, 1, 1)
+                              MOD_GROUP, 1, 1, 1, 
+                              self.pippen_conf)
                     )
 
             if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
@@ -757,7 +761,7 @@ class GrothProver(object):
                          total_words,
                          self.grouping,
                          0,
-                         MOD_GROUP, 1, 1, 1)
+                         MOD_GROUP, 1, 1, 1, self.pippen_conf)
                      )
           self.logger.info(' Process server - hExps Mexp common part completed ...')
 
@@ -1445,7 +1449,7 @@ class GrothProver(object):
                             0,
                             2,
                             0,
-                            MOD_GROUP, 1, 1, 1))
+                            MOD_GROUP, 1, 1, 1, self.pippen_conf))
 
            self.logger.info(' Process server - hExps Mexp ZK part completed ...')
            if self.p_CPU is not None:
