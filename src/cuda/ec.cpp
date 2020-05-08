@@ -1538,7 +1538,7 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   uint32_t start_idx, last_idx;
   uint32_t vars_per_thread = args->n;
   uint32_t max_threads = get_nprocs_h();
-  uint32_t compute_table = args->ec_table==NULL ? ~args->compute_table : 0;
+  uint32_t compute_table = args->ec_table==NULL ? !args->compute_table : 0;
   uint32_t outdims = ECP_JAC_OUTDIMS;
   uint32_t indims = ECP_JAC_INDIMS;
   uint32_t order = args->order;
@@ -1560,8 +1560,8 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   if (compute_table){
     if (args->n >= args->max_threads*(order << EC_JACREDUCE_BATCH_SIZE)*order){
       vars_per_thread = args->n/args->max_threads;
-      vars_per_thread = ((vars_per_thread + (order << EC_JACREDUCE_BATCH_SIZE) * order -1) / 
-                          ((order << EC_JACREDUCE_BATCH_SIZE) * order)) * 
+      vars_per_thread = ((vars_per_thread + ((order << EC_JACREDUCE_BATCH_SIZE) * order) -1) / 
+                          (((order << EC_JACREDUCE_BATCH_SIZE) * order))-1) * 
                           ((order << EC_JACREDUCE_BATCH_SIZE) * order);
     } else {
       args->max_threads = 1;
@@ -1590,8 +1590,7 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   printf("filename : %d\n",args->filename);
   printf("total words : %ld\n",args->total_words);
   printf("offset : %lld\n",args->offset);
- */
- 
+  */
   
   
   /*
@@ -1619,12 +1618,13 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
      w_args[i].last_idx = last_idx;
      w_args[i].thread_id = i;
     
-   /*         
+  /*          
      printf("Thread : %d, start_idx : %d, end_idx : %d\n",
              w_args[i].thread_id, 
              w_args[i].start_idx,
-             w_args[i].last_idx);   
+             w_args[i].last_idx);  
   */
+  
   }
 
   parallelism_enabled = 0;
@@ -1731,7 +1731,7 @@ void *ec_jacreduce_batch_h(void *args)
     ec_initP_h(Rin, 1ull<<wargs->pippen, wargs->ec2,  wargs->pidx);
   }
 
-  //printf("[%d] - N batches : %d %d\n",wargs->thread_id, n_batches, wargs->ec2);
+  //printf("[%d] - N batches : %d %d, %d\n",wargs->thread_id, n_batches, wargs->ec2, wargs->n);
 
   ec_initP_h(EPin, EC_JACREDUCE_TABLE_LEN, wargs->ec2,  wargs->pidx);
 

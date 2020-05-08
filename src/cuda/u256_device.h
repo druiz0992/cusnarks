@@ -37,6 +37,15 @@
 
 #include "log.h"
 
+typedef struct{
+  uint32_t *x0;
+  uint32_t *x1;
+  uint32_t *x2;
+  uint32_t *x3;
+  uint32_t *x4;
+}inv_t;
+
+
 __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void addmu256_reduce_shfl_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);

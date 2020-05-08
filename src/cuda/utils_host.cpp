@@ -28,6 +28,7 @@
 //
 // ------------------------------------------------------------------
 #include <stdlib.h>
+#include <stdio.h>
 #include <cassert>
 #include <sys/sysinfo.h>
 #include <pthread.h>

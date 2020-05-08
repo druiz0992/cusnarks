@@ -122,9 +122,11 @@ class GrothProver(object):
 
         random.seed(self.seed) 
 
-        self.sort_en = 0
         self.grouping = grouping
+        self.grouping_cuda = DEFAULT_U256_BSELM_CUDA
         self.pippen_conf  = pippen_conf
+
+        self.sort_en = 0
         self.compute_ntt_gpu = False
         self.compute_first_mexp_gpu = True
         self.compute_last_mexp_gpu = True
@@ -617,7 +619,6 @@ class GrothProver(object):
           self.logger.info(' Process server - Starting First Mexp...')
           pk_bin2 = pkbin_get(self.pk,['A','B2','B1','C','nPublic'])
           nPublic = pk_bin2[4][0]
-
           if not self.read_table_en or self.ec_table['woffset_A'] == self.ec_table['woffset_B2']:
              ep_vector = pk_bin2[0][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
           else :
@@ -1510,7 +1511,7 @@ class GrothProver(object):
             ZField.set_field(MOD_GROUP)
             #TODO : remove in_v
             #print(ecbn128_samples.shape, ec2, shamir_en, gpu_id, stream_id)
-            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id,True)
+            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id,True, grouping=self.grouping_cuda)
             if ec2 and stream_id == 0:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
             elif stream_id == 0:

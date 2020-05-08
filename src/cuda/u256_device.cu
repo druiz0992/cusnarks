@@ -1313,7 +1313,7 @@ __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel)
    uint32_t bit = bsel & NBITS_WORD_MOD; // bsel % 32 gives bit number
 
    #pragma unroll
-   for (i=0; i< DEFAULT_U256_BSELM; i++){
+   for (i=0; i< DEFAULT_U256_BSELM_CUDA; i++){
      asm("{                                       \n\t"
            "bfe.u32            %0,   %1,  %2, 1;  \n\t"      
          "}                                       \n\t"
@@ -1336,7 +1336,7 @@ __device__ uint32_t clzMu256(const uint32_t __restrict__ *x)
    uint32_t i,j, c, rc, mrc=256; 
   
    #pragma unroll 
-   for (i=0; i< DEFAULT_U256_BSELM; i++){
+   for (i=0; i< DEFAULT_U256_BSELM_CUDA; i++){
      c = 32;    
      rc = 0;
      for (j=NWORDS_256BIT; j >= 1 && c == 32; j--){
