@@ -344,7 +344,7 @@ def run(opt, parser):
         if '/' in args.table_f1:
            opt['table_f1'] = args.table_f1
         else:
-           opt['table_f1'] = opt['data_f1'] + args.table_f1
+           opt['table_f1'] = opt['data_f'] + args.table_f1
         opt['table_f'] =  opt['table_f1']
         opt['table_type'] = 0
 
@@ -352,7 +352,7 @@ def run(opt, parser):
         if '/' in args.table_fall:
            opt['table_fall'] = args.table_fall
         else:
-           opt['table_fall'] = opt['data_fall'] + args.table_fall
+           opt['table_fall'] = opt['data_f'] + args.table_fall
         opt['table_f'] =  opt['table_fall']
         opt['table_type'] = 1
 
