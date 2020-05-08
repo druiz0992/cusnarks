@@ -43,7 +43,7 @@ EXTRA_CFLAGS=-I $(AUX_INCLUDES)
 EXTRA_CFLAGS2=-march=native -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_61 --shared -o 
-LINKFLAGS2=--shared -o 
+LINKFLAGS2=--shared -z defs -o 
 LDFLAGS=-lm -lcudart -lgomp
 LDFLAGS2=-lm -lgomp
 NVDISASM = nvdisasm

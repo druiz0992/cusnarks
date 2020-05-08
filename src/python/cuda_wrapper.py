@@ -213,7 +213,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
       t = end - start
     return result,t
 
-def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0, separate_k=0):
+def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0, separate_k=0, grouping=DEFAULT_U256_BSELM):
    kernel_params={}
    kernel_config={}
    
@@ -233,14 +233,14 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
    if shamir_en == False :
      kernel_config['blockD']    = get_shfl_blockD(nsamples,8)
    else:
-     kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM),8)
+     kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/grouping),8)
 
    if separate_k:
          kernel_config['blockD']    = np.concatenate([[128], kernel_config['blockD']])
 
    nkernels = len(kernel_config['blockD'])
    kernel_params['stride']    = [outdims] * nkernels
-   kernel_params['stride'][0]    =  indims_e * U256_BSELM
+   kernel_params['stride'][0]    =  indims_e * grouping
    kernel_params['premul']    = [0] * nkernels
    kernel_params['premod']    = [0] * nkernels
    kernel_params['midx']      = [fidx] * nkernels
@@ -253,7 +253,7 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
    if separate_k:
          kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD'][1:]]
          kernel_config['smemS'] = np.concatenate([[0], np.asarray(kernel_config['smemS'],dtype=np.uint32)])
-         kernel_params['in_length'][1] = int(nsamples* outdims/U256_BSELM)
+         kernel_params['in_length'][1] = int(nsamples* outdims/grouping)
          kernel_config['gridD'][1:] = [int(np.product(kernel_config['blockD'][1+i:])/(kernel_config['blockD'][1+i])) for i in range(len(kernel_config['blockD'][1:]))]
          kernel = [CB_EC_JAC_MUL_OPT, CB_EC_JAC_RED] 
          kernel_config['kernel_idx'] =np.concatenate([[kernel[0]], np.ones(nkernels-1, dtype=np.uint32) * kernel[1]])

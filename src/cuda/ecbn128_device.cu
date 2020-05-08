@@ -259,8 +259,8 @@ __global__ void __launch_bounds__(128,5)scmulecjacopt_kernel(uint32_t *out_vecto
     Z1_t sumX2(xo.getu256(0));
       
     scmulecjac_opt<Z1_t, uint256_t>(&sumX,0,
-                           &sumX2, 2*idx*DEFAULT_U256_BSELM, 
-                           &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM],  params);
+                           &sumX2, 2*idx*DEFAULT_U256_BSELM_CUDA, 
+                           &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM_CUDA],  params);
    logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
 }
 
@@ -288,8 +288,8 @@ __global__ void scmulecjac_precomputed_kernel(uint32_t *out_vector, uint32_t *in
     Z1_t sumX2(xo.getu256(0));
       
     scmulecjac_precomputed<Z1_t, uint256_t>(&sumX,0,
-                           &sumX2, 2*idx<<DEFAULT_U256_BSELM, 
-                           &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM],  params);
+                           &sumX2, 2*idx<<DEFAULT_U256_BSELM_CUDA, 
+                           &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM_CUDA],  params);
    logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
 }
 
@@ -316,8 +316,8 @@ __global__ void __launch_bounds__(128,4) scmulec2jacopt_kernel(uint32_t *out_vec
     Z2_t sumX2(xo.getu256(0));
       
     scmulecjac_opt<Z2_t, uint512_t>(&sumX,0,
-                           &sumX2, 2*idx*DEFAULT_U256_BSELM, 
-                           &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM],  params);
+                           &sumX2, 2*idx*DEFAULT_U256_BSELM_CUDA, 
+                           &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM_CUDA],  params);
     
     logInfoBigNumberTid(6*128,"XOUT :\n",&out_vector[idx*ECP2_JAC_OUTOFFSET]);
 }
@@ -891,8 +891,8 @@ __device__ void madecjac_shfl(T1 *xr, T1 *xo, uint32_t *scl, T1 *smem_ptr, kerne
            //logInfoBigNumberTid(2*T1::getN(),"Xo[x,y]:\n",&sumX2);
       
            scmulecjac_opt<T1, T2>(&sumX,0,
-                                  &sumX2, 2*(idx*DEFAULT_U256_BSELM - opt_ec_offset), 
-                                  &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM],  params);
+                                  &sumX2, 2*(idx*DEFAULT_U256_BSELM_CUDA - opt_ec_offset), 
+                                  &scl[idx*NWORDS_256BIT *DEFAULT_U256_BSELM_CUDA],  params);
            //logInfoBigNumberTid(3*T1::getN(),"Final R : \n",&sumX);
         }
         
@@ -1693,7 +1693,7 @@ __device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoff
 {
   uint32_t i;
 
-  uint32_t __restrict__ EC_table[((1<<DEFAULT_U256_BSELM))*3*sizeof(T2)/sizeof(uint32_t)]; // N = P
+  uint32_t __restrict__ EC_table[((1<<DEFAULT_U256_BSELM_CUDA))*3*sizeof(T2)/sizeof(uint32_t)]; // N = P
   uint32_t offset;
   uint32_t msb = clzMu256(scl);
   uint32_t  b;
@@ -1828,7 +1828,7 @@ __device__ void build_ec_table(T1 *d_out,T1 *d_in, uint32_t din_offset, uint32_t
   //logInfoTid("stride : %d\n",params->stride);
   //logInfoTid("in_length : %d\n",params->in_length);
 
-  for (j=1; j< (1<<DEFAULT_U256_BSELM); j++){
+  for (j=1; j< (1<<DEFAULT_U256_BSELM_CUDA); j++){
       // check if power of 2
       if ((j & (j-1)) == 0) {
 	  last_pow2 = j;
