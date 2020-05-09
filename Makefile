@@ -94,6 +94,8 @@ AUX_JSSUBDIRS := $(aux_jsdirs)
 AUX_RSUBDIRS := $(aux_rdirs)
 AUX_REPOS := $(aux_repos)
 
+BRANCH = $(shell git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/' | tr a-z A-Z)
+
 #####
 # Define Options
 #LIBS = -lm 
@@ -114,8 +116,8 @@ AUX_REPOS := $(aux_repos)
 
 #DEFINES
 # -DPARALLEL_EN, -DCU_ASM, -DCU_ASM, -DCU_ASM_ECADD
-DEFINES = -DPARALLEL_EN  -DCU_ASM  -D_CASM  -D_ROLLUP
-DEFINES_DEBUG = -DPARALLEL_EN -DCU_ASM -D_CASM  -D_ROLLUP
+DEFINES = -DPARALLEL_EN  -DCU_ASM  -D_CASM  -D_$(BRANCH)
+DEFINES_DEBUG = -DPARALLEL_EN -DCU_ASM -D_CASM  -D_$(BRANCH)
 
 MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'INCLUDE_PATH=$(INCLUDE_PATH)'   \
@@ -131,7 +133,7 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'AUX_INCLUDES=$(AUX_INCLUDES)'  \
               'DEFINES=$(DEFINES)'   \
               'DEFINES_DEBUG=$(DEFINES_DEBUG)'  
-  
+ 
 build:
 	if ! test -d $(LIB_PATH); \
 		then mkdir $(LIB_PATH); fi
