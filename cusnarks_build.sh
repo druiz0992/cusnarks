@@ -121,6 +121,7 @@ fi
 export NROOTS=20
 if [ ! -f ${CUSNARKS_CONFIG_F} ]; then
   cd ${CUSNARKS_HOME};
+  echo "Building Roots"
   export LD_LIBRARY_PATH=$(pwd)/lib:$LD_LIBRARY_PATH; make config
 fi
 cd ${CUSNARKS_HOME};

@@ -34,7 +34,7 @@
 #CC=gcc
 MAKE=make
 NPM=npm i
-CARGO=cargo build --release
+CARGO=~/.cargo/bin/cargo build --release
 SHELL=/bin/sh
 
 #####
