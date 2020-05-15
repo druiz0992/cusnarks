@@ -226,7 +226,7 @@ class CUECTest(unittest.TestCase):
         ecbn128 = ECBN128(nsamples, seed=1)
 
         kernel_config = {'blockD' : [ECBN128_BLOCK_DIM] }
-        kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [nsamples], 'stride' : [1], 'out_length' : nsamples}
+        kernel_params = {'midx' : [MOD_FR] ,'premod' : [0], 'in_length' : [nsamples], 'stride' : [1], 'out_length' : nsamples}
 
         # Test add jacff
         kernel_params['in_length'] = [nsamples  * ECP_JAC_INDIMS]
@@ -237,7 +237,7 @@ class CUECTest(unittest.TestCase):
         kernel_config['kernel_idx'] = [CB_EC_JACAFF_ADD]
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
-        kernel_params['midx'] = [MOD_FIELD]
+        kernel_params['midx'] = [MOD_FR]
         kernel_config['gridD'] = [0]
 
         result,_ = ecbn128.kernelLaunch(ecbn128_vector, kernel_config, kernel_params )
@@ -263,7 +263,7 @@ class CUECTest(unittest.TestCase):
         kernel_config['kernel_idx'] = [CB_EC_JAC_ADD]
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
-        kernel_params['midx'] = [MOD_FIELD]
+        kernel_params['midx'] = [MOD_FR]
         kernel_config['gridD'] = [0]
 
         ecbn128_vector_ext = np.zeros((nsamples * ECP_JAC_OUTDIMS, 8),dtype=np.uint32)
@@ -286,7 +286,7 @@ class CUECTest(unittest.TestCase):
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
         kernel_config['gridD'] = [0]
-        kernel_params['midx'] = [MOD_FIELD]
+        kernel_params['midx'] = [MOD_FR]
 
         #ecbn128_vector[::3] = ecbn128_vector[1::3]
         #ecbn128_vector[1::3] = ecbn128_vector[2::3]
@@ -307,7 +307,7 @@ class CUECTest(unittest.TestCase):
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
         kernel_config['gridD'] = [0]
-        kernel_params['midx'] = [MOD_FIELD]
+        kernel_params['midx'] = [MOD_FR]
 
         ecbn128_vector_ext = np.zeros((nsamples * ECP_JAC_OUTDIMS, 8),dtype=np.uint32)
         ecbn128_vector_ext[::3] = ecbn128_vector[::2]
@@ -327,7 +327,7 @@ class CUECTest(unittest.TestCase):
         kernel_config['kernel_idx'] = [CB_EC_JAC_MUL]
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
-        kernel_params['midx'] = [MOD_FIELD]
+        kernel_params['midx'] = [MOD_FR]
         kernel_config['gridD'] = [0]
 
         result,_ = ecbn128.kernelLaunch(ecbn128_vector_full, kernel_config, kernel_params )
@@ -359,7 +359,7 @@ class CUECTest(unittest.TestCase):
         kernel_params['out_length'] = 1 * ECP_JAC_OUTDIMS
         kernel_params['padding_idx'] = [0,0]
         kernel_params['premod'] = [0,0]
-        kernel_params['midx'] = [MOD_FIELD, MOD_FIELD]
+        kernel_params['midx'] = [MOD_FR, MOD_FR]
         min_length = [ECP_JAC_OUTDIMS * \
                     (kernel_config['blockD'][idx] * kernel_params['stride'][idx]/ECP_JAC_OUTDIMS) for idx in range(len(kernel_params['stride']))]
 
@@ -398,7 +398,7 @@ class CUECTest(unittest.TestCase):
             sorted_ecc_vector = np.reshape(tmp_v[idx_v],(-1,8))
             sorted_ecbn128_vector_mad = np.concatenate((sorted_scl_vector,sorted_ecc_vector))
 
-            result, _ = ec_mad_cuda(ecbn128, sorted_ecbn128_vector_mad, MOD_FIELD)
+            result, _ = ec_mad_cuda(ecbn128, sorted_ecbn128_vector_mad, MOD_FR)
 
             result2 = 0
             #debugReducedECCAddShfl(r_mul, result, result2)
@@ -419,17 +419,17 @@ class CUECTest(unittest.TestCase):
         r_add_rdc = [(x + y) for x, y in zip(ecbn128_ecjac_rdc[::2], ecbn128_ecjac_rdc[1::2])]
         r_add_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_add_rdc])
         ecbn128_ecjac_rdc_u256 = np.reshape(ECC.as_uint256(ecbn128_ecjac_rdc),(-1,3,8))
-        r2_add_rdc_u256 = np.reshape([ec_jacadd_h(np.reshape(x,-1),np.reshape(y,-1),MOD_FIELD) for x, y in zip(ecbn128_ecjac_rdc_u256[::2], ecbn128_ecjac_rdc_u256[1::2])],(-1,8))
+        r2_add_rdc_u256 = np.reshape([ec_jacadd_h(np.reshape(x,-1),np.reshape(y,-1),MOD_FR) for x, y in zip(ecbn128_ecjac_rdc_u256[::2], ecbn128_ecjac_rdc_u256[1::2])],(-1,8))
         self.assertTrue(all(np.concatenate(r2_add_rdc_u256 == r_add_rdc_u256)))
 
         r_double_rdc = [x.double() for x in ecbn128_ecjac_rdc]
         r_double_rdc_u256 = np.concatenate([[x.get_P()[0].as_uint256(),x.get_P()[1].as_uint256(), x.get_P()[2].as_uint256()] for x in r_double_rdc])
-        r2_double_rdc_u256 = np.reshape([ec_jacdouble_h(np.reshape(x,-1),MOD_FIELD) for x in ecbn128_ecjac_rdc_u256],(-1,8))
+        r2_double_rdc_u256 = np.reshape([ec_jacdouble_h(np.reshape(x,-1),MOD_FR) for x in ecbn128_ecjac_rdc_u256],(-1,8))
         self.assertTrue(all(np.concatenate(r2_double_rdc_u256 == r_double_rdc_u256)))
 
         ecbn128_scl_u256 = [ZFieldElExt(scl).as_uint256() for scl in ecbn128_scl]
-        r2_mul_rdc_u256 = np.reshape([ec_jacscmul_h(x,np.reshape(y,-1),MOD_FIELD, add_last=True) for x, y in zip(ecbn128_scl_u256,ecbn128_ecjac_rdc_u256)],(-1,8))
-        self.assertTrue(all(np.concatenate(ec_jac2aff_h(np.reshape(r2_mul_rdc_u256,-1),MOD_FIELD) == ec_jac2aff_h(np.reshape(r_mul_rdc_u256,-1),MOD_FIELD))))
+        r2_mul_rdc_u256 = np.reshape([ec_jacscmul_h(x,np.reshape(y,-1),MOD_FR, add_last=True) for x, y in zip(ecbn128_scl_u256,ecbn128_ecjac_rdc_u256)],(-1,8))
+        self.assertTrue(all(np.concatenate(ec_jac2aff_h(np.reshape(r2_mul_rdc_u256,-1),MOD_FR) == ec_jac2aff_h(np.reshape(r_mul_rdc_u256,-1),MOD_FR))))
 
 def debugReducedECCAddShfl(r_mul, result1, result2):
 

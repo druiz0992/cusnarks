@@ -40,7 +40,7 @@ main()
       kparams[i].out_length = N;
       kparams[i].stride = 2;
       kparams[i].premod = 0;
-      kparams[i].midx   = MOD_FIELD;
+      kparams[i].midx   = MOD_FR;
       kparams[i].fft_Nx = (fft_size_t)FFT_N;
       kparams[i].fft_Ny = (fft_size_t)FFT_N;
       kparams[i].N_fftx =  M;

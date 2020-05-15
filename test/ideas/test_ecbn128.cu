@@ -33,7 +33,7 @@ main()
       kparams[i].stride = ECP_JAC_OUTDIMS;
       kparams[i].premul = 1;
       kparams[i].premod = 0;
-      kparams[i].midx   = MOD_FIELD;
+      kparams[i].midx   = MOD_FR;
       kparams[i].in_length = N * 3;
       kparams[i].out_length = 1 * ECP_JAC_OUTDIMS; 
       kparams[i].padding_idx = 0;

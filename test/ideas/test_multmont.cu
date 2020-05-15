@@ -16,7 +16,7 @@ main()
     uint32_t out_samples2[N/2 * NWORDS_256BIT];
     vector_t in_vector, out_vector;
     double t;
-    uint32_t midx = MOD_FIELD;
+    uint32_t midx = MOD_FR;
     uint32_t done = 0;
     uint32_t n_errors = 0;
     uint32_t max_samples = 1<< 26;

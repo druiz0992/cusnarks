@@ -8727,6 +8727,8 @@ uint32_t  test_ec_jacscmul(uint32_t ec2)
 
    struct stat st;
 
+   init_h();
+
    if (ec2){
      stat(input2_test_scmul_filename, &st);
    } else {
@@ -8791,6 +8793,7 @@ uint32_t  test_ec_jacscmul(uint32_t ec2)
    free(out_ecp2);
    free(r);
    free(r_aff);
+   release_h();
    return retval;
 }
 
@@ -8804,6 +8807,7 @@ uint32_t  test_ec_jacadd (uint32_t ec2)
         outdims = ECP2_JAC_OUTDIMS;
    }
 
+   init_h();
    struct stat st;
 
    if (ec2){
@@ -8902,6 +8906,7 @@ uint32_t  test_ec_jacadd (uint32_t ec2)
    free(out_ecp4);
    free(r);
    free(r_aff);
+   release_h();
    return retval;
 }
 
@@ -9285,13 +9290,13 @@ int main()
 
   retval+=test_inv_ext1();
   retval+=test_inv_ext2();
- 
+
   retval+=test_ec_jacadd(0);    // EC1
   retval+=test_ec_jacadd(1);    // EC2
 
   retval+=test_ec_jacscmul(0);    // EC1
   retval+=test_ec_jacscmul(1);    // EC2
-   
+
   retval+=test_ec_jacreduce_opt(0);   // EC1
   retval+=test_ec_jacreduce_opt(1);   // EC2
   

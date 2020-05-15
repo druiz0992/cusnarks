@@ -53,8 +53,6 @@
 #ifndef _ASM_DEVICE_H_
 #define _ASM_DEVICE_H_
 
-// Montgomery Multiplication (FIOS)
-
 #define ASM_MONTMULU256(out,in1,in2)  \
     ASM_MUL_START(out,in1,in2) \
     ASM_MUL_REDUCTION_BLOCK_LAST(out) \
@@ -72,26 +70,6 @@
     ASM_MUL_REDUCTION_BLOCK_LAST(out) \
     ASM_MUL_BLOCK(out,in1,in2,7) \
     ASM_MUL_REDUCTION_BLOCK_LAST(out)
-
-#if 0
-#define ASM_MONTSQ256(out,in1, in2)  \
-    ASM_MONTSQ_START(out,in1, in2) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MONTSQ_BLOCK1(out, in1, in2) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MUL_BLOCK(out, in1, in2,2) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MUL_BLOCK(out,in1,in2,3) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MUL_BLOCK(out,in1,in2,4) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MUL_BLOCK(out,in1,in2,5) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MUL_BLOCK(out,in1,in2,6) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out) \
-    ASM_MUL_BLOCK(out,in1,in2,7) \
-    ASM_MUL_REDUCTION_BLOCK_LAST(out)
-#endif
 
 #define ASM_MONTMULU256_64(out,in1,in2)  \
     ASM_MUL_START_64(out,in1,in2) \
@@ -433,68 +411,6 @@
     "madc.hi.cc.u32 "#out"7, "#in1#idx", "#in2"6, "#out"7;\n\t" \
     "madc.hi.cc.u32 lo, "#in1#idx", "#in2"7, lo;\n\t" \
     "addc.u32 hi, 0, 0;\n\t"  
-
-#if 0
-#define ASM_MONTSQ_BLOCK2(out, in1, in2)  \
-    "add.cc.u32 "#out"0, ttl1, "#out"0;\n\t" \
-    "addc.cc.u32 "#out"1, ttl7, "#out"1;\n\t" \
-    "madc.lo.cc.u32 "#out"2, "#in1#idx", "#in2"2, "#out"2;\n\t" \
-    "addc.cc.u32 "#out"2, ttl0, "#out"2;\n\t" \
-    "mul.lo.u32  ttl0, "#in1"2, "#in2"3;\n\t" \
-    "mul.lo.u32  ttl1, "#in1"2, "#in2"4;\n\t" \
-    "mul.lo.u32  ttl7, "#in1"2, "#in2"5;\n\t" \
-    "mul.lo.u32  ttl12, "#in1"2, "#in2"6;\n\t" \
-    "mul.hi.u32  tth12, "#in1"2, "#in2"6;\n\t" \
-    "mul.lo.u32  ttl13, "#in1"2, "#in2"7;\n\t" \
-    "mul.hi.u32  tth13, "#in1"2, "#in2"7;\n\t" \
-    "addc.cc.u32 "#out"3, ttl0, "#out"3;\n\t" \
-    "addc.cc.u32 "#out"4, ttl11, "#out"4;\n\t" \
-    "addc.cc.u32 "#out"5, ttl12, "#out"5;\n\t" \
-    "addc.cc.u32 "#out"6, ttl13, "#out"6;\n\t" \
-    "addc.cc.u32 "#out"7, ttl14, "#out"7;\n\t" \
-    "addc.u32 lo, lo, 0;\n\t" \
-    "add.cc.u32 "#out"1, tth1, "#out"1;\n\t" \
-    "addc.cc.u32 "#out"2, tth7, "#out"2;\n\t" \
-    "madc.hi.cc.u32 "#out"3, "#in1#idx", "#in2"2, "#out"3;\n\t" \
-    "madc.hi.cc.u32 "#out"4, "#in1#idx", "#in2"3, "#out"4;\n\t" \
-    "madc.hi.cc.u32 "#out"5, "#in1#idx", "#in2"4, "#out"5;\n\t" \
-    "madc.hi.cc.u32 "#out"6, "#in1#idx", "#in2"5, "#out"6;\n\t" \
-    "madc.hi.cc.u32 "#out"7, "#in1#idx", "#in2"6, "#out"7;\n\t" \
-    "madc.hi.cc.u32 lo, "#in1#idx", "#in2"7, lo;\n\t" \
-    "addc.u32 hi, 0, 0;\n\t"  
-
-#define ASM_MONTSQ_BLOCK1(out, in1, in2) \
-    "add.cc.u32 "#out"0, ttl0, "#out"0;\n\t" \
-    "mul.lo.u32  ttl0, "#in1"1, "#in2"2;\n\t" \
-    "mul.lo.u32  ttl7, "#in1"1, "#in2"3;\n\t" \
-    "mul.hi.u32  tth7, "#in1"1, "#in2"3;\n\t" \
-    "mul.lo.u32  ttl8, "#in1"1, "#in2"4;\n\t" \
-    "mul.hi.u32  tth8, "#in1"1, "#in2"4;\n\t" \
-    "mul.lo.u32  ttl9, "#in1"1, "#in2"5;\n\t" \
-    "mul.hi.u32  tth9, "#in1"1, "#in2"5;\n\t" \
-    "mul.lo.u32  ttl10, "#in1"1, "#in2"6;\n\t" \
-    "mul.lhiu32  tth10, "#in1"1, "#in2"6;\n\t" \
-    "mul.lo.u32  ttl11, "#in1"1, "#in2"7;\n\t" \
-    "mul.hi.u32  tth11, "#in1"1, "#in2"7;\n\t" \
-    "madc.lo.cc.u32 "#out"1, "#in1"1, "#in2"1, "#out"1;\n\t" \
-    "addc.cc.u32 "#out"2, ttl0, "#out"2;\n\t" \
-    "addc.cc.u32 "#out"3, ttl7, "#out"3;\n\t" \
-    "addc.cc.u32 "#out"4, ttl8, "#out"4;\n\t" \
-    "addc.cc.u32 "#out"5, ttl9, "#out"5;\n\t" \
-    "addc.cc.u32 "#out"6, ttl10, "#out"6;\n\t" \
-    "addc.cc.u32 "#out"7, ttl11, "#out"7;\n\t" \
-    "addc.u32 lo, lo, 0;\n\t" \
-    "add.cc.u32 "#out"1, tth0, "#out"1;\n\t" \
-    "mul.hi.u32  tth0, "#in1"1, "#in2"2;\n\t" \
-    "madc.hi.cc.u32 "#out"2, "#in1#idx", "#in2"1, "#out"2;\n\t" \
-    "addc.u32 "#out"3, tth0, "#out"3;\n\t" \
-    "addc.u32 "#out"4, tth7, "#out"4;\n\t" \
-    "addc.u32 "#out"5, tth8, "#out"5;\n\t" \
-    "addc.u32 "#out"6, tth9, "#out"6;\n\t" \
-    "addc.u32 "#out"7, tth10, "#out"7;\n\t" \
-    "addc.u32 lo, tth11, lo;\n\t" \
-    "addc.u32 hi, 0, 0;\n\t" 
-#endif
 
 #define ASM_MUL_BLOCK_64(out, in1, in2, idx) \
     "mad.lo.cc.u64 "#out"0, "#in1#idx", "#in2"0, "#out"0;\n\t" \
