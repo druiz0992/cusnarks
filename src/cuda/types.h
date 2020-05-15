@@ -34,12 +34,12 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
+#include "_ff.h"
+
 #define NWORDS_256BIT           (8)
-#define NBITS_254BIT           (254)
-#define NWORDS_256BIT_SHIFT     (3)
+//TODO check if I need NBITS_WORD, NBITS_WORD_LOG2, NBITS_WORDS_MOD
+//TODO Check appearances of NWORDS_256BIT
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
-#define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
-#define PRIME_BASE           (30)
 #define NBITS_WORD           (32)
 #define NBITS_WORD_LOG2      (5)
 #define NBITS_WORD_MOD       (0x1F)
@@ -226,8 +226,8 @@ typedef struct {
 
 // index to different primes used
 typedef enum{
-   MOD_GROUP = 0,
-   MOD_FIELD,
+   MOD_FP = 0,
+   MOD_FR,
    MOD_N
 
 }mod_t;

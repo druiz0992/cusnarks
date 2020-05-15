@@ -111,9 +111,9 @@ class GrothSetup(object):
         # Initialize Field
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data)
-        ZPoly.init(MOD_FIELD)
+        ZPoly.init(MOD_FR)
 
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         self.cir = getCircuit()
 
         self.cir_header   = None
@@ -279,7 +279,7 @@ class GrothSetup(object):
         logging.info('')
         logging.info(' Starting setup....')
 
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         start_s = time.time()
         
         #Init PK
@@ -505,7 +505,7 @@ class GrothSetup(object):
       toxic_invDelta = self.toxic['kdelta'].inv()
       toxic_invGamma = self.toxic['kgamma'].inv()
 
-      ZField.set_field(MOD_GROUP)
+      ZField.set_field(MOD_FP)
       Gx = ZFieldElExt(curve_params['Gx'])
       Gy = ZFieldElExt(curve_params['Gy'])
       G2x = Z2FieldEl([curve_params_g2['Gx1'], curve_params_g2['Gx2']])
@@ -658,13 +658,13 @@ class GrothSetup(object):
       start = time.time()
 
       logging.info(' Computing EC Point C')
-      ZField.set_field(MOD_FIELD)
+      ZField.set_field(MOD_FR)
       pidx = ZField.get_field()
       ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
                                       toxic_invDelta.reduce().as_uint256(),
                                       a_t_u256, b_t_u256, c_t_u256, self.pk['nPublic']+1, self.pk['nVars'], pidx )
 
-      ZField.set_field(MOD_GROUP)
+      ZField.set_field(MOD_FP)
       sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
@@ -692,12 +692,12 @@ class GrothSetup(object):
       maxH = self.pk['domainSize']+1
       self.pk['hExps'] = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
 
-      ZField.set_field(MOD_FIELD)
+      ZField.set_field(MOD_FR)
       pidx = ZField.get_field()
       zod_u256 = montmultN_h(toxic_invDelta.reduce().as_uint256(), z_t_u256, pidx)
       eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), np.reshape(zod_u256,-1), maxH, pidx)
 
-      ZField.set_field(MOD_GROUP)
+      ZField.set_field(MOD_FP)
       sorted_idx = sortu256_idx_h(eT_u256,self.sort_en)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
@@ -721,12 +721,12 @@ class GrothSetup(object):
       start = time.time()
 
       logging.info(' Computing EC Point IC')
-      ZField.set_field(MOD_FIELD)
+      ZField.set_field(MOD_FR)
       pidx = ZField.get_field()
       ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
                                       toxic_invGamma.reduce().as_uint256(),
                                       a_t_u256, b_t_u256, c_t_u256, 0, self.pk['nPublic']+1, pidx )
-      ZField.set_field(MOD_GROUP)
+      ZField.set_field(MOD_FP)
       sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
@@ -860,8 +860,8 @@ class GrothSetup(object):
          for gidx in range(len(groups)-1):
            table = ec_inittable_h(
                                  np.reshape(super_group[groups[gidx]:groups[gidx+1]],
-                                             -1), self.grouping, MOD_GROUP, 1)
-           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
            appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
          
          logging.info(' Done computing EC Point A Tables')
@@ -878,8 +878,8 @@ class GrothSetup(object):
          for gidx in range(len(groups)-1):
            table = ec2_inittable_h(
                               np.reshape(super_group[groups[gidx]:groups[gidx+1]],
-                                   -1), self.grouping, MOD_GROUP, 1)
-           table = ec2_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+                                   -1), self.grouping, MOD_FP, 1)
+           table = ec2_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
            appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
          logging.info(' Done computing EC Point B2 Tables')
 
@@ -895,8 +895,8 @@ class GrothSetup(object):
          for gidx in range(len(groups)-1):
            table = ec_inittable_h(
                                  np.reshape(super_group[groups[gidx]:groups[gidx+1]],
-                                             -1), self.grouping, MOD_GROUP, 1)
-           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
            appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
          logging.info(' Done computing EC Point B1 Tables')
 
@@ -908,8 +908,8 @@ class GrothSetup(object):
          for gidx in range(len(groups)-1):
            table = ec_inittable_h(
                                  np.reshape(super_group[groups[gidx]:groups[gidx+1]],
-                                             -1), self.grouping, MOD_GROUP, 1)
-           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
            appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
          logging.info(' Done computing EC Point C Tables')
 
@@ -924,8 +924,8 @@ class GrothSetup(object):
        for gidx in range(len(groups)-1):
            table = ec_inittable_h(
                                  np.reshape(super_group[groups[gidx]:groups[gidx+1]],
-                                             -1), self.grouping, MOD_GROUP, 1)
-           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
            appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
          
        logging.info(' Done computing EC Point hExps Tables')
@@ -1005,7 +1005,7 @@ class GrothSetup(object):
     def vars_to_vkdict(self, alfabeta=False):
       # TODO : only suported formats for vk are .json, affine and extended 
       vk_dict = {}
-      ZField.set_field(MOD_GROUP)
+      ZField.set_field(MOD_FP)
       vk_dict['vk_alfa_1'] = ECC.from_uint256(
                  self.pk['alfa_1'],
                  in_ectype=EC_T_AFFINE,

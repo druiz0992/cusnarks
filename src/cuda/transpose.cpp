@@ -133,7 +133,7 @@ void transpose_square_h(uint32_t *min, uint32_t in_nrows)
     for(uint32_t j=i+1; j <in_nrows; j++){
         uint32_t cur_pos = (i << m) + j;
         uint32_t trans_pos = (j << m) + i;
-        swapu256_h(&min[trans_pos << NWORDS_256BIT_SHIFT], &min[cur_pos << NWORDS_256BIT_SHIFT]);
+        swapu256_h(&min[trans_pos  * NWORDS_256BIT], &min[cur_pos * NWORDS_256BIT]);
     } 
   }
 }

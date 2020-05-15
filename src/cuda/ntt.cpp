@@ -293,7 +293,7 @@ static void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < Ancols; i++){
-    fft_ptr(&A[i<<NWORDS_256BIT_SHIFT], roots, Nrows,Ancols, rstride<<Ncols, direction,  pidx);
+    fft_ptr(&A[i * NWORDS_256BIT], roots, Nrows,Ancols, rstride<<Ncols, direction,  pidx);
   }
 
   #ifndef TEST_MODE
@@ -301,9 +301,9 @@ static void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
   #endif
   for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
     ridx = (rstride * (i >> Ncols) * (i & (Ancols - 1)) * direction ) & (rstride * Anrows * Ancols - 1);
-    montmult_h(&A[i<<NWORDS_256BIT_SHIFT],
-               &A[i<<NWORDS_256BIT_SHIFT],
-               &roots[ridx << NWORDS_256BIT_SHIFT],
+    montmult_h(&A[i * NWORDS_256BIT],
+               &A[i * NWORDS_256BIT],
+               &roots[ridx * NWORDS_256BIT],
                pidx);
   }
 
@@ -311,7 +311,7 @@ static void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < Anrows; i++){
-    fft_ptr(&A[i<<Ncols+NWORDS_256BIT_SHIFT], roots, Ncols,1, rstride<<Nrows, direction, pidx);
+    fft_ptr(&A[(i * NWORDS_256BIT ) <<Ncols], roots, Ncols,1, rstride<<Nrows, direction, pidx);
   }
 }
 
@@ -326,7 +326,7 @@ static void _ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < 1 << Ncols; i++){
-    fft_ptr(&A[i<<NWORDS_256BIT_SHIFT], roots, Nrows,1 << Ncols, rstride<<Ncols, direction,  pidx);
+    fft_ptr(&A[i * NWORDS_256BIT], roots, Nrows,1 << Ncols, rstride<<Ncols, direction,  pidx);
   }
 
   montmult_parallel_reorder_h(A, roots, Nrows, Ncols, rstride, direction, pidx);
@@ -335,7 +335,7 @@ static void _ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < 1 << Nrows; i++){
-    fft_ptr(&A[i<<(Ncols+NWORDS_256BIT_SHIFT)], roots, Ncols,1, rstride<<Nrows, direction, pidx);
+    fft_ptr(&A[(i*NWORDS_256BIT) <<Ncols], roots, Ncols,1, rstride<<Nrows, direction, pidx);
   }
 }
 
@@ -369,7 +369,7 @@ void intt_parallel_h(uint32_t *A, const uint32_t *roots,uint32_t format, uint32_
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0;i < 1 << (Nrows + Ncols); i++){
-      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &scaler[(Nrows + Ncols)<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &scaler[(Nrows + Ncols) * NWORDS_256BIT], pidx);
   }
 }
 
@@ -409,9 +409,9 @@ static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64
         for (j=i; j<i+halfsize; j++){
            l = j + halfsize;
            ridx = (rstride*k) & (rstride * n-1);
-           lidx = (astride*l) << NWORDS_256BIT_SHIFT;
-           jidx = (astride*j) << NWORDS_256BIT_SHIFT;
-           mulm_cb(right,&A[lidx], &roots[ridx<<NWORDS_256BIT_SHIFT]);
+           lidx = (astride*l) * NWORDS_256BIT;
+           jidx = (astride*j) * NWORDS_256BIT;
+           mulm_cb(right,&A[lidx], &roots[ridx * NWORDS_256BIT]);
            subm_cb(&A[lidx], &A[jidx], right);
            addm_cb(&A[jidx], &A[jidx], right);
            k += tablestep;
@@ -439,9 +439,9 @@ static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, int32_t 
         for (j=i; j<i+halfsize; j++){
            l = j + halfsize;
            ridx = k & (n-1);
-           lidx = l << NWORDS_256BIT_SHIFT;
-           jidx = j << NWORDS_256BIT_SHIFT;
-           mulm_cb(right,&A[lidx], &roots[ridx<<NWORDS_256BIT_SHIFT]);
+           lidx = l * NWORDS_256BIT;
+           jidx = j * NWORDS_256BIT;
+           mulm_cb(right,&A[lidx], &roots[ridx * NWORDS_256BIT]);
            subm_cb(&A[lidx], &A[jidx], right);
            addm_cb(&A[jidx], &A[jidx], right);
            k += tablestep;
@@ -473,15 +473,15 @@ static void _ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_ui
           s = j * (1 << (levels - i)) + k;
           t = s + (1 << (levels - i - 1));
           subm_h(right,
-                 &A[astride*s<<NWORDS_256BIT_SHIFT],
-                 &A[astride*t<<NWORDS_256BIT_SHIFT],
+                 &A[astride*s * NWORDS_256BIT],
+                 &A[astride*t * NWORDS_256BIT],
                  pidx);
-          addm_h(&A[astride*s<<NWORDS_256BIT_SHIFT],
-                 &A[astride*s<<NWORDS_256BIT_SHIFT],
-                 &A[astride*t<<NWORDS_256BIT_SHIFT], pidx);
-          montmult_h(&A[astride*t<<NWORDS_256BIT_SHIFT],
+          addm_h(&A[astride*s * NWORDS_256BIT],
+                 &A[astride*s * NWORDS_256BIT],
+                 &A[astride*t * NWORDS_256BIT], pidx);
+          montmult_h(&A[astride*t * NWORDS_256BIT],
                      right,
-                     &roots[((rstride*(1ull<<i)*k*direction) & (rstride*(1ull << levels)-1))<<NWORDS_256BIT_SHIFT], pidx);
+                     &roots[((rstride*(1ull<<i)*k*direction) & (rstride*(1ull << levels)-1)) * NWORDS_256BIT], pidx);
        }
      }
    }
@@ -505,7 +505,7 @@ static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride)
    for (uint32_t i=0; i < 1 << levels ; i++){
       uint32_t j = reverse_ptr(i, levels);
       if (j > i){
-         swapu256_h(&A[astride*i<<NWORDS_256BIT_SHIFT],&A[astride*j<<NWORDS_256BIT_SHIFT]);
+         swapu256_h(&A[astride* i * NWORDS_256BIT],&A[astride*j * NWORDS_256BIT]);
       }
    }
 }
@@ -528,10 +528,10 @@ static void montmult_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t leve
   for (uint32_t i=0;i<1 << levels; i++){
     uint32_t j = reverse_ptr(i, levels);
     if (j > i){
-      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[j<<NWORDS_256BIT_SHIFT], pidx);
-      montmult_h(&A[j<<NWORDS_256BIT_SHIFT], &A[j<<NWORDS_256BIT_SHIFT], &roots[i<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &roots[j * NWORDS_256BIT], pidx);
+      montmult_h(&A[j * NWORDS_256BIT], &A[j * NWORDS_256BIT], &roots[i * NWORDS_256BIT], pidx);
     } else if (j == i) {
-      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[i<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &roots[i * NWORDS_256BIT], pidx);
     } 
   }
 }
@@ -555,7 +555,7 @@ static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint
   for (t_uint64 i=0;i<1 << levels; i++){
     int32_t ridx = (rstride * (i >> Ncols) * (i & ( (1 << Ncols) - 1)) * direction ) & ( (rstride  << (Nrows + Ncols)) - 1);
     t_uint64 j = reverse_ptr(ridx, levels+1);
-    montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[j<<NWORDS_256BIT_SHIFT], pidx);
+    montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &roots[j * NWORDS_256BIT], pidx);
   }
 }
 
@@ -597,7 +597,7 @@ static void _intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0; i< (1<<levels); i++){
-     montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &scaler[levels << NWORDS_256BIT_SHIFT], pidx);
+     montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &scaler[levels * NWORDS_256BIT], pidx);
   }
   
 }
@@ -617,7 +617,7 @@ static void _intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uin
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0; i< (1<<levels); i++){
-     montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &scaler[levels << NWORDS_256BIT_SHIFT], pidx);
+     montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &scaler[levels * NWORDS_256BIT], pidx);
   }
 }
 
@@ -664,7 +664,7 @@ void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
-      montmult_h(&A[i<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &roots[i<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&A[i * NWORDS_256BIT], &A[i * NWORDS_256BIT], &roots[i * NWORDS_256BIT], pidx);
   }
   ntt_parallel_h(A, roots, Nrows, Ncols, rstride, 1, FFT_T_DIT,  pidx);
 }
@@ -790,7 +790,7 @@ void *interpol_and_mul_h(void *args)
   int64_t ridx;
   uint32_t i;
   uint32_t ridx1;
-  uint32_t B_offset = 1ull<<(wargs->Nrows+wargs->Ncols + NWORDS_256BIT_SHIFT);
+  uint32_t B_offset = (1ull*NWORDS_256BIT)<<(wargs->Nrows+wargs->Ncols);
   uint32_t *M_transpose1_ptr = M_transpose;
   uint32_t *M_transpose2_ptr = &M_transpose[B_offset];
   uint32_t roffset1, roffset2, roffset3, roffset4;
@@ -817,13 +817,13 @@ void *interpol_and_mul_h(void *args)
   // multiply M_mul[2*i] = A * B
   for (i=wargs->start_idx; i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_mul[(2*(i+1))<<NWORDS_256BIT_SHIFT]);
-      __builtin_prefetch(&wargs->A[(i+1)<<NWORDS_256BIT_SHIFT]);
-      __builtin_prefetch(&wargs->B[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&M_mul[(2*(i+1)) * NWORDS_256BIT]);
+      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_256BIT]);
+      __builtin_prefetch(&wargs->B[(i+1) * NWORDS_256BIT]);
     }
-    mulm_cb(&M_mul[(2*i)<<NWORDS_256BIT_SHIFT],
-               &wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->B[i<<NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_mul[(2*i) * NWORDS_256BIT],
+               &wargs->A[i * NWORDS_256BIT],
+               &wargs->B[i * NWORDS_256BIT]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -841,10 +841,10 @@ void *interpol_and_mul_h(void *args)
   wait_h(wargs->thread_id, NULL, NULL);
 
   for (i=start_col; i<last_col; i++){
-    ntt_h(&M_transpose1_ptr[i<<(wargs->Nrows+NWORDS_256BIT_SHIFT)], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, -1,  &ff);
+    ntt_h(&M_transpose1_ptr[(i*NWORDS_256BIT)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, -1,  &ff);
   }
   for (i=start_col; i<last_col; i++){
-    ntt_h(&M_transpose2_ptr[i<<(wargs->Nrows+NWORDS_256BIT_SHIFT)], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, -1,  &ff);
+    ntt_h(&M_transpose2_ptr[(i*NWORDS_256BIT)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, -1,  &ff);
   }
 
   wait_h(wargs->thread_id, NULL, NULL);
@@ -853,21 +853,21 @@ void *interpol_and_mul_h(void *args)
 
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_transpose1_ptr[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&M_transpose1_ptr[(i+1) * NWORDS_256BIT]);
     }
     ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
-    mulm_cb(&M_transpose1_ptr[i<<NWORDS_256BIT_SHIFT],
-               &M_transpose1_ptr[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx1 << NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_transpose1_ptr[i * NWORDS_256BIT],
+               &M_transpose1_ptr[i * NWORDS_256BIT],
+               &wargs->roots[ridx1 * NWORDS_256BIT]);
   }
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_transpose2_ptr[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&M_transpose2_ptr[(i+1) * NWORDS_256BIT]);
     }
     ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
-    mulm_cb(&M_transpose2_ptr[i<<NWORDS_256BIT_SHIFT],
-               &M_transpose2_ptr[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx1 << NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_transpose2_ptr[i * NWORDS_256BIT],
+               &M_transpose2_ptr[i * NWORDS_256BIT],
+               &wargs->roots[ridx1 * NWORDS_256BIT]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -885,10 +885,10 @@ void *interpol_and_mul_h(void *args)
 
   // A[i] = IFFT_N/2(A).T; B[i] = IFFT_N/2(B).T
   for (i=start_row;i < last_row; i++){
-    ntt_h(&wargs->A[(i<<wargs->Ncols+NWORDS_256BIT_SHIFT)], &wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, -1, &ff);
+    ntt_h(&wargs->A[(i*NWORDS_256BIT)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, -1, &ff);
   }
   for (i=start_row;i < last_row; i++){
-    ntt_h(&wargs->B[(i<<wargs->Ncols+NWORDS_256BIT_SHIFT)],&wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, -1, &ff);
+    ntt_h(&wargs->B[(i*NWORDS_256BIT)<<wargs->Ncols],&wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, -1, &ff);
   }
 
   transposeBlock_h(M_transpose1_ptr, wargs->A,
@@ -911,27 +911,27 @@ void *interpol_and_mul_h(void *args)
   // A = A * scaler * l3W; B = B * scaler * l3W
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&wargs->A[(i+1)<<NWORDS_256BIT_SHIFT]);
-      __builtin_prefetch(&wargs->roots[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_256BIT]);
+      __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_256BIT]);
     }
-      mulm_cb(&wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &scaler_mont[(wargs->Nrows + wargs->Ncols)<<NWORDS_256BIT_SHIFT]);
-      mulm_cb(&wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->A[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->roots[i<<NWORDS_256BIT_SHIFT]);
+      mulm_cb(&wargs->A[i * NWORDS_256BIT],
+                 &wargs->A[i * NWORDS_256BIT],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols) * NWORDS_256BIT]);
+      mulm_cb(&wargs->A[i * NWORDS_256BIT],
+                 &wargs->A[i * NWORDS_256BIT],
+                 &wargs->roots[i * NWORDS_256BIT]);
   }
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&wargs->A[(i+1)<<NWORDS_256BIT_SHIFT]);
-      __builtin_prefetch(&wargs->roots[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_256BIT]);
+      __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_256BIT]);
     }
-      mulm_cb(&wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &scaler_mont[(wargs->Nrows + wargs->Ncols)<<NWORDS_256BIT_SHIFT]);
-      mulm_cb(&wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->B[i<<NWORDS_256BIT_SHIFT],
-                 &wargs->roots[i<<NWORDS_256BIT_SHIFT]);
+      mulm_cb(&wargs->B[i * NWORDS_256BIT],
+                 &wargs->B[i * NWORDS_256BIT],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols) * NWORDS_256BIT]);
+      mulm_cb(&wargs->B[i * NWORDS_256BIT],
+                 &wargs->B[i * NWORDS_256BIT],
+                 &wargs->roots[i * NWORDS_256BIT]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -948,10 +948,10 @@ void *interpol_and_mul_h(void *args)
   wait_h(wargs->thread_id, NULL, NULL);
 
   for (i=start_col;i < last_col; i++){
-    ntt_h(&M_transpose1_ptr[i<<(wargs->Nrows+NWORDS_256BIT_SHIFT)], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, 1,  &ff);
+    ntt_h(&M_transpose1_ptr[(i*NWORDS_256BIT)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, 1,  &ff);
   }
   for (i=start_col;i < last_col; i++){
-    ntt_h(&M_transpose2_ptr[i<<(wargs->Nrows+NWORDS_256BIT_SHIFT)], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, 1,  &ff);
+    ntt_h(&M_transpose2_ptr[(i*NWORDS_256BIT)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_256BIT], wargs->Nrows, 1,  &ff);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -959,21 +959,21 @@ void *interpol_and_mul_h(void *args)
   // A[i] = A[i] * l2_W[i]
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_transpose1_ptr[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&M_transpose1_ptr[(i+1) * NWORDS_256BIT]);
     }
     ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1))) & (wargs->rstride * Anrows * Ancols - 1);
-    mulm_cb(&M_transpose1_ptr[i<<NWORDS_256BIT_SHIFT],
-               &M_transpose1_ptr[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx1 << NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_transpose1_ptr[i * NWORDS_256BIT],
+               &M_transpose1_ptr[i * NWORDS_256BIT],
+               &wargs->roots[ridx1 * NWORDS_256BIT]);
   }
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_transpose2_ptr[(i+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&M_transpose2_ptr[(i+1) * NWORDS_256BIT]);
     }
     ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1))) & (wargs->rstride * Anrows * Ancols - 1);
-    mulm_cb(&M_transpose2_ptr[i<<NWORDS_256BIT_SHIFT],
-               &M_transpose2_ptr[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx1 << NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_transpose2_ptr[i * NWORDS_256BIT],
+               &M_transpose2_ptr[i * NWORDS_256BIT],
+               &wargs->roots[ridx1 * NWORDS_256BIT]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -992,10 +992,10 @@ void *interpol_and_mul_h(void *args)
 
   // A = FFT_N/2(A).T; B = FFT_N/2(B).T
   for (i=start_row;i < last_row; i++){
-    ntt_h(&wargs->A[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], &wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, 1, &ff);
+    ntt_h(&wargs->A[(i*NWORDS_256BIT)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, 1, &ff);
   }
   for (i=start_row;i < last_row; i++){
-    ntt_h(&wargs->B[i<<wargs->Ncols+NWORDS_256BIT_SHIFT], &wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, 1, &ff);
+    ntt_h(&wargs->B[(i*NWORDS_256BIT)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_256BIT], wargs->Ncols, 1, &ff);
   }
 
   M_transpose1_ptr = wargs->A;
@@ -1011,11 +1011,11 @@ void *interpol_and_mul_h(void *args)
   // M_mul[2*i+1] = A * B
   for (i=wargs->start_idx; i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_mul[(2*(i+1)+1)<<NWORDS_256BIT_SHIFT]);
+      __builtin_prefetch(&M_mul[(2*(i+1)+1) * NWORDS_256BIT]);
     }
-    mulm_cb(&M_mul[(2*i+1)<<NWORDS_256BIT_SHIFT],
-               &wargs->A[i<<NWORDS_256BIT_SHIFT],
-               &wargs->B[i<<NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_mul[(2*i+1) * NWORDS_256BIT],
+               &wargs->A[i * NWORDS_256BIT],
+               &wargs->B[i * NWORDS_256BIT]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -1032,16 +1032,16 @@ void *interpol_and_mul_h(void *args)
 
   // A = IFFT_N(A); B = IFFT_N(B)
   for (i=start_col;i < last_col; i++){
-    ntt_h(&M_transpose[i<<(wargs->mNrows+NWORDS_256BIT_SHIFT)], &wargs->roots[roffset3*NWORDS_256BIT], wargs->mNrows, -1, &ff);
+    ntt_h(&M_transpose[(i*NWORDS_256BIT)<<wargs->mNrows], &wargs->roots[roffset3*NWORDS_256BIT], wargs->mNrows, -1, &ff);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
   // A[i] = A[i] * l2_IW[i]
   for (i=wargs->start_idx*2;i < wargs->last_idx*2; i++){
     ridx1 = ( (wargs->rstride>>1) * (i >> wargs->mNrows) * (i & (Amnrows - 1)) * -1) & ((wargs->rstride>>1) * Amnrows * Amncols - 1);
-    mulm_cb(&M_transpose[i<<NWORDS_256BIT_SHIFT],
-               &M_transpose[i<<NWORDS_256BIT_SHIFT],
-               &wargs->roots[ridx1 << NWORDS_256BIT_SHIFT]);
+    mulm_cb(&M_transpose[i * NWORDS_256BIT],
+               &M_transpose[i * NWORDS_256BIT],
+               &wargs->roots[ridx1 * NWORDS_256BIT]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -1053,14 +1053,14 @@ void *interpol_and_mul_h(void *args)
   wait_h(wargs->thread_id, NULL, NULL);
 
   for (i=start_row;i < last_row; i++){
-    ntt_h(&M_mul[i<<wargs->mNcols+NWORDS_256BIT_SHIFT], &wargs->roots[roffset4*NWORDS_256BIT], wargs->mNcols, -1, &ff);
+    ntt_h(&M_mul[(i*NWORDS_256BIT)<<wargs->mNcols], &wargs->roots[roffset4*NWORDS_256BIT], wargs->mNcols, -1, &ff);
   }
   wait_h(wargs->thread_id, NULL, NULL);
 
   for (i=wargs->start_idx*2;i < wargs->last_idx*2; i++){
-      mulm_cb(&M_mul[i<<NWORDS_256BIT_SHIFT],
-                 &M_mul[i<<NWORDS_256BIT_SHIFT],
-                 &scaler_ext[(wargs->mNrows + wargs->mNcols)<<NWORDS_256BIT_SHIFT]);
+      mulm_cb(&M_mul[i * NWORDS_256BIT],
+                 &M_mul[i * NWORDS_256BIT],
+                 &scaler_ext[(wargs->mNrows + wargs->mNcols) * NWORDS_256BIT]);
   }
 
   transposeBlock_h(M_transpose,M_mul,start_row, last_row, 1<<wargs->mNrows, 1<<wargs->mNcols, TRANSPOSE_BLOCK_SIZE);
@@ -1078,7 +1078,7 @@ uint32_t *ntt_interpolandmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
-      montmult_h(&M_mul[(2*i)<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &B[i<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&M_mul[(2*i) * NWORDS_256BIT], &A[i * NWORDS_256BIT], &B[i * NWORDS_256BIT], pidx);
   }
 
   interpol_parallel_odd_h(A, roots, Nrows, Ncols, rstride, pidx);
@@ -1088,7 +1088,7 @@ uint32_t *ntt_interpolandmul_parallel_h(uint32_t *A, uint32_t *B, const uint32_t
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (uint32_t i=0;i < 1 << (Nrows + Ncols); i++){
-      montmult_h(&M_mul[(2*i+1)<<NWORDS_256BIT_SHIFT], &A[i<<NWORDS_256BIT_SHIFT], &B[i<<NWORDS_256BIT_SHIFT], pidx);
+      montmult_h(&M_mul[(2*i+1) * NWORDS_256BIT], &A[i * NWORDS_256BIT], &B[i * NWORDS_256BIT], pidx);
   }
 
   intt_parallel_h(M_mul, roots, 0, mNrows, mNcols, 1, FFT_T_DIF, pidx);
@@ -1180,7 +1180,7 @@ void find_roots_h(uint32_t *roots, const uint32_t *primitive_root, uint32_t nroo
 */
 void computeRoots_h(uint32_t *roots, uint32_t nbits)
 {
-  uint32_t i, pidx = MOD_FIELD;
+  uint32_t i, pidx = MOD_FR;
   const  uint32_t *One = CusnarksOneMontGet((mod_t)pidx);
   const uint32_t *proots = CusnarksPrimitiveRootsFieldGet(nbits);
   

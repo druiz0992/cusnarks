@@ -92,7 +92,7 @@
 
 #ifdef _CASM
 #include "fr.h"
-#include "fq.h"
+#include "fp.h"
 #endif
 
 #ifdef PARALLEL_EN
@@ -107,10 +107,10 @@ t_subm getcb_subm_h( uint32_t pidx)
 {
   t_subm subm_cb;
 
-  if (pidx == MOD_GROUP){
-     subm_cb = &Fr_rawSub;
+  if (pidx == MOD_FP){
+     subm_cb = &Fp_rawSub;
   } else {
-     subm_cb = &Fq_rawSub;
+     subm_cb = &Fr_rawSub;
   }
   return subm_cb;
 }
@@ -118,10 +118,10 @@ t_subm getcb_subm_h( uint32_t pidx)
 t_addm getcb_addm_h( uint32_t pidx)
 {
   t_addm addm_cb;
-  if (pidx == MOD_GROUP){
-     addm_cb = &Fr_rawAdd;
+  if (pidx == MOD_FP){
+     addm_cb = &Fp_rawAdd;
   } else {
-     addm_cb = &Fq_rawAdd;
+     addm_cb = &Fr_rawAdd;
   }
   return addm_cb;
 }
@@ -129,10 +129,10 @@ t_addm getcb_addm_h( uint32_t pidx)
 t_mulm getcb_mulm_h( uint32_t pidx)
 {
   t_mulm mulm_cb;
-  if (pidx == MOD_GROUP){
-     mulm_cb = &Fr_rawMMul;
+  if (pidx == MOD_FP){
+     mulm_cb = &Fp_rawMMul;
   } else {
-     mulm_cb = &Fq_rawMMul;
+     mulm_cb = &Fr_rawMMul;
   }
   return mulm_cb;
 }
@@ -140,10 +140,10 @@ t_mulm getcb_mulm_h( uint32_t pidx)
 t_sqm getcb_sqm_h( uint32_t pidx)
 {
   t_sqm sqm_cb;
-  if (pidx == MOD_GROUP){
-     sqm_cb = &Fr_rawMSquare;
+  if (pidx == MOD_FP){
+     sqm_cb = &Fp_rawMSquare;
   } else {
-     sqm_cb = &Fq_rawMSquare;
+     sqm_cb = &Fr_rawMSquare;
   }
   return sqm_cb;
 }
@@ -151,10 +151,10 @@ t_sqm getcb_sqm_h( uint32_t pidx)
 t_tomont getcb_tomont_h( uint32_t pidx)
 {
   t_tomont tom_cb;
-  if (pidx == MOD_GROUP){
-     tom_cb = &Fr_toMont;
+  if (pidx == MOD_FP){
+     tom_cb = &Fp_toMont;
   } else {
-     tom_cb = &Fq_toMont;
+     tom_cb = &Fr_toMont;
   }
   return tom_cb;
 }
@@ -162,17 +162,29 @@ t_tomont getcb_tomont_h( uint32_t pidx)
 t_frommont getcb_frommont_h( uint32_t pidx)
 {
   t_frommont fromm_cb;
-  if (pidx == MOD_GROUP){
-     fromm_cb = &Fr_fromMont;
+  if (pidx == MOD_FP){
+     fromm_cb = &Fp_fromMont;
   } else {
-     fromm_cb = &Fq_fromMont;
+     fromm_cb = &Fr_fromMont;
   }
   return fromm_cb;
 }
 
+void Fp_toMont(uint32_t *z, const uint32_t *x)
+{
+  const uint32_t *R2 = CusnarksR2Get((mod_t)MOD_FP);
+  Fp_rawMMul(z,x,R2);
+}
+
+void Fp_fromMont(uint32_t *z, const uint32_t *x)
+{
+  const uint32_t *one = CusnarksOneGet();
+  Fp_rawMMul(z,x,one);
+}
+
 void Fr_toMont(uint32_t *z, const uint32_t *x)
 {
-  const uint32_t *R2 = CusnarksR2Get((mod_t)MOD_GROUP);
+  const uint32_t *R2 = CusnarksR2Get((mod_t)MOD_FR);
   Fr_rawMMul(z,x,R2);
 }
 
@@ -180,18 +192,6 @@ void Fr_fromMont(uint32_t *z, const uint32_t *x)
 {
   const uint32_t *one = CusnarksOneGet();
   Fr_rawMMul(z,x,one);
-}
-
-void Fq_toMont(uint32_t *z, const uint32_t *x)
-{
-  const uint32_t *R2 = CusnarksR2Get((mod_t)MOD_FIELD);
-  Fq_rawMMul(z,x,R2);
-}
-
-void Fq_fromMont(uint32_t *z, const uint32_t *x)
-{
-  const uint32_t *one = CusnarksOneGet();
-  Fq_rawMMul(z,x,one);
 }
 
 
@@ -240,18 +240,6 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 
   memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS+1));
 
-  /*
-  printf("A\n");
-  printU256Number(A);
-  printf("B\n");
-  printU256Number(B);
-
-  printf("N\n");
-  printU256Number(N);
-
-  printf("NPrime[0] : %u\n",NPrime[0]);
-  */
-
   for(i=0; i<NWORDS_256BIT/2; i++) {
     // (C,S) = t[0] + a[0]*b[i], worst case 2 words
     mulu64_h(X, &dA[0], &dB[i]); // X[Upper,Lower] = a[0]*b[i]
@@ -259,129 +247,54 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
     addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper], No carry
     //printf("1[%d]: C: %llx S: %llx\n",i,(uint64_t)C, (uint64_t)S); 
 
-    /*
-    printf("0 - C : %u, S: %u\n",C,S);
-    printf("0 - A[0] : %u, B[i]: %u T[0] : %u\n",A[0],B[i], T[0]);
-    */
     // ADD(t[1],C)
-    //mpAddWithCarryProp(T, C, 1);
     carry = addu64_h(&dT[1], &dT[1], &C); 
-    //printf("a[%d]: C: %llx T[1]: %llx\n",i,(uint64_t)carry, (uint64_t)dT[1]); 
-    /*
-    printf("C3: %u\n",carry);
-    printf("T\n");
-    printU256Number(T);
-    */
-
     // m = S*n'[0] mod W, where W=2^32
     // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
     mulu64_h(M, &S, dNP);
-    //printf("b[%d]: M: %llx, N: %llx\n",i,(uint64_t)(M[0]),(uint64_t)dN[0]);
-    /*
-    printf("M[0]:%u, M[1]: %u\n",M[0], M[1]);
-    */
 
     // (C,S) = S + m*n[0], worst case 2 words
     mulu64_h(X, &M[0], dN); // X[Upper,Lower] = m*n[0]
-    /*
-    printf("1 - X[1] %u, X[0] : %u\n",X[1], X[0]);
-    */
     C = addu64_h(&S, &S, X+0); // [C,S] = S + X[Lower]
     addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper]
-    /*
-    printf("1 - C : %u, S: %u, X[1] %u, X[0] : %u\n\n",C,S, X[1], X[0]);
-    */
-    //printf("2[%d]: C: %llx S: %llx, carry: %llx\n",i,(uint64_t)C, (uint64_t)S, (uint64_t)carry); 
 
     for(j=1; j<NWORDS_256BIT/2; j++) {
       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
       mulu64_h(X,&dA[j], &dB[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
       C1 = addu64_h(&S, dT+j, &C);  // (C1,S) = t[j] + C
-      /*
-      printf("2 - C1 : %u, S: %u\n",C1,S);
-      */
       C2 = addu64_h(&S, &S, X+0);  // (C2,S) = S + X[Lower]
-      /*
-      printf("3 - C2 : %u, S: %u\n",C2,S);
-      printf("X[0] : %u, X[1]: %u\n",X[0],X[1]);
-      */
       addu64_h(&C, &C1, X+1);   // (~,C)  = C1 + X[Upper], doesn't produce carry
-      /*
-      printf("4 - C : %u\n",C);
-      */
       C3 = addu64_h(&C, &C, &C2);    // (~,C)  = C + C2, it DOES produce carry
-      /*
-      printf("5 - C : %u, C3 : %u\n",C, C3);
-      */
        
-      /*
-      // Fix this!!!! TODO
-      if (C3 > 0){
-        printf("Te pille\n");
-      }
-      */
-      // ADD(t[j+1],C)
-      //C += carry;
-      //printf("3[%d-%d]: C1: %llx C: %llx S: %llx\n",i,j,(uint64_t)C3,(uint64_t) C, (uint64_t)S); 
       C3 += addu64_h(&C, &C, &carry);    // (~,C)  = C + C2, It DOES produce carry
-      /*
-      if (C3 > 0){
-        printf("Te pille v2\n");
-      }
-      */
 
-      //printf("c[%d-%d]: C1: %llu C: %llx T[j+1]: %llx\n",i,j,(uint64_t) C3,(uint64_t)C, (uint64_t)dT[j+1]); 
       carry = addu64_h(&dT[j+1], &dT[j+1], &C) + C3; 
-      //printf("4[%d-%d]: C1: %llx C: %llx S: %llx, carry: %llx\n",i,j,(uint64_t) C3,(uint64_t)C, (uint64_t)dT[j+1],(uint64_t)carry); 
-      //mpAddWithCarryProp(T, C, j+1);
-      /*
-      printf("T(%u)\n", carry);
-      printU256Number(T);
-     */
    
       // (C,S) = S + m*n[j]
       mulu64_h(X, M, &dN[j]); // X[Upper,Lower] = m*n[j]
       C = addu64_h(&dT[j-1], &S, X+0); // [C,S] = S + X[Lower]
       addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper]
    
-      // t[j-1] = S
-      //dT[j-1] = S;
-      /*
-      printf("T[%d]\n", j-1);
-      printU256Number(T);
-      */
-      //printU256Number("T1 : \n",T);
     }
 
-    //mpAddWithCarryProp(T, carry, NWORDS_256BIT, NWORDS_256BIT_FIOS);
     // (C,S) = t[s] + C
     C = addu64_h(&dT[NWORDS_256BIT/2-1], dT+NWORDS_256BIT/2, &C);
-    /*
-    printf("6 - C : %u, S: %u\n",C,S);
-    */
-    // t[s-1] = S
-    //dT[NWORDS_256BIT/2-1] = S;
-    // t[s] = t[s+1] + C
     addu64_h(dT+NWORDS_256BIT/2, dT+NWORDS_256BIT/2+1, &C);
-    // t[s+1] = 0
     dT[NWORDS_256BIT/2+1] = 0;
-    //printU256Number("T2 : \n",T);
   }
 
-  //printU256Number("T : \n",T);
   /* Step 3: if(u>=n) return u-n else return u */
   if(compu256_h(T, N) >= 0) {
     subu256_h(T, (const uint32_t *)T, N);
   }
 
   memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
-  //printU256Number("U : \n",U);
 
  #else
-    if (pidx == MOD_GROUP ){
-       Fr_rawMMul(U, A, B);
+    if (pidx == MOD_FP ){
+       Fp_rawMMul(U, A, B);
     } else {
-       Fq_rawMMul(U, A, B);
+       Fr_rawMMul(U, A, B);
     }
  #endif
 }
@@ -425,10 +338,10 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
   #ifndef _CASM
     montmult_h(U,A,A,pidx);
   #else
-    if (pidx == MOD_GROUP){
-      Fr_rawMSquare(U,A);
+    if (pidx == MOD_FP){
+      Fp_rawMSquare(U,A);
     } else {
-      Fq_rawMSquare(U,A);
+      Fr_rawMSquare(U,A);
     }
   #endif
 }
@@ -440,14 +353,14 @@ void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
   #else
     uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
     uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
-    void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawSub;
-    void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fq_rawAdd;
-    void (*sqm_cb)(uint32_t *, const uint32_t *) = &Fq_rawMSquare;
+    void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fr_rawSub;
+    void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fr_rawAdd;
+    void (*sqm_cb)(uint32_t *, const uint32_t *) = &Fr_rawMSquare;
 
-    if (pidx == MOD_GROUP){
-     subm_cb = &Fr_rawSub;
-     addm_cb = &Fr_rawAdd;
-     sqm_cb = &Fr_rawMSquare;
+    if (pidx == MOD_FP){
+     subm_cb = &Fp_rawSub;
+     addm_cb = &Fp_rawAdd;
+     sqm_cb = &Fp_rawMSquare;
     } 
     sqm_cb(t0,A);
     sqm_cb(t1,&A[NWORDS_256BIT]);
@@ -686,10 +599,10 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
       subu256_h(z, z, N);
    }
    #else
-    if (pidx == MOD_GROUP ){
-       Fr_rawAdd(z, x, y);
+    if (pidx == MOD_FP ){
+       Fp_rawAdd(z, x, y);
     } else {
-       Fq_rawAdd(z, x, y);
+       Fr_rawAdd(z, x, y);
     }
 	
    #endif
@@ -723,10 +636,10 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 
    //memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
   #else
-    if (pidx == MOD_GROUP ){
-       Fr_rawSub(z, x, y);
+    if (pidx == MOD_FP ){
+       Fp_rawSub(z, x, y);
     } else {
-       Fq_rawSub(z, x, y);
+       Fr_rawSub(z, x, y);
     }
   #endif
 }
@@ -744,7 +657,6 @@ void subm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
 */
 void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
 {
-#if 1
    uint32_t k;
    uint32_t t[] = {1,0,0,0,0,0,0,0};
 
@@ -756,27 +668,6 @@ void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
    shllu256_h(t,t,2 * NWORDS_256BIT * NBITS_WORD - k);
    to_montgomery_h(t,t,pidx);
    montmult_h(y, y,t,pidx);
-#else
-   uint32_t k;
-   uint32_t t[] = {1,0,0,0,0,0,0,0};
-   uint32_t t_idx;
-
-   const uint32_t *R[2];
-   R[0] = CusnarksR2Get((mod_t)pidx);
-   R[1] = CusnarksR3Get((mod_t)pidx);
-   uint32_t shift[2];
-
-   almmontinv_h(y,&k, x, pidx);
-
-   t_idx = 2*NWORDS_256BIT*NBITS_WORD/k-1;
-   shift[0] = 2*NWORDS_256BIT * NBITS_WORD - k;
-   shift[1] = NWORDS_256BIT * NBITS_WORD - k;
-
-   shllu256_h(t,t,shift[t_idx]);
-   montmult_h(y, y, R[t_idx],pidx);
-   montmult_h(y, y, t,pidx);
-
-#endif
 }
 void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
 {

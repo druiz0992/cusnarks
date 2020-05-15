@@ -36,7 +36,6 @@
 
 const uint32_t * CusnarksPGet(mod_t type);
 const uint32_t * CusnarksR2Get(mod_t type);
-const uint32_t * CusnarksR3Get(mod_t type);
 const uint32_t * CusnarksNPGet(mod_t type);
 const uint32_t * CusnarksIScalerGet(fmt_t type);
 const uint32_t * CusnarksZeroGet(void);

@@ -61,3 +61,5 @@ config/.nroots
 config/.root_f
 config/gen_roots
 circuits/*
+*_ff*
+*.casm

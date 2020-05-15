@@ -128,7 +128,7 @@ class CUZPolyTest(unittest.TestCase):
         ZField.inv_roots[0] = inv_roots_rdc
 
         kernel_config = {'blockD' : [256] }
-        kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
+        kernel_params = {'midx' : [MOD_FR] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
 
         for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
@@ -178,7 +178,7 @@ class CUZPolyTest(unittest.TestCase):
         ZField.inv_roots[0] = inv_roots_rdc
 
         kernel_config = {'blockD' : [256] }
-        kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
+        kernel_params = {'midx' : [MOD_FR] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
         for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
             for st in xrange(16,32):
@@ -237,7 +237,7 @@ class CUZPolyTest(unittest.TestCase):
         ZField.inv_roots[0] = inv_roots_rdc
 
         kernel_config = {'blockD' : [256] }
-        kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
+        kernel_params = {'midx' : [MOD_FR] ,'premod' : [0], 'in_length' : [CUZPolyTest.nsamples], 'stride' : [1], 'out_length' : CUZPolyTest.nsamples}
         for niter in xrange(CUZPolyTest.TEST_ITER):
             zpoly_vector = cu_zpoly.randu256(CUZPolyTest.nsamples,CUZPolyTest.u256_p)
 
@@ -307,7 +307,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1]
             kernel_params['premod'] = [0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR, MOD_FR]
             kernel_params['fft_Nx'] = [5,5]
             kernel_params['fft_Ny'] = [5,5]
             kernel_params['forward'] = [1,1]
@@ -361,7 +361,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1]
             kernel_params['premod'] = [0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR, MOD_FR]
             kernel_params['fft_Nx'] = [5,5]
             kernel_params['fft_Ny'] = [5,5]
             kernel_params['forward'] = [0,0]
@@ -379,11 +379,11 @@ class CUZPolyTest(unittest.TestCase):
             zpoly_vector_copy = np.copy(zpoly_vector)
             ntt_p = ZPoly.from_uint256(zpoly_vector, reduced=True)
 
-            ntt_h_r = ntt_h(zpoly_vector_copy,roots_rdc_u256, MOD_FIELD)
+            ntt_h_r = ntt_h(zpoly_vector_copy,roots_rdc_u256, MOD_FR)
             ntt_p.ntt()
             self.assertTrue(ntt_p == ZPoly.from_uint256(ntt_h_r, reduced=True))
 
-            intt_h_r = intt_h(ntt_h_r,inv_roots_rdc_u256,1,MOD_FIELD)
+            intt_h_r = intt_h(ntt_h_r,inv_roots_rdc_u256,1,MOD_FR)
             ntt_p.intt()
             self.assertTrue(ntt_p == ZPoly.from_uint256(intt_h_r, reduced=True))
             self.assertTrue(all(np.concatenate(intt_h_r == zpoly_vector)))
@@ -449,7 +449,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1,1,1]
             kernel_params['premod'] = [0,0,0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR, MOD_FR, MOD_FR, MOD_FR]
             kernel_params['fft_Nx'] = [fft_N, fft_N, fft_N, fft_N] #xx,xx,yx,yx
             kernel_params['fft_Ny'] = [fft_N, fft_N, fft_N, fft_N] #xy,xy,yy,yy
             kernel_params['N_fftx'] = [n_cols, n_cols, n_cols, n_cols]
@@ -493,7 +493,7 @@ class CUZPolyTest(unittest.TestCase):
             #f.close()
 
 
-            r1_u256 = intt_h(r_u256,inv_roots_rdc_u256,1,MOD_FIELD)
+            r1_u256 = intt_h(r_u256,inv_roots_rdc_u256,1,MOD_FR)
             self.assertTrue(all(np.concatenate(result_fft3d == r_u256)))
             self.assertTrue(all(np.concatenate(zpoly_vector == r1_u256)))
 
@@ -558,7 +558,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1,1,1]
             kernel_params['premod'] = [0,0,0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR, MOD_FR, MOD_FR, MOD_FR]
             kernel_params['fft_Nx'] = [fft_N, fft_N, fft_N, fft_N] #xx,xx,yx,yx
             kernel_params['fft_Ny'] = [fft_N, fft_N, fft_N, fft_N] #xy,xy,yy,yy
             kernel_params['N_fftx'] = [n_cols, n_cols, n_cols, n_cols]
@@ -583,8 +583,8 @@ class CUZPolyTest(unittest.TestCase):
             result_ifft3d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,n_kernels=4)
             zpoly_vector_copy = np.copy(zpoly_vector)
             #intt_h_r = ntt_parallel2D_h(zpoly_vector, roots_rdc_u256, n_rows, fft_N, n_cols, fft_N, 1)
-            intt_h_r = intt_h(zpoly_vector_copy,inv_roots_rdc_u256,1,MOD_FIELD)
-            #intt_h_r = ntt_h(zpoly_vector_copy,roots_rdc_u256,MOD_FIELD)
+            intt_h_r = intt_h(zpoly_vector_copy,inv_roots_rdc_u256,1,MOD_FR)
+            #intt_h_r = ntt_h(zpoly_vector_copy,roots_rdc_u256,MOD_FR)
             self.assertTrue(all(np.concatenate(result_ifft3d == intt_h_r)))
 
 
@@ -654,7 +654,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1,1,1]
             kernel_params['premod'] = [0,0,0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR, MOD_FR, MOD_FR, MOD_FR]
             kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
             kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
             kernel_params['N_fftx'] = [Nx, Nx, Nx, Nx]
@@ -754,7 +754,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2,1,1,1]
             kernel_params['premod'] = [0,0,0,0]
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD, MOD_FIELD, MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR, MOD_FR, MOD_FR, MOD_FR]
             kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
             kernel_params['fft_Ny'] = [fft_xy, fft_xy, fft_yy, fft_yy] #xy,xy,yy,yy
             kernel_params['N_fftx'] = [Nx, Nx, Nx, Nx]
@@ -778,7 +778,7 @@ class CUZPolyTest(unittest.TestCase):
 
             result_ifft3d,_ = cu_zpoly.kernelLaunch(zpoly_vector1, kernel_config, kernel_params,n_kernels=4)
             zpoly_vector_copy = np.copy(zpoly_vector)
-            intt_h_r = intt_h(zpoly_vector_copy,inv_roots_rdc_u256,1,MOD_FIELD)
+            intt_h_r = intt_h(zpoly_vector_copy,inv_roots_rdc_u256,1,MOD_FR)
             self.assertTrue(all(np.concatenate(result_ifft3d == intt_h_r)))
 
 
@@ -864,7 +864,7 @@ class CUZPolyTest(unittest.TestCase):
                kernel_params['stride'] = [1] * n_kernels1
                kernel_params['stride'][0] = 2
                kernel_params['premod'] = [0] * n_kernels1
-               kernel_params['midx'] = [MOD_FIELD]  * n_kernels1
+               kernel_params['midx'] = [MOD_FR]  * n_kernels1
                kernel_params['N_fftx'] = [Ncols] * n_kernels1
                kernel_params['N_ffty'] = [Nrows] * n_kernels1
                kernel_params['fft_Nx'] = [fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
@@ -899,7 +899,7 @@ class CUZPolyTest(unittest.TestCase):
                kernel_params['out_length'] = nsamples
                kernel_params['stride'] = [1] * n_kernels2
                kernel_params['premod'] = [0] * n_kernels2
-               kernel_params['midx'] = [MOD_FIELD]  * n_kernels2
+               kernel_params['midx'] = [MOD_FR]  * n_kernels2
                kernel_params['N_fftx'] = [Ncols] * n_kernels2
                kernel_params['N_ffty'] = [Nrows] * n_kernels2
                kernel_params['fft_Nx'] = [0,fft_xx, fft_xx, fft_yx, fft_yx] #xx,xx,yx,yx
@@ -917,13 +917,13 @@ class CUZPolyTest(unittest.TestCase):
                fftmul_result,_ = cu_zpoly.kernelLaunch(X1S, kernel_config, kernel_params,n_kernels=n_kernels2)
 
   
-               X2S = ntt_h(X2,roots_rdc_u256,MOD_FIELD)
-               Y2S = ntt_h(Y2,roots_rdc_u256,MOD_FIELD)
+               X2S = ntt_h(X2,roots_rdc_u256,MOD_FR)
+               Y2S = ntt_h(Y2,roots_rdc_u256,MOD_FR)
                idx = 0
                for c1,c2 in zip(X2S, Y2S):
                   Y2S[idx] = montmult_h(c1, c2,1)
                   idx+=1
-               result = intt_h(Y2S,inv_roots_rdc_u256,1,MOD_FIELD)
+               result = intt_h(Y2S,inv_roots_rdc_u256,1,MOD_FR)
 
                self.assertTrue(all(np.concatenate(fftmul_result == result)))
 
@@ -948,7 +948,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [nsamples]
 
             kernel_config['smemS'] = [0]
@@ -969,7 +969,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = len(zpoly_vector1)
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [len(zpoly_vector2)]
 
             kernel_config['smemS'] = [0]
@@ -993,7 +993,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [nsamples]
 
             kernel_config['smemS'] = [0]
@@ -1014,7 +1014,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = len(zpoly_vector1)
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [len(zpoly_vector2)]
 
             kernel_config['smemS'] = [0]
@@ -1038,7 +1038,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [nsamples]
 
             kernel_config['smemS'] = [0]
@@ -1059,7 +1059,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples
             kernel_params['stride'] = [1]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [nsamples]
 
             kernel_config['smemS'] = [0]
@@ -1085,7 +1085,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples/2
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
 
             kernel_config['smemS'] = [0]
             kernel_config['blockD'] = [256]
@@ -1108,7 +1108,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = nsamples/2
             kernel_params['stride'] = [1]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
 
             kernel_config['smemS'] = [0]
             kernel_config['blockD'] = [256]
@@ -1131,7 +1131,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = len(zpoly_vector1)
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [nsamples]
 
             kernel_config['return_val'] = [0]
@@ -1149,7 +1149,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = len(zpoly_vector1)
             kernel_params['stride'] = [1]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [len(zpoly_vector2)]
 
             kernel_config['return_val'] = [0]
@@ -1166,7 +1166,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = len(zpoly_vector1)
             kernel_params['stride'] = [2]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [len(zpoly_vector3) ]
 
             kernel_config['return_val'] = [1]
@@ -1211,7 +1211,7 @@ class CUZPolyTest(unittest.TestCase):
             kernel_params['out_length'] = m - n + 1
             kernel_params['stride'] = [1]
             kernel_params['premod'] = [0]
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['padding_idx'] = [ne]
             kernel_params['forward'] = [nd]
 

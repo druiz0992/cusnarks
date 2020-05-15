@@ -267,9 +267,9 @@ def cirjson_to_vars(in_circuit_f, in_circuit_format, out_circuit_format):
         cir['nOutputs']     =  np.uint64(cir_data['nOutputs'])
         cir['nConstraints'] =  np.uint64(len(cir_data['constraints']))
         pidx = ZField.get_field()
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         cir['field_r']        = ZField.get_extended_p().as_uint256()
-        ZField.set_field(MOD_GROUP)
+        ZField.set_field(MOD_FP)
         cir['group_q']       = ZField.get_extended_p().as_uint256()
         ZField.set_field(pidx)
         cir['R1CSA_nWords'] =  np.uint64(R1CSA_len)
@@ -373,7 +373,7 @@ def cirr1cs_to_vars(header, r1csA, r1csB, r1csC ):
 
 def cirr1cs_to_mpoly(r1cs, cir_header, fmat, extend):
         to_mont = 0
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         pidx = ZField.get_field()
         if fmat == ZUtils.FEXT:
            to_mont = 1
@@ -386,9 +386,9 @@ def cirr1cs_to_mpoly(r1cs, cir_header, fmat, extend):
 def cirvars_to_pkvars(pk, cir):
         cir['Rbitlen']        = np.asarray(ZField.get_reduction_data()['Rbitlen'],dtype=np.uint32)
         pidx = ZField.get_field()
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         cir['field_r']        = ZField.get_extended_p().as_uint256()
-        ZField.set_field(MOD_GROUP)
+        ZField.set_field(MOD_FP)
         cir['group_q']       = ZField.get_extended_p().as_uint256()
         ZField.set_field(pidx)
 
@@ -443,7 +443,7 @@ def getPK():
       return pk
 
 def mpoly_to_json(mpoly, reduced):
-     ZField.set_field(MOD_FIELD)
+     ZField.set_field(MOD_FR)
      spoly = mpoly_to_sparseu256_h(mpoly)
      if reduced:
           P = [{k : str(BigInt.from_uint256(p[k]).as_long()) for  k in p.keys()} for p in spoly]
@@ -452,7 +452,7 @@ def mpoly_to_json(mpoly, reduced):
      return P
 
 def ecp_to_json(ecp, out_ec, b_reduce, ec2):
-        ZField.set_field(MOD_GROUP)
+        ZField.set_field(MOD_FP)
         if ec2:
            P = ECC.from_uint256(ecp.reshape((-1,2,NWORDS_256BIT)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)
         else:
@@ -494,7 +494,7 @@ def pkvars_to_json(out_bin, out_ec, pk):
         pk_dict['domainBits'] = int(pk['domainBits'])
         pk_dict['domainSize'] = int(pk['domainSize'])
 
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
 
         worker = mp.Pool(processes=min(5,mp.cpu_count()))
 
@@ -508,7 +508,7 @@ def pkvars_to_json(out_bin, out_ec, pk):
         pk_dict['polsA'] = r1.get()
         pk_dict['polsB'] = r2.get()
 
-        ZField.set_field(MOD_GROUP)
+        ZField.set_field(MOD_FP)
 
         r1 = worker.apply_async(ecp_to_json, args=(pk['A'], out_ec, b_reduce, False))
         r2 = worker.apply_async(ecp_to_json, args=(pk['B1'], out_ec, b_reduce, False))
@@ -658,20 +658,20 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
          
           if out_bin == FMT_EXT:
             A_ext = np.concatenate(
-                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_FP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_FP,1),-1)
                                   )
             B1_ext = np.concatenate(
-                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_FP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_FP,1),-1)
                                   )
             B2_ext = np.concatenate(
-                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1)
+                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_FP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_FP,1),-1)
                                    )
             C_ext = np.zeros(0,dtype=np.uint32)
             hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
-            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_FP,1),-1)
 
           else:
             A_ext = np.concatenate( (pk['alfa_1'], pk['delta_1']) )
@@ -696,8 +696,8 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
                       dw2w(hExps_extnWords)) )
 
         if out_bin == FMT_EXT:
-           mpoly_from_montgomery_h(pk['polsA'], MOD_FIELD)
-           mpoly_from_montgomery_h(pk['polsB'], MOD_FIELD)
+           mpoly_from_montgomery_h(pk['polsA'], MOD_FR)
+           mpoly_from_montgomery_h(pk['polsB'], MOD_FR)
            pk_bin = np.concatenate( (
                       pk_bin,
                       pk['polsA'],
@@ -712,41 +712,41 @@ def pkvars_to_bin(out_bin, out_ec, pk, ext=False):
 
            pk_bin = np.concatenate( (
                       pk_bin,
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_FP,0),-1),
                       A_ext ))
            del pk['A']
 
            pk_bin = np.concatenate( (
                       pk_bin,
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_FP,0),-1),
                       B1_ext))
            del pk['B1']
 
            pk_bin = np.concatenate( (
                       pk_bin,
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['B2'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['B2'],-1), MOD_FP,0),-1),
                       B2_ext ))
            del pk['B2']
 
            pk_bin = np.concatenate( (
                       pk_bin,
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['C'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['C'],-1), MOD_FP,0),-1),
                       C_ext))
            del pk['C']
 
            pk_bin = np.concatenate( (
                       pk_bin,
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_FP,0),-1),
                       hExps_ext))
            del pk['hExps']
 
-           #mpoly_to_montgomery_h(pk['polsA'], MOD_FIELD)
-           #mpoly_to_montgomery_h(pk['polsB'], MOD_FIELD)
+           #mpoly_to_montgomery_h(pk['polsA'], MOD_FR)
+           #mpoly_to_montgomery_h(pk['polsB'], MOD_FR)
         else:
            pk_bin = np.concatenate((pk_bin, pk['polsA'], polsA_ext))
            del pk['polsA']
@@ -827,20 +827,20 @@ def pkvars_to_file(out_bin, out_ec, pk, fname, ext=False):
          
           if out_bin == FMT_EXT:
             A_ext = np.concatenate(
-                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                      np.reshape(from_montgomeryN_h(pk['alfa_1'], MOD_FP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_FP,1),-1)
                                   )
             B1_ext = np.concatenate(
-                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+                      np.reshape(from_montgomeryN_h(pk['beta_1'], MOD_FP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_FP,1),-1)
                                   )
             B2_ext = np.concatenate(
-                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_GROUP,1),-1),
-                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_GROUP,1),-1)
+                      np.reshape(from_montgomeryN_h(pk['beta_2'], MOD_FP,1),-1),
+                      np.reshape(from_montgomeryN_h(pk['delta_2'], MOD_FP,1),-1)
                                    )
             C_ext = np.zeros(0,dtype=np.uint32)
             hExps_ext = np.zeros(pk['hExps_nWords'],dtype=np.uint32)
-            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_GROUP,1),-1)
+            hExps_ext[6*NWORDS_256BIT:8*NWORDS_256BIT] = np.reshape(from_montgomeryN_h(pk['delta_1'], MOD_FP,1),-1)
 
           else:
             A_ext = np.concatenate( (pk['alfa_1'], pk['delta_1']) )
@@ -866,8 +866,8 @@ def pkvars_to_file(out_bin, out_ec, pk, fname, ext=False):
         appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
         if out_bin == FMT_EXT:
-           mpoly_from_montgomery_h(pk['polsA'], MOD_FIELD)
-           mpoly_from_montgomery_h(pk['polsB'], MOD_FIELD)
+           mpoly_from_montgomery_h(pk['polsA'], MOD_FR)
+           mpoly_from_montgomery_h(pk['polsB'], MOD_FR)
            pk_bin = np.concatenate( (
                       pk['polsA'],
                       polsA_ext) )
@@ -881,42 +881,42 @@ def pkvars_to_file(out_bin, out_ec, pk, fname, ext=False):
            appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
            pk_bin = np.concatenate( (
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_GROUP,0),-1),
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['alfa_1'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_1'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_1'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['beta_2'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['delta_2'],-1), MOD_FP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['A'],-1), MOD_FP,0),-1),
                       A_ext ))
            del pk['A']
            appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
            pk_bin = np.concatenate( (
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['B1'],-1), MOD_FP,0),-1),
                       B1_ext))
            del pk['B1']
            appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
            pk_bin = np.concatenate( (
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['B2'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['B2'],-1), MOD_FP,0),-1),
                       B2_ext ))
            del pk['B2']
            appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
            pk_bin = np.concatenate( (
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['C'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['C'],-1), MOD_FP,0),-1),
                       C_ext))
            del pk['C']
            appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
            pk_bin = np.concatenate( (
-                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_GROUP,0),-1),
+                      np.reshape(from_montgomeryN_h(np.reshape(pk['hExps'],-1), MOD_FP,0),-1),
                       hExps_ext))
            del pk['hExps']
            appendU256DataFile_h(pk_bin, fname.encode("UTF-8"))
 
-           #mpoly_to_montgomery_h(pk['polsA'], MOD_FIELD)
-           #mpoly_to_montgomery_h(pk['polsB'], MOD_FIELD)
+           #mpoly_to_montgomery_h(pk['polsA'], MOD_FR)
+           #mpoly_to_montgomery_h(pk['polsB'], MOD_FR)
         else:
            pk_bin = np.concatenate((pk['polsA'], polsA_ext))
            del pk['polsA']
@@ -1000,7 +1000,7 @@ def pkjson_to_pyvars(pk_proof):
         pk = getPK()
         b_reduce=False
         if 'k_binformat' in pk_proof.keys() and pk_proof['k_binformat']=="montgomery":
-            ZField.set_field(MOD_GROUP)
+            ZField.set_field(MOD_FP)
             b_reduce=True
             k = [ZFieldElRedc(el) for el in pk_proof['vk_alfa_1']]
             pk['alfa_1'] = ECC_F1(p=k)
@@ -1039,7 +1039,7 @@ def pkjson_to_pyvars(pk_proof):
 
         worker.terminate()
 
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
 
         # TODO : This representation may not be optimum. I only have good representation of sparse polynomial,
         #  but not of array of sparse poly (it is also sparse). I should encode it as a dictionary as wekk
@@ -1051,13 +1051,13 @@ def pkjson_to_pyvars(pk_proof):
 
 
 def pkpyec_to_vars(ecp, remove_last, as_reduced):
-     ZField.set_field(MOD_GROUP)
+     ZField.set_field(MOD_FP)
      P = ECC.as_uint256(ecp, remove_last, as_reduced)
 
      return P
 
 def pkpyspol_to_vars(spolp):
-       ZField.set_field(MOD_FIELD)
+       ZField.set_field(MOD_FR)
        pols_l = []
        pols_p = []
        for pol in spolp:
@@ -1074,7 +1074,7 @@ def pkpyspol_to_vars(spolp):
 def pkjson_to_vars(pk_proof, proving_key_f):
        pk = pkjson_to_pyvars(pk_proof)
 
-       ZField.set_field(MOD_GROUP)
+       ZField.set_field(MOD_FP)
        pk['alfa_1'] = np.reshape(pkpyec_to_vars(pk['alfa_1'],True, True),-1)
        pk['beta_1'] = np.reshape(pkpyec_to_vars(pk['beta_1'],True, True),-1)
        pk['delta_1'] = np.reshape(pkpyec_to_vars(pk['delta_1'],True, True),-1)
@@ -1097,7 +1097,7 @@ def pkjson_to_vars(pk_proof, proving_key_f):
 
        worker.terminate()
 
-       ZField.set_field(MOD_FIELD)
+       ZField.set_field(MOD_FR)
        
        pk['polsA'] = pkpyspol_to_vars(pk['polsA'])
        pk['polsB'] = pkpyspol_to_vars(pk['polsB'])
@@ -1119,9 +1119,9 @@ def pkjson_to_vars(pk_proof, proving_key_f):
        pk['domainBits'] = np.uint32(pk_proof['domainBits'])
        pk['domainSize'] = np.uint32(pk_proof['domainSize'])
        pidx = ZField.get_field()
-       ZField.set_field(MOD_GROUP)
+       ZField.set_field(MOD_FP)
        pk['group_q'] = ZField.get_extended_p().as_uint256()
-       ZField.set_field(MOD_FIELD)
+       ZField.set_field(MOD_FR)
        pk['field_r']        = ZField.get_extended_p().as_uint256()
        ZField.set_field(pidx)
 
@@ -1181,11 +1181,11 @@ def pkbin_to_vars(pk_bin):
                            pk['polsB_nWords']
                           
           if pk['k_binformat'] == FMT_EXT:
-              mpoly_to_montgomery_h(pk_bin[offset_data:offset_data+pk['polsA_nWords']],MOD_FIELD)
+              mpoly_to_montgomery_h(pk_bin[offset_data:offset_data+pk['polsA_nWords']],MOD_FR)
               tmp_offset_data = offset_data + pk['polsA_nWords']
-              mpoly_to_montgomery_h(pk_bin[tmp_offset_data:tmp_offset_data+pk['polsB_nWords']],MOD_FIELD)
+              mpoly_to_montgomery_h(pk_bin[tmp_offset_data:tmp_offset_data+pk['polsB_nWords']],MOD_FR)
               tmp_offset_data += pk['polsB_nWords']
-             #to_montgomeryN_h(pk_bin[offset_data:offset_ec_data], MOD_FIELD)
+             #to_montgomeryN_h(pk_bin[offset_data:offset_ec_data], MOD_FR)
 
           pk['polsA'] = pk_bin[offset_data:int(offset_data+pk['polsA_nWords'])]
           offset_data += int(pk['polsA_nWords'])
@@ -1193,7 +1193,7 @@ def pkbin_to_vars(pk_bin):
           offset_data += int(pk['polsB_nWords'])
          
           if pk['k_binformat'] == FMT_EXT:
-             pk_bin[offset_ec_data:] = np.reshape(to_montgomeryN_h(pk_bin[offset_ec_data:], MOD_GROUP),-1)
+             pk_bin[offset_ec_data:] = np.reshape(to_montgomeryN_h(pk_bin[offset_ec_data:], MOD_FP),-1)
             
           pk['alfa_1'] = pk_bin[offset_data:offset_data+2*NWORDS_256BIT]
           offset_data += 2*NWORDS_256BIT
