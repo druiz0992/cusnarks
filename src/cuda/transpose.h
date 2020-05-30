@@ -39,7 +39,7 @@ void transposeBlock_h(uint32_t *mout, uint32_t *min, uint32_t start_row, uint32_
 void transposeBlock_h(uint32_t *mout, uint32_t *min, uint32_t start_row, uint32_t last_row, uint32_t in_nrows, uint32_t in_ncols, uint32_t block_size);
 void transpose_square_h(uint32_t *min, uint32_t in_nrows);
 const uint32_t *inplaceTransposeTidxGet();
-void printU256M(const char *, uint32_t nrows, uint32_t ncols);
+void printU256M(const uint32_t *, uint32_t nrows, uint32_t ncols);
 
 #endif
 

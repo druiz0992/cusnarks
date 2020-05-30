@@ -631,17 +631,17 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
 
 #else
 
-#if 0
+  #if 0
      t_uint64 const __restrict__ *dP_u256 = (t_uint64 *)mod_info_ct[midx].p;
      t_uint64 const *dA = (t_uint64 *)A;
      t_uint64 const *dB = (t_uint64 *)A;
      t_uint64 const *dU = (t_uint64 *)U;
-#else
+  #else
      uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
      uint32_t const *B = A;
-#endif
+  #endif
      uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-
+  
      asm(ASM_MULG2_INIT
          ASM_MONTMULU256(tmulx,ax,bx)  
          ASM_MODU256(tmulx)
@@ -654,7 +654,6 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
          ASM_MODU256(ry)
          ASM_SUBMU256(ry, ry, tmulx)
          ASM_MULG2_PACK);
-#endif
 #endif
     
 }

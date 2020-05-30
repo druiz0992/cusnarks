@@ -774,8 +774,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
          }
        }
        msb = 255 - msb;
-     } 
-
+     }
      for (int j=msb; j >= lsb ; j--){
         uint32_t b = getbit_cb(&scl[i*stride], j, MIN(order, n -order*i ));
 
@@ -787,7 +786,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
         }
        
         /*
-        if (i==debug_tid){ 
+        if (i==0){ 
           printf("offset : %d, b : %d\n",255-j, b);
           printf("Q :\n");
           printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS]);
@@ -797,8 +796,11 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
           printU256Number(&z[i * NWORDS_256BIT * ECP_JAC_OUTDIMS+2*NWORDS_256BIT]);
         }
         */
+        
      }
-     if (Rin) {
+     
+     
+     if (Rin && pippen_conf) {
        uint32_t r=0;
        const uint32_t mod_p = (1 << pippen_conf) - 1;
        for (int j=0; j < MIN(order, n-order*i) ; j++){
@@ -813,6 +815,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
                 }
       }
     }
+    
   }
 }
 
@@ -1555,7 +1558,6 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   } else {
     args->max_threads = MIN(args->max_threads, max_threads);
   }
-
   // set number of threads and vars per thread depending on nvars
   if (compute_table){
     if (args->n >= args->max_threads*(order << EC_JACREDUCE_BATCH_SIZE)*order){
@@ -1590,7 +1592,9 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   printf("filename : %d\n",args->filename);
   printf("total words : %ld\n",args->total_words);
   printf("offset : %lld\n",args->offset);
+  printf("pippen : %d\n",args->pippen);
   */
+  
   
   
   /*
@@ -1734,7 +1738,6 @@ void *ec_jacreduce_batch_h(void *args)
   //printf("[%d] - N batches : %d %d, %d\n",wargs->thread_id, n_batches, wargs->ec2, wargs->n);
 
   ec_initP_h(EPin, EC_JACREDUCE_TABLE_LEN, wargs->ec2,  wargs->pidx);
-
   for (uint32_t i=0; i < n_batches; i++){
     nsamples = MIN((order << EC_JACREDUCE_BATCH_SIZE)*order,(wargs->last_idx - wargs->start_idx) - nsamples_offset);
     // prefetch
