@@ -78,7 +78,7 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None,
+                 benchmark_f=None, seed=None, snarkjs=None, n_gpu=1, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None,
                  table_type=None, grouping=DEFAULT_U256_BSELM):
  
         # Check valid folder exists
@@ -102,7 +102,7 @@ class GrothSetup(object):
 
         random.seed(self.seed) 
 
-        self.n_gpu = get_ngpu(max_used_percent=99.)
+        self.n_gpu = min(get_ngpu(max_used_percent=99.), n_gpu)
         self.grouping = grouping
 
         self.curve_data = ZUtils.CURVE_DATA[curve]

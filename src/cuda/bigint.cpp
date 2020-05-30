@@ -213,15 +213,21 @@ uint32_t getbitu32_h(uint32_t *x, uint32_t n, uint32_t group_size)
   return val;
 }
 
+// __builtin_clz only defined for 32 bits
 uint32_t msbu256_h(uint32_t *x)
 {
   int i,j;
-  uint32_t count=0, n; 
+  uint32_t count=0, n=0; 
   for(i=NWORDS_256BIT-1; i >= 0; i--){
-    n = __builtin_clz(x[i]);
+    if (x[i] == 0){
+      n = 32; 
+    } else {
+       n = __builtin_clz(x[i]);
+    }
     count += n;
     if (n != 32) return count;
   }
+  return 255;
 }
 
 /*

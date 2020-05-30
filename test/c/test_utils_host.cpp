@@ -8968,6 +8968,7 @@ uint32_t  test_ec_jacreduce_opt(uint32_t ec2)
    args->ec_table = NULL;
    args->pidx = 0;
    args->ec2 = ec2;
+   args->filename = NULL;
 
    for (uint32_t k=0; k <= max_pippen; k++) {
      args->pippen = k;
@@ -9293,6 +9294,7 @@ int main()
 
   retval+=test_ec_jacadd(0);    // EC1
   retval+=test_ec_jacadd(1);    // EC2
+
 
   retval+=test_ec_jacscmul(0);    // EC1
   retval+=test_ec_jacscmul(1);    // EC2

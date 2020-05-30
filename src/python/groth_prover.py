@@ -644,6 +644,7 @@ class GrothProver(object):
                             self.pippen_conf))
 
           self.logger.info(' Process server - Mexp A Done... ')
+
           if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
              ep_vector = pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS]
           else :
