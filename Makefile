@@ -62,7 +62,7 @@ SNARKJS_PATH = $(AUX_PATH)/snarkjs
 SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
 
 RUST_CIRCOM_PATH = $(AUX_PATH)/za
-RUST_CIRCOM_REPO = http://github.com/iden3/za.git
+RUST_CIRCOM_REPO = http://github.com/druiz0992/za.git
 
 FFIASM_PATH = $(AUX_PATH)/ffiasm
 FFIASM_REPO = http://github.com/iden3/ffiasm.git
@@ -168,6 +168,7 @@ debug_gpu:
 	@for i in $(CTEST_IDEAS_PATH); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
 config:  
 	read -p "Enter Curve <BN256 | BLS12381> " CURVE; \
 	(cd ${CUSRC_PATH}; ./ff.sh $$CURVE; cd -;) 

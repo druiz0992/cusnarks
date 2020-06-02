@@ -329,8 +329,30 @@ class ZField(object):
         """
         if not ZField.is_init():
             assert False, "Finite field not initialized"
+        """
+        alpha = 2
+        prime = ZField.get_extended_p().as_long()
+        totient = prime - 1
+        exponents = []
+        idx = ZField.active_prime_idx
+        for f in ZField.factor_data[idx]['factors']:
+          exponents.append(int(totient/f))
+        
+        while True:
+          nattempts = 0
+          for e in exponents:
+            t = pow(alpha, int(e), int(prime))
+            if t  != 1:
+              nattempts += 1
+            else :
+              alpha +=1
+              break
+          if nattempts == len(exponents):
+            break
 
-        alpha = int(100)
+        return ZFieldElExt(alpha)
+        """
+        alpha = int(2)
         idx = ZField.active_prime_idx
         gamma = int(1)
         prime = ZField.get_extended_p().as_long()
@@ -349,9 +371,10 @@ class ZField(object):
             gamma = gamma % (prime)
 
         return ZFieldElExt(gamma)
+        
 
     @classmethod
-    def find_primitive_root(cls, nroots):
+    def find_primitive_root(cls):
         """
           Returns primitive root such that root = gen ^ nroots % prime,
 
@@ -361,8 +384,17 @@ class ZField(object):
             assert False, "Finite field not initialized"
 
         gen = ZField.find_generator().as_long()
+
         prime = ZField.get_extended_p().as_long()
-        return ZFieldElExt(pow(int(gen), int((prime - 1) // nroots), int(prime)))
+        idx = ZField.active_prime_idx
+        prime_factor = ZField.factor_data[idx]['factors'][1:]
+        exponent = ZField.factor_data[idx]['exponents'][1:]
+        prod = 1;
+        for f,e in zip(prime_factor, exponent):
+           prod = prod *  pow(f, e)
+        pr = ZFieldElExt(pow(int(gen), prod, int(prime)))
+
+        return pr
 
     @classmethod
     def get_roots(cls):

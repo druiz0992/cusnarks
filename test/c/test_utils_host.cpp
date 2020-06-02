@@ -8555,9 +8555,9 @@ uint32_t  test_setgetbit()
 uint32_t  test_inv()
 {
   uint32_t x[NWORDS_256BIT], xr[NWORDS_256BIT];
-  const uint32_t *one = CusnarksOneGet();
-  const uint32_t *zero = CusnarksZeroGet();
   int pidx = 1;
+  const uint32_t *one = CusnarksOneGet((mod_t)pidx);
+  const uint32_t *zero = CusnarksZeroGet((mod_t)pidx);
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
   uint32_t i;
   uint32_t n_errors=0;
@@ -8683,9 +8683,9 @@ uint32_t  test_inv_ext1()
 uint32_t  test_inv_ext2()
 {
   uint32_t x[2*NWORDS_256BIT], xr[2*NWORDS_256BIT];
-  const uint32_t *one = CusnarksOneGet();
-  const uint32_t *zero = CusnarksZeroGet();
   int pidx = 1;
+  const uint32_t *one = CusnarksOneGet((mod_t)pidx);
+  const uint32_t *zero = CusnarksZeroGet((mod_t)pidx);
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
   uint32_t i;
   uint32_t n_errors=0;
