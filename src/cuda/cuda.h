@@ -36,9 +36,13 @@
 #define _CUDA_H_
 
 // Prime information for Finite fields is declared in constant memory
-extern __constant__ mod_info_t mod_info_ct[MOD_N];
-extern __constant__ ecbn128_t ecbn128_params_ct[MOD_N];
-extern __constant__ misc_const_t misc_const_ct[MOD_N];
+extern __constant__ uint32_t ModOffset_ct[3];
+extern __constant__ uint32_t N_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ uint32_t NPrime_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ uint32_t R2_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ uint32_t R2rdc_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ ecbn128_t ecbn128_params_ct;
+extern __constant__ misc_const_t misc_const_ct;
 extern __constant__ uint32_t W32_ct[NWORDS_256BIT * 16];
 extern __constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
 extern __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];

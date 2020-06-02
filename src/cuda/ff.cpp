@@ -178,7 +178,7 @@ void Fp_toMont(uint32_t *z, const uint32_t *x)
 
 void Fp_fromMont(uint32_t *z, const uint32_t *x)
 {
-  const uint32_t *one = CusnarksOneGet();
+  const uint32_t *one = CusnarksOneGet((mod_t)MOD_FP);
   Fp_rawMMul(z,x,one);
 }
 
@@ -190,7 +190,7 @@ void Fr_toMont(uint32_t *z, const uint32_t *x)
 
 void Fr_fromMont(uint32_t *z, const uint32_t *x)
 {
-  const uint32_t *one = CusnarksOneGet();
+  const uint32_t *one = CusnarksOneGet((mod_t)MOD_FR);
   Fr_rawMMul(z,x,one);
 }
 
@@ -408,7 +408,7 @@ void montmultN_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t
 */   
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
 {
-  const uint32_t *one = CusnarksOneGet();
+  const uint32_t *one = CusnarksOneGet((mod_t)pidx);
   montmult_h(z,x,one, pidx);
 }
 
@@ -722,7 +722,7 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
 void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
 {
   uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
-  const uint32_t *Zero = CusnarksZeroGet();
+  const uint32_t *Zero = CusnarksZeroGet((mod_t)pidx);
 
   montsquare_h(t0,x,pidx);
   montsquare_h(t1,&x[NWORDS_256BIT], pidx);

@@ -215,8 +215,8 @@ __device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1off
 {
   uint32_t *xr, *x1, *x2;
   uint32_t *_1 = misc_const_ct[midx]._1;
-  uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-  uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+  uint32_t const __restrict__ *P_u256 = N_ct[ModOffset_ct[midx]];
+  uint32_t const __restrict__ *PN_u256 = N_Prime_ct[ModOffset_c[midx]];
 
   xr = zxr->getu256(zoffset);
   x1 = zx1->getu256(x1offset);
@@ -229,20 +229,3 @@ __device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1off
 
   return;
 }
-
-#if 0
-__device__ void scmulec_stepz(Z1_t *Q,Z1_t *N, uint32_t *scl, uint32_t msb,  mod_t midx )
-{
-  uint32_t *xr, *x1, *x2;
-  uint32_t *_1 = misc_const_ct[midx]._1;
-  uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-  uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
-
-  xr = Q->getu256(0);
-  x2 = Q->getu256(0);
-  x1 = N->getu256(0);
-
-  asm(ASM_ADDECJAC_INIT
-      ASM_ECJACADD);
-}
-#endif

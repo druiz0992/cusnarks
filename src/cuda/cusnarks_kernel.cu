@@ -50,7 +50,11 @@ using namespace std;
 // follow p x p_ - r * r_ = 1 whrere r is 1^256. This is used for Montgomery reduction
 //
 // There are two different set of primes (MOD_N)
-__constant__ mod_info_t mod_info_ct[MOD_N];
+__constant__ uint32_t ModOffset_ct[3];
+__constant__ uint32_t N_ct[NWORDS_FR + NWORDS_FP];
+__constant__ uint32_t NPrime_ct[NWORDS_FR + NWORDS_FP];
+__constant__ uint32_t R2_ct[NWORDS_FR + NWORDS_FP];
+__constant__ uint32_t R2rdc_ct[NWORDS_FR + NWORDS_FP];
 
 // EC BN128 curve and params definition
 // Y^2 = X^3 + b
@@ -66,10 +70,10 @@ __constant__ mod_info_t mod_info_ct[MOD_N];
 // Also, these parameters will vary depending on prime number used. 
 
 // There are two different set of primes (MOD_N)
-__constant__ ecbn128_t ecbn128_params_ct[MOD_N];
+__constant__ ecbn128_t ecbn128_params_ct;
 
 // Additional constants
-__constant__ misc_const_t misc_const_ct[MOD_N];
+__constant__ misc_const_t misc_const_ct;
 
 // 32 roots of unitity of field prime (only first 16)
 
@@ -263,9 +267,22 @@ void CUSnarks::allocateCudaCteResources()
     CCHECK(cudaSetDevice(i));
 
 
-    CCHECK(cudaMemcpyToSymbol(mod_info_ct,       CusnarksModInfoGet(),     MOD_N * sizeof(mod_info_t)));  // prime info
-    CCHECK(cudaMemcpyToSymbol(ecbn128_params_ct, CusnarksEcbn128ParamsGet(), MOD_N * sizeof(ecbn128_t)));   // ecbn128
-    CCHECK(cudaMemcpyToSymbol(misc_const_ct,    CusnarksMiscKGet(),    MOD_N * sizeof(misc_const_t)));// misc
+    CCHECK(cudaMemcpyToSymbol(ModOffset_ct,       CusnarksOffsetGet(),     sizeof(uint32_t)*3));  // prime info
+
+    CCHECK(cudaMemcpyToSymbol(N_ct,       CusnarksPGet((mod_t)MOD_FP),     sizeof(uint32_t)*NWORDS_FP));  // prime info
+    CCHECK(cudaMemcpyToSymbol(&N_ct[MOD_FP],       CusnarksPGet((mod_t)MOD_FR),     sizeof(uint32_t)*NWORDS_FR));  // prime info
+
+    CCHECK(cudaMemcpyToSymbol(NPrime_ct,       CusnarksNPGet((mod_t)MOD_FP),     sizeof(uint32_t)*NWORDS_FP));  // prime info
+    CCHECK(cudaMemcpyToSymbol(&NPrime_ct[MOD_FP],       CusnarksNPGet((mod_t)MOD_FR),     sizeof(uint32_t)*NWORDS_FR));  // prime info
+
+    CCHECK(cudaMemcpyToSymbol(R2_ct,       CusnarksR2Get((mod_t)MOD_FP),     sizeof(uint32_t)*NWORDS_FP));  // prime info
+    CCHECK(cudaMemcpyToSymbol(&R2_ct[MOD_FP],       CusnarksR2Get((mod_t)MOD_FR),     sizeof(uint32_t)*NWORDS_FR));  // prime info
+
+    CCHECK(cudaMemcpyToSymbol(R2rdc_ct,       CusnarksR2RedcGet((mod_t)MOD_FP),     sizeof(uint32_t)*NWORDS_FP));  // prime info
+    CCHECK(cudaMemcpyToSymbol(&R2rdc_ct[MOD_FP],       CusnarksR2RedcGet((mod_t)MOD_FR),     sizeof(uint32_t)*NWORDS_FR));  // prime info
+
+    CCHECK(cudaMemcpyToSymbol(&ecbn128_params_ct, CusnarksEcbn128ParamsGet(), sizeof(ecbn128_t)));   // ecbn128
+    CCHECK(cudaMemcpyToSymbol(&misc_const_ct,    CusnarksMiscKGet(),    sizeof(misc_const_t)));// misc
     CCHECK(cudaMemcpyToSymbol(W32_ct,           CusnarksW32RootsGet(), sizeof(uint32_t) * NWORDS_256BIT * 16));// W32roots
     CCHECK(cudaMemcpyToSymbol(IW32_ct,          CusnarksIW32RootsGet(), sizeof(uint32_t) * NWORDS_256BIT * 16));// IW32roots
     CCHECK(cudaMemcpyToSymbol(IW32_nroots_ct,   CusnarksIW32NRootsGet(), sizeof(uint32_t) * NWORDS_256BIT * (FFT_SIZE_N -1) ));// inverse 2,4,8,16,32

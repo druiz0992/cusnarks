@@ -390,14 +390,14 @@ class BigInt(object):
         return int(self.bignum)
 
     @classmethod
-    def from_uint256(cls, bn_uint256):
+    def from_uint256(cls, bn_uint256, NW=WORDS_IN_256BN):
         """
            convert from numpy array represenation to big int
         """
         if not isinstance(bn_uint256, np.ndarray):
             assert False, "Expected numpy array"
 
-        elif bn_uint256.ndim != 1 or bn_uint256.shape[0] != BigInt.WORDS_IN_256BN:
+        elif bn_uint256.ndim != 1 or bn_uint256.shape[0] != NW:
             assert False, "Unexpected dimensions"
 
         n = [int(int(x) << (32 * i)) for i, x in enumerate(bn_uint256)]
@@ -552,19 +552,18 @@ class BigInt(object):
                 break
 
         return z == 1
-    def as_uint256(self):
+
+
+    def as_uint256(self, NW=WORDS_IN_256BN):
        """ 
          return big int as numpy array of uint32
        """
        bn = self.bignum
-       return np.asarray([bn & BigInt.BMASK_32BIT,
-                             (bn >> 32 ) & BigInt.BMASK_32BIT,
-                             (bn >> 64 ) & BigInt.BMASK_32BIT,
-                             (bn >> 96 ) & BigInt.BMASK_32BIT,
-                             (bn >> 128) & BigInt.BMASK_32BIT,
-                             (bn >> 160) & BigInt.BMASK_32BIT,
-                             (bn >> 192) & BigInt.BMASK_32BIT,
-                             (bn >> 224) & BigInt.BMASK_32BIT], dtype=np.uint32)
+       result = np.zeros(NW, dtype=np.uint32)
+       for i in range(NW):
+            result[i] = (bn >> 32 * i ) & BigInt.BMASK_32BIT
+
+       return result
 
        
 
