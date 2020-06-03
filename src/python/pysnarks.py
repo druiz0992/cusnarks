@@ -415,7 +415,7 @@ def run(opt, parser):
         
       GS = GrothSetup(in_circuit_f = opt['input_circuit_f'], out_circuit_f=opt['output_circuit_f'],
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
-                    out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
+                    out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'], n_gpu=opt['max_gpus'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
                     snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'], 
                     write_table_f=opt['table_f'], table_type=opt['table_type'],

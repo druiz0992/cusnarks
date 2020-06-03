@@ -45,7 +45,7 @@
 
 #ifndef LOG_TID
   #define LOG_TID (LOG_TID_NOLOG)
-  //#define LOG_TID (127)
+  //#define LOG_TID (0)
 #endif
 #ifndef LOG_LEVEL
   #define LOG_LEVEL (LOG_LEVEL_NOLOG)

@@ -247,19 +247,19 @@ const uint32_t * CusnarksMiscKGet(void)
 
 const uint32_t *CusnarksG1OneGet(void)
 {  
-   return &misc_const_init[MISC_K_1];
+   return &misc_const_init[MISC_K_1*NWORDS_FP];
 }
 const uint32_t *CusnarksG2OneGet(void)
 {
-   return &misc_const_init[MISC_K_1];
+   return &misc_const_init[MISC_K_1*NWORDS_FP];
 }
 const uint32_t *CusnarksG1InfGet(void)
 {
-   return &misc_const_init[MISC_K_INF];
+   return &misc_const_init[MISC_K_INF*NWORDS_FP];
 }
 const uint32_t *CusnarksG2InfGet(void)
 {
-   return &misc_const_init[MISC_K_INF2];
+   return &misc_const_init[MISC_K_INF2*NWORDS_FP];
 }
 
 const uint32_t * CusnarksW32RootsGet(void)
