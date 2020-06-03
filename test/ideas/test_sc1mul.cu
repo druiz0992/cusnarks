@@ -34,7 +34,7 @@ main()
     kparams.premod = 0;
     kparams.midx   = MOD_FP;
     kparams.in_length = N*3;
-    kparams[i].out_length = (N-2)*3
+    kparams[i].out_length = (N-2)*3;
     kparams[i].padding_idx = 0;
 
     t = ecbn128->kernelLaunch(&out_vector, &in_vector, &kconfig, &kparams,0,0,1);
