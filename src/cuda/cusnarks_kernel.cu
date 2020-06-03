@@ -52,6 +52,7 @@ using namespace std;
 // There are two different set of primes (MOD_N)
 __constant__ uint32_t ModOffset_ct[3];
 __constant__ uint32_t N_ct[NWORDS_FR + NWORDS_FP];
+__constant__ t_uint64 N64_ct[(NWORDS_FR + NWORDS_FP)/2];
 __constant__ uint32_t NPrime_ct[NWORDS_FR + NWORDS_FP];
 __constant__ uint32_t R2_ct[NWORDS_FR + NWORDS_FP];
 __constant__ uint32_t R2rdc_ct[NWORDS_FR + NWORDS_FP];
@@ -74,10 +75,10 @@ __constant__ uint32_t R2rdc_ct[NWORDS_FR + NWORDS_FP];
 
 // Additional constants
 //__constant__ misc_const_t misc_const_ct[1];
-__constant__ uint32_t G1One_ct[NWORDS_FP];
-__constant__ uint32_t G2One_ct[NWORDS_FP*2];
-__constant__ uint32_t G1Inf_ct[NWORDS_FP*3];
-__constant__ uint32_t G2Inf_ct[NWORDS_FP*6];
+__constant__ uint32_t __align__ (16) G1One_ct[NWORDS_FP];
+__constant__ uint32_t __align__ (16) G2One_ct[NWORDS_FP*2];
+__constant__ uint32_t __align__ (16) G1Inf_ct[NWORDS_FP*3];
+__constant__ uint32_t __align__ (16) G2Inf_ct[NWORDS_FP*6];
 
 // 32 roots of unitity of field prime (only first 16)
 
@@ -274,6 +275,8 @@ void CUSnarks::allocateCudaCteResources()
     CCHECK(cudaMemcpyToSymbol(ModOffset_ct,       CusnarksOffsetGet(),     sizeof(uint32_t)*3));  // prime info
 
     CCHECK(cudaMemcpyToSymbol(N_ct,       CusnarksPGet((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR)));  // prime info
+
+    CCHECK(cudaMemcpyToSymbol(N64_ct,       CusnarksPGet((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR)));  // prime info
 
     CCHECK(cudaMemcpyToSymbol(NPrime_ct,       CusnarksNPGet((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR)));  // prime info
 

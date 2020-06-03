@@ -69,8 +69,8 @@ def init():
     opt['verification_key_f'] = 'verification_key.json'
     opt['debug_f'] = 'toxic.json'
     opt['witness_f'] = 'witness.json'
-    opt['proof_f'] = 'proof.json'
-    opt['public_data_f']= 'public.json'
+    opt['proof_f'] = '../../circuits/proof.json'
+    opt['public_data_f']= '../../circuits/public.json'
 
     opt['output_circuit_f'] = None
     opt['output_circuit_format'] = FMT_MONT

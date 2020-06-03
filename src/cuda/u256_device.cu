@@ -846,10 +846,11 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    }
 
 #else
+ 
  t_uint64 *dA = (t_uint64 *) A;
  t_uint64 *dB = (t_uint64 *) B;
  t_uint64 *dU = (t_uint64 *) U;
- t_uint64 const __restrict__ *dP_u256 = (t_uint64 *) (&N_ct[ModOffset_ct[midx]]);
+ t_uint64 const __restrict__ *dP_u256 = &N64_ct[ModOffset_ct[midx]];
 
  asm(ASM_MUL_INIT_64 
      ASM_MONTMULU256(r,a,b)
@@ -875,10 +876,10 @@ __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__
    mulmontu256(U,A,A,midx);
 #else
 
- t_uint64 *dA = (t_uint64 *) A;
- t_uint64 *dB = (t_uint64 *) A;
- t_uint64 *dU = (t_uint64 *) U;
- t_uint64 const __restrict__ *dP_u256 = (t_uint64 *) (&N_ct[ModOffset_ct[midx]]);
+ t_uint64  *dA = (t_uint64 *) A;
+ t_uint64  *dB = (t_uint64 *) A;
+ t_uint64  *dU = (t_uint64 *) U;
+ t_uint64 const __restrict__ *dP_u256 =  &N64_ct[ModOffset_ct[midx]];
  uint32_t const __restrict__ *PN_u256 =  &NPrime_ct[ModOffset_ct[midx]];
 
 #if 1
