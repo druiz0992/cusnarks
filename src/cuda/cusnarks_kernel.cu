@@ -273,9 +273,9 @@ void CUSnarks::allocateCudaCteResources()
 
     CCHECK(cudaMemcpyToSymbol(NPrime_ct,       CusnarksNPGet((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR)));  // prime info
 
-    CCHECK(cudaMemcpyToSymbol(R2_ct,       CusnarksR2Get((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR));  // prime info
+    CCHECK(cudaMemcpyToSymbol(R2_ct,       CusnarksR2Get((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR)));  // prime info
 
-    CCHECK(cudaMemcpyToSymbol(R2rdc_ct,       CusnarksR2RedcGet((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR));  // prime info
+    CCHECK(cudaMemcpyToSymbol(R2rdc_ct,       CusnarksR2RedcGet((mod_t)MOD_FP),     sizeof(uint32_t)*(NWORDS_FP+NWORDS_FR))));  // prime info
 
     //CCHECK(cudaMemcpyToSymbol(&ecbn128_params_ct, CusnarksEcbn128ParamsGet(), sizeof(ecbn128_t)));   // ecbn128
     CCHECK(cudaMemcpyToSymbol(misc_const_ct,    CusnarksMiscKGet(),    sizeof(misc_const_t)));// misc
