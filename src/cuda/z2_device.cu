@@ -262,7 +262,7 @@ __device__ void zeccz(Z2_t *z, Z2_t *x)
 
 __device__ void infz(Z2_t *z, mod_t midx)
 {
-  z->assign(misc_const_ct[midx]._inf2);
+  z->assign(G2Inf_ct);
 }
 
 

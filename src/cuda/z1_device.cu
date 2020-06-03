@@ -208,13 +208,13 @@ __device__ void zeccz(Z1_t *z, Z1_t *x)
 
 __device__ void infz(Z1_t *z, mod_t midx)
 {
-  z->assign(misc_const_ct[midx]._inf);
+  z->assign(G1Inf_ct);
 }
 
 __device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1offset, Z1_t *zx2, uint32_t x2offset, mod_t midx)
 {
   uint32_t *xr, *x1, *x2;
-  uint32_t *_1 = misc_const_ct[midx]._1;
+  uint32_t *_1 = G1One_ct;
   uint32_t const __restrict__ *P_u256 = &N_ct[ModOffset_ct[midx]];
   uint32_t const __restrict__ *PN_u256 = &NPrime_ct[ModOffset_ct[midx]];
 
