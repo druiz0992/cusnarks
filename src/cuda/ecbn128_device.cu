@@ -1603,7 +1603,7 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
   mod_t midx = params->midx;
 
   uint32_t __restrict__ zN[3*sizeof(T2)/sizeof(uint32_t)]; // N = P
-  uint32_t *_1 = misc_const_ct[0]._1;
+  uint32_t *_1 = G1One_ct;
   T1 N(zN);
   T1 Q(zxr->getu256(zoffset));
 
@@ -1814,7 +1814,7 @@ __device__ void build_ec_table(T1 *d_out,T1 *d_in, uint32_t din_offset, uint32_t
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
   uint32_t j, last_pow2, k=0;
   T1 _inf;
-  uint32_t __restrict__ *_1 = misc_const_ct[0]._1;
+  uint32_t __restrict__ *_1 = G1One_ct;
   uint32_t indims = 5;
   if (sizeof(T2) == sizeof(uint256_t)){
 	    indims = 3;
