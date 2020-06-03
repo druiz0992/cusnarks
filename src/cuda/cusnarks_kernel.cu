@@ -283,7 +283,7 @@ void CUSnarks::allocateCudaCteResources()
 
     //CCHECK(cudaMemcpyToSymbol(&ecbn128_params_ct, CusnarksEcbn128ParamsGet(), sizeof(ecbn128_t)));   // ecbn128
     //CCHECK(cudaMemcpyToSymbol(misc_const_ct,    CusnarksMiscKGet(),    sizeof(misc_const_t)));// misc
-    CCHECK(cudaMemcpyToSymbol(G1One_ct, CusnarksG1OneGet()   ,    sizeof(uint32_t)*NWORDS_FP);// misc
+    CCHECK(cudaMemcpyToSymbol(G1One_ct, CusnarksG1OneGet()   ,    sizeof(uint32_t)*NWORDS_FP));// misc
     CCHECK(cudaMemcpyToSymbol(G2One_ct, CusnarksG2OneGet()   ,    sizeof(uint32_t)*2*NWORDS_FP));// misc
     CCHECK(cudaMemcpyToSymbol(G1Inf_ct, CusnarksG1InfGet()   ,    sizeof(uint32_t)*3*NWORDS_FP));// misc
     CCHECK(cudaMemcpyToSymbol(G2Inf_ct, CusnarksG2InfGet()   ,    sizeof(uint32_t)*6*NWORDS_FP));// misc
