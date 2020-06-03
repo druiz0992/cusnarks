@@ -1617,7 +1617,7 @@ __forceinline__ __device__ void scmulecjac(T1 *zxr, uint32_t zoffset, T1 *zx1, u
   T1 x1(N.getu256(xoffset+0));
   T1 y1(N.getu256(xoffset+1));
 
-  zxr->setu256(0,&_inf,0);
+  zxr->setu256(0,&_inf,0); 
 
   //logInfoBigNumberTid(3*T1::getN(),"X: \n",&N);
   // TODO : revew this comparison
