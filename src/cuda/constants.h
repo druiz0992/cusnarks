@@ -44,10 +44,10 @@ const uint32_t * CusnarksZeroGet(mod_t type);
 const uint32_t * CusnarksOneGet(mod_t type);
 const uint32_t * CusnarksOneMontGet(mod_t type);
 const uint32_t * CusnarksOneMont2Get(mod_t type);
-const uint32_t * CusnarksG1OneGet(void)
-const uint32_t * CusnarksG2OneGet(void)
-const uint32_t * CusnarksG1InfGet(void)
-const uint32_t * CusnarksG2InfGet(void)
+const uint32_t * CusnarksG1OneGet(void);
+const uint32_t * CusnarksG2OneGet(void);
+const uint32_t * CusnarksG1InfGet(void);
+const uint32_t * CusnarksG2InfGet(void);
 const uint32_t * CusnarksEcbn128ParamsGet(void);
 const uint32_t * CusnarksMiscKGet(void);
 const uint32_t * CusnarksW32RootsGet(void);
