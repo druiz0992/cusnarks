@@ -679,7 +679,7 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     //logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
-    uint32_t const __restrict__ *PN_u256 = NPrime_ct[ModOffset_ct[midx]];
+    uint32_t const __restrict__ *PN_u256 = &NPrime_ct[ModOffset_ct[midx]];
 
 #ifndef CU_ASM
     uint32_t i;
@@ -898,7 +898,7 @@ __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__
 
 __device__ uint32_t almmontinvu256(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx)
 {
-  const uint32_t __restrict__ *P = (t_uint64 *)N_ct[ModOffset_ct[midx]];
+  const uint32_t __restrict__ *P = &N_ct[ModOffset_ct[midx]];
 
   uint32_t u[NWORDS_256BIT], v[NWORDS_256BIT];
   uint32_t s[] = {1,0,0,0,0,0,0,0};
@@ -1089,7 +1089,7 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
    */
 __device__ void modu255(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx)
 {
-   const uint32_t __restrict__ *p = N_ct[ModOffset_ct[midx]];
+   const uint32_t __restrict__ *p = &N_ct[ModOffset_ct[midx]];
 
    #if 1
    movu256(z,(uint32_t *)x);
