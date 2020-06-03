@@ -63,3 +63,4 @@ config/gen_roots
 circuits/*
 *_ff*
 *.casm
+src/cuda/constants.cpp
