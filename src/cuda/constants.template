@@ -255,11 +255,11 @@ const uint32_t *CusnarksG2OneGet(void)
 }
 const uint32_t *CusnarksG1InfGet(void)
 {
-   return &misc_const_init[MIST_K_INF];
+   return &misc_const_init[MISC_K_INF];
 }
 const uint32_t *CusnarksG2InfGet(void)
 {
-   return &misc_const_init[MIST_K_INF2];
+   return &misc_const_init[MISC_K_INF2];
 }
 
 const uint32_t * CusnarksW32RootsGet(void)
