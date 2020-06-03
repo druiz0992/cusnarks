@@ -26,10 +26,10 @@ main()
 
     kconfig.blockD = 256;
     kconfig.gridD = 0;
-    kconfig.smemS = 0
-    kconfig.kernel_idx = CB_EC_JAC_MUL1
+    kconfig.smemS = 0;
+    kconfig.kernel_idx = CB_EC_JAC_MUL1;
 
-    kparams.stride = 1
+    kparams.stride = 1;
     kparams.premul = 0;
     kparams.premod = 0;
     kparams.midx   = MOD_FP;
@@ -37,7 +37,7 @@ main()
     kparams[i].out_length = (N-2)*3
     kparams[i].padding_idx = 0;
 
-    t = ecbn128->kernelLaunch(&out_vector, &in_vector, kconfig, kparams,1);
+    t = ecbn128->kernelLaunch(&out_vector, &in_vector, &kconfig, &kparams,0,0,1);
 
     printf("Time : %f\n",t);
     printf("IN\n");
