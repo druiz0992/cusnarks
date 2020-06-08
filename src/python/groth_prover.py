@@ -1631,7 +1631,7 @@ class GrothProver(object):
           if EPidx==sort_idx:
               # Sort scl batch
               self.sorted_scl_array_idx[start_idx:end_idx] = \
-                   sortu256_idx_h(self.scl_array[start_idx:end_idx], sort_en)
+                   sortuBI_idx_h(self.scl_array[start_idx:end_idx], NWORDS_FR, sort_en)
               self.sorted_scl_array[start_idx:end_idx] = \
                    self.scl_array[start_idx:end_idx][self.sorted_scl_array_idx[start_idx:end_idx]]
               # Copy sorted scl batch
@@ -1750,9 +1750,11 @@ class GrothProver(object):
     def evalPoly(self,w, pX, nVars, m, pidx):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-        reduce_coeff = 0  
-        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
+        reduce_coeff = 0
+        egs = 1 << 17
+        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, int((m + egs-1)/egs) , pidx)
         return polX_T
+    
 
     def calculateH(self):
 

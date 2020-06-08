@@ -101,6 +101,8 @@ class FF(object):
       self.G2y  = Z2FieldEl([self.G2y1, self.G2y2])
       # only valid for y^2 = x^3 + b curves
       self.b2 = (self.G2y * self.G2y  - self.G2x * self.G2x * self.G2x)
+      #print(self.b2.P[0].as_long())
+      #print(self.b2.P[1].as_long())
 
       self.printFP()
       self.f.close()
@@ -157,12 +159,12 @@ class FF(object):
       self.toFile(s1,"<FP_R2_rdc>")
       s1 = printW32(self.FP_One_rdc.as_uint256(NW=self.FP_NWORDS))
       self.toFile(s1,"<FP_One_rdc>")
-      s1 += ", "+printW32(np.zeros(self.FR_NWORDS, dtype=np.uint32))
+      s1 += ", "+printW32(np.zeros(self.FP_NWORDS, dtype=np.uint32))
       self.toFile(s1,"<FP_One2_rdc>")
-      s2 = printW32(np.zeros(self.FR_NWORDS, dtype=np.uint32))
+      s2 = printW32(np.zeros(self.FP_NWORDS, dtype=np.uint32))
       s2 += ", "+s1
       self.toFile(s2,"<FP_G1_inf_rdc>")
-      s1 = printW32(np.zeros(self.FR_NWORDS, dtype=np.uint32))
+      s1 = printW32(np.zeros(self.FP_NWORDS, dtype=np.uint32))
       s2 = s1+", "+s2+", "+s1+", "+s1
 
       self.toFile(s2,"<FP_G2_inf_rdc>")

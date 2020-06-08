@@ -46,6 +46,8 @@ void readU256PKFile_h(uint32_t *samples, const char *filename, unsigned long lon
 void readR1CSFileHeader_h(r1csv1_t *r1cs_hdr, const char *filename);
 void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1cs_idx_t r1cs_idx );
 void readECTablesNElementsFile_h(ec_table_offset_t *table_offset, const char *filename);
+void readDataFile(uint32_t *samples, const char *filename);
+void getDataFileSize(t_uint64 *nwords , const char *filename);
 
 
 #endif

@@ -39,6 +39,8 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
 void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *header, uint32_t extend);
 void mpoly_from_montgomery_h(uint32_t *x, uint32_t pidx);
 void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx);
+void mpoly_init_h(uint32_t nroots);
+void mpoly_free_h();
 
 
 #endif

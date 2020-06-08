@@ -79,13 +79,13 @@ inline void sub(T *c, const T *a, const T*b)
 }
 */
 /* 
-   Substract 256 bit integers X and Y.
+   Substract BI bit integers X and Y.
 
-   uint32_t *x : 256 bit integer x
-   uint32_t *y : 256 bit integer y
+   uint32_t *x : BI bit integer x
+   uint32_t *y : BI bit integer y
    returns x - y
 */
-inline void subu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
+inline void subuBI_h(uint32_t *c, const uint32_t *a, const uint32_t *b, const uint32_t biSize)
 {
   uint32_t carry=0;
   const t_uint64 *dA = (t_uint64 *)a;
@@ -99,39 +99,28 @@ inline void subu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
   dC[0] = dA[0] + tmp;
   carry += (dC[0] < tmp);
 
-  tmp = NEG64(dB[1]);
-  dC[1] = dA[1] + carry;
-  carry = (dC[1] < carry);
-  dC[1] += tmp;
-  carry += (dC[1] < tmp);
-
-  tmp = NEG64(dB[2]);
-  dC[2] = dA[2] + carry;
-  carry = (dC[2] < carry);
-  dC[2] += tmp;
-  carry += (dC[2] < tmp);
-
-  tmp = NEG64(dB[3]);
-  dC[3] = dA[3] + carry;
-  carry = (dC[3] < carry);
-  dC[3] += tmp;
-  carry += (dC[3] < tmp);
-
+  for (uint32_t i=1; i < biSize/2; i++) {
+    tmp = NEG64(dB[i]);
+    dC[i] = dA[i] + carry;
+    carry = (dC[i] < carry);
+    dC[i] += tmp;
+    carry += (dC[i] < tmp);
+  }
 }
-inline void subu256_h(uint32_t *x, const uint32_t *y)
+
+inline void subuBI_h(uint32_t *x, const uint32_t *y, const uint32_t biSize)
 {
-   subu256_h(x, x, y);
+   subuBI_h(x, x, y, biSize);
 } 
   
-
 /* 
-   Add 256 bit integers X and Y.
+   Add BI bit integers X and Y.
 
-   uint32_t *x : 256 bit integer x
-   uint32_t *y : 256 bit integer y
+   uint32_t *x : BI bit integer x
+   uint32_t *y : BI bit integer y
    returns x + y
 */
-inline void addu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
+inline void adduBI_h(uint32_t *c, const uint32_t *a, const uint32_t *b, const uint32_t biSize)
 {
   uint32_t carry=0;
   const t_uint64 *dA = (t_uint64 *)a;
@@ -143,94 +132,61 @@ inline void addu256_h(uint32_t *c, const uint32_t *a, const uint32_t *b)
   dC[0] = dA[0] + dB[0];
   carry = (dC[0] < tmp);
 
-  tmp = dB[1];
-  dC[1] = dA[1] + carry;
-  carry = (dC[1] < carry);
-  dC[1] += tmp;
-  carry += (dC[1] < tmp);
+  for (uint32_t i=1; i < biSize/2; i++){
+    tmp = dB[i];
+    dC[i] = dA[i] + carry;
+    carry = (dC[i] < carry);
+    dC[i] += tmp;
+    carry += (dC[i] < tmp);
+  }
 
-  tmp = dB[2];
-  dC[2] = dA[2] + carry;
-  carry = (dC[2] < carry);
-  dC[2] += tmp;
-  carry += (dC[2] < tmp);
-
-  tmp = dB[3];
-  dC[3] = dA[3] + carry;
-  carry = (dC[3] < carry);
-  dC[3] += tmp;
-  carry += (dC[3] < tmp);
- 
 }
 
-inline void addu256_h(uint32_t *x, const uint32_t *y)
+inline void adduBI_h(uint32_t *x, const uint32_t *y, const uint32_t biSize)
 {
-   addu256_h(x, x, y);
+   adduBI_h(x, x, y, biSize);
 }   
 
-void setRandom(uint32_t *x, const uint32_t);
-void sortu256_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t sort_en);
 /* 
-   Compare 256 bit integers X and Y.
+   Compare BI bit integers X and Y.
 
-   uint32_t *x : 256 bit integer x
-   uint32_t *y : 256 bit integer y
+   uint32_t *x : BI bit integer x
+   uint32_t *y : BI bit integer y
    returns 
       0          : x == y
       pos number : x > y
       neg number : x < y
 */
-inline int32_t compu256_h(const uint32_t *a, const uint32_t *b)
+inline int32_t compuBI_h(const uint32_t *a, const uint32_t *b, const uint32_t biSize)
 {
   uint32_t gt=0, lt=0;
-  uint32_t idx = NWORDS_256BIT/2-1;
+  int idx = biSize/2-1;
 
   const t_uint64 *dA = (const t_uint64 *)a;
   const t_uint64 *dB = (const t_uint64 *)b;
-  // idx = 3
-  gt = (dA[idx] > dB[idx]);
-  lt = (dA[idx] < dB[idx]);
-  if (gt) return 1;
-  if (lt) return -1;
 
-  // idx = 2
-  idx--;
-  gt = (dA[idx] > dB[idx]);
-  lt = (dA[idx] < dB[idx]);
-  if (gt) return 1;
-  if (lt) return -1;
-
-  // idx = 1
-  idx--;
-  gt = (dA[idx] > dB[idx]);
-  lt = (dA[idx] < dB[idx]);
-  if (gt) return 1;
-  if (lt) return -1;
-
-  // idx =0
-  idx--;
-  gt = (dA[idx] > dB[idx]);
-  lt = (dA[idx] < dB[idx]);
-  if (gt) return 1;
-  if (lt) return -1;
-
+  for (idx=biSize/2-1; idx >= 0; idx--){
+    gt = (dA[idx] > dB[idx]);
+    lt = (dA[idx] < dB[idx]);
+    if (gt) return 1;
+    if (lt) return -1;
+  }
   return 0;
-
 }
 
 /* 
-   Compare 256 bit integers X and Y.
+   Compare BI bit integers X and Y.
 
-   uint32_t *x : 256 bit integer x
-   uint32_t *y : 256 bit integer y
+   uint32_t *x : BI bit integer x
+   uint32_t *y : BI bit integer y
 
    returns 
       1          : x < y
       0         : x >= y
 */
-inline int32_t ltu256_h(const uint32_t *x, const uint32_t *y)
+inline int32_t ltuBI_h(const uint32_t *x, const uint32_t *y, const uint32_t biSize)
 {
-  return (compu256_h(x, y) < 0);
+  return (compuBI_h(x, y, biSize) < 0);
 }
 
 inline int32_t ltu32_h(const uint32_t *x, const uint32_t *y)
@@ -239,26 +195,19 @@ inline int32_t ltu32_h(const uint32_t *x, const uint32_t *y)
 }
 
 /* 
-   Compare 256 bit integers X and Y.
+   Compare BI bit integers X and Y.
 
-   uint32_t *x : 256 bit integer x
-   uint32_t *y : 256 bit integer y
+   uint32_t *x : BI bit integer x
+   uint32_t *y : BI bit integer y
 
    returns 
       1          : x == y
       0         : x != y
 */
-inline int32_t equ256_h(const uint32_t *x, const uint32_t *y)
+inline int32_t equBI_h(const uint32_t *x, const uint32_t *y, const uint32_t biSize)
 {
-  return (compu256_h(x, y) == 0);
+  return (compuBI_h(x, y, biSize) == 0);
 }
-uint32_t shlru256_h(uint32_t *y, uint32_t *x, uint32_t count);
-uint32_t shllu256_h(uint32_t *y, uint32_t *x, uint32_t count);
-uint32_t msbu256_h(uint32_t *x);
-void setbitu256_h(uint32_t *x, uint32_t n);
-uint32_t getbitu256_h(uint32_t *x, uint32_t n);
-uint32_t getbitu256_h(uint32_t *x, uint32_t n, uint32_t group_size);
-uint32_t getbitu32_h(uint32_t *x, uint32_t n, uint32_t group_size);
 
 inline void mulu64_h(t_uint64 p[2], const t_uint64 *x, const t_uint64 *y)
 {
@@ -282,30 +231,31 @@ inline t_uint64 addu64_h(t_uint64 *c, t_uint64 *a, t_uint64 *b)
 }
 
 /*
-   Swaps two 256 bit variables x,y
+   Swaps two BI bit variables x,y
 */
-inline void swapu256_h(uint32_t *x, uint32_t *y)
+inline void swapuBI_h(uint32_t *x, uint32_t *y, const uint32_t biSize)
 {
   t_uint64 *dX = (t_uint64 *) x;
   t_uint64 *dY = (t_uint64 *) y;
-  t_uint64 tmp = dX[0];
+  t_uint64 tmp;
 
-  dX[0] = dY[0];
-  dY[0] = tmp;
-  
-  tmp = dX[1]; 
-  dX[1] = dY[1];
-  dY[1] = tmp;
-
-  tmp = dX[2]; 
-  dX[2] = dY[2];
-  dY[2] = tmp;
-
-  tmp = dX[3]; 
-  dX[3] = dY[3];
-  dY[3] = tmp;
+  for (uint32_t i=0; i < biSize/2; i++){
+    tmp = dX[i];
+    dX[i] = dY[i];
+    dY[i] = tmp;
+  }
 }
 
-void printU256Number(const uint32_t *x);
-void printU256Number(const char *, const uint32_t *x);
+
+void setRandom(uint32_t *x, const uint32_t);
+void sortuBI_idx_h(uint32_t *idx, const uint32_t *v, uint32_t len, uint32_t biSize, uint32_t sort_en);
+uint32_t shlruBI_h(uint32_t *y, uint32_t *x, uint32_t count, uint32_t biSize);
+uint32_t shlluBI_h(uint32_t *y, uint32_t *x, uint32_t count, uint32_t biSize);
+uint32_t msbuBI_h(uint32_t *x, uint32_t biSize);
+void setbituBI_h(uint32_t *x, uint32_t n);
+uint32_t getbituBI_h(uint32_t *x, uint32_t n);
+uint32_t getbituBI_h(uint32_t *x, uint32_t n, uint32_t group_size, uint32_t biSize);
+void printUBINumber(const uint32_t *x, uint32_t biSize);
+void printUBINumber(const char *, const uint32_t *x, uint32_t biSize);
+
 #endif

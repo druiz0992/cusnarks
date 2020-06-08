@@ -46,6 +46,8 @@ CUSNARKS_CIRCUITS = CUSNARKS_HOME + 'circuits/'
 
 CUSNARKS_ROOTS_F = CUSNARKS_CONFIG + '.root_f'
 CUSNARKS_ROOTS_N = CUSNARKS_CONFIG + '.nroots'
+CUSNARKS_CURVE_TMP = CUSNARKS_CONFIG + '.curve_tmp'
+CUSNARKS_CURVE = CUSNARKS_CONFIG + '.curve'
 
 snarkjs = { 
     'url'   :  'http://github.com/druiz0992/snarkjs.git',
@@ -139,6 +141,7 @@ def generate_config_f():
     print(roots['nbits'],file=f)
     f.close()
 
+
 def get_roots_file():
     return parse_configfile(config['folder'],'ROOTS_FILE')
 
@@ -170,20 +173,33 @@ def parse_configfile(fname, label):
    
 
 def generate_roots(nroots=None):
+    f = open(CUSNARKS_CURVE_TMP,'r')
+    roots['curve'] = f.read().rstrip()
+    f.close()
+   
+    f = open(CUSNARKS_CURVE,'w')
+    print(roots['curve'],file=f)
+    f.close()
+
+    if roots['curve'] == "_BN256":
+      roots['max_roots'] = 28
+    elif roots['curve'] == "_BLS12381":
+      roots['max_roots'] = 32
+   
     if nroots is None:
       sys.stdout.write('####################################\n\n')
-      sys.stdout.write('Generating roots of unity....\n\n')
+      sys.stdout.write('Generating roots of unity for curve' +roots['curve'] +'....\n\n')
       sys.stdout.write('Number of roots of unity imposes a limit on the maximum number of constraints\n')
       sys.stdout.write('in your circuit. Default number roots of unity is 2^'+str(roots['nbits'])+'.\n')
-      sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
+      sys.stdout.write('Do you want a different number in the range of 2^20 and 2^'+str(roots['max_roots'])+' ['+str(roots['nbits'])+']?\n')
       sys.stdout.flush()
       b_root= sys.stdin.readline().rstrip()
       if b_root != '':
           while True:
             try :
                # Try until input is valid
-               if int(b_root) > 28 or int(b_root) < 20 :
-                  sys.stdout.write('Do you want a different number in the range of 2^20 and 2^28 ['+str(roots['nbits'])+']?\n')
+               if int(b_root) > roots['max_roots'] or int(b_root) < 20 :
+                  sys.stdout.write('Do you want a different number in the range of 2^20 and 2^'+str(roots['max_roots'])+' ['+str(roots['nbits'])+']?\n')
                   b_root= sys.stdin.readline().rstrip()
                else:
                   break

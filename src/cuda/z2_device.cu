@@ -51,82 +51,49 @@ __device__ uint32_t * Z2_t::getu256()
 
 __device__ uint32_t * Z2_t::get2u256()
 {
-  return &el[NWORDS_256BIT];
+  return &el[NOWRDS_FP];
 }
 
 __device__ uint32_t * Z2_t::getsingleu256(uint32_t offset)
 {
-  return &el[offset*NWORDS_256BIT];
+  return &el[offset*NOWRDS_FP];
 }
 __device__ uint32_t * Z2_t::getu256(uint32_t offset)
 {
-  return &el[offset*ECP2_JAC_N256W*NWORDS_256BIT];
+  return &el[offset*ECP2_JAC_N256W*NOWRDS_FP];
 }
 
 __device__ uint32_t * Z2_t::get2u256(uint32_t offset)
 {
-  return &el[offset*ECP2_JAC_N256W*NWORDS_256BIT+NWORDS_256BIT];
+  return &el[offset*ECP2_JAC_N256W*NOWRDS_FP+NOWRDS_FP];
 }
 
 __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
 { 
-   //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-         //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-         //3 * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
-   movu256x6(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
-   //movu256x6(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+3)*NWORDS_256BIT],&y->el[(yoffset+3)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+4)*NWORDS_256BIT],&y->el[(yoffset+4)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+5)*NWORDS_256BIT],&y->el[(yoffset+5)*NWORDS_256BIT]);
+   movu256x6(&el[xoffset*NOWRDS_FP],&y->el[yoffset*NOWRDS_FP]);
 }
 
 __device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
 { 
-    //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-           //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-           //3* ECP2_JAC_N256W * NWORDS_256BIT * sizeof(uint32_t));
-   movu256x6(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+3)*NWORDS_256BIT],&y[(yoffset+3)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+4)*NWORDS_256BIT],&y[(yoffset+4)*NWORDS_256BIT]);
-   //movu256(&el[(xoffset+5)*NWORDS_256BIT],&y[(yoffset+5)*NWORDS_256BIT]);
+   movu256x6(&el[xoffset*NOWRDS_FP],&y[yoffset*NOWRDS_FP]);
 }
 
 __device__ void Z2_t::setu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-              //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              //ysize * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
-   movu256(&el[(xoffset)*2*NWORDS_256BIT],&y->el[(yoffset)*2*NWORDS_256BIT]);
-   movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y->el[(yoffset)*2*NWORDS_256BIT+NWORDS_256BIT]);
+   movu256(&el[(xoffset)*2*NOWRDS_FP],&y->el[(yoffset)*2*NOWRDS_FP]);
+   movu256(&el[(xoffset)*2*NOWRDS_FP+NOWRDS_FP],&y->el[(yoffset)*2*NOWRDS_FP+NOWRDS_FP]);
 }
 
 __device__ void Z2_t::setsingleu256(uint32_t xoffset, Z2_t *y, uint32_t yoffset)
 { 
-              //&y->el[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-              //ysize * ECP2_JAC_N256W* NWORDS_256BIT * sizeof(uint32_t));
-   movu256(&el[(xoffset)*2*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
-   movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*2*NOWRDS_FP],&y->el[(yoffset)*NOWRDS_FP]);
+   movu256(&el[(xoffset)*2*NOWRDS_FP+NOWRDS_FP],&y->el[(yoffset+1)*NOWRDS_FP]);
 }
 __device__ void Z2_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-    //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-           //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-           //ysize * ECP2_JAC_N256W * NWORDS_256BIT * sizeof(uint32_t));
-   movu256(&el[(xoffset)*2*NWORDS_256BIT],&y[(yoffset)*2*NWORDS_256BIT]);
-   movu256(&el[(xoffset)*2*NWORDS_256BIT+NWORDS_256BIT],&y[(yoffset)*2*NWORDS_256BIT+NWORDS_256BIT]);
+   movu256(&el[(xoffset)*2*NOWRDS_FP],&y[(yoffset)*2*NOWRDS_FP]);
+   movu256(&el[(xoffset)*2*NOWRDS_FP+NOWRDS_FP],&y[(yoffset)*2*NOWRDS_FP+NOWRDS_FP]);
 }
-/*
-__device__ void Z2_t::set2u256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
-{ 
-    //memcpy(&el[xoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-           //&y[yoffset*ECP2_JAC_N256W*NWORDS_256BIT],
-           //ysize * NWORDS_256BIT * sizeof(uint32_t));
-   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
-}
-*/
 
 __device__ void Z2_t::assign(uint32_t *y)
 { 
@@ -155,11 +122,11 @@ __device__ uint32_t eqz(Z2_t *x, Z2_t *y)
 }
 __device__ uint32_t eqz(Z2_t *x, uint32_t xoffset, uint32_t *y)
 {
-  return (equ256(x->getu256(xoffset), y) && equ256(x->get2u256(xoffset), &y[NWORDS_256BIT]));
+  return (equ256(x->getu256(xoffset), y) && equ256(x->get2u256(xoffset), &y[NOWRDS_FP]));
 }
 __device__ uint32_t eqz(Z2_t *x, uint32_t *y)
 {
-  return (equ256(x->getu256(), y) && equ256(x->get2u256(),  &y[NWORDS_256BIT]));
+  return (equ256(x->getu256(), y) && equ256(x->get2u256(),  &y[NOWRDS_FP]));
 }
 
 __device__  void squarez(Z2_t *z, Z2_t *x, mod_t midx)
@@ -238,8 +205,8 @@ __device__ void movz(uint32_t *y, uint32_t yoffset, Z2_t *x, uint32_t xoffset, u
   #pragma unroll
   for (i=0; i< 2*size; i++){
     movu256(&y[yoffset],x->getu256(xoffset));
-    xoffset += NWORDS_256BIT;
-    yoffset += NWORDS_256BIT;
+    xoffset += NOWRDS_FP;
+    yoffset += NOWRDS_FP;
   }
 }
 
@@ -272,11 +239,11 @@ __device__ void addecjacz(Z2_t *zxr, uint32_t zoffset, Z2_t *zx1, uint32_t x1off
   Z2_t x2(zx2->getu256(0+x2offset)), y2(zx2->getu256(1+x2offset)), z2(zx2->getu256(2+x2offset));
   Z2_t xr(zxr->getu256(0+zoffset)),  yr(zxr->getu256(1+zoffset)), zr(zxr->getu256(2+zoffset));
  
-  uint32_t __restrict__ ztmp[5*NWORDS_256BIT*2];
-  Z2_t tmp1(ztmp), tmp3(&ztmp[1*NWORDS_256BIT*2]),
-                 tmp_x(&ztmp[2*NWORDS_256BIT*2]),
-                 tmp_y(&ztmp[3*NWORDS_256BIT*2]),
-                 tmp_z(&ztmp[4*NWORDS_256BIT*2]);
+  uint32_t __restrict__ ztmp[5*NOWRDS_FP*2];
+  Z2_t tmp1(ztmp), tmp3(&ztmp[1*NOWRDS_FP*2]),
+                 tmp_x(&ztmp[2*NOWRDS_FP*2]),
+                 tmp_y(&ztmp[3*NOWRDS_FP*2]),
+                 tmp_z(&ztmp[4*NOWRDS_FP*2]);
 
   // TODO : Change definition of inf to 0, 1, 0 instead of 1,0,1 as it is now
   /*
@@ -350,9 +317,9 @@ __device__ void doublecjacz(Z2_t *zxr, Z2_t *zx1, mod_t midx)
   Z2_t y1(zx1->getu256(1)), z1(zx1->getu256(2));
   Z2_t yr(zxr->getu256(1)), zr(zxr->getu256(2));
 
-  uint32_t __restrict__ ztmp[2*NWORDS_256BIT*2];
-  Z2_t tmp_y(&ztmp[0*NWORDS_256BIT*2]),
-     tmp_z(&ztmp[1*NWORDS_256BIT*2]);
+  uint32_t __restrict__ ztmp[2*NOWRDS_FP*2];
+  Z2_t tmp_y(&ztmp[0*NOWRDS_FP*2]),
+     tmp_z(&ztmp[1*NOWRDS_FP*2]);
 
   // TODO : review this comparison, and see if I can do better. or where I should put it
   // as i check this in several places
@@ -389,17 +356,3 @@ __device__ void doublecjacz(Z2_t *zxr, Z2_t *zx1, mod_t midx)
 
 }
 
-#if 0
-__device__ void scmulec_stepz(Z2_t *Q,Z2_t *N, uint32_t *scl, uint32_t msb,  mod_t midx )
-{
-  uint32_t b;
-  for (uint32_t i=msb; i< (1 << (NWORDS_256BIT)); i++){
-      b = bselMu256(scl,255-i);
-      doublecjacz(Q,Q, midx);
-
-      if (b){
-       addecjacz(Q,0, N,b*3, Q,0, midx);
-     }
-  }
-}
-#endif

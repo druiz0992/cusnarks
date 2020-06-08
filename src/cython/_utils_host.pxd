@@ -34,7 +34,7 @@ cimport _types as ct
 
 cdef extern from "../cuda/bigint.h" nogil: 
 
-    void csortu256_idx_h "sortu256_idx_h" (ct.uint32_t *idx, ct.uint32_t *v, ct.uint32_t l, ct.uint32_t sort_en)
+    void csortuBI_idx_h "sortuBI_idx_h" (ct.uint32_t *idx, ct.uint32_t *v, ct.uint32_t l, ct.uint32_t biSize, ct.uint32_t sort_en)
 
 cdef extern from "../cuda/ff.h" nogil: 
 
@@ -48,12 +48,12 @@ cdef extern from "../cuda/ff.h" nogil:
 
     void caddm_h "addm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
 
-    void caddu256_h "addu256_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B)
+    void cadduBI_h "adduBI_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t biSize)
 
     void csubm_h "subm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
 
-    void crangeu256_h "rangeu256_h" (ct.uint32_t *samples, ct.uint32_t nsamples,
-                                     ct.uint32_t  *start, ct.uint32_t inc, ct.uint32_t *mod)
+    void crangeuBI_h "rangeuBI_h" (ct.uint32_t *samples, ct.uint32_t nsamples,
+                                     ct.uint32_t  *start, ct.uint32_t inc, ct.uint32_t *mod, ct.uint32_t biSize)
 
     void cmontinv_h "montinv_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t pidx)
 
@@ -64,6 +64,9 @@ cdef extern from "../cuda/ff.h" nogil:
                                                    ct.uint32_t n, ct.uint32_t pidx,
                                                    ct.uint32_t strip_last)
 
+
+cdef extern from "../cuda/constants.h":
+    ct.uint32_t cCusnarksPSizeGet "CusnarksPSizeGet" (ct.mod_t pidx)
 
 cdef extern from "../cuda/ntt.h" nogil: 
 

@@ -69,6 +69,8 @@ if [ "$1" == "BN256" ] || [ "$1" == "" ]; then
 
    NWORDS_FR=8
    NWORDS_FP=8
+   DEF="_BN256"
+   UNDEF="_BLS12381"
 
 elif  [ "$1" == "BLS12381" ]; then
    #E(Fq) := y^2 = x^3 + 4
@@ -90,6 +92,8 @@ elif  [ "$1" == "BLS12381" ]; then
 
    NWORDS_FR=8
    NWORDS_FP=12
+   UNDEF="_BN256"
+   DEF="_BLS12381"
 
 else 
    echo "Curve not valid";
@@ -115,6 +119,7 @@ while read f; do
 done <test.dat
 sed -i'' "s/TTTT/\n/g" "../src/cuda/constants.cpp"
 
+echo "${DEF}" > .curve_tmp
 cd -
 ../src/buildzqfield.js -q ${FR} -n Fr;
 ../src/buildzqfield.js -q ${FP} -n Fp;
@@ -122,15 +127,36 @@ cd -
 add_correct_labels "fr.asm"
 add_correct_labels "fp.asm"
 
+FP_ONE="1 "
+FP_ZERO="0 "
+for i in $(seq 2 $NWORDS_FP); do
+  FP_ONE="${FP_ONE} , 0"
+  FP_ZERO="${FP_ZERO} , 0"
+done
+
+FR_ONE="1 "
+FR_ZERO="0 "
+for i in $(seq 2 $NWORDS_FR); do
+  FR_ONE="${FR_ONE} , 0"
+  FR_ZERO="${FR_ZERO} , 0"
+done
 
 echo "#ifndef __FF_H_" > _ff.h
 echo "#define __FF_H_" >> _ff.h
 echo "#define NWORDS_FR  (${NWORDS_FR})" >> _ff.h
 echo "#define NWORDS_FP  (${NWORDS_FP})" >> _ff.h
+echo "#define FP_INIT_ARRONE(V) uint32_t V[]={${FP_ONE}}" >> _ff.h
+echo "#define FP_INIT_ARRZERO(V) uint32_t V[]={${FP_ZERO}}" >> _ff.h
+echo "#define FR_INIT_ARRONE(V) uint32_t V[]={${FR_ONE}}" >> _ff.h
+echo "#define FR_INIT_ARRZERO(V) uint32_t V[]={${FR_ZERO}}" >> _ff.h
+echo "#define ${DEF}" >> _ff.h
+echo "#undef ${UNDEF}" >> _ff.h
+     
 echo "#endif" >> _ff.h
 
 echo "NWORDS_FR = ${NWORDS_FR}" > _ff.py
 echo "NWORDS_FP = ${NWORDS_FP}" >> _ff.py
+
 
 mv fr.asm ../../../src/cuda/fr.casm
 mv fp.asm ../../../src/cuda/fp.casm

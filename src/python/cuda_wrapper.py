@@ -78,7 +78,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = 0):
      nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
      ne = n + nd
      nsamples = len(poly) + nd
-     zpoly_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
+     zpoly_vector = np.zeros((nsamples,NWORDS_FR),dtype=np.uint32)
      zpoly_vector[nd:] = poly
 
      kernel_config={}
@@ -102,7 +102,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = 0):
 
      result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=1)
 
-     result_snarks_complete = np.zeros((nsamples-ne,NWORDS_256BIT),dtype=np.uint32)
+     result_snarks_complete = np.zeros((nsamples-ne,NWORDS_FR),dtype=np.uint32)
      result_snarks_complete[:nsamples-2*ne+nd] = result_snarks
      result_snarks_complete[nsamples-2*ne+nd:] = zpoly_vector[-ne+nd:]
 

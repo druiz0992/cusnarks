@@ -522,30 +522,30 @@ class GrothSetup(object):
                      ec_jacscmul_h(
                               self.toxic['kalfa'].as_uint256().reshape(-1), 
                               G1.as_uint256(G1).reshape(-1),
-                              ZField.get_field(),
+                              MOD_FP,
                               0),
                      -1),
-                 ZField.get_field(),
+                 MOD_FP,
                  1)
       self.pk['beta_1'] = ec_jac2aff_h(
                  np.reshape(
                      ec_jacscmul_h(
                               self.toxic['kbeta'].as_uint256().reshape(-1), 
                               G1.as_uint256(G1).reshape(-1),
-                              ZField.get_field(),
+                              MOD_FP,
                               0),
                      -1),
-                 ZField.get_field(),
+                 MOD_FP,
                  1)
       self.pk['delta_1'] = ec_jac2aff_h(
                  np.reshape(
                      ec_jacscmul_h(
                               self.toxic['kdelta'].as_uint256().reshape(-1), 
                               G1.as_uint256(G1).reshape(-1),
-                              ZField.get_field(),
+                              MOD_FP,
                               0),
                      -1),
-                 ZField.get_field(),
+                 MOD_FP,
                  1)
     
       self.pk['beta_2'] = ec2_jac2aff_h(
@@ -553,10 +553,10 @@ class GrothSetup(object):
                      ec2_jacscmul_h(
                               self.toxic['kbeta'].as_uint256().reshape(-1), 
                               G2.as_uint256(G2).reshape(-1),
-                              ZField.get_field(),
+                              MOD_FP,
                               0),
                      -1),
-                 ZField.get_field(),
+                 MOD_FP,
                  1)
       self.pk['delta_2'] = ec2_jac2aff_h(
                  np.reshape(
@@ -566,7 +566,7 @@ class GrothSetup(object):
                               ZField.get_field(),
                               0),
                      -1),
-                 ZField.get_field(),
+                 MOD_FP,
                  1)
       self.pk['gamma_2'] = ec2_jac2aff_h(
                  np.reshape(
@@ -576,7 +576,7 @@ class GrothSetup(object):
                               ZField.get_field(),
                               0),
                      -1),
-                 ZField.get_field(),
+                 MOD_FP,
                  1)
 
       if self.n_gpu :
@@ -591,7 +591,7 @@ class GrothSetup(object):
       self.t_S['init k'] = end - start
       start = time.time()
       # a_t, b_t and c_t are in ext
-      sorted_idx = sortu256_idx_h(a_t_u256,self.sort_en)
+      sorted_idx = sortuBI_idx_h(a_t_u256, NWORDS_FR, self.sort_en)
       ecbn128_samples = np.concatenate((a_t_u256[sorted_idx],G1.as_uint256(G1)[:2]))
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point A to Affine coordinates')
@@ -613,7 +613,7 @@ class GrothSetup(object):
 
     
       logging.info(' Computing EC Point B1')
-      sorted_idx = sortu256_idx_h(b_t_u256,self.sort_en)
+      sorted_idx = sortuBI_idx_h(b_t_u256, NWORDS_FR, self.sort_en)
       ecbn128_samples[:-2] = b_t_u256[sorted_idx]
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point B1 to Affine coordinates')
@@ -665,7 +665,7 @@ class GrothSetup(object):
                                       a_t_u256, b_t_u256, c_t_u256, self.pk['nPublic']+1, self.pk['nVars'], pidx )
 
       ZField.set_field(MOD_FP)
-      sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
+      sorted_idx = sortuBI_idx_h(ps_u256, NWORDS_FR, self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point C to Affine coordinates')
@@ -698,7 +698,7 @@ class GrothSetup(object):
       eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), np.reshape(zod_u256,-1), maxH, pidx)
 
       ZField.set_field(MOD_FP)
-      sorted_idx = sortu256_idx_h(eT_u256,self.sort_en)
+      sorted_idx = sortuBI_idx_h(eT_u256, NWORDS_FR, self.sort_en)
       ecbn128_samples = np.concatenate((eT_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point hExps to Affine coordinates')
@@ -727,7 +727,7 @@ class GrothSetup(object):
                                       toxic_invGamma.reduce().as_uint256(),
                                       a_t_u256, b_t_u256, c_t_u256, 0, self.pk['nPublic']+1, pidx )
       ZField.set_field(MOD_FP)
-      sorted_idx = sortu256_idx_h(ps_u256,self.sort_en)
+      sorted_idx = sortuBI_idx_h(ps_u256, NWORDS_FR, self.sort_en)
       ecbn128_samples = np.concatenate((ps_u256[sorted_idx], G1.as_uint256(G1)[:2]))
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point IC to Affine coordinates')

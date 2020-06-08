@@ -268,7 +268,7 @@ class ZField(object):
             p = ZField.get_extended_p().as_long()
             bitlen = int(math.ceil(math.log(p, 2)))
             t = 1 << bitlen | 1  # force it to be odd
-            redc_data['Rbitlen'] = (t.bit_length() // 8 + 1) * 8  # Multiple of 8
+            redc_data['Rbitlen'] = int((t.bit_length() + 7) / 8)  * 8  # Multiple of 8
             redc_data['R'] = int(1 << redc_data['Rbitlen'])
             redc_data['Rmask'] = int(redc_data['R'] - 1)
             redc_data['Rp'] = ZField.inv(redc_data['R'] % p).as_long()

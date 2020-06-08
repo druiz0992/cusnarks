@@ -51,9 +51,9 @@ __global__ void zpoly_add_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR];
+    y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
    
     if (params->premod){
        modu256(x,x, params->midx);
@@ -62,9 +62,9 @@ __global__ void zpoly_add_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
     addmu256(z,x,y, params->midx);                
 
     if ( (params->in_length > 2*params->padding_idx) && (tid == 0)){
-       memcpy(&z[params->padding_idx*NWORDS_256BIT],
-              &y[params->padding_idx*NWORDS_256BIT],
-              (params->in_length - 2*params->padding_idx)*NWORDS_256BIT*sizeof(uint32_t));
+       memcpy(&z[params->padding_idx*NOWRDS_FR],
+              &y[params->padding_idx*NOWRDS_FR],
+              (params->in_length - 2*params->padding_idx)*NOWRDS_FR*sizeof(uint32_t));
     }
 
     return;
@@ -79,9 +79,9 @@ __global__ void zpoly_sub_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR];
+    y = (uint32_t *) &in_vector[(params->in_length - params->padding_idx + tid) * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     
     if (params->premod){
        modu256(x,x, params->midx);
@@ -90,9 +90,9 @@ __global__ void zpoly_sub_kernel(uint32_t *out_vector, uint32_t *in_vector, kern
     submu256(z,x,y, params->midx);                
 
     if ( (params->in_length > 2*params->padding_idx) && (tid == 0)){
-       memcpy(&z[params->padding_idx*NWORDS_256BIT],
-              &x[params->padding_idx*NWORDS_256BIT],
-              (params->in_length - 2*params->padding_idx)*NWORDS_256BIT*sizeof(uint32_t));
+       memcpy(&z[params->padding_idx*NOWRDS_FR],
+              &x[params->padding_idx*NOWRDS_FR],
+              (params->in_length - 2*params->padding_idx)*NOWRDS_FR*sizeof(uint32_t));
     }
 
     return;
@@ -107,9 +107,9 @@ __global__ void zpoly_subprev_kernel(uint32_t *out_vector, uint32_t *in_vector, 
       return;
     }
 
-    x = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
-    y = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &out_vector[tid * NOWRDS_FR];
+    y = (uint32_t *) &in_vector[tid * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     
     if (params->premod){
        modu256(x,x, params->midx);
@@ -128,9 +128,9 @@ __global__ void zpoly_mulc_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    y = (uint32_t *) &in_vector[(params->in_length/2 + tid) * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR];
+    y = (uint32_t *) &in_vector[(params->in_length/2 + tid) * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     
     if (params->premod){
        modu256(x,x, params->midx);
@@ -151,9 +151,9 @@ __global__ void zpoly_mulcprev_kernel(uint32_t *out_vector, uint32_t *in_vector,
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    y = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR];
+    y = (uint32_t *) &out_vector[tid * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     
     if (params->premod){
        modu256(x,x, params->midx);
@@ -174,8 +174,8 @@ __global__ void zpoly_mulK_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
     }
 
     scl = (uint32_t *) &in_vector[0];
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT + NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR + NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     logInfoBigNumberTid(1,"SCL: \n",scl); 
     logInfoBigNumberTid(1,"X: \n",x); 
     
@@ -199,8 +199,8 @@ __global__ void zpoly_madprev_kernel(uint32_t *out_vector, uint32_t *in_vector, 
     }
 
     scl = (uint32_t *) &in_vector[0];
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT + NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR + NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     
     if (params->premod){
        modu256(x,x, params->midx);
@@ -228,8 +228,8 @@ __global__ void zpoly_addprev_kernel(uint32_t *out_vector, uint32_t *in_vector, 
       return;
     }
 
-    x = (uint32_t *) &in_vector[tid * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[tid * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
     
     if (params->premod){
        modu256(x,x, params->midx);
@@ -257,9 +257,9 @@ __global__ void zpoly_divsnarks_kernel(uint32_t *out_vector, uint32_t *in_vector
       return;
     }
 
-    x = (uint32_t *) &in_vector[(tid + ne) * NWORDS_256BIT];
-    y = (uint32_t *) &in_vector[(tid + 2 * ne - nd) * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[(tid + ne) * NOWRDS_FR];
+    y = (uint32_t *) &in_vector[(tid + 2 * ne - nd) * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
    
     if (params->premod){
        modu256(x,x, params->midx);
@@ -286,9 +286,9 @@ __global__ void zpoly_divsnarksprev_kernel(uint32_t *out_vector, uint32_t *in_ve
       return;
     }
 
-    x = (uint32_t *) &in_vector[(tid + ne) * NWORDS_256BIT];
-    y = (uint32_t *) &in_vector[(tid + 2 * ne - nd) * NWORDS_256BIT];
-    z = (uint32_t *) &out_vector[tid * NWORDS_256BIT];
+    x = (uint32_t *) &in_vector[(tid + ne) * NOWRDS_FR];
+    y = (uint32_t *) &in_vector[(tid + 2 * ne - nd) * NOWRDS_FR];
+    z = (uint32_t *) &out_vector[tid * NOWRDS_FR];
    
     if (params->premod){
        modu256(x,x, params->midx);
@@ -325,7 +325,7 @@ __device__ void divsnarks(uint32_t *z_t, uint32_t *x_t, uint32_t *y_t, kernel_pa
        if(tid >= params->in_length - offset -ne) {
            return;
        }
-       x = (uint32_t *) &x_t[(offset) * NWORDS_256BIT];
+       x = (uint32_t *) &x_t[(offset) * NOWRDS_FR];
        logInfoTid("offset : %d\n",offset);
        logInfoBigNumberTid(1,"X:\n",x);
        addmu256(z_t,z_t,x, params->midx);                
@@ -333,7 +333,7 @@ __device__ void divsnarks(uint32_t *z_t, uint32_t *x_t, uint32_t *y_t, kernel_pa
        if(tid >= params->in_length - offset -ne+ nd) {
            return;
        }
-       y = (uint32_t *) &y_t[(offset) * NWORDS_256BIT];
+       y = (uint32_t *) &y_t[(offset) * NOWRDS_FR];
        logInfoBigNumberTid(1,"Y:\n",y);
        addmu256(z_t,z_t,y, params->midx);                
        logInfoBigNumberTid(1,"Z:\n",z_t);
@@ -342,10 +342,10 @@ __device__ void divsnarks(uint32_t *z_t, uint32_t *x_t, uint32_t *y_t, kernel_pa
        //if (i==3){ return;}
  
     }
-    //x = (uint32_t *) &in_vector[(tid + ne + offset) * NWORDS_256BIT];
+    //x = (uint32_t *) &in_vector[(tid + ne + offset) * NOWRDS_FR];
     //logInfoBigNumberTid(1,"Z:\n",z);
     //logInfoBigNumberTid(1,"X:\n",x);
-    //addmu256(z,z,&x[offset*NWORDS_256BIT], params->midx);                
+    //addmu256(z,z,&x[offset*NOWRDS_FR], params->midx);                
 
     //logInfoBigNumberTid(1,"Z:\n",z);
 
@@ -374,7 +374,7 @@ __global__ void zpoly_fft32_kernel(uint32_t *out_vector, uint32_t *in_vector, ke
     if (tid == 0){
         logInfo("len : %d\n",params->in_length);
         for (uint32_t i=0; i< 32; i++){
-           logInfoBigNumber("x[i]: \n",&x[i*NWORDS_256BIT]);
+           logInfoBigNumber("x[i]: \n",&x[i*NOWRDS_FR]);
         }
     }
     */
@@ -499,7 +499,7 @@ __global__ void zpoly_fftN_kernel(uint32_t *out_vector, uint32_t *in_vector, ker
     if (tid == 0){
         logInfo("len : %d\n",params->in_length);
         for (uint32_t i=0; i< 32; i++){
-           logInfoBigNumber("x[i]: \n",&x[i*NWORDS_256BIT]);
+           logInfoBigNumber("x[i]: \n",&x[i*NOWRDS_FR]);
         }
     }
     */
@@ -1157,7 +1157,7 @@ __device__ void fft3Dxx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
 
   mulmontu256(&z[tida*U256K_OFFSET],
               &z[tida*U256K_OFFSET],
-              &roots[root_idx*NWORDS_256BIT], midx);
+              &roots[root_idx*NOWRDS_FR], midx);
 }
 
 __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_params_t *params)
@@ -1198,7 +1198,7 @@ __device__ void fft3Dxy_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
 
   mulmontu256(&z[tida*U256K_OFFSET],
            &z[tida*U256K_OFFSET],
-           &roots[root_idx * NWORDS_256BIT],midx);
+           &roots[root_idx * NOWRDS_FR],midx);
 
 }
 
@@ -1241,7 +1241,7 @@ __device__ void fft3Dyx_dif(uint32_t *z, uint32_t *x, uint32_t *roots, kernel_pa
 
   mulmontu256(&z[tida*U256K_OFFSET],
            &z[tida*U256K_OFFSET],
-           &roots[root_idx * NWORDS_256BIT],midx);
+           &roots[root_idx * NOWRDS_FR],midx);
 }
 
 __device__ void fft3Dyy_dif(uint32_t *z, uint32_t *x, uint32_t *w2, uint32_t *scaler, kernel_params_t *params)
@@ -1300,7 +1300,7 @@ __device__ void mul_poly(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t d, mod_
 
   #pragma unroll
   for (i=0; i<= d; i++) {
-    coeff_idx = i * NWORDS_256BIT;
+    coeff_idx = i * NOWRDS_FR;
     mulmontu256(&z[coeff_idx],&x[coeff_idx],&y[coeff_idx],midx);
   }
 }
@@ -1330,7 +1330,7 @@ __device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx)
 
     logInfoBigNumberTid(1,"AfterB OtherX :\n",otherX);
 
-    root_idx = (1<< (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT;
+    root_idx = (1<< (ZPOLY_FFT_32-i-1)) * (lane%size) * NOWRDS_FR;
     if (lane%(size<<1) < size){  //  It 0: 0-15      W0,W1,...,W15
                                  //  It 1: 0-7, 16-23    W0,W2,W4,..W14
                                  //  It 2: 0-3, 8-11, 16-19, 24-27  W0, W4, W8, W12
@@ -1347,7 +1347,7 @@ __device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx)
     }
     logInfoBigNumberTid(1,"AfterB x:\n",thisX);
     logInfoBigNumberTid(1,"Root : \n",(uint32_t *)&W32[ root_idx]);
-    logInfoTid("idx : %d\n", root_idx / NWORDS_256BIT);
+    logInfoTid("idx : %d\n", root_idx / NOWRDS_FR);
   }
     logInfoBigNumberTid(1,"PreB OtherX :\n",otherX);
     logInfoBigNumberTid(1,"PreB X :\n",thisX);
@@ -1367,7 +1367,7 @@ __device__ void fft32_dif(uint32_t *z, uint32_t *x, mod_t midx)
       logInfoTid("Op : otherX - x : lane%(size>>1) : %d\n", lane%2);
   }
     logInfoBigNumberTid(1,"AfterB x:\n",z);
-    logInfoBigNumberTid(1,"Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_32-i-1)) * (lane%size) * NWORDS_256BIT]);
+    logInfoBigNumberTid(1,"Root : \n",(uint32_t *)&W32[ (1 << (ZPOLY_FFT_32-i-1)) * (lane%size) * NOWRDS_FR]);
     logInfoTid("idx : %d\n",(1 << (ZPOLY_FFT_32-i-1)) * (lane % size));
 }
 
@@ -1379,7 +1379,7 @@ __device__ void ifft32_dit(uint32_t *z, uint32_t *x, mod_t midx)
   uint32_t otherX[] = {0,0,0,0,0,0,0,0};
   uint32_t thisX[] = {0,0,0,0,0,0,0,0};
   uint32_t const *IW32 = IW32_ct;
-  uint32_t const *inv_scaler = &IW32_nroots_ct[(ZPOLY_FFT_32-1)*NWORDS_256BIT];
+  uint32_t const *inv_scaler = &IW32_nroots_ct[(ZPOLY_FFT_32-1)*NOWRDS_FR];
   uint32_t lane = threadIdx.x % warpSize;
   uint32_t i, size, root_idx;
 
@@ -1396,7 +1396,7 @@ __device__ void ifft32_dit(uint32_t *z, uint32_t *x, mod_t midx)
   #pragma unroll
   for (i=1; i < ZPOLY_FFT_32 ; i++){
     size = 1 << i;    // size = 2,4,8,16
-    root_idx = (1 << (ZPOLY_FFT_32 - 1 - i)) * (lane%size) * NWORDS_256BIT;
+    root_idx = (1 << (ZPOLY_FFT_32 - 1 - i)) * (lane%size) * NOWRDS_FR;
 
     if (lane % (size << 1) >= size){  
        mulmontu256(thisX, thisX, &IW32[root_idx], midx);
@@ -1448,7 +1448,7 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
 
     logInfoBigNumberTid(1,"AfterB OtherX :\n",otherX);
 
-    root_idx = ((1<< (N-i-1)) * (lane%size) * NWORDS_256BIT) << (ZPOLY_FFT_32 - N);
+    root_idx = ((1<< (N-i-1)) * (lane%size) * NOWRDS_FR) << (ZPOLY_FFT_32 - N);
     if (lane%(size<<1) < size){  //  It 0: 0-15      W0,W1,...,W15
                                  //  It 1: 0-7, 16-23    W0,W2,W4,..W14
                                  //  It 2: 0-3, 8-11, 16-19, 24-27  W0, W4, W8, W12
@@ -1465,7 +1465,7 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
     }
       logInfoBigNumberTid(1,"AfterB x:\n",thisX);
       logInfoBigNumberTid(1,"Root : \n",(uint32_t *)&W32[ root_idx]);
-      logInfoTid("idx : %d\n", root_idx / (NWORDS_256BIT * (1 << (ZPOLY_FFT_32 - N))) );
+      logInfoTid("idx : %d\n", root_idx / (NOWRDS_FR * (1 << (ZPOLY_FFT_32 - N))) );
   }
     logInfoBigNumberTid(1,"PreB OtherX :\n",otherX);
     logInfoBigNumberTid(1,"PreB X :\n",thisX);
@@ -1484,7 +1484,7 @@ __device__ void fftN_dif(uint32_t *z, uint32_t *x, const uint32_t *W32, uint32_t
   }
     logInfoBigNumberTid(1,"AfterB x:\n",z);
     logInfoTid("idx : %d\n",(1 << (N-i-1)) * (lane % size));
-    logInfoBigNumberTid(1,"Root : \n",(uint32_t *)&W32[ (1 << (N-i-1)) * (lane%size) * NWORDS_256BIT]);
+    logInfoBigNumberTid(1,"Root : \n",(uint32_t *)&W32[ (1 << (N-i-1)) * (lane%size) * NOWRDS_FR]);
 }
 
 /*
@@ -1495,7 +1495,7 @@ __device__ void ifftN_dit(uint32_t *z, uint32_t *x, const uint32_t *IW32, uint32
   int tid = threadIdx.x + blockDim.x * blockIdx.x;
   uint32_t otherX[] = {0,0,0,0,0,0,0,0};
   uint32_t thisX[] = {0,0,0,0,0,0,0,0};
-  uint32_t const *inv_scaler = &IW32_nroots_ct[(N-1)*NWORDS_256BIT];
+  uint32_t const *inv_scaler = &IW32_nroots_ct[(N-1)*NOWRDS_FR];
   uint32_t lane = threadIdx.x % warpSize;
   uint32_t i, size, root_idx;
   int debug_tidx=-1;
@@ -1513,7 +1513,7 @@ __device__ void ifftN_dit(uint32_t *z, uint32_t *x, const uint32_t *IW32, uint32
   #pragma unroll
   for (i=1; i < N ; i++){
     size = 1 << i;    // size = 2,4,8,16
-    root_idx = ((1<< (N-i-1)) * (lane%size) * NWORDS_256BIT) << (ZPOLY_FFT_32 - N);
+    root_idx = ((1<< (N-i-1)) * (lane%size) * NOWRDS_FR) << (ZPOLY_FFT_32 - N);
 
     if (lane % (size << 1) >= size){  
        mulmontu256(thisX, thisX, &IW32[root_idx], midx);
