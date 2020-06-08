@@ -29,6 +29,8 @@
 
 #include <stdio.h>
 #include <omp.h>
+#include <sys/stat.h>
+#include <sys/sysinfo.h>
 
 #include "types.h"
 #include "constants.h"
@@ -212,7 +214,7 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
            fread(&samples[r1cs_val_offset+j], 1, 1, ifp); 
         }
         offset-=(tmp_word + sizeof(char) + sizeof(uint32_t));
-        r1cs_val_offset += NWORDS_256BIT;
+        r1cs_val_offset += NWORDS_FR;
       }
       r1cs_coeff_offset = r1cs_val_offset;
 
@@ -388,7 +390,7 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
         fread(&samples[r1cs_val_offset], sizeof(uint32_t), tmp_word, ifp); 
         //}
         offset-=36;
-        r1cs_val_offset += NWORDS_256BIT;
+        r1cs_val_offset += NWORDS_FR;
       }
       r1cs_coeff_offset = r1cs_val_offset;
 
@@ -529,20 +531,33 @@ void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize
   fclose(ifp);
 }
 
+void getDataFileSize(t_uint64 *nwords , const char *filename)
+{
+  struct stat st;
+  stat(filename, &st);
+
+  *nwords = st.st_size/sizeof(uint32_t);
+}
+
+void readDataFile(uint32_t *samples, const char *filename)
+{
+  t_uint64 nwords;
+  getDataFileSize(&nwords, filename);
+
+  FILE *ifp = fopen(filename,"rb");
+ 
+  fread(samples,sizeof(uint32_t),nwords,ifp);
+
+  fclose(ifp);
+
+}
+
 void readU256DataFileFromOffset_h(uint32_t *samples, const char *filename, t_uint64 woffset, t_uint64 nwords)
 {
   FILE *ifp = fopen(filename,"rb");
 
   fseek(ifp, woffset * sizeof(uint32_t), SEEK_SET);
   fread(samples,sizeof(uint32_t),nwords,ifp);
-
-  /*
-  printf("Offset : %ld, Nwords : %d\n",woffset, nwords);
-  printU256Number(&samples[0]);
-  printU256Number(&samples[NWORDS_256BIT]);
-  printU256Number(&samples[2*NWORDS_256BIT]);
-  printU256Number(&samples[3*NWORDS_256BIT]);
-  */
 
   fclose(ifp);
 
@@ -554,7 +569,7 @@ void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt,  c
   uint32_t wsize;
   uint32_t wmore;
   uint32_t nwords32;
-  uint32_t r[NWORDS_256BIT];
+  uint32_t r[NWORDS_FR];
   FILE *ifp = fopen(filename,"rb");
   
 
@@ -567,17 +582,17 @@ void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt,  c
 
 #if 0
   for (i=0;i<inlen; i++){
-    fread(&samples[i*NWORDS_256BIT],sizeof(uint32_t),NWORDS_256BIT,ifp);
+    fread(&samples[i*NWORDS_256BIT],sizeof(uint32_t),NWORDS_FR,ifp);
   }
 #else
-    fread(samples,sizeof(uint32_t)*NWORDS_256BIT,inlen,ifp);
+    fread(samples,sizeof(uint32_t)*NWORDS_FR,inlen,ifp);
 #endif
   
   fclose(ifp);
 }
 void writeWitnessFile_h(uint32_t *samples, const char *filename, const unsigned long long nwords)
 {
-  uint32_t wsize = NWORDS_256BIT;
+  uint32_t wsize = NWORDS_FR;
   uint32_t wmore = 0;
   FILE *ifp = fopen(filename,"wb");
 
@@ -587,7 +602,7 @@ void writeWitnessFile_h(uint32_t *samples, const char *filename, const unsigned 
 
   fseek(ifp, WITNESS_HEADER_LEN_NWORDS * sizeof(uint32_t), SEEK_SET);
 
-  fwrite(samples, sizeof(uint32_t), nwords*NWORDS_256BIT, ifp); 
+  fwrite(samples, sizeof(uint32_t), nwords*NWORDS_FR, ifp); 
 
 }
 

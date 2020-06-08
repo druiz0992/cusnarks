@@ -35,6 +35,7 @@
 #define _CONSTANTS_H_
 
 const uint32_t * CusnarksOffsetGet();
+const uint32_t   CusnarksPSizeGet(mod_t type);
 const uint32_t * CusnarksPGet(mod_t type);
 const uint32_t * CusnarksR2Get(mod_t type);
 const uint32_t * CusnarksNPGet(mod_t type);

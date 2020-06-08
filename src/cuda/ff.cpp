@@ -227,7 +227,7 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
   #ifndef _CASM
   int i, j;
   t_uint64 S, C, C1, C2, C3=0, M[2], X[2], carry;
-  uint32_t T[NWORDS_256BIT_FIOS+1];
+  uint32_t T[NWORDS_FP+4];
   const uint32_t *NPrime = CusnarksNPGet((mod_t)pidx);
   const uint32_t *N = CusnarksPGet((mod_t)pidx);
 
@@ -237,10 +237,11 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
   const t_uint64 *dNP = (t_uint64 *)NPrime;
   const t_uint64 *dN = (t_uint64 *)N;
   t_uint64 *dT = (t_uint64 *)T;
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
-  memset(T, 0, sizeof(uint32_t)*(NWORDS_256BIT_FIOS+1));
+  memset(T, 0, sizeof(uint32_t)*(NWORDS_FP+4));
 
-  for(i=0; i<NWORDS_256BIT/2; i++) {
+  for(i=0; i<PSize/2; i++) {
     // (C,S) = t[0] + a[0]*b[i], worst case 2 words
     mulu64_h(X, &dA[0], &dB[i]); // X[Upper,Lower] = a[0]*b[i]
     C = addu64_h(&S, dT+0, X+0); // [C,S] = t[0] + X[Lower]
@@ -258,7 +259,7 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
     C = addu64_h(&S, &S, X+0); // [C,S] = S + X[Lower]
     addu64_h(&C, &C, X+1);  // [~,C] = C + X[Upper]
 
-    for(j=1; j<NWORDS_256BIT/2; j++) {
+    for(j=1; j<PSize/2; j++) {
       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
       mulu64_h(X,&dA[j], &dB[i]);   // X[Upper,Lower] = a[j]*b[i], double precision
       C1 = addu64_h(&S, dT+j, &C);  // (C1,S) = t[j] + C
@@ -278,17 +279,17 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
     }
 
     // (C,S) = t[s] + C
-    C = addu64_h(&dT[NWORDS_256BIT/2-1], dT+NWORDS_256BIT/2, &C);
-    addu64_h(dT+NWORDS_256BIT/2, dT+NWORDS_256BIT/2+1, &C);
-    dT[NWORDS_256BIT/2+1] = 0;
+    C = addu64_h(&dT[PSize/2-1], dT+PSize/2, &C);
+    addu64_h(dT+PSize/2, dT+PSize/2+1, &C);
+    dT[PSize/2+1] = 0;
   }
 
   /* Step 3: if(u>=n) return u-n else return u */
-  if(compu256_h(T, N) >= 0) {
-    subu256_h(T, (const uint32_t *)T, N);
+  if(compuBI_h(T, N, PSize) >= 0) {
+    subuBI_h(T, (const uint32_t *)T, N, PSize);
   }
 
-  memcpy(U, T, sizeof(uint32_t)*NWORDS_256BIT);
+  memcpy(U, T, sizeof(uint32_t)*PSize);
 
  #else
     if (pidx == MOD_FP ){
@@ -301,33 +302,34 @@ void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx
 
 void montmult_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
-  uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
-  uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
+  uint32_t t0[NWORDS_FP], t1[NWORDS_FP];
+  uint32_t t2[NWORDS_FP], t3[NWORDS_FP];
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
  #ifndef _CASM
   montmult_h(t0,x,y,pidx);
-  montmult_h(t1,&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
+  montmult_h(t1,&x[PSize],&y[PSize],pidx);
 
-  addm_h(t2,x,&x[NWORDS_256BIT],pidx);
-  addm_h(t3,y,&y[NWORDS_256BIT],pidx);
+  addm_h(t2,x,&x[PSize],pidx);
+  addm_h(t3,y,&y[PSize],pidx);
   montmult_h(t2,t2,t3,pidx);
   subm_h(z,t0,t1,pidx);
-  addm_h(&z[NWORDS_256BIT],t0,t1,pidx);
-  subm_h(&z[NWORDS_256BIT],t2,&z[NWORDS_256BIT],pidx);
+  addm_h(&z[PSize],t0,t1,pidx);
+  subm_h(&z[PSize],t2,&z[PSize],pidx);
  #else
   t_subm subm_cb = getcb_subm_h(pidx);
   t_addm addm_cb = getcb_addm_h(pidx);
   t_mulm mulm_cb = getcb_mulm_h(pidx);
  
   mulm_cb(t0,x,y);
-  mulm_cb(t1,&x[NWORDS_256BIT],&y[NWORDS_256BIT]);
+  mulm_cb(t1,&x[PSize],&y[PSize]);
 
-  addm_cb(t2,x,&x[NWORDS_256BIT]);
-  addm_cb(t3,y,&y[NWORDS_256BIT]);
+  addm_cb(t2,x,&x[PSize]);
+  addm_cb(t3,y,&y[PSize]);
   mulm_cb(t2,t2,t3);
   subm_cb(z,t0,t1);
-  addm_cb(&z[NWORDS_256BIT],t0,t1);
-  subm_cb(&z[NWORDS_256BIT],t2,&z[NWORDS_256BIT]);
+  addm_cb(&z[PSize],t0,t1);
+  subm_cb(&z[PSize],t2,&z[PSize]);
  #endif
   
 }
@@ -348,11 +350,12 @@ void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 
 void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 {
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
   #ifndef _CASM
     montmult_ext_h(U,A,A,pidx);
   #else
-    uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
-    uint32_t t2[NWORDS_256BIT], t3[NWORDS_256BIT];
+    uint32_t t0[NWORDS_FP], t1[NWORDS_FP];
+    uint32_t t2[NWORDS_FP], t3[NWORDS_FP];
     void (*subm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fr_rawSub;
     void (*addm_cb)(uint32_t *, const uint32_t *, const uint32_t *) = &Fr_rawAdd;
     void (*sqm_cb)(uint32_t *, const uint32_t *) = &Fr_rawMSquare;
@@ -363,13 +366,13 @@ void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
      sqm_cb = &Fp_rawMSquare;
     } 
     sqm_cb(t0,A);
-    sqm_cb(t1,&A[NWORDS_256BIT]);
+    sqm_cb(t1,&A[PSize]);
 
-    addm_cb(t2,A,&A[NWORDS_256BIT]);
+    addm_cb(t2,A,&A[PSize]);
     sqm_cb(t2,t2);
     subm_cb(U,t0,t1);
-    addm_cb(&U[NWORDS_256BIT],t0,t1);
-    subm_cb(&U[NWORDS_256BIT],t2,&U[NWORDS_256BIT]);
+    addm_cb(&U[PSize],t0,t1);
+    subm_cb(&U[PSize],t2,&U[PSize]);
     
   #endif
 }
@@ -377,23 +380,25 @@ void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx)
 void montmultN_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx)
 {
   uint32_t i;
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0; i<n; i++){
-     montmult_h(&U[i*NWORDS_256BIT], &A[i*NWORDS_256BIT], &B[i*NWORDS_256BIT], pidx);
+     montmult_h(&U[i*PSize], &A[i*PSize], &B[i*PSize], pidx);
   }
 }
 void montmultN_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t n, uint32_t pidx)
 {
   uint32_t i;
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for (i=0; i<n; i++){
-     montmult_ext_h(&U[2*i*NWORDS_256BIT], &A[2*i*NWORDS_256BIT], &B[2*i*NWORDS_256BIT], pidx);
+     montmult_ext_h(&U[2*i*PSize], &A[2*i*PSize], &B[2*i*PSize], pidx);
   }
 }
 
@@ -416,13 +421,14 @@ void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
 void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last)
 {
   uint32_t i;
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
   if (!strip_last){
     #ifndef TEST_MODE
       #pragma omp parallel for if(parallelism_enabled)
     #endif
     for(i=0; i<n;i++){
-      from_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+      from_montgomery_h(&z[i*PSize], &x[i*PSize], pidx);
     }
   } else if (strip_last == 1) {
     #ifndef TEST_MODE
@@ -431,7 +437,7 @@ void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pid
     for(i=0; i<n;i++){
       int rem = i%3;
       if (rem != 2){
-         from_montgomery_h(&z[(2*(i/3)+rem)*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+         from_montgomery_h(&z[(2*(i/3)+rem)*PSize], &x[i*PSize], pidx);
       }
       
     }
@@ -442,7 +448,7 @@ void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pid
     for(i=0; i<n;i++){
       int rem = i%6;
       if (rem < 4){
-        from_montgomery_h(&z[(4*(i/6)+rem)*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+        from_montgomery_h(&z[(4*(i/6)+rem)*PSize], &x[i*PSize], pidx);
       }
     }
   }
@@ -456,12 +462,12 @@ void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pid
    uint32_t *p       : If different from null, samples will be less than p (p is a 256 bit number)
    
 */
-void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
+void setRandomBI(uint32_t *x, const uint32_t nsamples, const uint32_t *p, const uint32_t biSize)
 {
   int j;
   _RNG* rng = _RNG::get_instance(x[0]);
 
-  memset(x,0,NWORDS_256BIT*sizeof(uint32_t)*nsamples);
+  memset(x,0,biSize*sizeof(uint32_t)*nsamples);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
@@ -472,30 +478,31 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, const uint32_t *p)
     rng->randu32(&nwords,1);
     rng->randu32(&nbits,1);
 
-    nwords %= NWORDS_256BIT;
-    nbits %= 32;
+    nwords %= biSize;
+    nbits %= NBITS_WORD; 
 
-    rng->randu32(&x[j*NWORDS_256BIT],nwords+1); 
+    rng->randu32(&x[j*biSize],nwords+1); 
 
-    x[j*NWORDS_256BIT+nwords] &= ((1 << nbits)-1);
-    if ((p!= NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
+    x[j*biSize+nwords] &= ((1 << nbits)-1);
+    if ((p!= NULL) && (nwords==biSize-1) && (compuBI_h(&x[j*biSize], p, biSize) >= 0)){
          do{
-           subu256_h(&x[j*NWORDS_256BIT], p);
-         }while(compu256_h(&x[j*NWORDS_256BIT],p) >=0);
+           subuBI_h(&x[j*biSize], p, biSize);
+         }while(compuBI_h(&x[j*biSize],p, biSize) >=0);
     }
   }
 }
-void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p)
+
+void setRandomBI(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p, const uint32_t biSize)
 {
   int j;
   _RNG* rng = _RNG::get_instance(x[0]);
 
-  memset(x,0,NWORDS_256BIT*sizeof(uint32_t)*nsamples);
+  memset(x,0,biSize*sizeof(uint32_t)*nsamples);
   if (min_nwords == -1){
 	  min_nwords = 0;
   }
   if (max_nwords == -1){
-	  max_nwords = NWORDS_256BIT - 1;
+	  max_nwords =biSize - 1;
   }
 
   /*
@@ -508,20 +515,20 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int3
     uint32_t nbits;
     do {
       rng->randu32(&nwords,1);
-      nwords %= NWORDS_256BIT;
+      nwords %= biSize;
 
     }while(nwords < min_nwords || nwords > max_nwords);
 
     rng->randu32(&nbits,1);
 
-    nbits %= 32;
+    nbits %= NBITS_WORD;
 
-    rng->randu32(&x[j*NWORDS_256BIT],nwords+1); 
-    x[j*NWORDS_256BIT+nwords] &= ((1 << nbits)-1);
-    if ((p!= NULL) && (nwords==NWORDS_256BIT-1) && (compu256_h(&x[j*NWORDS_256BIT], p) >= 0)){
+    rng->randu32(&x[j*biSize],nwords+1); 
+    x[j*biSize+nwords] &= ((1 << nbits)-1);
+    if ((p!= NULL) && (nwords==biSize-1) && (compuBI_h(&x[j*biSize], p, biSize) >= 0)){
          do{
-           subu256_h(&x[j*NWORDS_256BIT], p);
-         }while(compu256_h(&x[j*NWORDS_256BIT],p) >=0);
+           subuBI_h(&x[j*biSize], p, biSize);
+         }while(compuBI_h(&x[j*biSize],p, biSize) >=0);
     }
   }
 }
@@ -536,19 +543,19 @@ void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int3
    uint32_t inc      : sample increment 
    uint32_t *mod     : if different from NULL, it is maximum sample value. If generation reaches this value, it will go back to 0.  
 */
-void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc, const uint32_t *mod)
+void rangeuBI_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc, const uint32_t *mod, const uint32_t biSize)
 {
    uint32_t i;
    uint32_t _inc[] = {inc,0,0,0,0,0,0,0};
 
-   memcpy(samples,start,sizeof(uint32_t)*NWORDS_256BIT);
+   memcpy(samples,start,sizeof(uint32_t)*biSize);
 
    for (i=1; i < nsamples; i++){
-     addu256_h(&samples[i*NWORDS_256BIT], &samples[(i-1)*NWORDS_256BIT], _inc);
-     if ((mod != NULL) && (compu256_h(&samples[i*NWORDS_256BIT], mod) >= 0)){
+     adduBI_h(&samples[i*biSize], &samples[(i-1)*biSize], _inc, biSize);
+     if ((mod != NULL) && (compuBI_h(&samples[i*biSize], mod, biSize) >= 0)){
          do{
-           subu256_h(&samples[i*NWORDS_256BIT], mod);
-         }while(compu256_h(&samples[i*NWORDS_256BIT],mod) >=0);
+           subuBI_h(&samples[i*biSize], mod, biSize);
+         }while(compuBI_h(&samples[i*biSize],mod, biSize) >=0);
      }
    }
 }
@@ -571,12 +578,13 @@ void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
 void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
 {
   uint32_t i;
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
   for(i=0; i<n;i++){
-    to_montgomery_h(&z[i*NWORDS_256BIT], &x[i*NWORDS_256BIT], pidx);
+    to_montgomery_h(&z[i*PSize], &x[i*PSize], pidx);
   }
 }
 
@@ -592,11 +600,11 @@ void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
    #ifndef _CASM
-   //uint32_t tmp[NWORDS_256BIT];
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
-   addu256_h(z, x, y);
-   if(compu256_h(z, N) >= 0) {
-      subu256_h(z, z, N);
+   const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
+   adduBI_h(z, x, y, PSize);
+   if(compuBI_h(z, N, PSize) >= 0) {
+      subuBI_h(z, z, N, PSize);
    }
    #else
     if (pidx == MOD_FP ){
@@ -607,13 +615,14 @@ void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 	
    #endif
 
-   //memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
 }
 
 void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
+   const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
+
    addm_h(z,x,y,pidx);
-   addm_h(&z[NWORDS_256BIT],&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
+   addm_h(&z[PSize],&x[PSize],&y[PSize],pidx);
 }
 /*
   modular substraction of 256 bit numbers : Z = X - Y mod P
@@ -627,14 +636,13 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
   #ifndef _CASM
    const uint32_t *N = CusnarksPGet((mod_t)pidx);
+   const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
-   subu256_h(z, x, y);
-   //if(compu256_h(z, N) >= 0) {
-   if(z[NWORDS_256BIT-1] > N[NWORDS_256BIT-1]){
-       addu256_h(z, z, N);
+   subuBI_h(z, x, y, PSize);
+   if(z[PSize-1] > N[PSize-1]){
+       adduBI_h(z, z, N, PSize);
    }
 
-   //memcpy(z, tmp, sizeof(uint32_t)*NWORDS_256BIT);
   #else
     if (pidx == MOD_FP ){
        Fp_rawSub(z, x, y);
@@ -645,8 +653,9 @@ void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 }
 void subm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
+   const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
    subm_h(z,x,y,pidx);
-   subm_h(&z[NWORDS_256BIT],&x[NWORDS_256BIT],&y[NWORDS_256BIT],pidx);
+   subm_h(&z[PSize],&x[PSize],&y[PSize],pidx);
 }
 
 
@@ -658,31 +667,36 @@ void subm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
 void montinv_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
 {
    uint32_t k;
-   uint32_t t[] = {1,0,0,0,0,0,0,0};
+   FP_INIT_ARRONE(t);
+   const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
    almmontinv_h(y,&k, x, pidx);
-   if ( k <= NWORDS_256BIT*NBITS_WORD){
+   if ( k <= PSize*NBITS_WORD){
       to_montgomery_h(y,y,pidx);
-      k+=NWORDS_256BIT*NBITS_WORD;
+      k+=PSize*NBITS_WORD;
    }
-   shllu256_h(t,t,2 * NWORDS_256BIT * NBITS_WORD - k);
+   shlluBI_h(t,t,2 * PSize * NBITS_WORD - k, PSize);
    to_montgomery_h(t,t,pidx);
    montmult_h(y, y,t,pidx);
 }
+
 void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
 {
   const uint32_t *P = CusnarksPGet((mod_t)pidx);
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
-  uint32_t u[NWORDS_256BIT], v[NWORDS_256BIT];
-  uint32_t s[] = {1,0,0,0,0,0,0,0};
-  uint32_t r1[] = {0,0,0,0,0,0,0,0};
+  uint32_t u[NWORDS_FP], v[NWORDS_FP];
+  FP_INIT_ARRONE(s);
+  FP_INIT_ARRZERO(r1);
+  FP_INIT_ARRZERO(zero);
+  //uint32_t s[] = {1,0,0,0,0,0,0,0};
+  //uint32_t r1[] = {0,0,0,0,0,0,0,0};
+  //uint32_t zero[] = {0,0,0,0,0,0,0,0};
   uint32_t i = 0;
   uint32_t t0,t1,t2,t3;
-  uint32_t tmp[NWORDS_256BIT];
-  uint32_t zero[] = {0,0,0,0,0,0,0,0};
 
-  memcpy(u,P,NWORDS_256BIT*sizeof(uint32_t));
-  memcpy(v,a,NWORDS_256BIT*sizeof(uint32_t));
+  memcpy(u,P,PSize*sizeof(uint32_t));
+  memcpy(v,a,PSize*sizeof(uint32_t));
   *k = 0;
 
   //Phase 1 - ALmost inverse r = a^(-1) * 2 ^k, n<=k<=2n
@@ -691,47 +705,48 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
   // s is  1     
   // r1 is 0
 
-  while(compu256_h(v,zero) != 0){
-     if (getbitu256_h(u,0) == 0){
-        shlru256_h(u,u,1);
-        shllu256_h(s,s,1);
-     } else if (getbitu256_h(v,0) == 0){
-        shlru256_h(v,v,1);
-        shllu256_h(r1,r1,1);
-     } else if (compu256_h(u,v) > 0) {
-        subu256_h(u,v);
-        shlru256_h(u,u,1);
-        addu256_h(r1,s);
-        shllu256_h(s,s,1);
+  while(compuBI_h(v,zero, PSize) != 0){
+     if (getbituBI_h(u,0) == 0){
+        shlruBI_h(u,u,1, PSize);
+        shlluBI_h(s,s,1, PSize);
+     } else if (getbituBI_h(v,0) == 0){
+        shlruBI_h(v,v,1, PSize);
+        shlluBI_h(r1,r1,1, PSize);
+     } else if (compuBI_h(u,v, PSize) > 0) {
+        subuBI_h(u,v, PSize);
+        shlruBI_h(u,u,1, PSize);
+        adduBI_h(r1,s, PSize);
+        shlluBI_h(s,s,1, PSize);
      } else {
-        subu256_h(v,u);
-        shlru256_h(v,v,1);
-        addu256_h(s,r1);
-        shllu256_h(r1,r1,1);
+        subuBI_h(v,u, PSize);
+        shlruBI_h(v,v,1, PSize);
+        adduBI_h(s,r1, PSize);
+        shlluBI_h(r1,r1,1, PSize);
      }
      (*k)++;
   }
   
-  if (compu256_h(r1,P) >= 0){
-      subu256_h(r1,P);
+  if (compuBI_h(r1,P, PSize) >= 0){
+      subuBI_h(r1,P, PSize);
   }
-  subu256_h(r, (uint32_t *)P,r1);
-  uint32_t  tmp_msb = msbu256_h(a); 
+  subuBI_h(r, (uint32_t *)P,r1, PSize);
+  uint32_t  tmp_msb = msbuBI_h(a, PSize); 
 }
 
 void montinv_ext_h(uint32_t *y, uint32_t *x,  uint32_t pidx)
 {
-  uint32_t t0[NWORDS_256BIT], t1[NWORDS_256BIT];
+  uint32_t t0[NWORDS_FP], t1[NWORDS_FP];
   const uint32_t *Zero = CusnarksZeroGet((mod_t)pidx);
+  const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
   montsquare_h(t0,x,pidx);
-  montsquare_h(t1,&x[NWORDS_256BIT], pidx);
+  montsquare_h(t1,&x[PSize], pidx);
   addm_h(t0,t0,t1,pidx);
   montinv_h(t0,t0,pidx);
   
   montmult_h(y,x,t0,pidx);
-  montmult_h(&y[NWORDS_256BIT],&x[NWORDS_256BIT],t0,pidx);
-  subm_h(&y[NWORDS_256BIT],Zero,&y[NWORDS_256BIT],pidx);
+  montmult_h(&y[PSize],&x[PSize],t0,pidx);
+  subm_h(&y[PSize],Zero,&y[PSize],pidx);
 }
 
 

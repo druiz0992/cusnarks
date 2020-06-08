@@ -129,6 +129,11 @@ static uint32_t  mod_offset[] {
   NWORDS_FP + NWORDS_FR
 };
 
+static uint32_t  Psize[] {
+  NWORDS_FP,
+  NWORDS_FR
+};
+
 static uint32_t misc_const_init[] = {
   //One G2 Reduced
   <FP_One2_rdc>,
@@ -174,15 +179,15 @@ void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots)
       #pragma omp parallel for if(parallelism_enabled)
     #endif
     for(i=1; i<nroots/2; i++){
-      swapu256_h(&iroots[i*NWORDS_256BIT], &roots[(nroots-i)*NWORDS_256BIT]);
+      swapuBI_h(&iroots[i*NWORDS_FR], &roots[(nroots-i)*NWORDS_FR], NWORDS_FR);
     }
   } else {
-    memcpy(iroots, roots,NWORDS_256BIT*sizeof(uint32_t));
+    memcpy(iroots, roots,NWORDS_FR*sizeof(uint32_t));
     #ifndef TEST_MODE
       #pragma omp parallel for if(parallelism_enabled)
     #endif
     for (i=1; i<nroots; i++){
-      memcpy(&iroots[i*NWORDS_256BIT], &roots[(nroots-i)*NWORDS_256BIT],NWORDS_256BIT*sizeof(uint32_t));
+      memcpy(&iroots[i*NWORDS_FR], &roots[(nroots-i)*NWORDS_FR],NWORDS_FR*sizeof(uint32_t));
     }
   }
 }
@@ -192,6 +197,12 @@ const uint32_t *CusnarksOffsetGet()
 {
   return mod_offset;
 }
+
+const uint32_t CusnarksPSizeGet(mod_t type)
+{
+  return Psize[type];
+}
+
 const uint32_t * CusnarksPGet(mod_t type)
 {
   return &N[mod_offset[type]];
@@ -331,7 +342,7 @@ const uint32_t * CusnarksIW32NRootsGet(void)
 
 const uint32_t *CusnarksPrimitiveRootsFieldGet(uint32_t nbits)
 {
-  return &proots_field[nbits*NWORDS_256BIT];
+  return &proots_field[nbits*NWORDS_FR];
 }
 
 uint32_t CusnarksGetNRoots(void)

@@ -168,6 +168,7 @@ cdef extern from "types.h":
     uint32_t max_threads
     uint32_t thread_id
     uint32_t pidx
+    uint32_t ncoeff
 
   ctypedef struct ntt_interpolandmul_t:
     uint32_t *A

@@ -46,8 +46,49 @@ static  uint32_t parallelism_enabled =  1;
 static  uint32_t parallelism_enabled =  0;
 #endif
 
+void mpoly_addm(void *args);
 
 static  pthread_cond_t utils_cond;        
+
+/*
+static uint32_t **utils_mpoly;
+
+void mpoly_addm(void *args)
+{
+  mpoly_eval_t *wargs = (mpoly_eval_t *)args;
+  t_addm addm_cb =  getcb_addm_h(wargs->pidx);
+  uint32_t *pout = wargs->pout;
+
+  printf("N coeff : %d, Max threads : %d, Pidx : %d\n", wargs->ncoeff, wargs->max_threads, wargs->pidx);
+
+  for (uint32_t i=0; i <wargs->ncoeff; i++){
+     for (uint32_t j=1; j < wargs->max_threads; j++){
+       uint32_t *pout2 = utils_mpoly[j];
+       addm_cb(&pout[i*NWORDS_FR], &pout[i*NWORDS_FR], &pout2[i*NWORDS_FR]);
+     }
+  }
+}
+
+
+void mpoly_init_h(uint32_t nroots)
+{
+  uint32_t nprocs = get_nprocs_h();
+
+  utils_mpoly = (uint32_t **) malloc(nprocs * sizeof(uint32_t *));
+  for (uint32_t i=1; i < nprocs; i++){
+    utils_mpoly[i] = (uint32_t *) malloc((t_uint64) (nroots/2 ) * NWORDS_FR * sizeof(uint32_t)); 
+  }
+}
+
+void mpoly_free_h()
+{
+  uint32_t nprocs = get_nprocs_h();
+  for (uint32_t i=1; i < nprocs; i++){
+    free(utils_mpoly[i]);
+ }
+ free(utils_mpoly);
+}
+*/
 
 /*
    Launch server to evaluate Mpolys. Several threads interact
@@ -88,6 +129,7 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
    
   pthread_t *workers = (pthread_t *) malloc(nthreads * sizeof(pthread_t));
   mpoly_eval_t *w_args  = (mpoly_eval_t *)malloc(nthreads * sizeof(mpoly_eval_t));
+  init_barrier_h(args->max_threads);
 
   
   //printf ("Creating  %d threads, with %d vars per thread. Start idx: %d, Last idx %d\n",
@@ -96,6 +138,11 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   for(i=0; i< nthreads; i++){
      start_idx = i * vars_per_thread;
      last_idx = (i+1) * vars_per_thread;
+     /*
+     if (i > 0){
+        memset(utils_mpoly[i], 0, sizeof(uint32_t) * (1ull << CusnarksGetNRoots()));
+     }
+     */
      if ( (i == nthreads - 1) && (last_idx != nvars) ){
          last_idx = nvars;
      }
@@ -116,6 +163,7 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   for (i=0; i < nthreads; i++){
     pthread_join(workers[i], NULL);
   }
+  del_barrier_h();
 
   free(workers);
   free(w_args);
@@ -129,11 +177,17 @@ void *mpoly_eval_h(void *vargs)
   t_uint64 zcoeff_d_offset = 1 + n_zpoly;
   t_uint64 zcoeff_v_offset;
   t_uint64 n_zcoeff;
-  uint32_t scl[NWORDS_256BIT];
+  uint32_t scl[NWORDS_FR];
   t_uint64 i,j;
-  uint32_t zcoeff_v_in[NWORDS_256BIT], *zcoeff_v_out;
+  uint32_t zcoeff_v_in[NWORDS_FR], *zcoeff_v_out;
   t_uint64 zcoeff_d;
   t_uint64 accum_n_zcoeff=0;
+  uint32_t *pout= args->pout;
+  /*
+  if (args->thread_id != 0) {
+    pout= utils_mpoly[args->thread_id];
+  } 
+  */
 
   t_addm addm_cb =  getcb_addm_h(args->pidx);
   t_mulm mulm_cb =  getcb_mulm_h(args->pidx);
@@ -146,10 +200,10 @@ void *mpoly_eval_h(void *vargs)
     accum_n_zcoeff += (t_uint64) args->pin[i+1];
   }
  
-  zcoeff_d_offset = accum_n_zcoeff*(NWORDS_256BIT+1) +1 + n_zpoly;
+  zcoeff_d_offset = accum_n_zcoeff*(NWORDS_FR+1) +1 + n_zpoly;
 
   for (i=args->start_idx; i<args->last_idx; i++){
-    tom_cb(scl, &args->scalar[i*NWORDS_256BIT]);
+    tom_cb(scl, &args->scalar[i*NWORDS_FR]);
     n_zcoeff = (t_uint64) args->pin[1+i];
     accum_n_zcoeff += n_zcoeff;   
  
@@ -157,12 +211,13 @@ void *mpoly_eval_h(void *vargs)
 
     for (j=0; j< n_zcoeff; j++){
        zcoeff_d = (t_uint64) args->pin[zcoeff_d_offset+j];
-       zcoeff_v_out = &args->pout[zcoeff_d*NWORDS_256BIT];
-       mulm_cb(zcoeff_v_in, &args->pin[zcoeff_v_offset+j*NWORDS_256BIT], scl);
+       zcoeff_v_out = &pout[zcoeff_d*NWORDS_FR];
+       mulm_cb(zcoeff_v_in, &args->pin[zcoeff_v_offset+j*NWORDS_FR], scl);
        addm_cb(zcoeff_v_out, zcoeff_v_out, zcoeff_v_in);
     }
-    zcoeff_d_offset = accum_n_zcoeff*(NWORDS_256BIT+1) +1 + n_zpoly;
+    zcoeff_d_offset = accum_n_zcoeff*(NWORDS_FR+1) +1 + n_zpoly;
   }
+  //wait_h(args->thread_id, mpoly_addm, args);
 
   return NULL;
 }
@@ -181,7 +236,7 @@ void r1cs_to_mpoly_len_h(uint32_t *coeff_len, uint32_t *cin, cirbin_hfile_t *hea
        poly_idx = cin[const_offset+j];
        coeff_len[poly_idx]++;
      }
-     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
+     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_FR+1));
      prev_n_coeff = n_coeff;
   }
 
@@ -215,8 +270,8 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
   cum_v_poly[0] = pout[0] + pout[1];
 
   for (i=1; i < header->nVars+1;i++){
-    cum_c_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_c_poly[i-1];
-    //cum_v_poly[i] = pout[i] * (NWORDS_256BIT+1) + cum_v_poly[i-1];
+    cum_c_poly[i] = pout[i] * (NWORDS_FR+1) + cum_c_poly[i-1];
+    //cum_v_poly[i] = pout[i] * (NWORDS_FR+1) + cum_v_poly[i-1];
     cum_v_poly[i] = cum_c_poly[i] + pout[i+1];
 
   }
@@ -232,14 +287,14 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
        coeff_idx = tmp_poly[poly_idx]++;
        pout[cum_c_poly[poly_idx]+coeff_idx+1]=i;
        if (to_mont){
-         to_montgomery_h(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT],
+         to_montgomery_h(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_FR],
                          &cin[coeff_offset], pidx);
        } else {
-         memcpy(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_256BIT], &cin[coeff_offset] ,NWORDS_256BIT * sizeof(uint32_t));
+         memcpy(&pout[cum_v_poly[poly_idx]+1+coeff_idx*NWORDS_FR], &cin[coeff_offset] ,NWORDS_FR * sizeof(uint32_t));
        }
-       coeff_offset += NWORDS_256BIT;
+       coeff_offset += NWORDS_FR;
      }
-     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_256BIT+1));
+     const_offset += ((n_coeff - prev_n_coeff) * (NWORDS_FR+1));
      prev_n_coeff = n_coeff;
   }
 
@@ -247,7 +302,7 @@ void r1cs_to_mpoly_h(uint32_t *pout, uint32_t *cin, cirbin_hfile_t *header, uint
     for (i=0; i < header->nPubInputs + header->nOutputs + 1; i++){
        coeff_idx = tmp_poly[i]++;
        pout[cum_c_poly[i]+1+coeff_idx]=i + header->nConstraints;
-       memcpy(&pout[cum_v_poly[i]+1+coeff_idx*NWORDS_256BIT], One, sizeof(uint32_t)*NWORDS_256BIT);
+       memcpy(&pout[cum_v_poly[i]+1+coeff_idx*NWORDS_FR], One, sizeof(uint32_t)*NWORDS_FR);
     }
   }
   //TODO
@@ -271,7 +326,7 @@ void mpoly_from_montgomery_h(uint32_t *x, uint32_t pidx)
   for (i=0; i < x[0];i++){
     offset += x[i+1];
     from_montgomeryN_h(&x[offset], &x[offset], x[i+1], pidx,0);
-    offset += (x[i+1]*NWORDS_256BIT);
+    offset += (x[i+1]*NWORDS_FR);
   }
 }
 
@@ -283,7 +338,7 @@ void mpoly_to_montgomery_h(uint32_t *x, uint32_t pidx)
   for (i=0; i < x[0];i++){
     offset += x[i+1];
     to_montgomeryN_h(&x[offset], &x[offset], x[i+1], pidx);
-    offset += (x[i+1]*NWORDS_256BIT);
+    offset += (x[i+1]*NWORDS_FR);
   }
 }
 

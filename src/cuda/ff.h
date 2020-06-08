@@ -41,9 +41,9 @@ void montmultN_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t
 void montmult_h2(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx);
 void montsquare_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
 void montsquare_ext_h(uint32_t *U, const uint32_t *A, uint32_t pidx);
-void setRandom256(uint32_t *x, uint32_t nsamples, const uint32_t *p);
-void setRandom256(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p);
-void rangeu256_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod);
+void setRandomBI(uint32_t *x, uint32_t nsamples, const uint32_t *p, const uint32_t biSize);
+void setRandomBI(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32_t max_nwords, const uint32_t *p, const uint32_t biSize);
+void rangeuBI_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, uint32_t inc,  const uint32_t *mod, const uint32_t biSize);
 void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);
 void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx);
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx);

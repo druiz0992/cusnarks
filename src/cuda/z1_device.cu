@@ -55,38 +55,38 @@ __device__ uint32_t * Z1_t::get2u256()
 
 __device__ uint32_t  * Z1_t::getu256(uint32_t offset)
 {
-    return &el[offset*NWORDS_256BIT];
+    return &el[offset*NWORDS_FP];
 }
 __device__ uint32_t  * Z1_t::getsingleu256(uint32_t offset)
 {
-    return &el[offset*NWORDS_256BIT];
+    return &el[offset*NWORDS_FP];
 }
 
 __device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
 { 
-   movu256(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
-   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
-   //memcpy(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[xoffset*NWORDS_FP],&y->el[yoffset*NWORDS_FP]);
+   movu256(&el[(xoffset+1)*NWORDS_FP],&y->el[(yoffset+1)*NWORDS_FP]);
+   movu256(&el[(xoffset+2)*NWORDS_FP],&y->el[(yoffset+2)*NWORDS_FP]);
+   //memcpy(&el[xoffset*NWORDS_FP],&y->el[yoffset*NWORDS_FP],ysize * NWORDS_FP * sizeof(uint32_t));
 }
 __device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
 { 
-    movu256(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
-    movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
-    movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
-    //memcpy(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
+    movu256(&el[xoffset*NWORDS_FP],&y[yoffset*NWORDS_FP]);
+    movu256(&el[(xoffset+1)*NWORDS_FP],&y[(yoffset+1)*NWORDS_FP]);
+    movu256(&el[(xoffset+2)*NWORDS_FP],&y[(yoffset+2)*NWORDS_FP]);
+    //memcpy(&el[xoffset*NWORDS_FP],&y[yoffset*NWORDS_FP],ysize * NWORDS_FP * sizeof(uint32_t));
 }
 __device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*NWORDS_FP],&y->el[(yoffset)*NWORDS_FP]);
 }
 __device__ void Z1_t::setsingleu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
 { 
-   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*NWORDS_FP],&y->el[(yoffset)*NWORDS_FP]);
 }
 __device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-   movu256(&el[(xoffset)*NWORDS_256BIT],&y[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*NWORDS_FP],&y[(yoffset)*NWORDS_FP]);
 }
 __device__ void Z1_t::assign(uint32_t *y)
 { 
@@ -184,8 +184,8 @@ __device__ void movz(uint32_t *y, uint32_t yoffset, Z1_t *x, uint32_t xoffset, u
   #pragma unroll
   for (i=0; i< size; i++){
     movu256(&y[yoffset],x->getu256(xoffset));
-    xoffset += NWORDS_256BIT;
-    yoffset += NWORDS_256BIT;
+    xoffset += NWORDS_FP;
+    yoffset += NWORDS_FP;
   }
 }
 

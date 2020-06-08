@@ -69,7 +69,7 @@ class CUSnarks {
 
         static uint32_t init_resources;
         void rand(uint32_t *samples, uint32_t n_samples);
-        void randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod);
+        void randuBI(uint32_t *samples, uint32_t n_samples, const uint32_t biSize, uint32_t *mod);
         void saveFile(uint32_t *samples, uint32_t n_samples, char *fname);
         double kernelLaunch(
 		vector_t *out_vector_host,

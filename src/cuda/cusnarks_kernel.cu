@@ -82,15 +82,15 @@ __constant__ uint32_t __align__ (16) G2Inf_ct[NWORDS_FP*6];
 
 // 32 roots of unitity of field prime (only first 16)
 
-__constant__ uint32_t W32_ct[NWORDS_256BIT * 16];
+__constant__ uint32_t W32_ct[NWORDS_FR * 16];
 
 // 32 inverse roots of unitity of field prime (only first 16)
 
-__constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
+__constant__ uint32_t IW32_ct[NWORDS_FR * 16];
 
 // During IFFT, I need to scale by inv(32). Below is the representation of 32 in Mongtgomery
 
-__constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];
+__constant__ uint32_t IW32_nroots_ct[NWORDS_FR * (FFT_SIZE_N - 1)];
 
 
 static  int deviceCount = 0;
@@ -323,12 +323,12 @@ void CUSnarks::rand(uint32_t *samples, uint32_t n_samples)
      setRandom(samples, n_samples * size_sample);
 }
 
-void CUSnarks::randu256(uint32_t *samples, uint32_t n_samples, uint32_t *mod=NULL)
+void CUSnarks::randuBI(uint32_t *samples, uint32_t n_samples, uint32_t biSize, uint32_t *mod=NULL)
 {
     //uint32_t size_sample = in_vector_device.size / (in_vector_device.length * sizeof(uint32_t));
     //rng->randu256(samples, n_samples * size_sample, 1);
     //rng->randu256(samples, n_samples, mod);
-    setRandom256(samples, n_samples,0,7, mod);
+    setRandomBI(samples, n_samples,0,7, mod, biSize);
 }
 
 void CUSnarks::saveFile(uint32_t *samples, uint32_t n_samples, char *fname)
