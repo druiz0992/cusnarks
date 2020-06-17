@@ -316,6 +316,9 @@ class GrothProver(object):
                 np.frombuffer(
                         self.roots_rdc_u256_sh,
                         dtype=np.uint32).reshape(( (1<< nroots) + (1 << nroots2) + (1 << nroots3), NWORDS_256BIT))
+          if nroots > self.n_bits_roots:
+               print("Insufficient precomputed roots... Aborting")
+               sys.exit(1)
           np.copyto(
                 self.roots_rdc_u256[:1<<nroots],
                 readU256DataFile_h(
@@ -1175,7 +1178,7 @@ class GrothProver(object):
         elif p_r:
           self.logger.info("Verification keys are different")
         elif pd_r:
-          self.logger.info("Proving keys are different")
+          self.logger.info("oroving keys are different")
         else:
           self.logger.info("Verification and Proving keys are different")
 

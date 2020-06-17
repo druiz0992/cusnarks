@@ -62,7 +62,7 @@ SNARKJS_PATH = $(AUX_PATH)/snarkjs
 SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
 
 RUST_CIRCOM_PATH = $(AUX_PATH)/za
-RUST_CIRCOM_REPO = http://github.com/druiz0992/za.git
+RUST_CIRCOM_REPO = http://github.com/iden3/za.git
 
 FFIASM_PATH = $(AUX_PATH)/ffiasm
 FFIASM_REPO = http://github.com/iden3/ffiasm.git
@@ -145,7 +145,7 @@ build:
 		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
 
 
-all: third_party_libs build
+all: third_party_libs config
 
 force_all: clean third_party_libs_clean all
 
@@ -174,7 +174,7 @@ ifeq ($(CUSNARKS_CURVE),"")
 	     read -p "Enter Curve <BN256 | BLS12381> " CURVE; \
 	     (cd ${CUSRC_PATH}; ./ff.sh $$CURVE; cd -;) 
 else
-	     (cd ${CUSRC_PATH}; ./ff.sh $($CUSNARKS_CURVE); cd -;) 
+	     (cd ${CUSRC_PATH}; ./ff.sh $(CUSNARKS_CURVE); cd -;) 
 endif
 	make clean build 
 	@for i in $(CONFIG_SUBDIRS); do \
