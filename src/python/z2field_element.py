@@ -47,6 +47,7 @@ from random import randint
 class Z2FieldEl(ZFieldEl):
     init = False
     zero = [[None, None], [None, None]]
+    WORDS_IN_256BN = 8
 
     def __init__(self, el, force_init=False):
         """
@@ -318,7 +319,7 @@ class Z2FieldEl(ZFieldEl):
 
         return newZ2
 
-    def as_uint256(self):
+    def as_uint256(self, NW=WORDS_IN_256BN):
        x = self.as_list()
        return  [BigInt(x[0]).as_uint256(), BigInt(x[1]).as_uint256()]
 
