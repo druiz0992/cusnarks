@@ -48,7 +48,7 @@ import os.path
 import numpy as np
 import time
 import math
-from subprocess import call, Popen, PIPE
+from subprocess import call, Popen, PIPE, run
 import multiprocessing as mp
 try:
   import nvgpu
@@ -1605,7 +1605,14 @@ def get_ngpu(max_used_percent=20.):
    try:
      return len(nvgpu.available_gpus(max_used_percent))
    except :
-     return 0
+     try :
+        out = run(['nvl'],stdout=PIPE)
+        out = out.stdout.decode("utf-8")
+        return out.count('\n') - 2
+
+     except:
+ 
+        return 0
 
 def get_nstreams():
     return (N_STREAMS_PER_GPU)

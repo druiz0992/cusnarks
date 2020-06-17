@@ -90,6 +90,7 @@ def run():
     sys.stdout.write('Configuring cusnarks....\n\n')
 
     #download_repos([snarkjs, rust_circom])
+    print(sys.argv)
     if len(sys.argv) > 1:
       generate_roots(nroots = int(sys.argv[1]))
     else:

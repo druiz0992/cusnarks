@@ -159,7 +159,6 @@ class GrothProver(object):
                                  self.n_gpu,
                                  len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
                               )
-
         if self.n_gpu == 0 :
           self.logger.info('No available GPUs')
           self.compute_ntt_gpu = False

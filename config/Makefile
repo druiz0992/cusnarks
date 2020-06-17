@@ -39,7 +39,7 @@ clean:
 
 ##################################################
 config: $(OBJ)
-	python3 cusnarks_config.py ${NROOTS}
+	python3 cusnarks_config.py ${CUSNARKS_NROOTS} ${CUSNARKS_CURVE}
 
 ##################################################
 %.o : %.cpp
