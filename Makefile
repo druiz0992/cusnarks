@@ -170,8 +170,12 @@ debug_gpu:
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
 
 config:  
-	read -p "Enter Curve <BN256 | BLS12381> " CURVE; \
-	(cd ${CUSRC_PATH}; ./ff.sh $$CURVE; cd -;) 
+ifeq ($(CUSNARKS_CURVE),"") 
+	     read -p "Enter Curve <BN256 | BLS12381> " CURVE; \
+	     (cd ${CUSRC_PATH}; ./ff.sh $$CURVE; cd -;) 
+else
+	     (cd ${CUSRC_PATH}; ./ff.sh $($CUSNARKS_CURVE); cd -;) 
+endif
 	make clean build 
 	@for i in $(CONFIG_SUBDIRS); do \
 	echo "make test in $$i..."; \
