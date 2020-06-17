@@ -66,6 +66,7 @@ from builtins import int
 
 from zfield import *
 from z2field_element import *
+from constants import *
 
 import sys
 
@@ -428,13 +429,13 @@ class ECC(object):
             Px = [x.get_P() for x in P]
          Pc=[]
          for Py in Px:
-           Pc.append([ x.as_uint256() for x in Py[0:last_idx]])
+           Pc.append([ x.as_uint256(NW=NWORDS_FP) for x in Py[0:last_idx]])
          Pc = np.concatenate(Pc)
       else:
          if as_reduced:
-           Pc = np.asarray([ x.as_uint256() for x in P.reduce().get_P()[0:last_idx]])
+           Pc = np.asarray([ x.as_uint256(NW=NWORDS_FP) for x in P.reduce().get_P()[0:last_idx]])
          else:
-           Pc = np.asarray([ x.as_uint256() for x in P.get_P()[0:last_idx]])
+           Pc = np.asarray([ x.as_uint256(NW=NWORDS_FP) for x in P.get_P()[0:last_idx]])
 
       if len(Pc[0])==2:
           Pc = np.reshape(Pc,(-1,8))
@@ -455,14 +456,14 @@ class ECC(object):
         
         if not ec2:
           if reduced:
-              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,last_idx))
+              P = np.reshape(np.asarray([ZFieldElRedc(BigInt.from_uint256(x_, NW=NWORDS_FP).as_long()) for x_ in x]),(-1,last_idx))
           else:
-              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_).as_long()) for x_ in x]),(-1,last_idx))
+              P = np.reshape(np.asarray([ZFieldElExt(BigInt.from_uint256(x_, NW=NWORDS_FP).as_long()) for x_ in x]),(-1,last_idx))
         else:
           if reduced:
-              P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0])), ZFieldElRedc(BigInt.from_uint256(x_[1]))]) for x_ in x]),(-1,last_idx))
+              P = np.reshape(np.asarray([Z2FieldEl([ZFieldElRedc(BigInt.from_uint256(x_[0], NW=NWORDS_FP)), ZFieldElRedc(BigInt.from_uint256(x_[1], NW=NWORDS_FP))]) for x_ in x]),(-1,last_idx))
           else:
-              P = np.reshape(np.asarray([Z2FieldEl([BigInt.from_uint256(x_[0]).as_long(), BigInt.from_uint256(x_[1]).as_long()]) for x_ in x]),(-1,last_idx))
+              P = np.reshape(np.asarray([Z2FieldEl([BigInt.from_uint256(x_[0], NW=NWORDS_FP).as_long(), BigInt.from_uint256(x_[1], NW=NWORDS_FP).as_long()]) for x_ in x]),(-1,last_idx))
         
 
         Pinf = ECC._point_at_inf(out_ectype=out_ectype, reduced=reduced, ec2=ec2).get_P()

@@ -200,10 +200,10 @@ class GrothSetup(object):
              logging.error('Insufficient number of roots in ' + self.roots_f + '. Required number of roots is '+ str(1<< self.nbits))
              sys.exit(1)
            
-           self.roots_rdc_u256_sh = RawArray(c_uint32,  int((1 << self.nbits) * NWORDS_256BIT))
+           self.roots_rdc_u256_sh = RawArray(c_uint32,  int((1 << self.nbits) * NWORDS_FR))
            self.roots_rdc_u256 = np.frombuffer(
                     self.roots_rdc_u256_sh,
-                    dtype=np.uint32).reshape((1 << self.nbits, NWORDS_256BIT))
+                    dtype=np.uint32).reshape((1 << self.nbits, NWORDS_FR))
            np.copyto(self.roots_rdc_u256, readU256DataFile_h(self.roots_f.encode("UTF-8"), 1<<self.n_bits_roots, 1<<self.nbits) )
 
         else:
@@ -462,8 +462,8 @@ class GrothSetup(object):
        m = 1 << bits
        t_rdc = self.toxic['t'].reduce()
        tm = (t_rdc ** int(m))
-       u_u256 = np.zeros((m,NWORDS_256BIT),dtype=np.uint32)
-       trdc_u256 = t_rdc.as_uint256()
+       u_u256 = np.zeros((m,NWORDS_FR),dtype=np.uint32)
+       trdc_u256 = t_rdc.as_uint256(NW=NWORDS_FR)
       
        z = tm.extend() - 1
        z_rdc = z.reduce()
@@ -471,11 +471,11 @@ class GrothSetup(object):
          for i in xrange(m): 
            #TODO : roots[0] is always 1. Does this make any sense? check javascript version
            if self.roots_rdc_u256[0] == trdc_u256:
-             u_u256[i] = ZFieldElExt(1).reduce().as_uint256()
-             return z.as_uint256(), u_u256
+             u_u256[i] = ZFieldElExt(1).reduce().as_uint256(NW=NWORDS_FR)
+             return z.as_uint256(NW=NWORDS_FR), u_u256
 
        l_rdc = z_rdc * ZFieldElExt(int(m)).inv().reduce()
-       lrdc_u256 = l_rdc.as_uint256()
+       lrdc_u256 = l_rdc.as_uint256(NW=NWORDS_FR)
 
        pidx = ZField.get_field()
        u_u256 = evalLagrangePoly_h(trdc_u256,lrdc_u256, self.roots_rdc_u256, pidx)
@@ -483,7 +483,7 @@ class GrothSetup(object):
        logging.info(' Deleting roots from memory')
        del self.roots_rdc_u256
 
-       return z.as_uint256(), u_u256
+       return z.as_uint256(NW=NWORDS_FR), u_u256
    
     def calculateEncryptedValuesAtT(self):
       start = time.time()
@@ -520,7 +520,7 @@ class GrothSetup(object):
       self.pk['alfa_1'] = ec_jac2aff_h(
                  np.reshape(
                      ec_jacscmul_h(
-                              self.toxic['kalfa'].as_uint256().reshape(-1), 
+                              self.toxic['kalfa'].as_uint256(NW=NWORDS_FR).reshape(-1), 
                               G1.as_uint256(G1).reshape(-1),
                               MOD_FP,
                               0),
@@ -530,7 +530,7 @@ class GrothSetup(object):
       self.pk['beta_1'] = ec_jac2aff_h(
                  np.reshape(
                      ec_jacscmul_h(
-                              self.toxic['kbeta'].as_uint256().reshape(-1), 
+                              self.toxic['kbeta'].as_uint256(NW=NWORDS_FR).reshape(-1), 
                               G1.as_uint256(G1).reshape(-1),
                               MOD_FP,
                               0),
@@ -540,7 +540,7 @@ class GrothSetup(object):
       self.pk['delta_1'] = ec_jac2aff_h(
                  np.reshape(
                      ec_jacscmul_h(
-                              self.toxic['kdelta'].as_uint256().reshape(-1), 
+                              self.toxic['kdelta'].as_uint256(NW=NWORDS_FR).reshape(-1), 
                               G1.as_uint256(G1).reshape(-1),
                               MOD_FP,
                               0),
@@ -551,7 +551,7 @@ class GrothSetup(object):
       self.pk['beta_2'] = ec2_jac2aff_h(
                  np.reshape(
                      ec2_jacscmul_h(
-                              self.toxic['kbeta'].as_uint256().reshape(-1), 
+                              self.toxic['kbeta'].as_uint256(NW=NWORDS_FR).reshape(-1), 
                               G2.as_uint256(G2).reshape(-1),
                               MOD_FP,
                               0),
@@ -561,7 +561,7 @@ class GrothSetup(object):
       self.pk['delta_2'] = ec2_jac2aff_h(
                  np.reshape(
                      ec2_jacscmul_h(
-                              self.toxic['kdelta'].as_uint256().reshape(-1), 
+                              self.toxic['kdelta'].as_uint256(NW=NWORDS_FR).reshape(-1), 
                               G2.as_uint256(G2).reshape(-1),
                               ZField.get_field(),
                               0),
@@ -571,7 +571,7 @@ class GrothSetup(object):
       self.pk['gamma_2'] = ec2_jac2aff_h(
                  np.reshape(
                      ec2_jacscmul_h(
-                              self.toxic['kgamma'].as_uint256().reshape(-1), 
+                              self.toxic['kgamma'].as_uint256(NW=NWORDS_FR).reshape(-1), 
                               G2.as_uint256(G2).reshape(-1),
                               ZField.get_field(),
                               0),
@@ -599,9 +599,9 @@ class GrothSetup(object):
       self.assert_isoncurve('A', samples= ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
-      self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_256BIT))
-      self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
+      self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_FP))[unsorted_idx]
+      self.pk['A'] = np.reshape(self.pk['A'],(-1,NWORDS_FP))
+      self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_FP )
       infv = ec_isinf(np.reshape(self.pk['A'],-1), ZField.get_field())
       self.pk['A_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
@@ -621,9 +621,9 @@ class GrothSetup(object):
       self.assert_isoncurve('B1', samples=ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
-      self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
-      self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
+      self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_FP))[unsorted_idx]
+      self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_FP))
+      self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_FP)
 
       infv = ec_isinf(np.reshape(self.pk['B1'],-1), ZField.get_field())
       self.pk['B1_density'] = 100.0  - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
@@ -641,11 +641,11 @@ class GrothSetup(object):
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('B2', samples = ec2bn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
-      #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
-      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
+      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_FP))[unsorted_idx]
+      #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_FP))
+      self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_FP))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
-      self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
+      self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_FP)
 
       infv = ec2_isinf(np.reshape(self.pk['B2'],-1), ZField.get_field())
       self.pk['B2_density'] = 100.0 - 100 * np.count_nonzero(infv == 1) / len(infv)
@@ -660,8 +660,8 @@ class GrothSetup(object):
       logging.info(' Computing EC Point C')
       ZField.set_field(MOD_FR)
       pidx = ZField.get_field()
-      ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
-                                      toxic_invDelta.reduce().as_uint256(),
+      ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(NW=NWORDS_FR), self.toxic['kbeta'].reduce().as_uint256(NW=NWORDS_FR),
+                                      toxic_invDelta.reduce().as_uint256(NW=NWORDS_FR),
                                       a_t_u256, b_t_u256, c_t_u256, self.pk['nPublic']+1, self.pk['nVars'], pidx )
 
       ZField.set_field(MOD_FP)
@@ -672,10 +672,10 @@ class GrothSetup(object):
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('C', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
+      self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_FP))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
-      self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
-      self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
+      self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_FP),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_FP))))
+      self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_FP)
 
       infv = ec_isinf(np.reshape(self.pk['C'],-1), ZField.get_field())
       self.pk['C_density'] = 100.0 - 100.0 * np.count_nonzero(infv == 1) / len(infv)
@@ -690,12 +690,12 @@ class GrothSetup(object):
 
       logging.info(' Computing EC Point hExps')
       maxH = self.pk['domainSize']+1
-      self.pk['hExps'] = np.zeros((maxH,NWORDS_256BIT),dtype=np.uint32)
+      self.pk['hExps'] = np.zeros((maxH,NWORDS_FP),dtype=np.uint32)
 
       ZField.set_field(MOD_FR)
       pidx = ZField.get_field()
-      zod_u256 = montmultN_h(toxic_invDelta.reduce().as_uint256(), z_t_u256, pidx)
-      eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(), np.reshape(zod_u256,-1), maxH, pidx)
+      zod_u256 = montmultN_h(toxic_invDelta.reduce().as_uint256(NW=NWORDS_FR), z_t_u256, pidx)
+      eT_u256 = GrothSetupComputeeT_h(self.toxic['t'].reduce().as_uint256(NW=NWORDS_FR), np.reshape(zod_u256,-1), maxH, pidx)
 
       ZField.set_field(MOD_FP)
       sorted_idx = sortuBI_idx_h(eT_u256, NWORDS_FR, self.sort_en)
@@ -705,9 +705,9 @@ class GrothSetup(object):
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('hExps', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
-      self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
-      self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_256BIT)
+      self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_FP))[unsorted_idx]
+      self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_FP))
+      self.pk['hExps_nWords'] = np.uint32(self.pk['hExps'].shape[0] * NWORDS_FP)
 
       end = time.time()
       self.t_S['hExps'] =end - start 
@@ -723,8 +723,8 @@ class GrothSetup(object):
       logging.info(' Computing EC Point IC')
       ZField.set_field(MOD_FR)
       pidx = ZField.get_field()
-      ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(), self.toxic['kbeta'].reduce().as_uint256(),
-                                      toxic_invGamma.reduce().as_uint256(),
+      ps_u256 = GrothSetupComputePS_h(self.toxic['kalfa'].reduce().as_uint256(NW=NWORDS_FR), self.toxic['kbeta'].reduce().as_uint256(NW=NWORDS_FR),
+                                      toxic_invGamma.reduce().as_uint256(NW=NWORDS_FR),
                                       a_t_u256, b_t_u256, c_t_u256, 0, self.pk['nPublic']+1, pidx )
       ZField.set_field(MOD_FP)
       sorted_idx = sortuBI_idx_h(ps_u256, NWORDS_FR, self.sort_en)
@@ -734,8 +734,8 @@ class GrothSetup(object):
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
       self.assert_isoncurve('IC', samples = ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
-      self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
-      self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
+      self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_FP))[unsorted_idx]
+      self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_FP)))
 
       end = time.time()
       self.t_S['IC'] =end - start 
@@ -753,14 +753,13 @@ class GrothSetup(object):
 
       logging.info(' Checking EC Point belongs to curve')
       pok = np.asarray([ec_isoncurve_h(np.reshape(x,-1), 1, ec2, 
-                    ZField.get_field()) for x in np.reshape(self.pk[ec_str],(-1,dim2,NWORDS_256BIT))])
+                    ZField.get_field()) for x in np.reshape(self.pk[ec_str],(-1,dim2,NWORDS_FP))])
       if not all(pok > 0):
         n_fails = np.asarray(np.where(pok==0)[0]).shape[0]
         logging.error("%s containts %s points not on curve: \n",ec_str, n_fails)
         fail_idx = np.asarray(np.where(pok==0)[0])
         logging.error("indexes - %s\n", np.asarray(np.where(pok==0)[0])[:max_fails])
-        ecp = np.reshape(self.pk[ec_str],(-1, dim2, NWORDS_256BIT))
-        #writeU256DataFile_h(np.reshape(samples,-1), '/local/david/iden3/cusnarks/test/c/aux_data/samples.bin'.encode("UTF-8"))
+        ecp = np.reshape(self.pk[ec_str],(-1, dim2, NWORDS_FP))
         #writeU256DataFile_h(np.reshape(self.pk[ec_str],-1),'/local/david/iden3/cusnarks/test/c/aux_data/ecp.bin'.encode("UTF-8"))
  
         logging.error("Input scalars : %s\n", samples[fail_idx])
@@ -812,16 +811,16 @@ class GrothSetup(object):
 
        if all_tables:
          nTables_A = int((self.pk['A'].shape[0] / ECP_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping) 
-         nWords1_A = (nTables_A << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords_offset
+         nWords1_A = (nTables_A << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords_offset
          nWords1_A_dw = dw2w(nWords1_A)
          nTables_B2 = int((self.pk['B2'].shape[0] / ECP2_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping) 
-         nWords1_B2 = (nTables_B2 << self.grouping ) * NWORDS_256BIT * ECP2_JAC_INDIMS + nWords1_A
+         nWords1_B2 = (nTables_B2 << self.grouping ) * NWORDS_FP * ECP2_JAC_INDIMS + nWords1_A
          nWords1_B2_dw = dw2w(nWords1_B2)
          nTables_B1 = int((self.pk['B1'].shape[0] / ECP_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping)
-         nWords1_B1 = (nTables_B1 << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_B2
+         nWords1_B1 = (nTables_B1 << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_B2
          nWords1_B1_dw = dw2w(nWords1_B1)
          nTables_C = int((self.pk['C'][2*(nPublic+1):].shape[0] / ECP_JAC_INDIMS + self.grouping - 1)/self.grouping)
-         nWords1_C = (nTables_C << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_B1
+         nWords1_C = (nTables_C << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_B1
          nWords1_C_dw = dw2w(nWords1_C)
        else:
          nWords1_A_dw = dw2w(nWords_offset)
@@ -835,7 +834,7 @@ class GrothSetup(object):
          nWords1_C = 0
 
        nTables_hExps = int((domainSize + self.grouping - 1)/self.grouping) 
-       nWords1_hExps = (nTables_hExps << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_C
+       nWords1_hExps = (nTables_hExps << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_C
        nWords1_hExps_dw = dw2w(nWords1_hExps)
 
        nWords = np.concatenate(([np.uint32(self.grouping)], nWords_offset_dw, 
@@ -1013,7 +1012,7 @@ class GrothSetup(object):
                  reduced=True,
                  remove_last=True)[0].extend().as_str()
       vk_dict['vk_beta_2'] = ECC.from_uint256(
-                 self.pk['beta_2'].reshape((-1,2,NWORDS_256BIT)),
+                 self.pk['beta_2'].reshape((-1,2,NWORDS_FP)),
                  in_ectype=EC_T_AFFINE,
                  out_ectype=EC_T_AFFINE,
                  reduced=True,
@@ -1025,8 +1024,8 @@ class GrothSetup(object):
         vk_dict['vk_alfabeta_12'] = json.load(f)
         f.close()
         vk_dict['protocol'] = "groth"
-        vk_dict['field_r'] = str(ZFieldElExt.from_uint256(self.pk['field_r']).as_long())
-        vk_dict['group_q'] = str(ZFieldElExt.from_uint256(self.pk['group_q']).as_long())
+        vk_dict['fr'] = str(ZFieldElExt.from_uint256(self.pk['fr'], NW=NWORDS_FR).as_long())
+        vk_dict['fp'] = str(ZFieldElExt.from_uint256(self.pk['fp'], NW=NWORDS_FP).as_long())
         vk_dict['binFormat'] = "normal"
 
         vk_dict['Rbitlen'] = int(self.pk['Rbitlen'])
@@ -1038,14 +1037,14 @@ class GrothSetup(object):
         vk_dict['domainSize'] = int(self.pk['domainSize'])
   
         vk_dict['vk_delta_2'] = ECC.from_uint256(
-                   self.pk['delta_2'].reshape((-1,2,NWORDS_256BIT)),
+                   self.pk['delta_2'].reshape((-1,2,NWORDS_FP)),
                    in_ectype=EC_T_AFFINE,
                    out_ectype=EC_T_AFFINE,
                    reduced=True,
                    ec2=True,
                    remove_last=True)[0].extend().as_str()
         vk_dict['vk_gamma_2'] = ECC.from_uint256(
-                   self.pk['gamma_2'].reshape((-1,2,NWORDS_256BIT)),
+                   self.pk['gamma_2'].reshape((-1,2,NWORDS_FP)),
                    in_ectype=EC_T_AFFINE,
                    out_ectype=EC_T_AFFINE,
                    reduced=True,

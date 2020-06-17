@@ -24,12 +24,12 @@
 // ------------------------------------------------------------------
 //
 // Description:
-//   Util functions for host. Functions mostly implement 256 bit arithmetic and polynomial of finite field elementss
+//   Util functions for host. Functions mostly implement BI bit arithmetic and polynomial of finite field elementss
 //
-//   256 bit samples are represented by 8 32-bit words (NWORDS_256BIT), where word 0 is the least significant word
+//   BI bit samples are represented by N 32-bit words (NWORDS_FP/NWORDS_FR), where word 0 is the least significant word
 //
-//   A polynomial of degree N is represented by N+1 256 bit samples ((N+1) * NWORDS_256BIT), where degree 0 coefficient
-//   is stored in the first NWORDS_256BIT words
+//   A polynomial of degree N is represented by N+1 BI bit samples ((N+1) * NWORDS_FR/NWORDS_FP), where degree 0 coefficient
+//   is stored in the first NWORDS_FR/NWORDS_FP words
 //
 // ------------------------------------------------------------------
 
@@ -402,13 +402,11 @@ void montmultN_ext_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t
   }
 }
 
-/* 
-   Convert 256 bit number from montgomery representation of one of the two prime 
-      p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
-      p2 = 21888242871839275222246405745257275088548364400416034343698204186575808495617L
+/* I
+   Convert BI bit number from montgomery representation of one of the two prime 
 
-   uint32_t *z   : normal represention of input sample x. Z is 256 bits
-   uint32_t *x   : input 256 bit sample in montgomery format
+   uint32_t *z   : normal represention of input sample x. 
+   uint32_t *x   : input BI bit sample in montgomery format
    uint32_t pidx : prime select. if 0, use p1. If 1, use p2
 */   
 void from_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
@@ -455,11 +453,11 @@ void from_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pid
 }
 
 /*
-   Generate N 256 bit random samples
+   Generate N BI bit random samples
 
-   uint32_t *x       : output vector containing 256 bit samples. Vector is of length nsamples
-   uint32_t nsamples : Number of 256 bit samples to generate
-   uint32_t *p       : If different from null, samples will be less than p (p is a 256 bit number)
+   uint32_t *x       : output vector containing BI bit samples. Vector is of length nsamples
+   uint32_t nsamples : Number of BI bit samples to generate
+   uint32_t *p       : If different from null, samples will be less than p (p is a BI bit number)
    
 */
 void setRandomBI(uint32_t *x, const uint32_t nsamples, const uint32_t *p, const uint32_t biSize)
@@ -534,7 +532,7 @@ void setRandomBI(uint32_t *x, const uint32_t nsamples, int32_t min_nwords, int32
 }
 
 /*
-   Generates N 256 bit samples with incremements of inc starting at start. If sample reached value of mod,
+   Generates N BI bit samples with incremements of inc starting at start. If sample reached value of mod,
    value goes back to 0
 
    uint32_t *samples : Vector containing output samples. Vector is of length nsamples
@@ -561,12 +559,10 @@ void rangeuBI_h(uint32_t *samples, uint32_t nsamples, const uint32_t  *start, ui
 }
 
 /* 
-   Convert 256 bit number to montgomery representation of one of the two prime 
-      p1 = 21888242871839275222246405745257275088696311157297823662689037894645226208583L
-      p2 = 21888242871839275222246405745257275088548364400416034343698204186575808495617L
+   Convert BI bit number to montgomery representation of one of the two prime 
 
-   uint32_t *z   : montgomery represention of input sample x. Z is 256 bits
-   uint32_t *x   : input 256 bit sample
+   uint32_t *z   : montgomery represention of input sample x. 
+   uint32_t *x   : input BI bit sample
    uint32_t pidx : prime select. if 0, use p1. If 1, use p2
 */   
 void to_montgomery_h(uint32_t *z, const uint32_t *x, uint32_t pidx)
@@ -590,12 +586,12 @@ void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
 
 
 /*
-  modular addition of 256 bit numbers : Z = X + Y mod P
+  modular addition of BI bit numbers : Z = X + Y mod P
 
-  uint32_t *z : Output 256 bit number
-  uint32_t *x : Input 256 bit number 1
-  uint32_t *y : Input 256 bit number 2
-  uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
+  uint32_t *z : Output BI bit number
+  uint32_t *x : Input BI bit number 1
+  uint32_t *y : Input BI bit number 2
+  uint32_t pidx    : index of BI modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
@@ -625,12 +621,12 @@ void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
    addm_h(&z[PSize],&x[PSize],&y[PSize],pidx);
 }
 /*
-  modular substraction of 256 bit numbers : Z = X - Y mod P
+  modular substraction of BI bit numbers : Z = X - Y mod P
 
-  uint32_t *z : Output 256 bit number
-  uint32_t *x : Input 256 bit number 1
-  uint32_t *y : Input 256 bit number 2
-  uint32_t pidx    : index of 256 modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
+  uint32_t *z : Output BI bit number
+  uint32_t *x : Input BI bit number 1
+  uint32_t *y : Input BI bit number 2
+  uint32_t pidx    : index of BI modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
@@ -700,8 +696,8 @@ void almmontinv_h(uint32_t *r, uint32_t *k, uint32_t *a, uint32_t pidx)
   *k = 0;
 
   //Phase 1 - ALmost inverse r = a^(-1) * 2 ^k, n<=k<=2n
-  // u is  < 256bits
-  // v is < 256 bits, < u
+  // u is  < BIbits
+  // v is < BI bits, < u
   // s is  1     
   // r1 is 0
 

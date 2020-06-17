@@ -154,7 +154,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
     kernel_config['return_val']=[1]
 
     nsamples = len(vector)
-    if pysnark is not None :
+    if pysnark is not None and batch_size == 0:
 
        kernel_params['in_length'] = [nsamples]
        kernel_params['out_length'] = (nsamples-indims)*outdims

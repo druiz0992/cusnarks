@@ -767,7 +767,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
   }
 
   int lsb = pippen_conf;
-  uint32_t msb = 255;
+  uint32_t msb = NWORDS_FR * NBITS_WORD - 1;
   uint32_t stride = NWORDS_FR * order;
 
   if (!Rin){
@@ -780,7 +780,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
   for (i=0; i<n_tables ; i++){
      if (Rin){
        uint32_t tmp_msb;
-       msb = 255;
+       msb = NWORDS_FR * NBITS_WORD - 1;
        for(uint32_t j=0; j< order; j++){
          if (order*i + j < n){
             tmp_msb = msbuBI_h(&scl[i*order*NWORDS_FR+j*NWORDS_FR], NWORDS_FR); 
@@ -792,7 +792,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
                  break;
          }
        }
-       msb = 255 - msb;
+       msb = NWORDS_FR * NBITS_WORD -1 - msb;
      }
      for (int j=msb; j >= lsb ; j--){
         uint32_t b = getbit_cb(&scl[i*stride], j, MIN(order, n -order*i ), biSize);
@@ -806,7 +806,7 @@ static void ec_jacscmul_opt_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t 
        
         /*
         if (i==0){ 
-          printf("offset : %d, b : %d\n",255-j, b);
+          printf("offset : %d, b : %d\n",NWORDS_FR * NBITS_WORD -1-j, b);
           printf("Q :\n");
           printUBINumber(&z[i * NWORDS_FP * ECP_JAC_OUTDIMS], NWORDS_FP);
           printf("Q :\n");
@@ -892,7 +892,7 @@ void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t
      } else{
         N = &x[i * NWORDS_FP * ECP_JAC_INDIMS];
      }
-     uint32_t msb = 255 - msbuBI_h(&scl[i*NWORDS_FR], NWORDS_FR);
+     uint32_t msb = NWORDS_FR * NBITS_WORD -1 - msbuBI_h(&scl[i*NWORDS_FR], NWORDS_FR);
 
      for (int32_t j=msb; j >=0 ; j--){
         uint32_t b0 = getbituBI_h(&scl[i * NWORDS_FR], j);
@@ -951,7 +951,7 @@ void ec2_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_
         N = &x[i * NWORDS_FP * ECP2_JAC_INDIMS];
      }
 
-     uint32_t msb = 255 - msbuBI_h(&scl[i*NWORDS_FR], NWORDS_FR); 
+     uint32_t msb = NWORDS_FR * NBITS_WORD -1 - msbuBI_h(&scl[i*NWORDS_FR], NWORDS_FR); 
 
      for (int32_t j=msb; j >= 0 ; j--){
         uint32_t b0 = getbituBI_h(&scl[i * NWORDS_FR], j);
@@ -1975,7 +1975,7 @@ void *ec_jacreduce_batch_precomputed_h(void *args)
      /*
      if (wargs->thread_id == 0){   
        printf("Ps\n" );
-       for (uint32_t k=0; k< 255; k++){
+       for (uint32_t k=0; k< NWORDS_FR *NBITS_WORD -1; k++){
          printf("%d\n",k);
          printUBINumber(&utils_EPin_ptr[k*outdims*NWORDS_FP], NWORDS_FP);
          printUBINumber(&utils_EPin_ptr[k*outdims*NWORDS_FP+NWORDS_FP], NWORDS_FP);
@@ -2042,7 +2042,7 @@ static void ec_jacdouble_finish_h(void *args)
 
   /*
   printf("FINISH\n");
-  printf("255\n");
+  printf("%d\n",NWORDS_FR * NBITS_WORD -1");
   printUBINumber(P, NWORDS_FP);
   printUBINumber(&P[NWORDS_FP], NWORDS_FP);
   printUBINumber(&P[2*NWORDS_FP], NWORDS_FP);
@@ -2091,7 +2091,7 @@ static void ec_jacdouble_pippengers_finish_h(void *args)
   uint32_t *Q = P;
 
   /*
-  printf("255\n");
+  printf("%d\n", NWORDS_FR * NBITS_WORD - 1);
   printUBINumber(P, NWORDS_FP);
   printUBINumber(&P[NWORDS_FP], NWORDS_FP);
   printUBINumber(&P[2*NWORDS_FP], NWORDS_FP);
