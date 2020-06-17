@@ -40,7 +40,9 @@ SHELL=/bin/sh
 #####
 # Define Paths
 
-CUSNARKS_PATH = ${PWD}
+ifeq ($(CUSNARKS_PATH),)
+CUSNARKS_PATH := $(PWD)
+endif
 INCLUDE_PATH = $(CUSNARKS_PATH)/src/cuda
 OBJECT_PATH = $(CUSNARKS_PATH)/build
 LIB_PATH = $(CUSNARKS_PATH)/lib
