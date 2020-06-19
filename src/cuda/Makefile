@@ -27,7 +27,7 @@ LOG_LEVEL=$(LOG_LEVEL)
 NVCC = nvcc
 CC  = g++
 ASM = nasm
-GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
+GENCODE_ARCH_COMPUTE=-gencode arch=compute_75,code=sm_75 -gencode arch=compute_61,code=sm_61
 DEBUG=0
 ifeq ($(DEBUG),1)
   CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE $(DEFINES_DEBUG) -std=c++11 -I $(INCLUDE_PATH) -w
@@ -41,7 +41,8 @@ ASMFLAGS=-f elf64
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
 EXTRA_CFLAGS2=-march=native -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
-LINKFLAGS= -arch=sm_61 --shared -o 
+#LINKFLAGS= -arch=sm_61 --shared -o 
+LINKFLAGS= --shared -o 
 LINKFLAGS2=--shared -o 
 LDFLAGS=-lm -lcudart -lgomp
 LDFLAGS2=-lm -lgomp

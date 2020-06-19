@@ -235,7 +235,11 @@ __global__ void __launch_bounds__(256,2) scmulecjac_kernel(uint32_t *out_vector,
    return;
 }
 
+#if (_CUDA_ARCH__ == 610)
 __global__ void __launch_bounds__(128,5)scmulecjacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+__global__ void __launch_bounds__(256,2)scmulecjacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
 {
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
@@ -293,7 +297,11 @@ __global__ void scmulecjac_precomputed_kernel(uint32_t *out_vector, uint32_t *in
    logInfoBigNumberTid(3,"XOUT :\n",&out_vector[idx*ECP_JAC_OUTOFFSET]);
 }
 
+#if (_CUDA_ARCH__ == 610)
 __global__ void __launch_bounds__(128,4) scmulec2jacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+__global__ void scmulec2jacopt_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
 {
     unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
     unsigned int tid = threadIdx.x;
