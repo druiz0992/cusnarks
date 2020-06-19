@@ -8,16 +8,12 @@ add_correct_labels() {
   
   ADX_SUPPORT=$(cat /proc/cpuinfo | grep -m1 -oP 'adx')
 
-  if [ -z "$ADX_SUPPORT" ]; then
-     sed -i "1s;^;\n\n\n\n        global F${EXT}_rawAdd\n        global F${EXT}_rawSub\n        global F${EXT}_rawMMul\n        global F${EXT}_rawMSquare\n;" "$FILE";
+  sed -i "1s;^;\n\n\n\n        global F${EXT}_rawAdd\n        global F${EXT}_rawSub\n        global F${EXT}_rawMMul\n        global F${EXT}_rawMSquare\n;" "$FILE";
   
-     sed -i "s/\brawAddLL\b/F${EXT}_rawAdd/g" "$FILE";
-     sed -i "s/\brawSubLL\b/F${EXT}_rawSub/g" "$FILE";
-     sed -i "s/\brawMontgomeryMul\b/F${EXT}_rawMMul/g" "$FILE";
-     sed -i "s/\brawMontgomerySquare\b/F${EXT}_rawMSquare/g" "$FILE";
-  fi
-  
-
+  sed -i "s/\brawAddLL\b/F${EXT}_rawAdd/g" "$FILE";
+  sed -i "s/\brawSubLL\b/F${EXT}_rawSub/g" "$FILE";
+  sed -i "s/\brawMontgomeryMul\b/F${EXT}_rawMMul/g" "$FILE";
+  sed -i "s/\brawMontgomerySquare\b/F${EXT}_rawMSquare/g" "$FILE";
   sed -i "0,/F${EXT}_fail/s//fail_h/" "$FILE";
   sed -i "s/F${EXT}_fail/fail_h wrt ..plt/1" "$FILE";
 }
