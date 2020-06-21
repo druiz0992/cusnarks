@@ -129,7 +129,7 @@ class GrothProver(object):
         self.sort_en = 0
         self.compute_ntt_gpu = False
         self.compute_first_mexp_gpu = True
-        self.compute_last_mexp_gpu = True
+        self.compute_last_mexp_gpu = False
 
         self.read_table_en = False
         self.read_table_f = read_table_f
@@ -412,6 +412,8 @@ class GrothProver(object):
         self.ect_hExps = 0
         self.ect_G1_woffset = 0
         self.ect_G2_woffset = 0
+        self.G1_woffset = 0
+        self.G2_woffset = 0
         self.ec_table = 0
 
         if len(self.read_table_f):
@@ -625,8 +627,8 @@ class GrothProver(object):
              ep_vector = pk_bin2[0][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
           else :
             ep_vector = np.reshape(self.ect_A,-1)
-            offset = self.ect_G1_woffset
-            total_words = self.ec_table['woffset_B2'] - self.ect_G1_woffset
+            offset = self.G1_woffset
+            total_words = self.ec_table['woffset_B2'] - self.G1_woffset
 
           np.copyto(self.pi_a_eccf1,
                     ec_jacreduce_h(
@@ -651,8 +653,8 @@ class GrothProver(object):
              ep_vector = pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS]
           else :
             ep_vector = np.reshape(self.ect_B2,-1)
-            offset = self.ect_G2_woffset
-            total_words = self.ec_table['woffset_B1'] - self.ect_G2_woffset
+            offset = self.G2_woffset
+            total_words = self.ec_table['woffset_B1'] - self.G2_woffset
 
           np.copyto(self.pi_b_eccf2,
                  ec_jacreduce_h(
@@ -675,11 +677,11 @@ class GrothProver(object):
           if not self.read_table_en or self.ec_table['woffset_C'] == self.ec_table['woffset_hExps']:
              ep_vector = pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS]
           else :
-             self.ect_G1_woffset -= self.ec_table['woffset_A'] 
-             self.ect_G1_woffset += self.ec_table['woffset_C'] 
+             self.G1_woffset -= self.ec_table['woffset_A'] 
+             self.G1_woffset += self.ec_table['woffset_C'] 
              ep_vector = np.reshape(self.ect_C,-1)
-             offset = self.ect_G1_woffset
-             total_words = self.ec_table['woffset_hExps'] - self.ect_G1_woffset
+             offset = self.G1_woffset
+             total_words = self.ec_table['woffset_hExps'] - self.G1_woffset
 
           np.copyto(self.pi_c_eccf1,
                     ec_jacreduce_h(
@@ -699,11 +701,11 @@ class GrothProver(object):
             if not self.read_table_en or self.ec_table['woffset_B1'] == self.ec_table['woffset_C']:
                ep_vector = pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
             else :
-               self.ect_G1_woffset -= self.ec_table['woffset_C'] 
-               self.ect_G1_woffset += self.ec_table['woffset_B1'] 
+               self.G1_woffset -= self.ec_table['woffset_C'] 
+               self.G1_woffset += self.ec_table['woffset_B1'] 
                ep_vector = np.reshape(self.ect_B1,-1)
-               offset = self.ect_G1_woffset
-               total_words = self.ec_table['woffset_C'] - self.ect_G1_woffset
+               offset = self.G1_woffset
+               total_words = self.ec_table['woffset_C'] - self.G1_woffset
 
             np.copyto(self.pi_b1_eccf1,
                     ec_jacreduce_h(
@@ -724,8 +726,8 @@ class GrothProver(object):
                     )
 
             if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
-             self.ect_G1_woffset -= self.ec_table['woffset_B1'] 
-             self.ect_G1_woffset += self.ec_table['woffset_hExps'] 
+             self.G1_woffset -= self.ec_table['woffset_B1'] 
+             self.G1_woffset += self.ec_table['woffset_hExps'] 
             self.logger.info(' Process server - Mexp B1  Done...')
 
           end2 = time.time()
@@ -753,8 +755,8 @@ class GrothProver(object):
                              ))
           else :
              EP_vector =   np.reshape(self.ect_hExps,-1)
-             offset = self.ect_G1_woffset
-             total_words = self.ec_table['nwords_tdata'] - self.ect_G1_woffset
+             offset = self.G1_woffset
+             total_words = self.ec_table['nwords_tdata'] - self.G1_woffset
 
           np.copyto(self.pi_c2_eccf1,
                   ec_jacreduce_h(
@@ -1101,6 +1103,9 @@ class GrothProver(object):
       self.verify_en = verify_en
       self.t_GP = {}
       self.stop_client.value = 0
+
+      self.G1_woffset = self.ect_G1_woffset
+      self.G2_woffset = self.ect_G2_woffset
 
       if self.active_client.value :
           return
