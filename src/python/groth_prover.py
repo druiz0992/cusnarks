@@ -1008,7 +1008,9 @@ class GrothProver(object):
 
        else:
           self.logger.error('Witness file %s doesn\'t exist', self.witness_f)
-          sys.exit(1)
+          return 0
+
+       return 1
 
     def load_pkdata(self):
        if self.proving_key_f.endswith('npz'):
@@ -1127,7 +1129,11 @@ class GrothProver(object):
       self.t_GP['init'] = time.time() - start
       ##### Starting proof
 
-      self.gen_proof()
+      # Proof fails for internal reasons
+      if self.gen_proof() == 0:
+         self.verify = -3
+         self.active_client.value = 0
+         return self.verify
       
       if self.stop_client.value:
           self.active_client.value = 0
@@ -1291,7 +1297,8 @@ class GrothProver(object):
         start = time.time()
         # Read witness info
         self.logger.info(' Reading Witness...')
-        self.read_witness_data()
+        if self.read_witness_data() == 0:
+           return 0
 
         end = time.time()
         self.t_GP['Read_W'] = end - start
@@ -1349,7 +1356,7 @@ class GrothProver(object):
               self.p_CPU.terminate()
               self.p_CPU.join()
               self.logger.info('Client stopped...')
-              return
+              return 1
 
           self.findECPointsDispatch(
                              self.dispatch_table_phase2,
@@ -1361,7 +1368,7 @@ class GrothProver(object):
               self.p_CPU.terminate()
               self.p_CPU.join()
               self.logger.info('Client stopped...')
-              return
+              return 1
 
           # Assign collected values to pi's
           self.assignECPvalues(compute_ECP=False)
@@ -1459,7 +1466,7 @@ class GrothProver(object):
            if self.p_CPU is not None:
              self.t_GP['Mexp2'] = t[2]
      
-        return 
+        return 1
  
 
     def assignECPvalues(self, compute_ECP=False):
@@ -1510,11 +1517,11 @@ class GrothProver(object):
                                       1)   # strip z coordinate from affine result
                                    )
 
-    def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0):
+    def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0, start_idx=0):
             ZField.set_field(MOD_FP)
             #TODO : remove in_v
             #print(ecbn128_samples.shape, ec2, shamir_en, gpu_id, stream_id)
-            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_FP, ec2, shamir_en, gpu_id, stream_id,True, grouping=self.grouping_cuda)
+            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_FP, ec2, shamir_en, gpu_id, stream_id,True, grouping=self.grouping_cuda, start_idx=start_idx)
             if ec2 and stream_id == 0:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_FP)
             elif stream_id == 0:
@@ -1655,7 +1662,7 @@ class GrothProver(object):
           result, t = self.compute_proof_ecp(
               cuda_ec128,
               EC_P[ecidx],
-              step == 4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id)
+              step == 4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id, start_idx=scl_start_idx)
 
 
           if stream_id == 0:
