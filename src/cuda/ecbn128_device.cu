@@ -516,8 +516,7 @@ __global__ void __launch_bounds__(256,2)madecjac_shfl_kernel(uint32_t *out_vecto
  
     // Set to 0 z component of unused elements
     if(idx >= params->in_length/params->stride) {
-       uint32_t padding[] = {0,0,0,0,0,0,0,0};
-       movu256(&out_vector[idx * ECP_JAC_OUTOFFSET + 2*NWORDS_FP],padding);
+       return
     }
 
     Z1_t xo;
@@ -574,8 +573,7 @@ __global__ void __launch_bounds__(256,2)redecjac_kernel(uint32_t *out_vector, ui
     // Set to 0 z component of unused elements
     if(idx >= params->in_length/params->stride) {
        uint32_t padding[] = {0,0,0,0,0,0,0,0};
-       movu256(&out_vector[idx * ECP2_JAC_OUTOFFSET + 4*NWORDS_FP],padding);
-       movu256(&out_vector[idx * ECP2_JAC_OUTOFFSET + 5*NWORDS_FP],padding);
+       movu256(&out_vector[idx * ECP_JAC_OUTOFFSET + 2*NWORDS_FP],padding);
     }
 
     Z1_t xo;
@@ -595,7 +593,9 @@ __global__ void __launch_bounds__(256,2) redec2jac_kernel(uint32_t *out_vector, 
     Z2_t zsmem(smem);  // 0 .. blockDim
 
     if(idx >= params->in_length/params->stride) {
-      return;
+       uint32_t padding[] = {0,0,0,0,0,0,0,0};
+       movu256(&out_vector[idx * ECP2_JAC_OUTOFFSET + 4*NWORDS_FP],padding);
+       movu256(&out_vector[idx * ECP2_JAC_OUTOFFSET + 5*NWORDS_FP],padding);
     }
 
     Z2_t xo;
@@ -1695,6 +1695,7 @@ __device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoff
   uint32_t i;
 
   uint32_t __restrict__ EC_table[((1<<DEFAULT_U256_BSELM_CUDA))*3*sizeof(T2)/sizeof(uint32_t)]; // N = P
+  int tid = threadIdx.x + blockDim.x * blockIdx.x;
   uint32_t offset;
   uint32_t msb = clzMu256(scl);
   uint32_t  b;
