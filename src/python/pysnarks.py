@@ -487,7 +487,12 @@ def run(opt, parser):
           if opt['start_server']:
               GP.startGPServer()
           else:
-             GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'])
+             # abort if witness is not present
+             if os.path.isfile(opt['witness_f']) :
+                 GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'])
+             else :
+                print('Witness file %s doesn\'t exist', self.witness_f)
+           
                       
 
       else :

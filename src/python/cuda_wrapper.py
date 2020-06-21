@@ -213,7 +213,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
       t = end - start
     return result,t
 
-def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0, separate_k=0, grouping=DEFAULT_U256_BSELM):
+def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0, separate_k=0, grouping=DEFAULT_U256_BSELM, start_idx=0):
    kernel_params={}
    kernel_config={}
    
@@ -246,14 +246,14 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
    kernel_params['midx']      = [fidx] * nkernels
    kernel_params['in_length'] = [nsamples* indims_e]*nkernels
    kernel_params['out_length'] = 1 * outdims
-   kernel_params['padding_idx'] = [shamir_en] * nkernels
+   kernel_params['padding_idx'] = [start_idx] * nkernels
    kernel_config['gridD'] = [0] * nkernels
    kernel_config['gridD'][nkernels-1] = 1
 
    if separate_k:
          kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD'][1:]]
          kernel_config['smemS'] = np.concatenate([[0], np.asarray(kernel_config['smemS'],dtype=np.uint32)])
-         kernel_params['in_length'][1] = int(nsamples* outdims/grouping)
+         kernel_params['in_length'][1] = outdims* int((nsamples + grouping - 1) / grouping)
          kernel_config['gridD'][1:] = [int(np.product(kernel_config['blockD'][1+i:])/(kernel_config['blockD'][1+i])) for i in range(len(kernel_config['blockD'][1:]))]
          kernel = [CB_EC_JAC_MUL_OPT, CB_EC_JAC_RED] 
          kernel_config['kernel_idx'] =np.concatenate([[kernel[0]], np.ones(nkernels-1, dtype=np.uint32) * kernel[1]])
@@ -1602,18 +1602,18 @@ def get_gpu_affinity_cuda():
      return gpu_affinity
 
 def get_ngpu(max_used_percent=20.):
-   try:
-     return len(nvgpu.available_gpus(max_used_percent))
-   except :
-     try :
-        out = run(['nvl'],stdout=PIPE)
-        out = out.stdout.decode("utf-8")
-        return out.count('\n') - 2
-
-     except:
+     out = run(['which', 'nvcc'],stdout=PIPE)
+     out = out.stdout.decode("utf-8")
+     if len(out) == 0 :
+         return 0
  
-        return 0
-
+     try:
+        return len(nvgpu.available_gpus(max_used_percent))
+     except :
+         out = run(['nvl'],stdout=PIPE)
+         out = out.stdout.decode("utf-8")
+         return out.count('\n') - 2
+ 
 def get_nstreams():
     return (N_STREAMS_PER_GPU)
 

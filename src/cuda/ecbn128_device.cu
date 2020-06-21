@@ -514,8 +514,10 @@ __global__ void __launch_bounds__(256,2)madecjac_shfl_kernel(uint32_t *out_vecto
 
     uint32_t __restrict__ *scl = NULL;
  
+    // Set to 0 z component of unused elements
     if(idx >= params->in_length/params->stride) {
-      return;
+       uint32_t padding[] = {0,0,0,0,0,0,0,0};
+       movu256(&out_vector[idx * ECP_JAC_OUTOFFSET + 2*NWORDS_FP],padding);
     }
 
     Z1_t xo;
@@ -569,8 +571,11 @@ __global__ void __launch_bounds__(256,2)redecjac_kernel(uint32_t *out_vector, ui
     extern __shared__ uint32_t smem[];
     Z1_t zsmem(smem);  // 0 .. blockDim
 
+    // Set to 0 z component of unused elements
     if(idx >= params->in_length/params->stride) {
-      return;
+       uint32_t padding[] = {0,0,0,0,0,0,0,0};
+       movu256(&out_vector[idx * ECP2_JAC_OUTOFFSET + 4*NWORDS_FP],padding);
+       movu256(&out_vector[idx * ECP2_JAC_OUTOFFSET + 5*NWORDS_FP],padding);
     }
 
     Z1_t xo;
@@ -1701,6 +1706,11 @@ __device__ void scmulecjac_opt(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoff
   T1 T(EC_table);
 
   Q.setu256(0,&_inf, 0);
+  // padding_idx indicates where real samples start. Before that it is all zeros
+  if (tid < params->padding_idx / WARP_SIZE){
+           return;
+  }
+  
   //logInfoBigNumberTid(3*T1::getN(),"Initial Q : \n",&Q);
 
   //logInfoTid("msb : %d\n",msb);

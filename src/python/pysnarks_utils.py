@@ -547,7 +547,7 @@ def pkbin_get(pk_bin, labels):
     fp_words = pk_bin[PKBIN_H_RBITLEN_OFFSET] >> 16
     if fp_words != NWORDS_FP:
              print("Mismatch in NWORDS_FP")
-             os.exit(1)
+             sys.exit(1)
     offset_data = PKBIN_H_N_OFFSET + fr_words + fp_words + 14
     offset = PKBIN_H_N_OFFSET +  fr_words + fp_words
 
