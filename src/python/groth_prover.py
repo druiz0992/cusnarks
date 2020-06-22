@@ -129,7 +129,7 @@ class GrothProver(object):
         self.sort_en = 0
         self.compute_ntt_gpu = False
         self.compute_first_mexp_gpu = True
-        self.compute_last_mexp_gpu = False
+        self.compute_last_mexp_gpu = True
 
         self.read_table_en = False
         self.read_table_f = read_table_f
@@ -1335,7 +1335,7 @@ class GrothProver(object):
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps','delta_1'])
  
         if self.compute_first_mexp_gpu:
-          self.logger.info(' Starting First Mexp...')
+          self.logger.info(' Starting First Mexp - GPU...')
           self.findECPointsDispatch(
                                   self.dispatch_table_phase1b,
                                   self.batch_size_mexp_phase1,
@@ -1379,7 +1379,7 @@ class GrothProver(object):
           self.assignECPvalues(compute_ECP=False)
           if self.compute_last_mexp_gpu == False:
              self.assignECPvalues(compute_ECP=True)
-          self.logger.info(' First Mexp completed...')
+          self.logger.info(' First Mexp completed GPU...')
 
           end = time.time()
           self.t_GP['Mexp1'] = (end - start)
@@ -1412,7 +1412,7 @@ class GrothProver(object):
 
         if self.compute_last_mexp_gpu:
            start = time.time()
-           self.logger.info(' Starting Last Mexp...')
+           self.logger.info(' Starting Last Mexp GPU...')
            self.findECPointsDispatch(
                                   self.dispatch_table_phase3,
                                   self.batch_size_mexp_phase3,
