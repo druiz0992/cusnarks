@@ -516,7 +516,7 @@ __global__ void __launch_bounds__(256,2)madecjac_shfl_kernel(uint32_t *out_vecto
  
     // Set to 0 z component of unused elements
     if(idx >= params->in_length/params->stride) {
-       return
+       return;
     }
 
     Z1_t xo;
