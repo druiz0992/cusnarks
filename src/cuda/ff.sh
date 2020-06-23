@@ -10,10 +10,12 @@ add_correct_labels() {
 
   sed -i "1s;^;\n\n\n\n        global F${EXT}_rawAdd\n        global F${EXT}_rawSub\n        global F${EXT}_rawMMul\n        global F${EXT}_rawMSquare\n;" "$FILE";
   
-  sed -i "s/\brawAddLL\b/F${EXT}_rawAdd/g" "$FILE";
-  sed -i "s/\brawSubLL\b/F${EXT}_rawSub/g" "$FILE";
-  sed -i "s/\brawMontgomeryMul\b/F${EXT}_rawMMul/g" "$FILE";
-  sed -i "s/\brawMontgomerySquare\b/F${EXT}_rawMSquare/g" "$FILE";
+  if [ -z $ADX_SUPPORT ]; then 
+    sed -i "s/\brawAddLL\b/F${EXT}_rawAdd/g" "$FILE";
+    sed -i "s/\brawSubLL\b/F${EXT}_rawSub/g" "$FILE";
+    sed -i "s/\brawMontgomeryMul\b/F${EXT}_rawMMul/g" "$FILE";
+    sed -i "s/\brawMontgomerySquare\b/F${EXT}_rawMSquare/g" "$FILE";
+  fi
   sed -i "0,/F${EXT}_fail/s//fail_h/" "$FILE";
   sed -i "s/F${EXT}_fail/fail_h wrt ..plt/1" "$FILE";
 }
@@ -37,7 +39,7 @@ cd ffiasm;
 
 ADX_SUPPORT=$(cat /proc/cpuinfo | grep -m1 -oP 'adx')
 echo ${ADX_SUPPORT}
-if [ -z "$ADX_SUPPORT" ]; then
+if [ -z $ADX_SUPPORT ]; then 
     echo "system does not support adx"
     git checkout cdabe2242a9bd1dc61285fec918f9e7cd610d7ef;
 fi
