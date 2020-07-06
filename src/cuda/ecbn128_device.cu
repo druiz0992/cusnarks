@@ -1238,10 +1238,19 @@ __forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1
   */
 
   if (eq0z(&z2)){ 
-      zxr->setu256(T1::getN()*zoffset,zx1,T1::getN()*x1offset);
-      logInfoTid("R1=inf %d\n", midx);
+     if ( (eq0z(&x1) && eqz(&y1,_1))){ 
+        zxr->setu256(T1::getN()*zoffset,zx2,T1::getN()*x2offset);
+     } else {
+        zxr->setu256(T1::getN()*zoffset,zx1,T1::getN()*x1offset);
+     }
+      //logInfoTid("R1=inf %d\n", midx);
       return;  
   }
+  if ( (eq0z(&x1) && eqz(&y1,_1))){ 
+      zxr->setu256(T1::getN()*zoffset,zx2,T1::getN()*x2offset);
+      return;
+  }
+
   squarez(&tmp_x, &z2,         midx);  // tmp_x = z2sq 
   mulz(&tmp_z, &tmp_x, &x1, midx);  // tmp_z = u1 = x1 * z2sq
   mulz(&tmp_x, &tmp_x, &z2, midx);  // tmp_x = z2cube
@@ -1892,4 +1901,638 @@ __forceinline__ __device__ void shflxoruecc(T1 *d_out,T1 *d_in, uint32_t srcLane
     }
 }
 
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,5)scmulecjac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+__global__ void __launch_bounds__(256,2)scmulecjac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // offset where input ep points start
+    uint32_t poffset = params->in_length/ECP_JAC_OUTDIMS * NWORDS_FR;
+    // size of bins in bits
+    const uint32_t bin_size = params->padding_idx;  // for example 16
+    // number of blocks per scalar. A block is the operation unit of pippenger. 
+    const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size;
+    // thread inpout data offset.
+    uint32_t in_offset = idx / nblocks * params->stride/ECP_JAC_OUTDIMS;
+    // thread output data offset
+    uint32_t nelems = params->premod;
+    //uint32_t out_offset = idx;
+    uint32_t out_offset = idx;
+
+    uint32_t __restrict__ *scl = NULL;
+
+    
+    logInfoTid("Length : %d\n", params->in_length);
+    logInfoTid("Stride : %d\n", params->stride);
+    logInfoTid("Premul : %d\n", params->premul);
+    logInfoTid("Padding : %d\n", params->padding_idx);
+    logInfoTid("Poffset : %d\n", poffset);
+    logInfoTid("BinSize : %d\n", bin_size);
+    logInfoTid("NBlocks : %d\n", nblocks);
+    logInfoTid("InOffset : %d\n", in_offset);
+    logInfoTid("OutOffset : %d\n", out_offset);
+    logInfoTid("Limit : %d\n", (params->in_length+params->stride-1)/params->stride * nblocks);
+    
+ 
+    //if(idx >= params->in_length/params->stride*nblocks) {
+    if(idx >= (params->in_length+params->stride-1)/params->stride*nblocks) {
+      return;
+    }
+
+    Z1_t xo;
+    Z1_t xr;
+    // pointer to scalar
+    scl = (uint32_t *) in_vector;
+    // pointer to input vector.
+    xo.assign(&in_vector[poffset]);
+    // pointer to output vector
+    xr.assign(out_vector);
+    
+    // pointer to input vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z1_t in(xo.getu256(ECP_JAC_INDIMS * in_offset));
+    // pointer to output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z1_t out(xr.getu256(out_offset * ECP_JAC_OUTDIMS * (1 << params->padding_idx)));
+    /*  
+    logInfoBigNumberTid(1,"SCL :\n",&scl[in_offset * NWORDS_FP]);
+    logInfoBigNumberTid(3,"IN :\n",&in);
+    */
+    scmulecjac_pippen<Z1_t, uint256_t>(&out,0,
+                                       &in, 0, 
+                                       &scl[in_offset * NWORDS_FR],  params);
+    //logInfoBigNumberTid(3,"OUT :\n",&out);
+}
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,2)redecjac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+__global__ void __launch_bounds__(256,2)redecjac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // size of bins in bits
+    const uint32_t bin_size = params->padding_idx;  // for example 16
+    // number of blocks per scalar. A block is the operation unit of pippenger. 
+    const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size ;
+    // thread output data offset
+    uint32_t out_offset = idx; 
+
+    uint32_t __restrict__ *scl = NULL;
+
+    logInfoTid("Length : %d\n", params->in_length);
+    logInfoTid("Stride : %d\n", params->stride);
+    logInfoTid("BinSize : %d\n", bin_size);
+    logInfoTid("NBlocks : %d\n", nblocks);
+    logInfoTid("OutOffset : %d\n", out_offset);
+    logInfoTid("Limit : %d\n", params->in_length/params->stride);
+ 
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+
+    Z1_t xo;
+    Z1_t xr;
+
+    // pointer to output vector
+    xr.assign(out_vector);
+    
+    // pointer to input/output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z1_t out(xr.getu256(out_offset * ECP_JAC_OUTDIMS));
+    Z1_t in(xr.getu256(out_offset * ECP_JAC_OUTDIMS * (1 << params->padding_idx)));
+      
+    logInfoBigNumberTid(3,"IN :\n",&out);
+    redecjac_pippen<Z1_t, uint256_t>(&out,0,
+		                     &in,0,
+                                     params);
+    logInfoBigNumberTid(3,"OUT :\n",&out);
+}
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,2)redecjac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+__global__ void __launch_bounds__(256,2)redecjac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // size of bins in bits
+    const uint32_t bin_size = params->padding_idx;  // for example 16
+    // number of blocks per scalar. A block is the operation unit of pippenger. 
+    const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size ;
+    // thread output data offset
+    uint32_t out_offset = idx; 
+
+    uint32_t __restrict__ *scl = NULL;
+
+    logInfoTid("Length : %d\n", params->in_length);
+    logInfoTid("Stride : %d\n", params->stride);
+    logInfoTid("BinSize : %d\n", bin_size);
+    logInfoTid("NBlocks : %d\n", nblocks);
+    logInfoTid("OutOffset : %d\n", out_offset);
+    logInfoTid("Limit : %d\n", params->in_length/params->stride);
+ 
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+
+    Z1_t xo;
+    Z1_t xr;
+
+    // pointer to output vector
+    xr.assign(out_vector);
+    
+    // pointer to input/output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z1_t out(xr.getu256(out_offset * ECP_JAC_OUTDIMS));
+    Z1_t in(xr.getu256(out_offset * ECP_JAC_OUTDIMS * (1 << params->padding_idx)));
+      
+    logInfoBigNumberTid(3,"IN :\n",&out);
+    doublecjac_pippen<Z1_t, uint256_t>(&out,0,
+		                     &in,0,
+                                    params);
+    logInfoBigNumberTid(3,"OUT :\n",&out);
+}
+
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,2)redecjac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+__global__ void __launch_bounds__(256,2)redecjac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    logInfoTid("Limit : %d\n", params->in_length/params->stride);
+    logInfoTid("Padding : %d\n", params->padding_idx);
+    extern __shared__ uint32_t smem[];
+    Z1_t zsmem(smem);  // 0 .. blockDim
+
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+    Z1_t xo;
+    Z1_t xr;
+
+    // pointer to output vector
+    xr.assign(&out_vector[blockIdx.x * ECP_JAC_OUTOFFSET + ECP_JAC_OUTXOFFSET]);  
+    
+    // pointer to input/output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    xo.assign(&out_vector[idx * ECP_JAC_OUTDIMS * (1 << params->padding_idx) * NWORDS_FP]);
+    //xo.assign(&out_vector[idx * ECP_JAC_OUTDIMS ]);
+    
+    logInfoBigNumberTid(3,"RES0  :\n",xo.getsingleu256(0));
+    logInfoBigNumberTid(3,"RES1  :\n",xo.getsingleu256(32*1*3*(1<<params->padding_idx)));
+    logInfoBigNumberTid(3,"RES2  :\n",xo.getsingleu256(32*2*3*(1<<params->padding_idx)));
+    logInfoBigNumberTid(3,"RES3  :\n",xo.getsingleu256(32*3*3*(1<<params->padding_idx)));
+    
+    ////TODO Remove
+    //xr.setu256(idx*3,&xo,0);
+    //return;
+ 
+    //__syncthreads();
+    redecjac<Z1_t, uint256_t>(&xr, &xo, &zsmem, params);
+    logInfoBigNumberTid(3,"XOUT :\n",xr.getsingleu256(0));
+}
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,5)scmulec2jac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+//__global__ void __launch_bounds__(256,2)scmulec2jac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void scmulec2jac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // offset where input ep points start
+    uint32_t poffset = params->in_length/5 * NWORDS_FR;
+    // size of bins in bits
+    const uint32_t bin_size = params->padding_idx;  // for example 16
+    // number of blocks per scalar. A block is the operation unit of pippenger. 
+    const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size;
+    // thread inpout data offset.
+    uint32_t in_offset = idx / nblocks * params->stride/5;
+    // thread output data offset
+    uint32_t nelems = params->premod;
+    //uint32_t out_offset = idx;
+    uint32_t out_offset = idx;
+
+    uint32_t __restrict__ *scl = NULL;
+
+    
+    logInfoTid("Length : %d\n", params->in_length);
+    logInfoTid("Stride : %d\n", params->stride);
+    logInfoTid("Premul : %d\n", params->premul);
+    logInfoTid("Padding : %d\n", params->padding_idx);
+    logInfoTid("Poffset : %d\n", poffset);
+    logInfoTid("BinSize : %d\n", bin_size);
+    logInfoTid("NBlocks : %d\n", nblocks);
+    logInfoTid("InOffset : %d\n", in_offset);
+    logInfoTid("OutOffset : %d\n", out_offset);
+    logInfoTid("Limit : %d\n", (params->in_length+params->stride-1)/params->stride * nblocks);
+    
+ 
+    //if(idx >= params->in_length/params->stride*nblocks) {
+    if(idx >= (params->in_length+params->stride-1)/params->stride*nblocks) {
+      return;
+    }
+
+    Z2_t xo;
+    Z2_t xr;
+    // pointer to scalar
+    scl = (uint32_t *) in_vector;
+    // pointer to input vector.
+    xo.assign(&in_vector[poffset]);
+    // pointer to output vector
+    xr.assign(out_vector);
+    
+    // pointer to input vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z2_t in(xo.getu256(ECP_JAC_INDIMS * in_offset));
+    // pointer to output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z2_t out(xr.getu256(out_offset * ECP_JAC_OUTDIMS * (1 << params->padding_idx)));
+     
+    /* 
+    logInfoBigNumberTid(1,"SCL :\n",&scl[in_offset * NWORDS_FP]);
+    logInfoBigNumberTid(4,"IN :\n",&in);
+    */
+    
+    scmulecjac_pippen<Z2_t, uint512_t>(&out,0,
+                                       &in, 0, 
+                                       &scl[in_offset * NWORDS_FR],  params);
+    //logInfoBigNumberTid(6,"OUT :\n",&out);
+}
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,2)redec2jac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+//__global__ void __launch_bounds__(256,2)redec2jac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void redec2jac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // size of bins in bits
+    const uint32_t bin_size = params->padding_idx;  // for example 16
+    // number of blocks per scalar. A block is the operation unit of pippenger. 
+    const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size ;
+    // thread output data offset
+    uint32_t out_offset = idx; 
+
+    uint32_t __restrict__ *scl = NULL;
+
+    logInfoTid("Length : %d\n", params->in_length);
+    logInfoTid("Stride : %d\n", params->stride);
+    logInfoTid("BinSize : %d\n", bin_size);
+    logInfoTid("NBlocks : %d\n", nblocks);
+    logInfoTid("OutOffset : %d\n", out_offset);
+    logInfoTid("Limit : %d\n", params->in_length/params->stride);
+ 
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+
+    Z2_t xo;
+    Z2_t xr;
+
+    // pointer to output vector
+    xr.assign(out_vector);
+    
+    // pointer to input/output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z2_t out(xr.getu256(out_offset * ECP_JAC_OUTDIMS));
+    Z2_t in(xr.getu256(out_offset * ECP_JAC_OUTDIMS * (1 << params->padding_idx)));
+      
+    logInfoBigNumberTid(6,"IN :\n",&out);
+    redecjac_pippen<Z2_t, uint512_t>(&out,0,
+		                     &in,0,
+                                    params);
+    logInfoBigNumberTid(3,"OUT :\n",&out);
+}
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,2)redec2jac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+//__global__ void __launch_bounds__(256,2)redec2jac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void redec2jac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+    // size of bins in bits
+    const uint32_t bin_size = params->padding_idx;  // for example 16
+    // number of blocks per scalar. A block is the operation unit of pippenger. 
+    const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size ;
+    // thread output data offset
+    uint32_t out_offset = idx; 
+
+    uint32_t __restrict__ *scl = NULL;
+
+    logInfoTid("Length : %d\n", params->in_length);
+    logInfoTid("Stride : %d\n", params->stride);
+    logInfoTid("BinSize : %d\n", bin_size);
+    logInfoTid("NBlocks : %d\n", nblocks);
+    logInfoTid("OutOffset : %d\n", out_offset);
+    logInfoTid("Limit : %d\n", params->in_length/params->stride);
+ 
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+
+    Z2_t xo;
+    Z2_t xr;
+
+    // pointer to output vector
+    xr.assign(out_vector);
+    
+    // pointer to input/output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    Z2_t out(xr.getu256(out_offset * ECP_JAC_OUTDIMS));
+    Z2_t in(xr.getu256(out_offset * ECP_JAC_OUTDIMS * (1 << params->padding_idx)));
+      
+    logInfoBigNumberTid(6,"IN :\n",&out);
+    doublecjac_pippen<Z2_t, uint512_t>(&out,0,
+		                     &in,0,
+                                     params);
+    logInfoBigNumberTid(6,"OUT :\n",&out);
+}
+
+
+#if (_CUDA_ARCH__ == 610)
+__global__ void __launch_bounds__(128,2)redec2jac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#else
+//__global__ void __launch_bounds__(256,2)redec2jac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+__global__ void redec2jac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
+#endif
+{
+    unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+    logInfoTid("Limit : %d\n", params->in_length/params->stride);
+    logInfoTid("Padding : %d\n", params->padding_idx);
+    extern __shared__ uint32_t smem[];
+    Z2_t zsmem(smem);  // 0 .. blockDim
+
+    if(idx >= params->in_length/params->stride) {
+      return;
+    }
+    Z2_t xo;
+    Z2_t xr;
+
+    // pointer to output vector
+    xr.assign(&out_vector[blockIdx.x * ECP2_JAC_OUTOFFSET + ECP2_JAC_OUTXOFFSET]);  
+    
+    // pointer to input/output vector per thread. Each thread works with point pointed by pointer for stride elemeents
+    xo.assign(&out_vector[idx * ECP2_JAC_OUTDIMS * (1 << params->padding_idx) * NWORDS_FP]);
+    //xo.assign(&out_vector[idx * ECP_JAC_OUTDIMS ]);
+    
+    /*logInfoBigNumberTid(6,"RES0  :\n",xo.getsingleu256(0));
+    logInfoBigNumberTid(6,"RES1  :\n",xo.getsingleu256(32*1*6*(1<<params->padding_idx)));
+    logInfoBigNumberTid(6,"RES2  :\n",xo.getsingleu256(32*2*6*(1<<params->padding_idx)));
+    logInfoBigNumberTid(6,"RES3  :\n",xo.getsingleu256(32*3*6*(1<<params->padding_idx)));
+    */
+    
+    ////TODO Remove
+    //xr.setu256(idx*3,&xo,0);
+    //return;
+ 
+    //__syncthreads();
+    redecjac<Z2_t, uint512_t>(&xr, &xo, &zsmem, params);
+    logInfoBigNumberTid(6,"XOUT :\n",xr.getsingleu256(0));
+}
+
+
+template<typename T1, typename T2>
+__device__ void scmulecjac_pippen(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params)
+{
+  uint32_t i;
+
+  uint32_t offset;
+  uint32_t  b, bin;
+  unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+  const uint32_t _0[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  uint32_t bin_size = params->padding_idx;
+  uint32_t scl_size =  NWORDS_FR * NBITS_WORD - 1;  // 255
+  uint32_t *_1 = G2One_ct;
+  uint32_t __restrict__ zN[3*sizeof(T2)/sizeof(uint32_t)]; // N = P
+  uint32_t outdims = ECP_JAC_OUTDIMS;
+  uint32_t edims = ECP_JAC_OUTDIMS;
+
+  if (sizeof(T2) == sizeof(uint512_t)){
+	 outdims = ECP2_JAC_OUTDIMS;
+         edims = ECP2_JAC_INDIMS + 1;
+  }
+
+  T1 zero((uint32_t *)_0);
+  T1 N(zN);
+
+  setkz(&N,2,_1);
+
+  // output  
+  T1 Q(zxr->getu256(zoffset));
+
+  // if first time, initialize z component to 0
+  if (params->premul) {
+    for (i=0; i < 1 << params->padding_idx; i++){
+        Q.setsingleu256(i*ECP_JAC_OUTDIMS+2,&zero,0);
+    }
+  }
+
+  // get scl bits and add it to corresponding bin
+  for (i=0; i < params->stride/edims; i++){ 
+       bin = getbitu256(&scl[(i)*NWORDS_FR],(idx*bin_size) & scl_size, bin_size);
+       if (bin == 0) {
+	       continue;
+       }
+       
+       /*
+       logInfoBigNumberTid(1,"scl :\n",&scl[i*NWORDS_FR]);
+       logInfoTid("bin : %x\n", bin);
+       */
+       
+  
+       // Add third coordinate to input param  
+       N.setu256(0,zx1,xoffset+(i)*ECP_JAC_INDIMS,1);
+       N.setu256(1,zx1,xoffset+(i)*ECP_JAC_INDIMS+1,1);
+       
+       /*     
+       logInfoBigNumberTid(T1::getN()*3,"A :\n",N.getsingleu256(0));
+       logInfoBigNumberTid(T1::getN()*3,"B :\n",Q.getsingleu256(bin*ECP_JAC_OUTDIMS*T1::getN()));
+       */
+       
+       
+       // Q[bin*ECP_JAC_OUTDIMS] += zx1[i*ECP_JAC_OUTDIMS]
+       #ifdef CU_ASM_ECADD
+         addecjacz(&Q,bin*ECP_JAC_OUTDIMS, &N,0, &Q,bin*ECP_JAC_OUTDIMS, params->midx);
+       #else
+         //addecjac<T1, T2>(&Q,bin*ECP_JAC_OUTDIMS, &N,0, &Q,bin*ECP_JAC_OUTDIMS, params->midx);
+         addecjacmixed<T1, T2>(&Q,bin*ECP_JAC_OUTDIMS, &N,0, &Q,bin*ECP_JAC_OUTDIMS, params->midx);
+       //logInfoBigNumberTid(T1::getN()*3,"RES :\n",zxr->getsingleu256(bin*ECP_JAC_OUTDIMS*T1::getN()));
+       #endif
+  }
+ 
+ 
+ /* 
+  __syncthreads();
+  if (idx == LOG_TID){
+  for(i=0; i < params->in_length/params->stride; i++){
+     logInfoTid("i : %d\n",i);
+     logInfoBigNumberTid(1,"SCL :\n",&scl[i*NWORDS_FR]);
+  }
+  uint32_t init=0;
+  uint32_t start = idx * (1<<params->padding_idx);
+  for(i=start; i <( params->premod * blockDim.x * (1<<params->padding_idx)); i++){
+     T1 Q2(zxr->getsingleu256((i-start)*(ECP_JAC_OUTDIMS)*T1::getN()+2*T1::getN()));
+     if (!eq0z(&Q2)) {
+        logInfoTid("bin : %d\n",i%(1<<params->padding_idx));
+        logInfoTid("block : %d\n",i/(1<<params->padding_idx));
+        logInfoTid("n : %d\n",init);
+	init++;
+        logInfoBigNumberTid(3*T1::getN(),"RES :\n",zxr->getsingleu256((i-start)*ECP_JAC_OUTDIMS*T1::getN()));
+     }
+  }
+  }
+  */
+  
+ 
+
+  return;
+}
+
+template<typename T1, typename T2>
+__device__ void redecjac_pippen(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset,kernel_params_t *params)
+{
+  uint32_t i;
+  uint32_t bin_size = params->padding_idx;
+  unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+  const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size;
+  uint32_t scl_size =  NWORDS_FR * NBITS_WORD - 1;  // 255
+
+  logInfoTid("bin_size : %d\n", bin_size);
+  logInfoTid("nblocks : %d\n", nblocks);
+  logInfoTid("scl_size : %d\n", scl_size);
+
+  T1 Q(zx1->getu256(xoffset));
+
+  // Accumulate : For each bin block, sum el[i+1] to el[i] for i=1..n-1
+  for (i = (1 << params->padding_idx)-2; i > 0; i--){
+	  /*
+      logInfoTid("i : %d\n", i);
+      logInfoBigNumberTid(3*T1::getN(),"A :\n",Q.getsingleu256(i*ECP_JAC_OUTDIMS*T1::getN()));
+      logInfoBigNumberTid(3*T1::getN(),"B :\n",Q.getsingleu256((i+1)*ECP_JAC_OUTDIMS*T1::getN()));
+      */
+      addecjac<T1, T2>(&Q,i*ECP_JAC_OUTDIMS, &Q,(i+1)*ECP_JAC_OUTDIMS, &Q,i*ECP_JAC_OUTDIMS, params->midx);
+      //logInfoBigNumberTid(3*T1::getN(),"RES :\n",Q.getsingleu256(i*ECP_JAC_OUTDIMS*T1::getN()));
+  }
+
+  /*
+  
+  __syncthreads();
+  if (idx == LOG_TID){
+  uint32_t init=0;
+  uint32_t start = idx * (1<<params->padding_idx);
+  for(i=start; i <( params->premod*blockDim.x * (1<<params->padding_idx)); i++){
+     T1 Q2(zx1->getsingleu256((i-start)*ECP_JAC_OUTDIMS*T1::getN()+2*T1::getN()));
+     if (!eq0z(&Q2)) {
+        logInfoTid("bin : %d\n",i%(1<<params->padding_idx));
+        logInfoTid("block : %d\n",i/(1<<params->padding_idx));
+        logInfoTid("n : %d\n",init);
+	init++;
+        logInfoBigNumberTid(3*T1::getN(),"RES :\n",zx1->getsingleu256((i-start)*ECP_JAC_OUTDIMS*T1::getN()));
+     }
+  }
+  }
+  */
+
+  // Reduce : For ech bin block, el[0] = el[1] + el[2] + ... + el[n-1]
+  addecjac<T1, T2>(&Q,0, &Q,ECP_JAC_OUTDIMS, &Q,2*ECP_JAC_OUTDIMS, params->midx);
+  for (i=3 ;i < 1 << params->padding_idx;  i++){
+/*	  
+      logInfoTid("i : %d\n", i);
+      logInfoBigNumberTid(3*T1::getN(),"A :\n",Q.getsingleu256(i*ECP_JAC_OUTDIMS*T1::getN()));
+      logInfoBigNumberTid(3*T1::getN(),"B :\n",Q.getsingleu256((0)*ECP_JAC_OUTDIMS*T1::getN()));
+      */
+      
+      addecjac<T1, T2>(&Q,0, &Q,i*ECP_JAC_OUTDIMS, &Q,0, params->midx);
+      //logInfoBigNumberTid(3*T1::getN(),"RES :\n",Q.getsingleu256(0*ECP_JAC_OUTDIMS*T1::getN()));
+  }
+
+ /* 
+  
+  __syncthreads();
+  if (idx == LOG_TID){
+  uint32_t init=0;
+  uint32_t start = idx * (1<<params->padding_idx);
+  for(i=start; i <( params->premod * blockDim.x * (1<<params->padding_idx)); i+=(1<<params->padding_idx)){
+     T1 Q2(zx1->getsingleu256((i-start)*ECP_JAC_OUTDIMS*T1::getN()+2*T1::getN()));
+     if (!eq0z(&Q2)) {
+        logInfoTid("bin : %d\n",i%(1<<params->padding_idx));
+        logInfoTid("block : %d\n",i/(1<<params->padding_idx));
+        logInfoTid("n : %d\n",init);
+	init++;
+        logInfoBigNumberTid(3*T1::getN(),"RES :\n",zx1->getsingleu256((i-start)*ECP_JAC_OUTDIMS*T1::getN()));
+     }
+  }
+  }
+  
+ */ 
+  
+  return;
+}
+
+template<typename T1, typename T2>
+__device__ void doublecjac_pippen(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset,kernel_params_t *params)
+{
+  uint32_t i;
+  uint32_t bin_size = params->padding_idx;
+  unsigned int idx = threadIdx.x + blockDim.x * blockIdx.x;
+  const uint32_t nblocks = NWORDS_FR * NBITS_WORD / bin_size;
+  uint32_t scl_size =  NWORDS_FR * NBITS_WORD - 1;  // 255
+
+  logInfoTid("bin_size : %d\n", bin_size);
+  logInfoTid("nblocks : %d\n", nblocks);
+  logInfoTid("scl_size : %d\n", scl_size);
+
+  T1 Q(zx1->getu256(xoffset));
+
+  // Reduce : For ech bin block, el[0] = el[1] + el[2] + ... + el[n-1]
+  for (i=1 ; i <params->premod ;  i++){
+ /* 
+     logInfoTid("i : %d\n", i);
+     logInfoBigNumberTid(3,"A :\n",Q.getsingleu256(0*ECP_JAC_OUTDIMS));
+     logInfoBigNumberTid(3,"B :\n",Q.getsingleu256(i*NWORDS_FR*NBITS_WORD*ECP_JAC_OUTDIMS*(1<<params->padding_idx)));
+     */
+   
+     addecjac<T1, T2>(&Q,0, &Q,i*blockDim.x*ECP_JAC_OUTDIMS*(1<<params->padding_idx), &Q,0, params->midx);
+     
+     //logInfoBigNumberTid(3,"RES :\n",Q.getsingleu256(0*ECP_JAC_OUTDIMS));
+     
+  }
+ 
+  // Double : 
+  for (i=0 ; i < ((idx*bin_size) & scl_size);  i++){
+	  /*
+      logInfoTid("i : %d\n", i);
+      logInfoBigNumberTid(3,"A :\n",Q.getsingleu256(0*ECP_JAC_OUTDIMS));
+      */
+      
+      doublecjac<T1, T2>(&Q,&Q, params->midx);
+      //logInfoBigNumberTid(3,"RES :\n",Q.getsingleu256(0*ECP_JAC_OUTDIMS));
+  }
+  //logInfoBigNumberTid(3,"Q in :\n",Q.getsingleu256(0));
+
+  //__syncthreads();
+  //zxr->setu256(0,zx1,0);
+  
+
+ /* 
+  if (idx == LOG_TID){
+  __syncthreads();
+  uint32_t init=0;
+  uint32_t start = idx * (1<<params->padding_idx);
+  for(i=start; i <( blockDim.x * (1<<params->padding_idx)); i+=(1<<params->padding_idx)){
+        logInfoTid("bin : %d\n",i%(1<<params->padding_idx));
+        logInfoTid("block : %d\n",i/(1<<params->padding_idx));
+        logInfoTid("n : %d\n",init);
+	init++;
+        logInfoBigNumberTid(3*T1::getN(),"RES :\n",zx1->getsingleu256((i-start)*ECP_JAC_OUTDIMS*T1::getN()));
+        //logInfoBigNumberTid(3,"RES2 :\n",zxr->getsingleu256(i/(1<<params->padding_idx)*ECP_JAC_OUTDIMS));
+  }
+  }
+*/ 
+  
+
+  return;
+}
 

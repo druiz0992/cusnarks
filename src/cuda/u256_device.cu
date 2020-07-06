@@ -1373,4 +1373,22 @@ __forceinline__ __device__ void shflxoru256(uint32_t *d_out, uint32_t *d_in, uin
     out->w = __shfl_xor_sync(0xffffffff, in.w, srcLane);
 }
 
+__device__ uint32_t getbitu256(const uint32_t __restrict__ *x, uint32_t n, uint32_t g_size)
+{
+   uint32_t c;
+   uint32_t word = n >> NBITS_WORD_LOG2; // n/32 gives the word number
+   uint32_t bit =  n & NBITS_WORD_MOD; // b % 32 gives bit number
+   uint32_t m = (1<<g_size) - 1;
+
+   asm("{                                       \n\t"
+           "shr.u32            %0,   %1,  %2;     \n\t"      
+           "bfe.u32            %0,   %0,  0, %3;  \n\t"      
+         "}                                       \n\t"
+         : "=r"(c)
+         : "r"(x[word]), "r"(bit), "r"(g_size));
+
+   return c;
+}
+ 
+
 

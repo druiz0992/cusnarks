@@ -78,6 +78,7 @@ extern __device__ uint32_t shl1u256(uint32_t __restrict__ *x);
 extern __device__ void shlu256(uint32_t *x, uint32_t count);
 extern __device__ uint32_t bselMu256(const uint32_t __restrict__ *x, uint32_t bsel);
 extern __device__ uint32_t bselu256(const uint32_t __restrict__ *x, uint32_t bsel);
+extern __device__ uint32_t getbitu256(const uint32_t __restrict__ *x, uint32_t n, uint32_t g_size);
 extern __device__ uint32_t clzu256(const uint32_t __restrict__ *x);
 extern __device__ uint32_t clzMu256(const uint32_t __restrict__ *x);
 extern __device__ void div2u256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x);
