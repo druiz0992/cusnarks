@@ -1221,6 +1221,7 @@ __forceinline__ __device__ void addecjacmixed(T1 *zxr, uint32_t zoffset, T1 *zx1
   T1 x1(zx1->getu256(0+x1offset)), y1(zx1->getu256(1+x1offset));
   T1 x2(zx2->getu256(0+x2offset)), y2(zx2->getu256(1+x2offset)), z2(zx2->getu256(2+x2offset));
   T1 xr(zxr->getu256(0+zoffset)),  yr(zxr->getu256(1+zoffset)), zr(zxr->getu256(2+zoffset));
+  uint32_t *_1 = G2One_ct;
  
   uint32_t __restrict__ ztmp[4*sizeof(T2)/sizeof(uint32_t)];
   T1 tmp1(&ztmp[0*sizeof(T2)/sizeof(uint32_t)]), 
