@@ -1371,7 +1371,10 @@ class GrothProver(object):
           scl_vector = self.scl_array[nPublic+1:self.nVars]
           ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
 
-          used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False)
+          if self.compute_last_mexp_gpu == False:
+              used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True)
+          else:
+              used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False)
 
           if self.stop_client.value and self.p_CPU is not None:
               self.p_CPU.terminate()
@@ -1420,17 +1423,18 @@ class GrothProver(object):
            
            scl_vector = np.concatenate( 
                                  (self.scl_array[:domainSize-1],
-                                  [self.neg_rs_scl],
                                   [self.s_scl],
                                   [self.r_scl],
+                                  [self.neg_rs_scl],
                                   np.asarray([[1,0,0,0,0,0,0,0]],dtype=np.uint32)))
            
            ecp_vector = np.concatenate(
                                 (pk_bin[4][:(domainSize-1)*ECP_JAC_INDIMS*NWORDS_FP],
-                                 pk_bin[5],
                                  np.reshape(self.pi_a_eccf1,-1),
                                  np.reshape(self.pi_b1_eccf1,-1),
+                                 pk_bin[5],
                                  np.reshape(self.pi_c_eccf1,-1)))
+
 
            self.findECPointsDispatch( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
 
