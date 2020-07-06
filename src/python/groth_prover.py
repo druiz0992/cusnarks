@@ -170,7 +170,7 @@ class GrothProver(object):
           self.n_streams = 1
 
         if self.compute_first_mexp_gpu or self.compute_last_mexp_gpu:
-          self.ecbn128  = ECBN128(2*self.batch_size,   seed=self.seed)
+          self.ecbn128  = ECBN128(max(2*self.batch_size,2<<(8+8+4)),   seed=self.seed)
           self.ec2bn128 = self.ecbn128
           #self.ec2bn128 =\
                 #EC2BN128(
@@ -1488,7 +1488,7 @@ class GrothProver(object):
         return 1
  
 
-    def assignECPvalues(self, compute_ECP=False):
+    def assignECPvalues(self, label):
         """
         Labels : 'A', 'B2', 'B1', 'C' . hExps = 'C'
         """
@@ -1546,7 +1546,7 @@ class GrothProver(object):
           stream_id = p[4]
           cuda_ec128.streamSync(gpu_id,stream_id)
 
-   def getECResults(self, dispatch_table):
+    def getECResults(self, dispatch_table):
        for bidx,p in enumerate(dispatch_table):
           P = p[0]
           cuda_ec128 = self.ec_type_dict[P][0]
@@ -1583,7 +1583,7 @@ class GrothProver(object):
 
        return nsamples, EC_P, scl_start_idx, ec_start_idx
 
-   def findECPointsDispatch3(self, dispatch_table, scl_vector, ecp_vector, ec2=0, reduce_en=True, used_streams=None):
+    def findECPointsDispatch(self, dispatch_table, scl_vector, ecp_vector, ec2=0, reduce_en=True, used_streams=None):
 
        ZField.set_field(MOD_FP)
        n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
@@ -1625,9 +1625,7 @@ class GrothProver(object):
           if stream_id in used_streams[gpu_id] :
             first_time = 0
 
-          self.logger.info(' Calling PIPPEN MUL...')
           ec_pippen_mul(cuda_ec128, batch ,MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id, first_time=first_time)
-          self.logger.info(' RETURN PIPPEN MUL...')
           used_streams[gpu_id].add(stream_id)
 
           if stream_id == 0:
@@ -1646,14 +1644,12 @@ class GrothProver(object):
              if n_dispatch == n_par_batches:
                  n_dispatch=0
 
-                 self.logger.info(' START DELETE STREAMS...')
                  try:
                     self.streamsDel(pending_dispatch_table)
                  except ValueError:
                     self.logger.error('Exception occurred when getting EC results. Exiting program...')
                     sys.exit(1)
                  pending_dispatch_table = []
-                 self.logger.info(' STREAMS DELETED...')
 
           if self.stop_client.value:
              # Collect final results
@@ -1661,15 +1657,12 @@ class GrothProver(object):
              return
 
        # Collect final results
-       self.logger.info(' START DELETE STREAMS...')
        self.streamsDel(pending_dispatch_table)
-       self.logger.info(' REDUCTION...')
        if reduce_en :
           for gpu_id, streams  in enumerate(used_streams):
               for stream_id in streams:
                  ec_pippen_reduce(cuda_ec128, batch, MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id)
   
-          self.logger.info(' COLLECT FINAL RESULTS...')
           for gpu_id, streams  in enumerate(used_streams):
               for stream_id in streams:
                 result, t = cuda_ec128.streamSync(gpu_id,stream_id)
@@ -1685,7 +1678,6 @@ class GrothProver(object):
                                  result.reshape(-1),
                                  MOD_FP,
                                  strip_last=1) 
-          self.logger.info(' DONE...')
           return None                  
        else:
           return used_streams
