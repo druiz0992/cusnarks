@@ -347,13 +347,17 @@ typedef enum{
    CB_EC_JAC_MUL_OPT,
    CB_EC_JAC_RED,
    CB_EC_JAC_MUL_PRECOMP,
+   CB_EC_JAC_MUL_PIPPEN,
+   CB_EC_JAC_RED1_PIPPEN,
+   CB_EC_JAC_RED2_PIPPEN,
+   CB_EC_JAC_RED3_PIPPEN,
    CB_EC_N
 
 }ec_callback_t;
 
 // index to ec128bn class kernels
 typedef enum{
-   CB_EC2_JACAFF_ADD = 0,
+   CB_EC2_JACAFF_ADD = CB_EC_N,
    CB_EC2_JAC_ADD,
    CB_EC2_JACAFF_DOUBLE,
    CB_EC2_JAC_DOUBLE,
@@ -363,6 +367,10 @@ typedef enum{
    CB_EC2_JAC_MAD_SHFL,
    CB_EC2_JAC_MUL_OPT,
    CB_EC2_JAC_RED,
+   CB_EC2_JAC_MUL_PIPPEN,
+   CB_EC2_JAC_RED1_PIPPEN,
+   CB_EC2_JAC_RED2_PIPPEN,
+   CB_EC2_JAC_RED3_PIPPEN,
    CB_EC2_N
 
 }ec2_callback_t;

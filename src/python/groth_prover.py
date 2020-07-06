@@ -142,8 +142,8 @@ class GrothProver(object):
         self.n_bits_roots = cfg.get_n_roots()
 
         self.batch_size = None
-        if batch_size > 20:
-            batch_size = 20
+        if batch_size > 25:
+            batch_size = 25
 
         self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
 
@@ -170,12 +170,13 @@ class GrothProver(object):
           self.n_streams = 1
 
         if self.compute_first_mexp_gpu or self.compute_last_mexp_gpu:
-          self.ecbn128  = ECBN128(self.batch_size,   seed=self.seed)
-          self.ec2bn128 =\
-                EC2BN128(
-                              int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * self.batch_size),
-                              seed=self.seed
-                        )
+          self.ecbn128  = ECBN128(2*self.batch_size,   seed=self.seed)
+          self.ec2bn128 = self.ecbn128
+          #self.ec2bn128 =\
+                #EC2BN128(
+                              #int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * self.batch_size),
+                              #seed=self.seed
+                        #)
         else:
           self.ecbn128  = None
           self.ec2bn128 = None
@@ -506,75 +507,53 @@ class GrothProver(object):
         nPublic = pk_bin[1][0]
         domainSize = pk_bin[2][0]
 
-        nbatches1 = math.ceil((nVars - (nPublic+1))/(self.batch_size-1)) + 1
-        nbatches2 = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-1)) + 1
-
-        if nbatches1 != nbatches2:
-          nbatches = math.ceil((nVars+2 - (nPublic+1))/(self.batch_size-2)) + 1
-          self.batch_size_mexp_phase1 = self.batch_size-1
-        else:
-          nbatches = nbatches1
-          self.batch_size_mexp_phase1 = self.batch_size
-
         next_gpu_idx = 0
         first_stream_idx = min(self.n_streams-1,1)
 
-        if self.zk:
-          ec_lable_ph1 = np.asarray(['A', 'B1', 'C'])
-          ec_lable_ph2 = np.asarray(['A', 'B2', 'B1'])
-          n_els_ph1 = len(ec_lable_ph1)
-          n_els_ph2 = len(ec_lable_ph2)
-        else:
-          ec_lable_ph1 = np.asarray(['A', 'C'])
-          n_els_ph1 = len(ec_lable_ph1)
-          ec_lable_ph2 = np.asarray(['A', 'B2'])
-          n_els_ph2 = len(ec_lable_ph2)
+        nsamples = self.nVars+2
+        nsamplesC = self.nVars - nPublic -1
 
-        # EC reduce A, B2, B1 and C from nPublic+1 to end	
-        self.dispatch_table_phase1 = buildDispatchTable( nbatches-1,
-                                         n_els_ph1,
-                                         self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
-                                         nPublic+1, nVars,
-                                         start_pidx=self.ec_type_dict['A'][2],
-                                         start_gpu_idx=next_gpu_idx,
-                                         start_stream_idx=first_stream_idx,
-                                         ec_lable = ec_lable_ph1)
-
-        self.dispatch_table_phase1b = buildDispatchTable( nbatches-1,
+        self.tableA = buildDispatchTable( math.ceil(nsamples/self.batch_size),
                                          1,
-                                         self.n_gpu, self.n_streams, self.batch_size_mexp_phase1-1,
-                                         nPublic+1, nVars,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamples,
                                          start_pidx=0,
-                                         start_gpu_idx=next_gpu_idx,
-                                         start_stream_idx=first_stream_idx,
+                                         start_gpu_idx=0,
+                                         ec_lable = np.asarray(['A']))
+
+        self.tableB1 = buildDispatchTable( math.ceil(nsamples/self.batch_size),
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamples,
+                                         start_pidx=0,
+                                         start_gpu_idx=0,
+                                         ec_lable = np.asarray(['B1']))
+
+        self.tableC = buildDispatchTable( math.ceil(nsamplesC/self.batch_size),
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamplesC,
+                                         start_pidx=0,
+                                         start_gpu_idx=0,
+                                         ec_lable = np.asarray(['C']))
+
+        self.tableB2 = buildDispatchTable( math.ceil(nsamples/self.batch_size),
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamples,
+                                         start_pidx=0,
+                                         start_gpu_idx=0,
                                          ec_lable = np.asarray(['B2']))
 
+        nsamplesH = domainSize - 1 + 1 +1 +1 +1  # a + b1 + delta_1 + c
+        self.tableH = buildDispatchTable( math.ceil(nsamplesH/self.batch_size),
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamplesH,
+                                         start_pidx=0,
+                                         start_gpu_idx=0,
+                                         ec_lable = np.asarray(['hExps']))
 
-        # EC reduce A, B2 and B1 from 0 to nPublic+1
-        self.dispatch_table_phase2 = buildDispatchTable(1, 
-                                n_els_ph2,
-                                self.n_gpu, self.n_streams, nPublic+1,
-                                0, nPublic+1,
-                                start_pidx=self.ec_type_dict['A'][2],
-                                start_gpu_idx=next_gpu_idx,
-                                start_stream_idx=first_stream_idx,
-                                ec_lable = ec_lable_ph2)
-
-        self.batch_size_mexp_phase3 = self.batch_size
-        while True:
-           nbatches = math.ceil((domainSize - 1)/(self.batch_size_mexp_phase3 - 1))
-           if domainSize -1 - max(1,(nbatches-1))*(self.batch_size_mexp_phase3 - 1)  < 3:
-              self.batch_size_mexp_phase3 -= 3
-           else :
-             break
-
-       
-        # EC reduce hExps
-        self.dispatch_table_phase3 = buildDispatchTable( nbatches, 1,
-                                         self.n_gpu, self.n_streams, self.batch_size_mexp_phase3-1,
-                                         0, domainSize-1,
-                                         start_pidx=self.ec_type_dict['hExps'][2],
-                                         ec_lable = self.ec_lable)
 
     def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape, pi_c2_eccf1_sh):
         self.logger.info(' Launching Poly Process Client')
@@ -1335,39 +1314,64 @@ class GrothProver(object):
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps','delta_1'])
  
         if self.compute_first_mexp_gpu:
-          self.logger.info(' Starting First Mexp - GPU...')
-          self.findECPointsDispatch(
-                                  self.dispatch_table_phase1b,
-                                  self.batch_size_mexp_phase1,
-                                  self.dispatch_table_phase1b.shape[0]-1, pk_bin,
-                                  sort_idx = self.ec_type_dict['B2'][2],
-                                  change_s_scl_idx = [self.ec_type_dict['B2'][2]],
-                                  sort_en=self.sort_en)
+          self.logger.info(' Starting Mexp B2 - GPU...')
 
-          if self.zk:
-              n_els = self.dispatch_table_phase1.shape[0]-(self.ec_type_dict['C'][2])
-          else:
-              n_els = self.dispatch_table_phase1.shape[0]-2
+          scl_vector = np.concatenate( 
+                                 (self.scl_array[:self.nVars],
+                                  np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                  [self.s_scl]))
 
-          self.findECPointsDispatch(
-                                  self.dispatch_table_phase1,
-                                  self.batch_size_mexp_phase1,
-                                  n_els, pk_bin,
-                                  change_s_scl_idx = [self.ec_type_dict['B1'][2]],
-                                  change_r_scl_idx = [self.ec_type_dict['A'][2]],
-                                  sort_en=self.sort_en)
+          ecp_vector = pk_bin[1][:(self.nVars+2)*ECP2_JAC_INDIMS*NWORDS_FP]
 
-          if self.stop_client.value and self.p_CPU is not None:
+         
+          self.findECPointsDispatch( self.tableB2, scl_vector, ecp_vector, ec2=1 )
+          self.assignECPvalues('B2')
+   
+          if self.stop_client.value:
               self.p_CPU.terminate()
               self.p_CPU.join()
               self.logger.info('Client stopped...')
               return 1
 
-          self.findECPointsDispatch(
-                             self.dispatch_table_phase2,
-                             nPublic+2,
-                             self.dispatch_table_phase2.shape[0]+1, pk_bin,
-                             sort_en = self.sort_en)
+
+          # A
+          self.logger.info(' Mexp A started...')
+
+          scl_vector[-1] = self.r_scl
+
+          ecp_vector = pk_bin[0][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
+
+          self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0)
+          self.assignECPvalues('A')
+          if self.stop_client.value and self.p_CPU is not None:
+               self.p_CPU.terminate()
+               self.p_CPU.join()
+               self.logger.info('Client stopped...')
+               return 1
+
+          # B1
+          if self.zk:
+             self.logger.info(' Mexp B1 started...')
+             
+             scl_vector[-1] = self.s_scl
+             ecp_vector = pk_bin[2][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
+
+             self.findECPointsDispatch( self.tableB1, scl_vector, ecp_vector)
+
+             self.assignECPvalues('B1')
+             if self.stop_client.value:
+                 self.p_CPU.terminate()
+                 self.p_CPU.join()
+                 self.logger.info('Client stopped...')
+                 return 1
+
+          # C 
+          self.logger.info(' Mexp C  started...')
+
+          scl_vector = self.scl_array[nPublic+1:self.nVars]
+          ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
+
+          used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False)
 
           if self.stop_client.value and self.p_CPU is not None:
               self.p_CPU.terminate()
@@ -1376,9 +1380,8 @@ class GrothProver(object):
               return 1
 
           # Assign collected values to pi's
-          self.assignECPvalues(compute_ECP=False)
           if self.compute_last_mexp_gpu == False:
-             self.assignECPvalues(compute_ECP=True)
+             self.assignECPvalues('C')
           self.logger.info(' First Mexp completed GPU...')
 
           end = time.time()
@@ -1413,15 +1416,26 @@ class GrothProver(object):
         if self.compute_last_mexp_gpu:
            start = time.time()
            self.logger.info(' Starting Last Mexp GPU...')
-           self.findECPointsDispatch(
-                                  self.dispatch_table_phase3,
-                                  self.batch_size_mexp_phase3,
-                                  self.dispatch_table_phase3.shape[0]-1, pk_bin,
-                                  sort_idx = self.ec_type_dict['hExps'][2],
-                                  change_rs_scl_idx = [self.ec_type_dict['hExps'][2]],
-                                  sort_en=self.sort_en)
+
+           
+           scl_vector = np.concatenate( 
+                                 (self.scl_array[:domainSize-1],
+                                  [self.neg_rs_scl],
+                                  [self.s_scl],
+                                  [self.r_scl],
+                                  np.asarray([[1,0,0,0,0,0,0,0]],dtype=np.uint32)))
+           
+           ecp_vector = np.concatenate(
+                                (pk_bin[4][:(domainSize-1)*ECP_JAC_INDIMS*NWORDS_FP],
+                                 pk_bin[5],
+                                 np.reshape(self.pi_a_eccf1,-1),
+                                 np.reshape(self.pi_b1_eccf1,-1),
+                                 np.reshape(self.pi_c_eccf1,-1)))
+
+           self.findECPointsDispatch( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
+
         
-           self.assignECPvalues(compute_ECP=True)
+           self.assignECPvalues('C')
            end = time.time()
            self.t_GP['Mexp2'] = (end - start)
            self.logger.info(' Last Mexp completed')
@@ -1475,70 +1489,64 @@ class GrothProver(object):
  
 
     def assignECPvalues(self, compute_ECP=False):
+        """
+        Labels : 'A', 'B2', 'B1', 'C' . hExps = 'C'
+        """
+        EC_idx = self.ec_type_dict[label][4]
 
-        EC_A_idx = self.ec_type_dict['A'][4]
-        EC_B2_idx = self.ec_type_dict['B2'][4]
-        EC_B1_idx = self.ec_type_dict['B1'][4]
-        EC_C_idx = self.ec_type_dict['C'][4]
 
-        if compute_ECP is False:
-            np.copyto(
-                       self.pi_a_eccf1,
-                       ec_jacaddreduce_h(
-                                       np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_A_idx],-1)),-1),
-                                       MOD_FP,
-                                       1,   # to affine
-                                       1,   # Add z coordinate to inout
-                                       1)   # strip z coordinate from affine result
-                                   )
-
-            np.copyto(
-                      self.pi_b_eccf2,
-                      ec2_jacaddreduce_h(
-                                      np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_B2_idx],-1)),-1),
-                                      MOD_FP,
-                                      1,   # to affine
-                                      1,   # Add z coordinate to inout
-                                      1)   # strip z coordinate from affine result
-                                   )
-
-            np.copyto(
-                      self.pi_b1_eccf1,
-                      ec_jacaddreduce_h(
-                                    np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_B1_idx],-1)),-1),
-                                    MOD_FP,
-                                    1,   # to affine
-                                    1,   # Add z coordinate to inout
-                                    1)   # strip z coordinate from affine result
-                                  )
+        if label == 'B2' :
+             ecp = ec2_jacaddreduce_h(
+                                np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_idx],-1)),-1),
+                                MOD_FP,
+                                1,   # to affine
+                                1,   # Add z coordinate to inout
+                                1)   # strip z coordinate from affine result
         else:
-            np.copyto(
-                      self.pi_c_eccf1,
-                      ec_jacaddreduce_h(
-                                      np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
-                                      MOD_FP,
-                                      1,   # to affine
-                                      1,   # Add z coordinate to inout
-                                      1)   # strip z coordinate from affine result
-                                   )
+             ecp = ec_jacaddreduce_h(
+                                np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_idx],-1)),-1),
+                                MOD_FP,
+                                1,   # to affine
+                                1,   # Add z coordinate to inout
+                                1)   # strip z coordinate from affine result
+
+
+        if label == 'A':
+            np.copyto(self.pi_a_eccf1, ecp)
+        elif label == 'B2' :
+            np.copyto(self.pi_b_eccf2, ecp)
+        elif label == 'B1' :
+            np.copyto(self.pi_b1_eccf1, ecp)
+        else :
+            np.copyto(self.pi_c_eccf1, ecp)
+
+        for idx,v in enumerate(self.init_ec_val[:,:,EC_idx][0]):
+            self.init_ec_val[:,:,EC_idx][0][idx]  = np.zeros(v.shape, dtype=np.uint32)
+
 
     def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0, start_idx=0):
             ZField.set_field(MOD_FP)
             #TODO : remove in_v
             #print(ecbn128_samples.shape, ec2, shamir_en, gpu_id, stream_id)
-            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_FP, ec2, shamir_en, gpu_id, stream_id,True, grouping=self.grouping_cuda, start_idx=start_idx)
+            ecp,t = ec_pippen_mul(pyCuOjb, ecbn128_samples, MOD_FP,8,8,ec2, gpu_id, stream_id, first_time)
             if ec2 and stream_id == 0:
               ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_FP)
+              return ecp[0:6], t
             elif stream_id == 0:
               ecp = ec_jac2aff_h(ecp.reshape(-1),MOD_FP)
-
-            if ec2:
-              return ecp[0:6], t
-            else:
-              #return ecp, t
               return ecp[0:3], t
+            
+            return None
 
-    def getECResults(self, dispatch_table):
+    def streamsDel(self, dispatch_table):
+       for bidx,p in enumerate(dispatch_table):
+          P = p[0]
+          cuda_ec128 = self.ec_type_dict[P][0]
+          gpu_id = p[3]
+          stream_id = p[4]
+          cuda_ec128.streamSync(gpu_id,stream_id)
+
+   def getECResults(self, dispatch_table):
        for bidx,p in enumerate(dispatch_table):
           P = p[0]
           cuda_ec128 = self.ec_type_dict[P][0]
@@ -1575,103 +1583,54 @@ class GrothProver(object):
 
        return nsamples, EC_P, scl_start_idx, ec_start_idx
 
-    def findECPointsDispatch(self, dispatch_table, batch_size, last_batch_idx, pk_bin,
-                             sort_idx=0, change_s_scl_idx=[-1], change_r_scl_idx=[-1], change_rs_scl_idx=[-1], sort_en=0):
+   def findECPointsDispatch3(self, dispatch_table, scl_vector, ecp_vector, ec2=0, reduce_en=True, used_streams=None):
 
        ZField.set_field(MOD_FP)
-       nsamples, EC_P, scl_start_idx, ec_start_idx = self.init_EC_P(batch_size)
-       extra_samples = 0
-
        n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
        pending_dispatch_table = []
        n_dispatch=len(pending_dispatch_table)
+       indims = ECP_JAC_INDIMS
+       outdims = ECP_JAC_OUTDIMS
+       edims = ECP_JAC_OUTDIMS
+       if ec2 == 1:
+           indims = ECP2_JAC_INDIMS
+           outdims = ECP2_JAC_OUTDIMS
+           edims = ECP2_JAC_INDIMS + 1
+    
+       if used_streams is None:
+           used_streams = [set([])] * self.n_gpu
 
        for bidx, p in enumerate(dispatch_table):
           #Retrieve point name : A,B1,B2,..
           P = p[0]    
           # Retrieve cuda pointer
           cuda_ec128 = self.ec_type_dict[P][0]
-          step = self.ec_type_dict[P][1]
-          # Retrieve point idx : A->0, B2->1, B1->2, C->3
-          EPidx = self.ec_type_dict[P][2]
-          # Retrieve pis 
-          pidx = self.ec_type_dict[P][4]
           # Retrieve EC type : EC -> 0, EC2 -> 1
-          ecidx = self.ec_type_dict[P][3]
           start_idx = p[1]
           end_idx   = p[2]
           gpu_id    = p[3]
           stream_id = p[4]
-          init_ec_val = self.init_ec_val[gpu_id][stream_id][pidx]
+          pidx = self.ec_type_dict[P][4]
 
-          if bidx >= last_batch_idx:
-            if bidx == last_batch_idx:
-              # End point is end point + 2 additional scalars + previous point
-              extra_samples = 2
-              if EPidx in change_rs_scl_idx:
-                  extra_samples +=1
-              batch_size = end_idx+extra_samples+1-start_idx
-              nsamples, EC_P, scl_start_idx, ec_start_idx = self.init_EC_P(batch_size)
-              # 1 * EC_P
-              self.sorted_scl_array[end_idx:end_idx+1]   = np.asarray([1,0,0,0,0,0,0,0], dtype=np.uint32)
-              self.sorted_scl_array_idx[end_idx] = end_idx - start_idx
-              self.sorted_scl_array_idx[end_idx+1] = end_idx+1 - start_idx
+          #nsamples needs to be multiple of 128
+          nsamples = int((end_idx - start_idx+128-1)/(128))*128
+          offset = nsamples - (end_idx - start_idx)
+          batch = np.zeros((nsamples*edims, NWORDS_FR),dtype=np.uint32)
+          batch[offset:nsamples] = scl_vector[start_idx:end_idx]
+          batch[nsamples+indims*offset:] = np.reshape(
+                                            ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],
+                                            (-1,NWORDS_FP))
 
-            # r/s * EC_P
-            if EPidx in change_r_scl_idx :
-                self.sorted_scl_array[end_idx+1:end_idx+2] = self.r_scl
-            elif EPidx in change_s_scl_idx:
-                self.sorted_scl_array[end_idx+1:end_idx+2] = self.s_scl
-            elif EPidx in change_rs_scl_idx:
-                self.sorted_scl_array[end_idx:end_idx+1] = self.s_scl
-                self.sorted_scl_array[end_idx+1:end_idx+2] = self.r_scl
-                self.sorted_scl_array[end_idx+2:end_idx+3] = self.neg_rs_scl
+          first_time = 1
+          if stream_id in used_streams[gpu_id] :
+            first_time = 0
 
-                self.sorted_scl_array_idx[end_idx+2] = end_idx+2 - start_idx
-
-                pk_bin[EPidx][step*end_idx*NWORDS_256BIT:step*(end_idx+1)*NWORDS_256BIT] =\
-                        np.reshape(self.pi_a_eccf1,-1)[:step*NWORDS_256BIT]
-                pk_bin[EPidx][step*(end_idx+1)*NWORDS_256BIT:step*(end_idx+2)*NWORDS_256BIT] =\
-                       np.reshape(self.pi_b1_eccf1,-1)[:step*NWORDS_256BIT]
-
-            else:
-                self.sorted_scl_array[end_idx:end_idx+1]  = np.asarray([0,0,0,0,0,0,0,0], dtype=np.uint32)
-                self.sorted_scl_array[end_idx:end_idx+2]  = np.asarray([0,0,0,0,0,0,0,0], dtype=np.uint32)
-                self.sorted_scl_array_idx[end_idx] = 0
-                self.sorted_scl_array_idx[end_idx+1] = 0
-
-            EC_P[ecidx][nsamples-1-extra_samples:nsamples-1] = self.sorted_scl_array[end_idx:end_idx+extra_samples]
-
-          if EPidx==sort_idx:
-              # Sort scl batch
-              self.sorted_scl_array_idx[start_idx:end_idx] = \
-                   sortuBI_idx_h(self.scl_array[start_idx:end_idx], NWORDS_FR, sort_en)
-              self.sorted_scl_array[start_idx:end_idx] = \
-                   self.scl_array[start_idx:end_idx][self.sorted_scl_array_idx[start_idx:end_idx]]
-              # Copy sorted scl batch
-              EC_P[0][scl_start_idx:nsamples-1] = self.sorted_scl_array[start_idx:end_idx+extra_samples]
-              EC_P[1][scl_start_idx:nsamples-1] = self.sorted_scl_array[start_idx:end_idx+extra_samples]
-
-          # Copy sorted EC points batch
-          EC_P[ecidx][ec_start_idx[ecidx]:-step] = \
-                     np.reshape(
-                        np.reshape(
-                           pk_bin[EPidx][step*start_idx*NWORDS_256BIT:step*(end_idx+extra_samples)*NWORDS_256BIT],
-                           (-1,step,NWORDS_256BIT))[self.sorted_scl_array_idx[start_idx:end_idx+extra_samples]],
-                        (-1, NWORDS_256BIT)
-                    )
-
-          # Copy last batch EC point sum
-          EC_P[ecidx][-step:] = init_ec_val
-
-          result, t = self.compute_proof_ecp(
-              cuda_ec128,
-              EC_P[ecidx],
-              step == 4, shamir_en=1, gpu_id=gpu_id, stream_id=stream_id, start_idx=scl_start_idx)
-
+          self.logger.info(' Calling PIPPEN MUL...')
+          ec_pippen_mul(cuda_ec128, batch ,MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id, first_time=first_time)
+          self.logger.info(' RETURN PIPPEN MUL...')
+          used_streams[gpu_id].add(stream_id)
 
           if stream_id == 0:
-             self.init_ec_val[gpu_id][stream_id][pidx] = result[:step]
              try:
                cuda_ec128.streamDel(gpu_id, stream_id)
              except ValueError:
@@ -1687,20 +1646,50 @@ class GrothProver(object):
              if n_dispatch == n_par_batches:
                  n_dispatch=0
 
+                 self.logger.info(' START DELETE STREAMS...')
                  try:
-                    self.getECResults(pending_dispatch_table)
+                    self.streamsDel(pending_dispatch_table)
                  except ValueError:
                     self.logger.error('Exception occurred when getting EC results. Exiting program...')
                     sys.exit(1)
                  pending_dispatch_table = []
+                 self.logger.info(' STREAMS DELETED...')
 
           if self.stop_client.value:
              # Collect final results
-             self.getECResults(pending_dispatch_table)
+             self.streamsDel(pending_dispatch_table)
              return
 
        # Collect final results
-       self.getECResults(pending_dispatch_table)
+       self.logger.info(' START DELETE STREAMS...')
+       self.streamsDel(pending_dispatch_table)
+       self.logger.info(' REDUCTION...')
+       if reduce_en :
+          for gpu_id, streams  in enumerate(used_streams):
+              for stream_id in streams:
+                 ec_pippen_reduce(cuda_ec128, batch, MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id)
+  
+          self.logger.info(' COLLECT FINAL RESULTS...')
+          for gpu_id, streams  in enumerate(used_streams):
+              for stream_id in streams:
+                result, t = cuda_ec128.streamSync(gpu_id,stream_id)
+                if len(result) == ECP_JAC_OUTDIMS:
+                    self.init_ec_val[gpu_id][stream_id][pidx] =\
+                               ec_jac2aff_h(
+                                result.reshape(-1),
+                                MOD_FP,
+                                strip_last=1) 
+                else:
+                   self.init_ec_val[gpu_id][stream_id][pidx] =\
+                            ec2_jac2aff_h(
+                                 result.reshape(-1),
+                                 MOD_FP,
+                                 strip_last=1) 
+          self.logger.info(' DONE...')
+          return None                  
+       else:
+          return used_streams
+
 
     def write_pdata(self):
         if self.out_public_f.endswith('.json'):

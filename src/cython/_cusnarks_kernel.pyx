@@ -1135,3 +1135,31 @@ def init_h():
 def release_h():
     uh.crelease_h()
 
+def montsquare_ext_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+        cdef ct.uint32_t PSize = getPSize_h(pidx)
+
+        uh.cmontsquare_ext_h(&out_vec[0], &in_veca[0], pidx)
+  
+        return np.reshape(out_vec, (-1, PSize))
+
+
+def montmultN_ext_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+        cdef ct.uint32_t PSize = getPSize_h(pidx)
+        cdef ct.uint32_t n = <int>(len(in_veca)/(2*PSize))
+        cdef ct.uint32_t i,offset=0
+
+        for i in xrange(n):
+           uh.cmontmult_ext_h(&out_vec[offset], &in_veca[offset], &in_vecb[offset], pidx)
+           offset +=(2*PSize)
+  
+        return np.reshape(out_vec, (-1, PSize))
+
+def subm_ext_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_veca, np.ndarray[ndim=1, dtype=np.uint32_t] in_vecb, ct.uint32_t pidx):
+        cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_vec = np.zeros(len(in_veca), dtype=np.uint32)
+
+        uh.csubm_ext_h(&out_vec[0], &in_veca[0], &in_vecb[0], pidx)
+  
+        return out_vec
+

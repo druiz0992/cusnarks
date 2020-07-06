@@ -221,10 +221,12 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
       outdims = ECP2_JAC_OUTDIMS
       indims_e = ECP2_JAC_INDIMS + U256_NDIMS
       kernel = CB_EC2_JAC_MAD_SHFL
+      kernel_offset = CB_EC_N
    else:
       outdims = ECP_JAC_OUTDIMS 
       indims_e = ECP_JAC_INDIMS + U256_NDIMS
       kernel = CB_EC_JAC_MAD_SHFL
+      kernel_offset = 0
 
  
    nsamples = int(len(vector)/indims_e)
@@ -255,13 +257,13 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
          kernel_config['smemS'] = np.concatenate([[0], np.asarray(kernel_config['smemS'],dtype=np.uint32)])
          kernel_params['in_length'][1] = outdims* int((nsamples + grouping - 1) / grouping)
          kernel_config['gridD'][1:] = [int(np.product(kernel_config['blockD'][1+i:])/(kernel_config['blockD'][1+i])) for i in range(len(kernel_config['blockD'][1:]))]
-         kernel = [CB_EC_JAC_MUL_OPT, CB_EC_JAC_RED] 
+         kernel = [CB_EC_JAC_MUL_OPT+kernel_offset, CB_EC_JAC_RED+kernel_offset] 
          kernel_config['kernel_idx'] =np.concatenate([[kernel[0]], np.ones(nkernels-1, dtype=np.uint32) * kernel[1]])
          start_k = 2
    else:
      kernel_params['premul'][0] = 1
      kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
-     kernel_config['kernel_idx'] =[kernel] * nkernels
+     kernel_config['kernel_idx'] =[kernel+offset] * nkernels
      kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
      start_k = 1
 
@@ -283,6 +285,85 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
 
    return vector, result, t
 
+def ec_pippen_mul(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 , ec2=False, gpu_id=0, stream_id = 0, first_time=0):
+   kernel_params={}
+   kernel_config={}
+   
+   if ec2:
+      outdims = ECP2_JAC_OUTDIMS
+      indims_e = ECP2_JAC_INDIMS + U256_NDIMS
+      kernel = [CB_EC2_JAC_MUL_PIPPEN]
+   else:
+      outdims = ECP_JAC_OUTDIMS 
+      indims_e = ECP_JAC_INDIMS + U256_NDIMS
+      kernel = [CB_EC_JAC_MUL_PIPPEN]
+
+ 
+   nsamples = int(len(vector)/indims_e)
+   nkernels = 1
+   nblocks = 16
+   nbins =int((NWORDS_FR * NBITS_WORD) / pippen_binsize) 
+   npoints_out = int((1<<pippen_blocksize) / nbins)
+
+   kernel_params['in_length'] = [indims_e*nsamples]
+   kernel_params['out_length'] = outdims 
+   kernel_params['stride'] = [indims_e*int((nsamples+npoints_out*nblocks-1)/(npoints_out*nblocks))]
+   kernel_params['premul']    = [first_time]
+   kernel_params['premod'] = [nblocks]
+   kernel_params['padding_idx'] = [pippen_binsize] 
+   kernel_params['midx']      = [fidx] 
+
+   kernel_config['kernel_idx'] = kernel
+   kernel_config['blockD'] = [1<<pippen_blocksize] 
+   kernel_config['smemS'] = [0] 
+   kernel_config['gridD'] = [nblocks]
+
+   #writeU256DataFile_h(np.reshape(vector,-1), "/home/edu/david/cusnarks/pippen.bin".encode("UTF-8"))
+   result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )
+   #result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
+
+   return
+
+
+def ec_pippen_reduce(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 , ec2=0, gpu_id=0, stream_id = 0):
+   kernel_params={}
+   kernel_config={}
+   
+   if ec2:
+      outdims = ECP2_JAC_OUTDIMS
+      indims_e = ECP2_JAC_INDIMS + U256_NDIMS
+      kernel = [CB_EC2_JAC_RED1_PIPPEN, CB_EC2_JAC_RED2_PIPPEN, CB_EC2_JAC_RED3_PIPPEN]
+   else:
+      outdims = ECP_JAC_OUTDIMS 
+      indims_e = ECP_JAC_INDIMS + U256_NDIMS
+      kernel = [CB_EC_JAC_RED1_PIPPEN, CB_EC_JAC_RED2_PIPPEN, CB_EC_JAC_RED3_PIPPEN]
+
+ 
+   nsamples = int(len(vector)/indims_e)
+   nkernels = 3
+   nblocks = 16
+   nbins =int((NWORDS_FR * NBITS_WORD) / pippen_binsize) 
+   npoints_out = int((1<<pippen_blocksize) / nbins)
+
+   kernel_params['in_length'] = [outdims*nblocks*(1<<(pippen_binsize+pippen_blocksize)), outdims*nblocks*(1<<pippen_blocksize), outdims*(1<<pippen_blocksize)]
+   kernel_params['out_length'] = outdims 
+   kernel_params['stride'] = [outdims*(1<<pippen_binsize), outdims*nblocks, outdims] 
+   kernel_params['premul']    = [0 ,0, 0 ]
+   kernel_params['premod'] = [nblocks,nblocks,1]
+   kernel_params['padding_idx'] = [pippen_binsize] * nkernels
+   kernel_params['midx']      = [fidx] * nkernels
+
+   kernel_config['kernel_idx'] = kernel
+   kernel_config['blockD'] = [1<<pippen_blocksize] * nkernels
+   kernel_config['smemS'] = [0] * nkernels
+   kernel_config['smemS'][nkernels-1] = (1<<(pippen_blocksize-5)) * NWORDS_FP * outdims * 4
+   kernel_config['gridD'] = [nblocks,1,1] 
+
+   #writeU256DataFile_h(np.reshape(vector,-1), "/home/edu/david/cusnarks/pippen.bin".encode("UTF-8"))
+   result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )
+   #result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
+
+   return t
 
 
 def ec_mad_cuda(pysnark, vector, fidx, ec2=False, gpu_id=0, stream_id = 0):

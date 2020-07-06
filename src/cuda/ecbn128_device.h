@@ -95,6 +95,21 @@ __device__ void build_ec_table(T1 *d_out,T1 *d_in, uint32_t din_offset, uint32_t
 template<typename T1, typename T2>
 __device__ void toaff(T1 *zxr,  T1 *zx1, mod_t midx);
 
+__global__ void scmulecjac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void redecjac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void redecjac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void redecjac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void scmulec2jac_pippen_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void redec2jac_pippen1_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void redec2jac_pippen2_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+__global__ void redec2jac_pippen3_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
+template<typename T1, typename T2>
+__device__ void scmulecjac_pippen(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, uint32_t *scl, kernel_params_t *params);
+template<typename T1, typename T2>
+__device__ void doublecjac_pippen(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, kernel_params_t *params);
+template<typename T1, typename T2>
+__device__ void redecjac_pippen(T1 *zxr, uint32_t zoffset, T1 *zx1, uint32_t xoffset, kernel_params_t *params);
+
 #if 0
 __global__ void addecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);
 __global__ void doublecldr_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params);

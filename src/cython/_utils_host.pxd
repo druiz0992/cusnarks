@@ -40,8 +40,11 @@ cdef extern from "../cuda/ff.h" nogil:
 
     void cmontmult_h "montmult_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, 
                                    ct.uint32_t pidx)
+    void cmontmult_ext_h "montmult_ext_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, 
+                                   ct.uint32_t pidx)
 
     void cmontsquare_h "montsquare_h" (ct.uint32_t *U, ct.uint32_t *B, ct.uint32_t pidx)
+    void cmontsquare_ext_h "montsquare_ext_h" (ct.uint32_t *U, ct.uint32_t *B, ct.uint32_t pidx)
 
     #void cmontmultN_h "montmultN_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, 
     #                                  ct.uint32_t n, ct.uint32_t pidx)
@@ -51,6 +54,7 @@ cdef extern from "../cuda/ff.h" nogil:
     void cadduBI_h "adduBI_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t biSize)
 
     void csubm_h "subm_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
+    void csubm_ext_h "subm_ext_h" (ct.uint32_t *U, ct.uint32_t *A, ct.uint32_t *B, ct.uint32_t pidx)
 
     void crangeuBI_h "rangeuBI_h" (ct.uint32_t *samples, ct.uint32_t nsamples,
                                      ct.uint32_t  *start, ct.uint32_t inc, ct.uint32_t *mod, ct.uint32_t biSize)
