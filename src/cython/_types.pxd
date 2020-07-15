@@ -64,6 +64,7 @@ cdef extern from "types.h":
         int in_offset
         int return_offset
         int n_kernels
+        int input_val
 
   ctypedef struct vector_t:
       uint32_t *data

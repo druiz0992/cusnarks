@@ -206,6 +206,7 @@ typedef struct {
         int return_val;
         int in_offset;
         int return_offset;
+        int input_val;
 } kernel_config_t;
 
 

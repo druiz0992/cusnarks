@@ -1546,27 +1546,6 @@ class GrothProver(object):
           stream_id = p[4]
           cuda_ec128.streamSync(gpu_id,stream_id)
 
-    def getECResults(self, dispatch_table):
-       for bidx,p in enumerate(dispatch_table):
-          P = p[0]
-          cuda_ec128 = self.ec_type_dict[P][0]
-          step = self.ec_type_dict[P][1]
-          pidx = self.ec_type_dict[P][4]
-          gpu_id = p[3]
-          stream_id = p[4]
-          result, t = cuda_ec128.streamSync(gpu_id,stream_id)
-          if step==4:
-             self.init_ec_val[gpu_id][stream_id][pidx] =\
-                            ec2_jac2aff_h(
-                             result.reshape(-1),
-                             MOD_FP,
-                             strip_last=1) 
-          else:
-             self.init_ec_val[gpu_id][stream_id][pidx] =\
-                        ec_jac2aff_h(
-                              result.reshape(-1),
-                              MOD_FP,
-                              strip_last=1) 
 
     def init_EC_P(self, batch_size):
        nsamples = np.product(get_shfl_blockD(batch_size))
@@ -1620,12 +1599,18 @@ class GrothProver(object):
           batch[nsamples+indims*offset:] = np.reshape(
                                             ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],
                                             (-1,NWORDS_FP))
+          """ 
+          print(offset, nsamples)
+          batch = np.concatenate((scl_vector[start_idx:end_idx],
+                                           np.reshape( ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],(-1,8))))
+          """                                   
+          
 
           first_time = 1
           if stream_id in used_streams[gpu_id] :
             first_time = 0
 
-          ec_pippen_mul(cuda_ec128, batch ,MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id, first_time=first_time)
+          ec_pippen_mul(cuda_ec128, batch ,MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id, first_time=first_time, offset=0)
           used_streams[gpu_id].add(stream_id)
 
           if stream_id == 0:

@@ -285,7 +285,7 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
 
    return vector, result, t
 
-def ec_pippen_mul(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 , ec2=False, gpu_id=0, stream_id = 0, first_time=0):
+def ec_pippen_mul(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 , ec2=False, gpu_id=0, stream_id = 0, first_time=0, offset=0):
    kernel_params={}
    kernel_config={}
    
@@ -299,6 +299,7 @@ def ec_pippen_mul(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 ,
       kernel = [CB_EC_JAC_MUL_PIPPEN]
 
  
+   #nsamples = int(len(vector)+indims_e)
    nsamples = int(len(vector)/indims_e)
    nkernels = 1
    nblocks = 16
@@ -311,6 +312,7 @@ def ec_pippen_mul(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 ,
    kernel_params['premul']    = [first_time]
    kernel_params['premod'] = [nblocks]
    kernel_params['padding_idx'] = [pippen_binsize] 
+   kernel_params['forward'] = [offset]
    kernel_params['midx']      = [fidx] 
 
    kernel_config['kernel_idx'] = kernel
@@ -339,7 +341,6 @@ def ec_pippen_reduce(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=
       kernel = [CB_EC_JAC_RED1_PIPPEN, CB_EC_JAC_RED2_PIPPEN, CB_EC_JAC_RED3_PIPPEN]
 
  
-   nsamples = int(len(vector)/indims_e)
    nkernels = 3
    nblocks = 16
    nbins =int((NWORDS_FR * NBITS_WORD) / pippen_binsize) 
@@ -358,6 +359,7 @@ def ec_pippen_reduce(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=
    kernel_config['smemS'] = [0] * nkernels
    kernel_config['smemS'][nkernels-1] = (1<<(pippen_blocksize-5)) * NWORDS_FP * outdims * 4
    kernel_config['gridD'] = [nblocks,1,1] 
+   kernel_config['input_val'] = [0,0,0] 
 
    #writeU256DataFile_h(np.reshape(vector,-1), "/home/edu/david/cusnarks/pippen.bin".encode("UTF-8"))
    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )

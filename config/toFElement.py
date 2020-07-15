@@ -47,7 +47,7 @@ from z2field_element import *
 
 class FF(object):
 
-   def __init__(self, fr, fp, G1x, G1y, G2x1, G2x2, G2y1, G2y2, factors_fr):
+   def __init__(self, fr, fp, G1x, G1y, G2x1, G2y1, G2x2, G2y2, factors_fr):
       self.f = open("test.dat","w")
       ZField.init_prime = False
     
