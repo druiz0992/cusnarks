@@ -51,6 +51,7 @@
 #include "file_utils.h"
 #include "transpose.h"
 #include "utils_host.h"
+#include "mpoly.h"
 
 #define NROOTS 128
 #define MAX_ITER_1M 10
@@ -239,6 +240,9 @@ static char ec_rdc_filename[4][100] = {
                                            "./aux_data/ec2_rdc_0.tbin",
                                            "./aux_data/ec2_rdc_2.tbin"
 };
+
+static char zkey_file[] = "./aux_data/circuit_final.zkey";
+static char wtns_file[] = "./aux_data/witness.wtns";
 
 uint32_t test_addm(void)
 {
@@ -2940,10 +2944,188 @@ uint32_t test_transpose_square(void)
   return retval;
 }
 
+uint32_t test_zkey(void) 
+{
+  const char oufname[] = "./aux_data/tmp.pkbin";
+  zKeyToPkFile_h(oufname, zkey_file);
+}
+
+uint32_t test_wtns(void) 
+{
+  unsigned long long start, nElems;
+  const char oufname[] = "./aux_data/tmp.pkbin";
+  uint32_t *samples;
+
+  // read witness
+  nElems = readNWtnsNEls_h(&start, wtns_file);
+  samples = (uint32_t *)malloc(nElems * NWORDS_FR * sizeof(uint32_t));
+  readWtnsFile_h(samples, nElems, start, wtns_file);
+
+  free(samples);
+}
+
+uint32_t test_mpolyseval(void) 
+{
+  unsigned long long start, nElems;
+  uint32_t *witness, *coeffs, *pout;
+  uint32_t *params;
+  uint32_t domainSize;
+  mpoly_eval_t args;
+
+  init_h();
+
+  params = readZKeySection_h(ZKEY_HDR_SECTION_2, zkey_file);
+  domainSize = params[20];
+  free(params);
+  
+  // read coeffs
+  coeffs = readZKeySection_h(ZKEY_HDR_SECTION_4, zkey_file);
+
+  // read witness
+  nElems = readNWtnsNEls_h(&start, wtns_file);
+  witness = (uint32_t *)malloc(nElems * NWORDS_FR * sizeof(uint32_t));
+  readWtnsFile_h(witness, nElems, start, wtns_file);
+
+  pout = (uint32_t *)malloc(2*domainSize*NWORDS_FR*sizeof(uint32_t));
+  memset(pout, 0, 2*domainSize*NWORDS_FR*sizeof(uint32_t));
+  // configure mpoly eval server
+  args.pout = pout;
+  args.scalar = witness;
+  args.pin = &coeffs[1];
+  args.start_idx = 0;
+  args.reduce_coeff = domainSize;
+  args.last_idx = coeffs[0]*ZKEY_COEFF_NWORDS;
+  args.max_threads = get_nprocs_conf();
+  //args.max_threads = 1;
+  args.pidx = MOD_FR;
+  args.ncoeff = coeffs[0];
+  args.mode = 1;
+
+  mpoly_eval_server_h(&args);
+
+  printf("N coeffs : %d\n", coeffs[0]);
+  /*
+  printf("coeffs\n");
+  for(uint32_t i=0; i < 1 + coeffs[0]*11; i++) {
+     for (uint32_t j=0; j < 4; j++){
+       printf("%u ",(coeffs[i] >> (8 * j)) & 0xFF);
+     }
+  }
+  */
+
+  /*
+  printf("Witness\n");
+  for(uint32_t i=0; i < nElems*8; i++) {
+     for (uint32_t j=0; j < 4; j++){
+       printf("%u ",(witness[i] >> (8 * j)) & 0xFF);
+     }
+  }
+  */
+  
+  printf("\npolsA\n");
+  for(uint32_t i=0; i < domainSize*8; i++) {
+     for (uint32_t j=0; j < 4; j++){
+       printf("%u ",(pout[i] >> (8 * j)) & 0xFF);
+     }
+  }
+
+ 
+  printf("\npolsB\n");
+  for(uint32_t i=0; i < domainSize*8; i++) {
+     for (uint32_t j=0; j < 4; j++){
+       printf("%u ",(pout[domainSize*NWORDS_FR + i] >> (8 * j)) & 0xFF);
+     }
+  }
+
+  FILE *tmpf = fopen("./aux_data/tmp.pols", "wb");
+  fwrite(pout, sizeof(uint32_t),2*domainSize*NWORDS_FR,tmpf);
+  fclose(tmpf);
+
+
+  release_h();
+  free(witness);
+  free(coeffs);
+  free(pout);
+}
+
+uint32_t test_interpols_and_multiply()
+{
+  uint32_t *coeffs;
+  uint32_t *params;
+  uint32_t domainSize;
+  int pidx=MOD_FR;
+  fft_params_t fft_params;
+  int Nrows,Ncols;
+  const uint32_t *N = CusnarksPGet((mod_t)pidx);
+  uint32_t *X1, *Y1;
+  uint32_t *R;
+  uint32_t *roots;
+  ntt_interpolandmul_t *args;
+  char roots_f[1000];
+  int cusnarks_nroots = 1 << CusnarksGetNRoots();
+  uint32_t npoints_raw, npoints, nroots, nroots2;
+  uint32_t retval=0;
+
+  init_h();
+
+  params = readZKeySection_h(ZKEY_HDR_SECTION_2, zkey_file);
+  domainSize = params[20];
+  uint32_t domainBits =  31-msbuBI_h(&domainSize,1);
+
+  free(params);
+  
+  CusnarksGetFRoots(roots_f, sizeof(roots_f));
+  nroots2 = domainSize;
+
+  X1 = (uint32_t *)malloc((domainSize) * NWORDS_FR * sizeof(uint32_t));
+  Y1 = (uint32_t *)malloc((domainSize) * NWORDS_FR * sizeof(uint32_t));
+  FILE *tmpf = fopen("./aux_data/tmp.pols", "rb");
+  fread(X1, sizeof(uint32_t), domainSize*NWORDS_FR, tmpf); 
+  fread(Y1, sizeof(uint32_t), domainSize*NWORDS_FR, tmpf); 
+  fclose(tmpf);
+  roots = (uint32_t *)malloc((2*domainSize + (1<<nroots2) + (1<<(nroots2+1))) * NWORDS_FR * sizeof(uint32_t));
+  args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
+
+  args->A = X1; args->B = Y1; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
+  args->rstride=2;
+  npoints_raw = domainSize;
+     
+  npoints = npoints_raw;
+  nroots = npoints;
+  readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
+  readU256DataFile_h(&roots[nroots*NWORDS_FR],roots_f, cusnarks_nroots, 1<<nroots2 );
+  if (domainBits % 2 == 1){
+     readU256DataFile_h(&roots[(nroots+(1<<nroots2))*NWORDS_FR],roots_f, cusnarks_nroots, 1<<(nroots2+1));
+  } else {
+     readU256DataFile_h(&roots[(nroots+(1<<nroots2))*NWORDS_FR],roots_f, cusnarks_nroots, 1<<(nroots2-1));
+  }
+
+  Nrows = domainBits/2;
+  Ncols = domainBits - Nrows;
+
+  args->Nrows = Nrows; args->Ncols=Ncols; args->nroots=1<<(Nrows+Ncols); args->max_threads = 1; args->mode=1;
+  R = ntt_interpolandmul_server_h(args);
+
+  free(X1);
+  free(Y1);
+  free(roots);
+  free(args);  
+
+  release_h();
+
+  return retval;
+}
 
 int main()
 {
   uint32_t retval;
+
+  //retval+=test_mpolyseval();
+  retval+=test_interpols_and_multiply();
+
+/*
+  retval+=test_zkey();  
+  retval+=test_wtns();  
 
   retval+=test_mul_prof();  // Profile montgomery mul 
   retval+=test_mul_ext_prof();  // Profile montgomery mul 
@@ -3015,6 +3197,7 @@ int main()
   retval+=test_ec_jacreduce_precompute(1,0,0);   
   retval+=test_ec_jacreduce_precompute(1,0,1);   
   retval+=test_ec_jacreduce_precompute(1,1);   
+*/
 
   if (retval){
     printf("\033[1;31m");

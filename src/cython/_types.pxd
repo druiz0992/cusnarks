@@ -54,6 +54,7 @@ cdef extern from "types.h":
   cdef uint32_t DEFAULT_U256_BSELM
   cdef uint32_t MAX_PIPPENGERS_CONF
   cdef uint32_t DEFAULT_PIPPENGERS_CONF
+  cdef uint32_t ZKEY_COEFF_NWORDS
 
   ctypedef struct kernel_config_t:
         int blockD
@@ -163,12 +164,13 @@ cdef extern from "types.h":
     const uint32_t *scalar
     uint32_t *pin
     uint32_t reduce_coeff
-    uint32_t start_idx
-    uint32_t last_idx
+    unsigned long long start_idx
+    unsigned long long last_idx
     uint32_t max_threads
     uint32_t thread_id
     uint32_t pidx
     uint32_t ncoeff
+    uint32_t mode
 
   ctypedef struct ntt_interpolandmul_t:
     uint32_t *A
@@ -182,9 +184,10 @@ cdef extern from "types.h":
     uint32_t rstride
     uint32_t pidx
     uint32_t max_threads
-    uint32_t start_idx
-    uint32_t last_idx
+    unsigned long long start_idx
+    unsigned long long last_idx
     uint32_t thread_id
+    uint32_t mode
 
   ctypedef struct jacadd_reduced_t:
     uint32_t *out_ep
@@ -267,3 +270,4 @@ _MAX_U256_BSELM = MAX_U256_BSELM
 _DEFAULT_U256_BSELM = DEFAULT_U256_BSELM
 _MAX_PIPPENGERS_CONF = MAX_PIPPENGERS_CONF
 _DEFAULT_PIPPENGERS_CONF = DEFAULT_PIPPENGERS_CONF
+_ZKEY_COEFF_NWORDS = (NWORDS_256BIT + 3)

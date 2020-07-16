@@ -28,7 +28,7 @@ NVCC = nvcc
 CC  = g++
 ASM = nasm
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_75,code=sm_75 -gencode arch=compute_61,code=sm_61
-DEBUG=0
+DEBUG=1
 ifeq ($(DEBUG),1)
   CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE $(DEFINES_DEBUG) -std=c++11 -I $(INCLUDE_PATH) -w
   CUFLAGS=-rdc=true -G -O3 --source-in-ptx -keep --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v -Xptxas -maxrregcount=120 --cudart shared $(GENCODE_ARCH_COMPUTE)

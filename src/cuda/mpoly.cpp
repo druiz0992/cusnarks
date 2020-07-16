@@ -108,24 +108,39 @@ void mpoly_free_h()
 void mpoly_eval_server_h(mpoly_eval_t *args)
 {
   if ((!args->max_threads) || (!utils_isinit_h())) {
-    mpoly_eval_h((void *)args);
+    if (args->mode==0) {
+      mpoly_eval_h((void *)args);
+    } else {
+      mpolys_eval_h((void *)args);
+    }
     return;
   }
 
   #ifndef PARALLEL_EN
-    mpoly_eval_h((void *)args);
+    if (args->mode==0) {
+      mpoly_eval_h((void *)args);
+    } else {
+      mpolys_eval_h((void *)args);
+    }
     return;
   #endif
   uint32_t nprocs = get_nprocs_h();
   int nthreads = args->max_threads > nprocs ? nprocs : args->max_threads;
-  uint32_t nvars = args->last_idx - args->start_idx;
+  unsigned long long nvars = args->last_idx - args->start_idx;
+  if (args->mode==1){
+    nvars = args->ncoeff;
+  }
 
   //printf("N threads : %d\n", nthreads);
   //printf("N vars    : %d\n", nvars);
 
-  uint32_t vars_per_thread = nvars/nthreads;
+  unsigned long long vars_per_thread = nvars/nthreads;
   uint32_t i;
-  uint32_t start_idx, last_idx;
+  unsigned long long start_idx, last_idx;
+
+  if (args->mode==1){
+     vars_per_thread = vars_per_thread * ZKEY_COEFF_NWORDS;
+  }
    
   pthread_t *workers = (pthread_t *) malloc(nthreads * sizeof(pthread_t));
   mpoly_eval_t *w_args  = (mpoly_eval_t *)malloc(nthreads * sizeof(mpoly_eval_t));
@@ -145,6 +160,9 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
      */
      if ( (i == nthreads - 1) && (last_idx != nvars) ){
          last_idx = nvars;
+         if (args->mode == 1){
+           last_idx = args->last_idx;
+         }
      }
      memcpy(&w_args[i], args, sizeof(mpoly_eval_t ));
 
@@ -153,10 +171,18 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
      w_args[i].thread_id = i;
 
      //printf("Thread %d : start_idx : %d, last_idx : %d\n", i, w_args[i].start_idx,w_args[i].last_idx);
-     if ( pthread_create(&workers[i], NULL, &mpoly_eval_h, (void *) &w_args[i]) ){
-       free(workers);
-       free(w_args);
-       exit(1);
+     if (args->mode == 0) {
+        if ( pthread_create(&workers[i], NULL, &mpoly_eval_h, (void *) &w_args[i]) ){
+          free(workers);
+          free(w_args);
+          exit(1);
+        }
+     } else {
+        if ( pthread_create(&workers[i], NULL, &mpolys_eval_h, (void *) &w_args[i]) ){
+          free(workers);
+          free(w_args);
+          exit(1);
+        }
      }
   }
 
@@ -168,7 +194,6 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   free(workers);
   free(w_args);
 }
-
 
 void *mpoly_eval_h(void *vargs)
 {
@@ -216,6 +241,41 @@ void *mpoly_eval_h(void *vargs)
        addm_cb(zcoeff_v_out, zcoeff_v_out, zcoeff_v_in);
     }
     zcoeff_d_offset = accum_n_zcoeff*(NWORDS_FR+1) +1 + n_zpoly;
+  }
+  //wait_h(args->thread_id, mpoly_addm, args);
+
+  return NULL;
+}
+
+
+void *mpolys_eval_h(void *vargs)
+{
+  mpoly_eval_t *args = (mpoly_eval_t *) vargs;
+  uint32_t *pin = args->pin;
+  uint32_t *pout;
+  uint32_t *coeff;
+  uint32_t scl[NWORDS_FR], tmp[NWORDS_FR];
+  uint32_t w_idx, p_idx;
+
+  t_addm addm_cb =  getcb_addm_h(args->pidx);
+  t_mulm mulm_cb =  getcb_mulm_h(args->pidx);
+  t_tomont tom_cb = getcb_tomont_h(args->pidx);
+  
+  for (uint32_t i=args->start_idx; i<args->last_idx; i+=ZKEY_COEFF_NWORDS){
+      coeff = &pin[i];
+      w_idx = coeff[ZKEY_COEFF_SIGNAL_OFFSET];
+      //tom_cb(scl, &args->scalar[w_idx*NWORDS_FR]);
+      memcpy(scl, &args->scalar[w_idx*NWORDS_FR], NWORDS_FR*sizeof(uint32_t));
+      
+      if (coeff[ZKEY_COEFF_MATRIX_OFFSET] == 0) {
+         p_idx = 0 + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
+         
+      } else {
+         p_idx = args->reduce_coeff + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
+      }
+      pout = &args->pout[p_idx*NWORDS_FR];
+      mulm_cb(tmp, &coeff[ZKEY_COEFF_VAL_OFFSET], scl);
+      addm_cb(pout, pout, tmp);
   }
   //wait_h(args->thread_id, mpoly_addm, args);
 

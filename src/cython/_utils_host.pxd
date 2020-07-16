@@ -202,6 +202,12 @@ cdef extern from "../cuda/file_utils.h" nogil:
     void creadECTablesNElementsFile_h "readECTablesNElementsFile_h" (ct.ec_table_offset_t *table_offset,
                                                                      const char *filename)
 
+    unsigned long long creadNWtnsNEls_h "readNWtnsNEls_h"(unsigned long long *start, const char *filename)
+
+    void creadWtnsFile_h "readWtnsFile_h"(ct.uint32_t *samples, unsigned long long nElems,
+                                           unsigned long long start, const char *filename)
+
+    void czKeyToPkFile_h "zKeyToPkFile_h" (const char *pkbin_filename, const char *zkey_filename)
 
 cdef extern from "../cuda/mpoly.h" nogil: 
     void cmpoly_from_montgomery_h "mpoly_from_montgomery_h" (ct.uint32_t *x, ct.uint32_t pidx)

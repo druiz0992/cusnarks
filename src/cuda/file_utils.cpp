@@ -40,6 +40,9 @@
 #include "ff.h"
 #include "file_utils.h"
 
+static void  zKeyInit_h(zkey_t *zkey, const char *filename);
+static uint32_t *readZKeySection_h(zkey_t *zkey, uint32_t section_id, const char *filename);
+static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pkbin_filename);
 
 /*
   Read header circuit binary file
@@ -590,6 +593,7 @@ void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt,  c
   
   fclose(ifp);
 }
+
 void writeWitnessFile_h(uint32_t *samples, const char *filename, const unsigned long long nwords)
 {
   uint32_t wsize = NWORDS_FR;
@@ -606,3 +610,278 @@ void writeWitnessFile_h(uint32_t *samples, const char *filename, const unsigned 
 
 }
 
+void readWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long long start, const char *filename)
+{
+  FILE *ifp = fopen(filename,"rb");
+
+  fseek(ifp, start, SEEK_SET);
+  fread(samples, sizeof(uint32_t), nElems*NWORDS_FR, ifp); 
+  
+  fclose(ifp);
+}
+
+unsigned long long readNWtnsNEls_h(unsigned long long *start, const char *filename)
+{
+  uint32_t section_id;
+  unsigned long long section_len, nElems;
+  FILE *ifp = fopen(filename,"rb");
+
+  fseek(ifp, WTNS_HDR_START_OFFSET_NBYTES, SEEK_SET);
+  fread(&section_id, sizeof(uint32_t), 1, ifp); 
+  fread(&section_len, sizeof(unsigned long long), 1, ifp); 
+
+  // set pointer at the beginning of section 2
+  fseek(ifp, section_len, SEEK_CUR);
+  fread(&section_id, sizeof(uint32_t), 1, ifp); 
+  fread(&section_len, sizeof(unsigned long long), 1, ifp); 
+  
+  nElems = section_len/(NWORDS_FR * sizeof(uint32_t));
+  *start = ftell(ifp);
+
+  fclose(ifp);
+
+  return nElems;
+}
+void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
+{
+  uint32_t *buffer;
+  uint32_t *buffer2;
+  zkey_t zkey;
+
+  // initialize section offsets
+  zKeyInit_h(&zkey, zkey_filename);
+
+  // Section 2 -> 
+  //      n8q (1W),  q(),  n8r,  r,   NVars,  NPub,   DomainSize  (multiple of 2
+  //      alpha1 , beta1,  delta1,  beta2,   gamma2,     delta2
+  buffer2 = readZKeySection_h(&zkey, 2, zkey_filename);
+  zKeyToPkFileAddHdr_h(buffer2, &zkey, pkbin_filename);
+
+  FILE *ofp = fopen(pkbin_filename,"wb");
+  fseek(ofp, 0, SEEK_END);
+  // Section 4 Coeffs
+  buffer = readZKeySection_h(&zkey, 4, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[4]/sizeof(uint32_t), ofp); 
+/*
+  printf("N coeffs : %d\n",buffer[0]);
+  uint32_t coeff_idx = 0;
+  for (uint32_t i=1; coeff_idx < buffer[0]; i+=ZKEY_COEFF_NWORDS){
+    if (buffer[i] == 0) {
+      printf("Coeff : %d. matrix : %d, constraint : %d, signal : %d\n", coeff_idx, buffer[i], buffer[i+1], buffer[i+2]);
+      printUBINumber(&buffer[i+3],8);
+    }
+    coeff_idx++;
+  }
+  coeff_idx=0;
+  for (uint32_t i=1; coeff_idx < buffer[0]; i+=11){
+    if (buffer[i] == 1) {
+      printf("Coeff : %d. matrix : %d, constraint : %d, signal : %d\n", coeff_idx, buffer[i], buffer[i+1], buffer[i+2]);
+      printUBINumber(&buffer[i+3],8);
+    }
+    coeff_idx++;
+  }
+*/
+  free(buffer);
+
+  // alpha1
+  fwrite(&buffer[21], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  // beta1 
+  fwrite(&buffer[21+2*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  // delta1 
+  fwrite(&buffer[21+4*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  //  beta2
+  fwrite(&buffer[21+6*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  // delta2 
+  fwrite(&buffer[21+14*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+
+
+  // Section 5 A
+  buffer = readZKeySection_h(&zkey, 5, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[5]/sizeof(uint32_t), ofp); 
+  // alpha1
+  fwrite(&buffer[21], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  // delta1 
+  fwrite(&buffer[21+4*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  free(buffer);
+
+  // Section 6 B1
+  buffer = readZKeySection_h(&zkey, 6, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[6]/sizeof(uint32_t), ofp); 
+  // beta1 
+  fwrite(&buffer[21+2*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  // delta1 
+  fwrite(&buffer[21+4*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  free(buffer);
+
+  // Section 7 B2
+  buffer = readZKeySection_h(&zkey, 7, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[7]/sizeof(uint32_t), ofp); 
+  //  beta2
+  fwrite(&buffer[21+6*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  // delta2 
+  fwrite(&buffer[21+14*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  free(buffer);
+
+  // Section 8 C
+  buffer = readZKeySection_h(&zkey, 8, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[8]/sizeof(uint32_t), ofp); 
+  free(buffer);
+
+  // Section 9 H
+  buffer = readZKeySection_h(&zkey, 9, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[9]/sizeof(uint32_t), ofp); 
+  // delta1 
+  // not needed
+
+  free(buffer);
+
+
+  free(buffer2);
+  fclose(ofp);
+
+}
+
+static void  zKeyInit_h(zkey_t *zkey, const char *filename)
+{
+  unsigned long long section_len;
+  uint32_t section_id;
+  uint32_t i;
+  FILE *ifp = fopen(filename,"rb");
+
+  // init zkey
+  memset(zkey, 0, sizeof(zkey_t));
+  fseek(ifp, ZKEY_HDR_START_OFFSET_NBYTES, SEEK_SET);
+  
+  while (fread(&section_id, sizeof(uint32_t), 1, ifp)) {
+      fread(&zkey->section_len[section_id], sizeof(unsigned long long), 1, ifp); 
+      zkey->section_offset[section_id] = ftell(ifp);
+      //printf("section : %u. length : %lu, offset : %lu\n",section_id, zkey->section_len[section_id], zkey->section_offset[section_id]);
+      fseek(ifp, zkey->section_len[section_id], SEEK_CUR);
+  }
+
+  /*
+  for (i =ZKEY_HDR_SECTION_0; i < ZKEY_HDR_NSECTIONS; i++){
+       printf("section : %u. Offset : %lu, length : %lu\n", i, zkey->section_offset[i], zkey->section_len[i]);
+  }
+  */
+ 
+  fclose(ifp);  
+}
+
+uint32_t *readZKeySection_h(uint32_t section_id, const char *filename)
+{
+  zkey_t zkey;
+  uint32_t *buffer;
+
+  zKeyInit_h(&zkey, filename);
+  buffer = readZKeySection_h(&zkey, section_id, filename);
+
+  return buffer;
+}
+
+static uint32_t *readZKeySection_h(zkey_t *zkey, uint32_t section_id, const char *filename)
+{
+  unsigned long long section_len;
+  uint32_t *buffer;
+  unsigned long long buffer_len;
+  FILE *ifp = fopen(filename,"rb");
+
+  fseek(ifp, zkey->section_offset[section_id] - 8, SEEK_SET);
+  // allocate buffer size for section
+  fread(&section_len, sizeof(unsigned long long), 1, ifp); 
+  buffer_len =(section_len + sizeof(uint32_t) -1)/sizeof(uint32_t);
+  buffer = (uint32_t *) malloc(buffer_len * sizeof(uint32_t));
+  fread(buffer, sizeof(uint32_t), buffer_len , ifp); 
+
+  fclose(ifp);  
+
+  return buffer;
+}
+
+static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pkbin_filename)
+{
+  uint32_t nVars = buffer[18];
+  uint32_t nPublic = buffer[19];
+  uint32_t domainSize = buffer[20];
+  uint32_t domainBits =  31-msbuBI_h(&domainSize,1);
+  uint32_t tmp;
+
+  FILE *ofp = fopen(pkbin_filename,"wb");
+
+ /*
+  printf("Nvars : %d\n",nVars);
+  printf("nPub : %d\n",nPublic);
+  printf("Domain Size : %d\n",domainSize);
+  printf("Domain Bits : %d\n", domainBits);
+*/
+
+  //nWords
+  tmp=0;
+  fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
+  // File TYPE
+  tmp = SNARKSFILE_T_PK;
+  fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
+  // Groth
+  tmp = PROTOCOL_T_GROTH;
+  fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
+  // RBitLen
+  tmp = NWORDS_FR * NBITS_WORD;
+  // MOnt
+  tmp = FMT_MONT;
+  // Affine 
+  tmp = EC_T_AFFINE;
+  fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
+  // nVars 
+  fwrite(&nVars, sizeof(uint32_t), 1, ofp); 
+  // nPublic
+  fwrite(&nPublic, sizeof(uint32_t), 1, ofp); 
+  // Domain Bits
+  fwrite(&domainBits, sizeof(uint32_t), 1, ofp); 
+  // Domain Size
+  tmp = domainSize;
+  fwrite(&domainSize, sizeof(uint32_t), 1, ofp); 
+  // MOD_FP
+  fwrite(&buffer[1], sizeof(uint32_t), buffer[0], ofp); 
+  // MOD_FR
+  fwrite(&buffer[10], sizeof(uint32_t), buffer[9], ofp); 
+
+  unsigned long long polsA_nWords = zkey->section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t);
+  unsigned long long polsB_nWords = zkey->section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t);
+  polsA_nWords = polsA_nWords > 2*domainSize * NWORDS_FR ? polsA_nWords : 2*domainSize * NWORDS_FR;
+  //polsB_nWords = polsB_nWords > domainSize * NWORDS_FR ? polsB_nWords : domainSize * NWORDS_FR;
+  polsB_nWords = 0;
+  // polsA_nWords
+  fwrite(&polsA_nWords, sizeof(unsigned long long), 1, ofp); 
+  fwrite(&polsB_nWords, sizeof(unsigned long long), 1, ofp); 
+/*
+  printf("polsA_nWords : %lu\n", polsA_nWords);
+  printf("polsB_nWords : %lu\n", polsB_nWords);
+*/
+
+  unsigned long long AnWords = zkey->section_len[ZKEY_HDR_SECTION_5]/sizeof(uint32_t) + 4 * NWORDS_FP;
+  unsigned long long B1nWords = zkey->section_len[ZKEY_HDR_SECTION_6]/sizeof(uint32_t) + 4 * NWORDS_FP;
+  unsigned long long B2nWords = zkey->section_len[ZKEY_HDR_SECTION_7]/sizeof(uint32_t) + 8 * NWORDS_FP;
+  unsigned long long CnWords = zkey->section_len[ZKEY_HDR_SECTION_8]/sizeof(uint32_t);
+  unsigned long long HnWords = zkey->section_len[ZKEY_HDR_SECTION_9]/sizeof(uint32_t) + 12 * NWORDS_FP;
+
+  // AnWords
+  fwrite(&AnWords, sizeof(unsigned long long), 1, ofp); 
+  // B1nWords
+  fwrite(&B1nWords, sizeof(unsigned long long), 1, ofp); 
+  // B2nWords
+  fwrite(&B2nWords, sizeof(unsigned long long), 1, ofp); 
+  // CnWords
+  fwrite(&CnWords, sizeof(unsigned long long), 1, ofp); 
+  // HnWords
+  fwrite(&HnWords, sizeof(unsigned long long), 1, ofp); 
+
+  /*
+  printf("AnWords : %lu\n", AnWords);
+  printf("B1nWords : %lu\n", B1nWords);
+  printf("B2nWords : %lu\n", B2nWords);
+  printf("CnWords : %lu\n", CnWords);
+  printf("HnWords : %lu\n", HnWords);
+  */
+
+  fclose(ofp);
+}
