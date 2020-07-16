@@ -130,6 +130,12 @@
 
 #define SHMEM_WITNESS_KEY (123456)
 
+#define ZKEY_COEFF_MATRIX_OFFSET  (0)
+#define ZKEY_COEFF_CONSTRAINT_OFFSET  (1)
+#define ZKEY_COEFF_SIGNAL_OFFSET  (2)
+#define ZKEY_COEFF_VAL_OFFSET  (3)
+#define ZKEY_COEFF_NWORDS (NWORDS_FR + ZKEY_COEFF_VAL_OFFSET)
+
 typedef unsigned int uint32_t;
 typedef int int32_t;
 typedef unsigned long long int t_uint64;
@@ -512,12 +518,13 @@ typedef struct{
   const uint32_t *scalar;
   uint32_t *pin;
   uint32_t reduce_coeff;
-  uint32_t start_idx;
-  uint32_t last_idx;
+  unsigned long long start_idx;
+  unsigned long long last_idx;
   uint32_t max_threads;
   uint32_t thread_id;
   uint32_t pidx;
   uint32_t ncoeff;
+  uint32_t mode;
   
 }mpoly_eval_t;
 
@@ -533,9 +540,10 @@ typedef struct{
   uint32_t rstride;
   uint32_t pidx;
   uint32_t max_threads;
-  uint32_t start_idx;
-  uint32_t last_idx;
+  unsigned long long start_idx;
+  unsigned long long last_idx;
   uint32_t thread_id;
+  uint32_t mode;
 
 }ntt_interpolandmul_t;
 

@@ -131,6 +131,8 @@ class GrothProver(object):
         self.compute_first_mexp_gpu = True
         self.compute_last_mexp_gpu = True
 
+        self.pkbin_mode = 0
+
         self.read_table_en = False
         self.read_table_f = read_table_f
         if read_table_f is not None:
@@ -238,6 +240,18 @@ class GrothProver(object):
 
         # Initialize shared memory
         self.logger.info('Initializing memories...')
+
+        if self.proving_key_f.endswith('.zkey'):
+          #generate verification_key
+          self.launch_snarkjs("verification_key")
+
+          #generate pkbin
+          out_fname = self.proving_key_f
+          out_fname[-5:-1] = ".bin"
+          out_fname[-1] = ""
+          zKeyToPkFile_h(out_fname.encode("UTF-8",self.proving_key_f.encode("UTF-8")))
+          self.proving_key_f = out_fname
+          self.pkbin_mode = 1
 
         # PK_BIN
         pkbin_nWords = int(os.path.getsize(self.proving_key_f)/4)
@@ -569,13 +583,21 @@ class GrothProver(object):
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
         pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
-        pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
 
-        self.logger.info(' Process server - Evaluating Poly A...')
-        np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FR))
-        self.logger.info(' Process server - Evaluating Poly B...')
-        np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FR))
-        self.logger.info(' Process server - Completed Evaluating Poly B...')
+        if self.pkbin_mode == 0:
+          pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
+          self.logger.info(' Process server - Evaluating Poly A...')
+          np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FR))
+          self.logger.info(' Process server - Evaluating Poly B...')
+          np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FR))
+          self.logger.info(' Process server - Completed Evaluating Poly B...')
+
+        else :
+          self.logger.info(' Process server - Evaluating Polys...')
+          pa = self.evalPolys(w[:wnElems], pA, m, MOD_FR)
+          np.copyto(pA_T,pa[:m*NWORDS_FR])
+          np.copyto(pB_T,pa[m*NWORDS_FR:])
+
         end = time.time()
 
         start1 = time.time()
@@ -982,6 +1004,12 @@ class GrothProver(object):
              np.copyto(
                 self.scl_array[:nVars],
                 readWitnessFile_h(self.witness_f.encode("UTF-8"),0, nVars ))
+
+           elif self.witness_f.endswith('.wtns'):
+             np.copyto(
+                self.scl_array[:nVars],
+                readWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
+
            else:
              np.copyto(
                 self.scl_array[:nVars],
@@ -1232,6 +1260,14 @@ class GrothProver(object):
              sys.exit(1)
         
           snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
+
+        elif mode == "verification_key":
+          self.verification_key_f = self.proving_key_f
+          self.verification_key_f[-5:] = "_vk.j" 
+          self.verification_key_f =  self.verification_key_f + "son"
+          print(self.verification_key_f)
+        
+          call([snarkjs, "zkey", "export", "verificationkey", self.proving_key_f, self.verification_key_f])
        
         return snarkjs
 
@@ -1754,6 +1790,10 @@ class GrothProver(object):
         polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, int((m + egs-1)/egs) , pidx)
         return polX_T
     
+    def evalPolys(self, w, pA, m, pidx):
+       pa = mpoly_evals_h(np.reshape(w,-1), np.reshape(pA, -1), m, pidx)
+       return pa
+   
 
     def calculateH(self):
 

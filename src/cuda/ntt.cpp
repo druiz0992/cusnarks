@@ -65,6 +65,7 @@ static void montmult_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t leve
 static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t rstride, uint32_t direction, uint32_t pidx);
 static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows, uint32_t *mNcols, uint32_t nRows, uint32_t nCols);
 void *interpol_and_mul_h(void *args);
+void *interpol_and_muls_h(void *args);
 
 
 
@@ -681,9 +682,9 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   uint32_t nprocs = get_nprocs_h();
   args->max_threads = MIN(args->max_threads, MIN(nprocs, 1<<MIN(args->Nrows, args->Ncols)));
 
-  uint32_t nvars = 1<<(args->Nrows+args->Ncols);
-  uint32_t start_idx, last_idx;
-  uint32_t vars_per_thread = nvars/args->max_threads;
+  unsigned long long nvars = 1ull<<(args->Nrows+args->Ncols);
+  unsigned long long start_idx, last_idx;
+  unsigned long long vars_per_thread = nvars/args->max_threads;
 
   if  ((vars_per_thread & (vars_per_thread-1)) != 0){
     vars_per_thread = sizeof(uint32_t) * NBITS_BYTE - __builtin_clz(args->max_threads/nvars) - 1;
@@ -742,7 +743,11 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   }
   */
 
-  launch_client_h(interpol_and_mul_h, workers, (void *)w_args, sizeof(ntt_interpolandmul_t), args->max_threads,0);
+  if (args->mode == 0) {
+    launch_client_h(interpol_and_mul_h, workers, (void *)w_args, sizeof(ntt_interpolandmul_t), args->max_threads,0);
+  } else {
+    launch_client_h(interpol_and_muls_h, workers, (void *)w_args, sizeof(ntt_interpolandmul_t), args->max_threads,0);
+  }
 
   /*
   for (uint32_t i=0; i < 1 << (args->Nrows +args->Ncols); i++){
@@ -778,8 +783,8 @@ static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows
 void *interpol_and_mul_h(void *args)
 {
   ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
-  uint32_t start_col = wargs->start_idx>>wargs->Nrows, last_col = wargs->last_idx>>wargs->Nrows;
-  uint32_t start_row = wargs->start_idx>>wargs->Ncols, last_row = wargs->last_idx>>wargs->Ncols;
+  unsigned long long start_col = wargs->start_idx>>wargs->Nrows, last_col = wargs->last_idx>>wargs->Nrows;
+  unsigned long long start_row = wargs->start_idx>>wargs->Ncols, last_row = wargs->last_idx>>wargs->Ncols;
   uint32_t Ancols = 1 << wargs->Ncols;
   uint32_t Anrows = 1 << wargs->Nrows;
   uint32_t Amncols = 1 << wargs->mNcols;
@@ -788,12 +793,12 @@ void *interpol_and_mul_h(void *args)
   const uint32_t *scaler_mont = CusnarksIScalerGet((fmt_t)1);
   const uint32_t *scaler_ext = CusnarksIScalerGet((fmt_t)0);
   int64_t ridx;
-  uint32_t i;
-  uint32_t ridx1;
-  uint32_t B_offset = (1ull*NWORDS_FR)<<(wargs->Nrows+wargs->Ncols);
+  unsigned long long i;
+  unsigned long long ridx1;
+  unsigned long long B_offset = (1ull*NWORDS_FR)<<(wargs->Nrows+wargs->Ncols);
   uint32_t *M_transpose1_ptr = M_transpose;
   uint32_t *M_transpose2_ptr = &M_transpose[B_offset];
-  uint32_t roffset1, roffset2, roffset3, roffset4;
+  unsigned long long roffset1, roffset2, roffset3, roffset4;
   t_ff  ff = {
              .subm_cb = getcb_subm_h(wargs->pidx),
              .addm_cb = getcb_addm_h(wargs->pidx),
@@ -923,7 +928,7 @@ void *interpol_and_mul_h(void *args)
   }
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->B[(i+1) * NWORDS_FR]);
       __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_FR]);
     }
       mulm_cb(&wargs->B[i * NWORDS_FR],
@@ -1064,6 +1069,325 @@ void *interpol_and_mul_h(void *args)
   }
 
   transposeBlock_h(M_transpose,M_mul,start_row, last_row, 1<<wargs->mNrows, 1<<wargs->mNcols, TRANSPOSE_BLOCK_SIZE);
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  return NULL;
+}
+
+void *interpol_and_muls_h(void *args)
+{
+  ntt_interpolandmul_t *wargs = (ntt_interpolandmul_t *)args;
+  unsigned long long start_col = wargs->start_idx>>wargs->Nrows, last_col = wargs->last_idx>>wargs->Nrows;
+  unsigned long long start_row = wargs->start_idx>>wargs->Ncols, last_row = wargs->last_idx>>wargs->Ncols;
+  uint32_t Ancols = 1 << wargs->Ncols;
+  uint32_t Anrows = 1 << wargs->Nrows;
+  uint32_t *save_A, *save_B, *save_C;
+  const uint32_t *scaler_mont = CusnarksIScalerGet((fmt_t)1);
+  int64_t ridx;
+  unsigned long long i;
+  unsigned long long ridx1;
+  unsigned long long B_offset = (1ull*NWORDS_FR)<<(wargs->Nrows+wargs->Ncols);
+  unsigned long long C_offset = (1ull*NWORDS_FR)<<(wargs->Nrows+wargs->Ncols);
+  uint32_t *M_transpose1_ptr = M_transpose;
+  uint32_t *M_transpose2_ptr = &M_transpose[B_offset];
+  uint32_t *M_transpose3_ptr = &M_mul[C_offset];
+  unsigned long long roffset1, roffset2;
+  t_ff  ff = {
+             .subm_cb = getcb_subm_h(wargs->pidx),
+             .addm_cb = getcb_addm_h(wargs->pidx),
+             .mulm_cb = getcb_mulm_h(wargs->pidx)
+  };
+
+  t_mulm mulm_cb =  ff.mulm_cb;
+  t_addm addm_cb =  ff.addm_cb;
+  t_frommont fromm_cb = getcb_frommont_h(wargs->pidx);
+  
+  roffset1 = wargs->Ncols + wargs->Nrows;
+  if  (roffset1 % 2){
+     roffset1 = 1 << (roffset1+1);
+     roffset2 = roffset1 + (1<<wargs->Nrows);
+  } else {
+     roffset1 = 1 << (roffset1+1); 
+     roffset2 = roffset1;
+  }
+
+
+  // multiply M_mul[i] = A * B = polC
+  for (i=wargs->start_idx; i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_mul[((i+1)) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->B[(i+1) * NWORDS_FR]);
+    }
+    mulm_cb(&M_mul[i * NWORDS_FR],
+               &wargs->A[i * NWORDS_FR],
+               &wargs->B[i * NWORDS_FR]);
+  }
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  // A = IFFT_N/2(A); B = IFFT_N/2(B); C = IFFT_N/2(M) . step 1
+  transposeBlock_h(M_transpose1_ptr, wargs->A,
+              start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_transpose2_ptr,
+              wargs->B, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_transpose3_ptr,
+              M_mul, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+
+  
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  for (i=start_col; i<last_col; i++){
+    ntt_h(&M_transpose1_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, -1,  &ff);
+  }
+  for (i=start_col; i<last_col; i++){
+    ntt_h(&M_transpose2_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, -1,  &ff);
+  }
+  for (i=start_col; i<last_col; i++){
+    ntt_h(&M_transpose3_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, -1,  &ff);
+  }
+
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  // A[i] = A[i] * l2_IW[i]
+
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_transpose1_ptr[(i+1) * NWORDS_FR]);
+    }
+    ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
+    mulm_cb(&M_transpose1_ptr[i * NWORDS_FR],
+               &M_transpose1_ptr[i * NWORDS_FR],
+               &wargs->roots[ridx1 * NWORDS_FR]);
+  }
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_transpose2_ptr[(i+1) * NWORDS_FR]);
+    }
+    ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
+    mulm_cb(&M_transpose2_ptr[i * NWORDS_FR],
+               &M_transpose2_ptr[i * NWORDS_FR],
+               &wargs->roots[ridx1 * NWORDS_FR]);
+  }
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_transpose3_ptr[(i+1) * NWORDS_FR]);
+    }
+    ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1)) * -1) & (wargs->rstride * Anrows * Ancols - 1);
+    mulm_cb(&M_transpose3_ptr[i * NWORDS_FR],
+               &M_transpose3_ptr[i * NWORDS_FR],
+               &wargs->roots[ridx1 * NWORDS_FR]);
+  }
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  transposeBlock_h(wargs->A, M_transpose1_ptr,
+              start_col, last_col,
+              1<<wargs->Ncols, 1<<wargs->Nrows,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(wargs->B,M_transpose2_ptr,
+              start_col, last_col,
+              1<<wargs->Ncols, 1<<wargs->Nrows,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_mul,M_transpose3_ptr,
+              start_col, last_col,
+              1<<wargs->Ncols, 1<<wargs->Nrows,
+              TRANSPOSE_BLOCK_SIZE);
+
+  wait_h(wargs->thread_id, NULL, NULL);
+
+
+  // A[i] = IFFT_N/2(A).T; B[i] = IFFT_N/2(B).T; C[i] = IFFT_N/2(M).T step 2
+  for (i=start_row;i < last_row; i++){
+    ntt_h(&wargs->A[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, -1, &ff);
+  }
+  for (i=start_row;i < last_row; i++){
+    ntt_h(&wargs->B[(i*NWORDS_FR)<<wargs->Ncols],&wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, -1, &ff);
+  }
+  for (i=start_row;i < last_row; i++){
+    ntt_h(&M_mul[(i*NWORDS_FR)<<wargs->Ncols],&wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, -1, &ff);
+  }
+
+  transposeBlock_h(M_transpose1_ptr, wargs->A,
+              start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_transpose2_ptr,
+              wargs->B, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_transpose3_ptr,
+              M_mul, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  save_A = wargs->A;
+  save_B = wargs->B;
+  save_C = M_mul;
+  wargs->A = M_transpose1_ptr;
+  wargs->B = M_transpose2_ptr;
+  M_mul = M_transpose3_ptr;
+  M_transpose1_ptr = save_A;
+  M_transpose2_ptr = save_B;
+  M_transpose3_ptr = save_C;
+
+  // A = A * scaler * l3W; B = B * scaler * l3W; C= C * scale * l3V
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_FR]);
+    }
+      mulm_cb(&wargs->A[i * NWORDS_FR],
+                 &wargs->A[i * NWORDS_FR],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols) * NWORDS_FR]);
+      mulm_cb(&wargs->A[i * NWORDS_FR],
+                 &wargs->A[i * NWORDS_FR],
+                 &wargs->roots[i * NWORDS_FR]);
+  }
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&wargs->B[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_FR]);
+    }
+      mulm_cb(&wargs->B[i * NWORDS_FR],
+                 &wargs->B[i * NWORDS_FR],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols) * NWORDS_FR]);
+      mulm_cb(&wargs->B[i * NWORDS_FR],
+                 &wargs->B[i * NWORDS_FR],
+                 &wargs->roots[i * NWORDS_FR]);
+  }
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_mul[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_FR]);
+    }
+      mulm_cb(&M_mul[i * NWORDS_FR],
+                 &M_mul[i * NWORDS_FR],
+                 &scaler_mont[(wargs->Nrows + wargs->Ncols) * NWORDS_FR]);
+      mulm_cb(&M_mul[i * NWORDS_FR],
+                 &M_mul[i * NWORDS_FR],
+                 &wargs->roots[i * NWORDS_FR]);
+  }
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  // A = FFT_N/2(A); B = FFT_N/2(B); C = FFT_N/2(C). Step 1
+  transposeBlock_h(M_transpose1_ptr, wargs->A,
+              start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_transpose2_ptr,
+              wargs->B, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_transpose3_ptr,
+              M_mul, start_row, last_row,
+              1<<wargs->Nrows, 1<<wargs->Ncols,
+              TRANSPOSE_BLOCK_SIZE);
+  
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  for (i=start_col;i < last_col; i++){
+    ntt_h(&M_transpose1_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, 1,  &ff);
+  }
+  for (i=start_col;i < last_col; i++){
+    ntt_h(&M_transpose2_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, 1,  &ff);
+  }
+  for (i=start_col;i < last_col; i++){
+    ntt_h(&M_transpose3_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, 1,  &ff);
+  }
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  
+  // A[i] = A[i] * l2_W[i]
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_transpose1_ptr[(i+1) * NWORDS_FR]);
+    }
+    ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1))) & (wargs->rstride * Anrows * Ancols - 1);
+    mulm_cb(&M_transpose1_ptr[i * NWORDS_FR],
+               &M_transpose1_ptr[i * NWORDS_FR],
+               &wargs->roots[ridx1 * NWORDS_FR]);
+  }
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_transpose2_ptr[(i+1) * NWORDS_FR]);
+    }
+    ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1))) & (wargs->rstride * Anrows * Ancols - 1);
+    mulm_cb(&M_transpose2_ptr[i * NWORDS_FR],
+               &M_transpose2_ptr[i * NWORDS_FR],
+               &wargs->roots[ridx1 * NWORDS_FR]);
+  }
+  for (i=wargs->start_idx;i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_transpose3_ptr[(i+1) * NWORDS_FR]);
+    }
+    ridx1 = (wargs->rstride * (i >> wargs->Nrows) * (i & (Anrows - 1))) & (wargs->rstride * Anrows * Ancols - 1);
+    mulm_cb(&M_transpose3_ptr[i * NWORDS_FR],
+               &M_transpose3_ptr[i * NWORDS_FR],
+               &wargs->roots[ridx1 * NWORDS_FR]);
+  }
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  transposeBlock_h(wargs->A, M_transpose1_ptr,
+              start_col, last_col,
+              1<<wargs->Ncols, 1<<wargs->Nrows,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(wargs->B,M_transpose2_ptr,
+              start_col, last_col,
+              1<<wargs->Ncols, 1<<wargs->Nrows,
+              TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_mul,M_transpose3_ptr,
+              start_col, last_col,
+              1<<wargs->Ncols, 1<<wargs->Nrows,
+              TRANSPOSE_BLOCK_SIZE);
+
+
+
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  // A = FFT_N/2(A).T; B = FFT_N/2(B).T ; C= FFT_N/2(C).T . Step 2
+  for (i=start_row;i < last_row; i++){
+    ntt_h(&wargs->A[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, 1, &ff);
+  }
+  for (i=start_row;i < last_row; i++){
+    ntt_h(&wargs->B[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, 1, &ff);
+  }
+  for (i=start_row;i < last_row; i++){
+    ntt_h(&M_mul[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, 1, &ff);
+  }
+
+  M_transpose1_ptr = wargs->A;
+  M_transpose2_ptr = wargs->B;
+  M_transpose3_ptr = M_mul;
+  wargs->A=save_A;
+  wargs->B=save_B;
+  M_mul=save_C;
+
+  transposeBlock_h(wargs->A,M_transpose1_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(wargs->B,M_transpose2_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_mul,M_transpose3_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
+  wait_h(wargs->thread_id, NULL, NULL);
+
+  // tmp = A * B
+  for (i=wargs->start_idx; i < wargs->last_idx; i++){
+    if (i < wargs->last_idx -1){
+      __builtin_prefetch(&M_mul[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->A[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&wargs->B[(i+1) * NWORDS_FR]);
+    }
+    mulm_cb(&wargs->A[i*NWORDS_FR],
+               &wargs->A[i * NWORDS_FR],
+               &wargs->B[i * NWORDS_FR]);
+    addm_cb(&M_mul[i*NWORDS_FR],
+               &M_mul[i * NWORDS_FR],
+               &wargs->A[i * NWORDS_FR]);
+    fromm_cb(&M_transpose[i*NWORDS_FR], &M_mul[i*NWORDS_FR]);
+  }
   wait_h(wargs->thread_id, NULL, NULL);
 
   return NULL;

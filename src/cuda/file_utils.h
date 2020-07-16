@@ -33,6 +33,31 @@
 #ifndef _FILE_UTILS_H_
 #define _FILE_UTILS_H_
 
+#define ZKEY_HDR_START_OFFSET_NBYTES (12)
+#define WTNS_HDR_START_OFFSET_NBYTES (12)
+
+
+typedef enum {
+   ZKEY_HDR_SECTION_0 = 0, // Zkey
+   ZKEY_HDR_SECTION_1,  // GROTH
+   ZKEY_HDR_SECTION_2,  // Constants
+   ZKEY_HDR_SECTION_3,  // IC
+   ZKEY_HDR_SECTION_4,  // Coeffs
+   ZKEY_HDR_SECTION_5,  // A
+   ZKEY_HDR_SECTION_6,  // B1
+   ZKEY_HDR_SECTION_7,  // B2
+   ZKEY_HDR_SECTION_8,  // C
+   ZKEY_HDR_SECTION_9,  // H
+   ZKEY_HDR_SECTION_10, // Contributions
+
+   ZKEY_HDR_NSECTIONS // Contributions
+}zkey_sections_t;
+
+typedef struct {
+   unsigned long long section_offset[ZKEY_HDR_NSECTIONS];
+   unsigned long long section_len[ZKEY_HDR_NSECTIONS];
+}zkey_t;
+
 void readU256DataFile_h(uint32_t *samples, const char *filename, uint32_t insize, uint32_t outsize);
 void readU256DataFileFromOffset_h(uint32_t *samples, const char *filename, t_uint64 woffset, t_uint64 nwrods);
 void readWitnessFile_h(uint32_t *samples, const char *filename, uint32_t fmt, const unsigned long long insize);
@@ -48,6 +73,10 @@ void readR1CSFile_h(uint32_t *samples, const char *filename, r1csv1_t *r1cs, r1c
 void readECTablesNElementsFile_h(ec_table_offset_t *table_offset, const char *filename);
 void readDataFile(uint32_t *samples, const char *filename);
 void getDataFileSize(t_uint64 *nwords , const char *filename);
+void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename);
+uint32_t *readZKeySection_h(uint32_t section_id, const char *zkey_filename);
+unsigned long long readNWtnsNEls_h(unsigned long long *start, const char *filename);
+void readWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long long start, const char *filename);
 
 
 #endif
