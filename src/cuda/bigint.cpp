@@ -225,8 +225,8 @@ uint32_t msbuBI_h(uint32_t *x, uint32_t biSize)
 void printUBINumber(const uint32_t *x, uint32_t biSize)
 {
   for (uint32_t i=0; i < biSize; i++){
-    //printf("%8x ",x[i]);
-    printf("%u ",x[i]);
+    printf("%8x ",x[i]);
+    //printf("%u ",x[i]);
   }
   printf ("\n");
 }

@@ -1638,36 +1638,6 @@ void ec_jacreduce_server_h(jacadd_reduced_t *args)
   
   
   }
-/*
-  printf("SCL : %d\n", args->n);
-
-  for (uint32_t f=0; f<args->n; f++){
-    //printUBINumber(&args->x[f*2*NWORDS_FR],8);
-    //printUBINumber(&args->x[f*2*NWORDS_FR+NWORDS_FR],8);
-
-      for (uint32_t f3=0; f3 < 8; f3++){
-      for (uint32_t f2=0; f2 < 4; f2++){
-        printf("%u ",(args->scl[f*NWORDS_FR+f3] >> (8 * f2)) & 0xFF);
-     } 
-     }
-
-  }
-  printf("\n");
-
-  for (uint32_t f=0; f<args->n; f++){
-  //for (uint32_t f=0; f<2; f++){
-    printUBINumber(&args->x[f*2*NWORDS_FR],8);
-    printUBINumber(&args->x[f*2*NWORDS_FR+NWORDS_FR],8);
-
-      for (uint32_t f3=0; f3 < 16; f3++){
-      for (uint32_t f2=0; f2 < 4; f2++){
-        printf("%u ",(args->x[2*f*NWORDS_FR+f3] >> (8 * f2)) & 0xFF);
-     } 
-     }
-
-  }
-  printf("\n");
-*/
 
   parallelism_enabled = 0;
 
