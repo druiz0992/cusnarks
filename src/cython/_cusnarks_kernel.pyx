@@ -491,11 +491,9 @@ def mpoly_evals_h(np.ndarray[ndim=1, dtype=np.uint32_t] scldata, np.ndarray[ndim
      args_c.reduce_coeff = ncoeff
      args_c.last_idx = <unsigned long long> len(p1data)-1
      args_c.max_threads = MAX_NCORES_OMP
-     #args_c.max_threads = 1
      args_c.pidx = pidx
      args_c.ncoeff = <ct.uint32_t> p1data[0]
      args_c.mode = 1
-     #print("n coeff ", args_c.ncoeff)
 
      with nogil:
         uh.cmpoly_eval_server_h(args_c)
@@ -521,7 +519,6 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
      args_c.rstride = rstride
      args_c.pidx = pidx
      args_c.max_threads = MAX_NCORES_OMP
-     #args_c.max_threads = 1
      args_c.mode = mode
 
      with nogil:

@@ -271,15 +271,7 @@ void *mpolys_eval_h(void *vargs)
       pout = &args->pout[p_idx*NWORDS_FR];
       mulm_cb(tmp, &coeff[ZKEY_COEFF_VAL_OFFSET], scl);
       addm_cb(pout, pout, tmp);
-      //printf("%d, %d, %d\n", coeff[0], coeff[1], coeff[2]);
   }
-/*
-  for (uint32_t i=0; i < 64; i++){
-     for (uint32_t j=0; j < 4; j++){
-       printf("%u ",(args->pout[i] >> (8 * j)) & 0xFF);
-     }
-  }
-*/
 
   return NULL;
 }

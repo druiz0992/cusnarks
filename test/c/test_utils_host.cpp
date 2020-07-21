@@ -51,7 +51,6 @@
 #include "file_utils.h"
 #include "transpose.h"
 #include "utils_host.h"
-#include "mpoly.h"
 
 #define NROOTS 128
 #define MAX_ITER_1M 10
@@ -240,9 +239,6 @@ static char ec_rdc_filename[4][100] = {
                                            "./aux_data/ec2_rdc_0.tbin",
                                            "./aux_data/ec2_rdc_2.tbin"
 };
-
-static char zkey_file[] = "./aux_data/circuit_final.zkey";
-static char wtns_file[] = "./aux_data/witness.wtns";
 
 uint32_t test_addm(void)
 {
@@ -2944,287 +2940,9 @@ uint32_t test_transpose_square(void)
   return retval;
 }
 
-uint32_t test_zkey(void) 
-{
-  const char oufname[] = "./aux_data/tmp.pkbin";
-  zKeyToPkFile_h(oufname, zkey_file);
-}
-
-uint32_t test_wtns(void) 
-{
-  unsigned long long start, nElems;
-  const char oufname[] = "./aux_data/tmp.pkbin";
-  uint32_t *samples;
-
-  // read witness
-  nElems = readNWtnsNEls_h(&start, wtns_file);
-  samples = (uint32_t *)malloc(nElems * NWORDS_FR * sizeof(uint32_t));
-  readWtnsFile_h(samples, nElems, start, wtns_file);
-
-  free(samples);
-}
-
-uint32_t test_mpolyseval(void) 
-{
-  unsigned long long start, nElems;
-  uint32_t *witness, *coeffs, *pout;
-  uint32_t *params;
-  uint32_t domainSize;
-  mpoly_eval_t args;
-
-  init_h();
-
-  params = readZKeySection_h(ZKEY_HDR_SECTION_2, zkey_file);
-  domainSize = params[20];
-  free(params);
-  
-  // read coeffs
-  coeffs = readZKeySection_h(ZKEY_HDR_SECTION_4, zkey_file);
-
-  // read witness
-  nElems = readNWtnsNEls_h(&start, wtns_file);
-  witness = (uint32_t *)malloc(nElems * NWORDS_FR * sizeof(uint32_t));
-  readWtnsFile_h(witness, nElems, start, wtns_file);
-
-  pout = (uint32_t *)malloc(2*domainSize*NWORDS_FR*sizeof(uint32_t));
-  memset(pout, 0, 2*domainSize*NWORDS_FR*sizeof(uint32_t));
-  // configure mpoly eval server
-  args.pout = pout;
-  args.scalar = witness;
-  args.pin = &coeffs[1];
-  args.start_idx = 0;
-  args.reduce_coeff = domainSize;
-  args.last_idx = coeffs[0]*ZKEY_COEFF_NWORDS;
-  args.max_threads = get_nprocs_conf();
-  //args.max_threads = 1;
-  args.pidx = MOD_FR;
-  args.ncoeff = coeffs[0];
-  args.mode = 1;
-  printf("n coeff : %d\n", coeffs[0]);
-
-  mpoly_eval_server_h(&args);
-
-  printf("N coeffs : %d\n", coeffs[0]);
-  /*
-  printf("coeffs\n");
-  for(uint32_t i=0; i < 1 + coeffs[0]*11; i++) {
-     for (uint32_t j=0; j < 4; j++){
-       printf("%u ",(coeffs[i] >> (8 * j)) & 0xFF);
-     }
-  }
-  */
-
-  /*
-  printf("Witness\n");
-  for(uint32_t i=0; i < nElems*8; i++) {
-     for (uint32_t j=0; j < 4; j++){
-       printf("%u ",(witness[i] >> (8 * j)) & 0xFF);
-     }
-  }
-  */
-  
-  printf("\npolsA\n");
-  for(uint32_t i=0; i < domainSize*8; i++) {
-     for (uint32_t j=0; j < 4; j++){
-       printf("%u ",(pout[i] >> (8 * j)) & 0xFF);
-     }
-  }
-
- 
-  printf("\npolsB\n");
-  for(uint32_t i=0; i < domainSize*8; i++) {
-     for (uint32_t j=0; j < 4; j++){
-       printf("%u ",(pout[domainSize*NWORDS_FR + i] >> (8 * j)) & 0xFF);
-     }
-  }
-
-  FILE *tmpf = fopen("./aux_data/tmp.pols", "wb");
-  fwrite(pout, sizeof(uint32_t),2*domainSize*NWORDS_FR,tmpf);
-  fclose(tmpf);
-
-
-  release_h();
-  free(witness);
-  free(coeffs);
-  free(pout);
-}
-
-uint32_t test_interpols_and_multiply()
-{
-  uint32_t *coeffs;
-  uint32_t *params;
-  uint32_t domainSize;
-  int pidx=MOD_FR;
-  fft_params_t fft_params;
-  int Nrows,Ncols;
-  const uint32_t *N = CusnarksPGet((mod_t)pidx);
-  uint32_t *X1, *Y1;
-  uint32_t *R;
-  uint32_t *roots;
-  ntt_interpolandmul_t *args;
-  char roots_f[1000];
-  int cusnarks_nroots = 1 << CusnarksGetNRoots();
-  uint32_t npoints_raw, npoints, nroots, nroots2;
-  uint32_t retval=0;
-
-  init_h();
-
-  params = readZKeySection_h(ZKEY_HDR_SECTION_2, zkey_file);
-  domainSize = params[20];
-  uint32_t domainBits =  31-msbuBI_h(&domainSize,1);
-
-  free(params);
-  
-  CusnarksGetFRoots(roots_f, sizeof(roots_f));
-  nroots2 = domainSize/2;
-
-  X1 = (uint32_t *)malloc((domainSize) * NWORDS_FR * sizeof(uint32_t));
-  Y1 = (uint32_t *)malloc((domainSize) * NWORDS_FR * sizeof(uint32_t));
-  FILE *tmpf = fopen("./aux_data/tmp.pols", "rb");
-  fread(X1, sizeof(uint32_t), domainSize*NWORDS_FR, tmpf); 
-  fread(Y1, sizeof(uint32_t), domainSize*NWORDS_FR, tmpf); 
-  fclose(tmpf);
-  roots = (uint32_t *)malloc((2*domainSize + (1<<nroots2) + (1<<(nroots2+1))) * NWORDS_FR * sizeof(uint32_t));
-  args = (ntt_interpolandmul_t *) malloc(sizeof(ntt_interpolandmul_t));
-
-  args->A = X1; args->B = Y1; args->roots = roots; args->pidx=pidx, args->max_threads = get_nprocs_conf();
-  printf("TH : %d\n",args->max_threads);
-  args->rstride=2;
-  npoints_raw = domainSize;
-     
-  npoints = npoints_raw;
-  nroots = npoints;
-  printf("1 %d, %d\n",domainSize, domainBits);
-  readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
-  printf("2\n");
-  readU256DataFile_h(&roots[nroots*NWORDS_FR],roots_f, cusnarks_nroots, 1<<nroots2 );
-  printf("3\n");
-  if (domainBits % 2 == 1){
-     readU256DataFile_h(&roots[(nroots+(1<<nroots2))*NWORDS_FR],roots_f, cusnarks_nroots, 1<<(nroots2+1));
-  } else {
-     readU256DataFile_h(&roots[(nroots+(1<<nroots2))*NWORDS_FR],roots_f, cusnarks_nroots, 1<<(nroots2-1));
-  }
-  printf("4\n");
-
-  Nrows = domainBits/2;
-  Ncols = domainBits - Nrows;
-
-  args->Nrows = Nrows; args->Ncols=Ncols; args->nroots=1<<(Nrows+Ncols); args->max_threads = 1; args->mode=1;
-  printf("START\n");
-  R = ntt_interpolandmul_server_h(args);
-
-  free(X1);
-  free(Y1);
-  free(roots);
-  free(args);  
-
-  release_h();
-
-  return retval;
-}
-
-uint32_t test_mul_prof2(void)
-{
-/*
-  char roots[] = {251,255,255,79,28,52,150,172,41,205,96,159,149,118,252,54,46,70,121,120,111,163,110,102,47,223,7,154,193,119,10,14};
-
-  char roots[] = {6,0,0,160,119,193,75,151,103,163,88,218,178,113,55,241,46,18,8,9,71,162,225,81,250,192,41,71,177,214,89,34};
-
-  char roots[] = {139,239,220,158,151,61,117,127,32,145,71,177,44,23,63,95,110,108,9,116,121,98,177,141,207,8,193,57,53,123,55,43};
-
- char roots[] = {63,124,173,181,226,74,173,248,190,133,203,131,255,198,96,45,247,41,148,93,43,253,118,217,169,217,154,63,231,124,64,36};
- char roots[] = {3,143,47,116,124,125,182,244,204,104,208,99,220,45,27,104,106,87,251,27,239,188,229,140,254,60,182,210,81,41,124,22};
-  char roots[] = {100,76,87,191,177,247,20,34,242,125,49,247,47,35,249,40,205,117,173,176,168,132,117,229,3,109,23,220,89,251,129,43};
-  char roots[] = {191,97,143,129,229,3,144,142,194,254,248,155,52,191,155,140,78,83,1,63,205,238,220,83,60,170,41,229,107,150,144,38};
- char roots[] = {177,123,129,38,48,196,121,10,240,125,83,153,124,204,178,123,222,230,65,2,213,39,202,182,76,240,50,54,63,179,122,0};
- char roots[] = {204,74,162,131,63,184,175,162,110,83,93,82,217,85,242,146,25,221,134,2,8,102,117,94,73,37,45,197,166,177,123,24};
- char roots[] = {222,35,164,34,231,59,83,156,13,110,223,124,18,157,42,100,5,192,154,64,70,117,188,13,130,80,61,178,141,76,240,0};
- char roots[] = {132,17,12,40,180,179,244,30,44,42,94,174,194,212,122,207,24,101,163,197,108,59,6,184,140,192,223,101,185,196,72,35};
- char roots[] = {178,207,79,174,137,33,231,72,7,90,248,141,60,251,3,10,10,46,155,234,53,138,77,255,119,29,156,205,46,140,169,40};
- char roots[] = {211,219,236,179,47,82,212,29,173,243,85,208,147,42,34,104,232,85,213,179,102,125,156,190,70,248,148,97,184,246,146,27};
- char roots[] = {214,78,160,121,190,220,76,137,135,7,211,68,106,222,108,149,95,193,219,215,43,182,161,89,78,111,128,154,16,228,235,18};
- char roots[] = {184,234,5,77,199,160,19,186,22,49,171,17,99,93,1,46,90,160,165,140,44,146,3,181,218,148,227,254,215,21,190,6};
- char roots[] = {84,184,253,91,5,247,78,128,242,234,206,64,113,107,167,122,203,137,254,178,104,90,201,252,199,6,196,241,53,28,70,29};
- char roots[] = {51,116,57,57,89,231,179,71,209,36,28,13,146,58,58,109,67,95,247,116,81,18,52,161,86,213,106,238,1,31,130,27};
- char roots[] = {124,220,4,18,216,184,5,218,65,141,48,6,230,42,50,72,44,137,158,132,39,142,53,53,146,213,45,214,251,202,15,4};
- char roots[] = {132,11,112,9,47,198,102,37,96,134,191,160,118,58,24,51,241,88,80,87,89,143,57,217,52,205,209,57,206,46,109,5};
- char roots[] = {54,122,162,230,183,163,158,4,188,219,62,5,3,230,235,239,212,158,206,58,90,180,36,132,94,121,136,166,144,131,124,40};
- char roots[] = {26,147,141,170,101,212,50,218,156,143,128,97,133,246,105,38,133,176,200,228,70,171,123,36,26,2,214,129,135,102,59,13};
- char roots[] = {60,47,50,245,146,33,234,39,167,233,143,101,233,132,24,177,105,192,83,160,188,35,134,58,166,57,225,37,240,243,143,18};
- char roots[] = {242,26,239,188,110,34,142,155,96,107,64,223,171,241,69,158,61,187,167,213,87,210,141,83,188,163,130,120,3,147,56,10};
-*/
- char roots[] = {0,145,158,192,4,36,72,110,178,37,0,89,199,145,117,13,17,190,94,58,121,39,2,164,168,76,169,193,195,166,100,1};
-/*
- char roots[] = {48,208,79,216,105,189,34,199,44,22,82,207,38,74,14,96,233,167,243,69,215,126,114,251,92,39,251,105,178,167,82,22};
- char roots[] = {226,7,92,87,255,250,14,64,197,154,143,75,73,115,35,85,55,173,231,129,237,171,121,170,57,46,77,8,184,229,198,26};
- char roots[] = {254,32,138,201,34,148,162,160,157,92,147,101,202,98,212,115,247,130,69,212,110,74,186,225,182,130,58,12,192,20,252,40};
- char roots[] = {103,2,137,128,20,100,89,135,73,3,192,228,181,120,58,74,126,177,166,82,221,79,0,73,18,234,230,101,221,23,69,40};
- char roots[] = {156,61,209,128,85,115,110,99,214,255,69,36,116,243,43,162,216,3,178,30,192,42,69,86,231,249,99,41,148,239,96,24};
-*/
-  //char roots[] = { 156,61,209,128,85,115,110,99,214,255,69,36,116,243,43,162,216,3,178,30,192,42,69,86,231,249,99,41,148,239,96,24};
-  char P[] = {116,119,43,235,167,253,94,58,96,186,153,78,101,126,112,177,236,230,19,233,142,244,90,64,2,192,183,206,13,57,62,14,206,41,145,180,124,236,229,218,52,109,22,192,84,99,252,117,188,217,57,55,204,164,248,208,35,135,59,126,210,162,182,10};
-  uint32_t *r = (uint32_t *) roots;
-  uint32_t pidx = MOD_FR;
-  
-
-  uint32_t *a = r;
-  uint32_t *b = r;
-  uint32_t r2[NWORDS_FR];
-  char roots_f[1000];
-  int nroots = 1 << 23;
- 
-  int cusnarks_nroots = 1 << CusnarksGetNRoots();
-  CusnarksGetFRoots(roots_f, sizeof(roots_f));
-
-  printf("is on curve : %d\n", ec_isoncurve_h((uint32_t *)P,1,MOD_FP));
-  printUBINumber((uint32_t *)P, 8);
-
-  uint32_t *roots_cu = (uint32_t *)malloc(nroots * NWORDS_FR * sizeof(uint32_t));
-
-  readU256DataFile_h(roots_cu,roots_f,cusnarks_nroots,nroots);
-  for(uint32_t i=0; i< 4; i++){
-    printUBINumber(&roots_cu[i*NWORDS_FR], 8);
-    for(uint32_t f=0; f < 8; f++) {
-      for (uint32_t f2=0; f2 < 4; f2++){
-       printf("%u ",(roots_cu[f+i*NWORDS_FR] >> (8 * f2)) & 0xFF);
-     }
-    }
-    printf("\n");
-  }
-  printf("XXXXXXXXXXX\n");
-  printUBINumber(a, 8);
-    for(uint32_t f=0; f < 8; f++) {
-      for (uint32_t f2=0; f2 < 4; f2++){
-       printf("%u ",(a[f] >> (8 * f2)) & 0xFF);
-     }
-    }
-  printf("\n");
-  montmult_h(r2, a, b, pidx);
-  printUBINumber(r2, 8);
-  montmult_h(r2, r2, b, pidx);
-  printUBINumber(r2, 8);
-  montmult_h(r2, r2, b, pidx);
-  printUBINumber(r2, 8);
-  montmult_h(r2, r2, b, pidx);
-  printUBINumber(r2, 8);
-
-  printf("%d\n",nroots);
-  free(roots_cu);
-  return 0;
-
-}
-
 int main()
 {
   uint32_t retval;
-
-  //retval+=test_mpolyseval();
-  //retval+=test_mul_prof2();
-  retval+=test_interpols_and_multiply();
-
-/*
-  retval+=test_zkey();  
-  retval+=test_wtns();  
 
   retval+=test_mul_prof();  // Profile montgomery mul 
   retval+=test_mul_ext_prof();  // Profile montgomery mul 
@@ -3296,7 +3014,7 @@ int main()
   retval+=test_ec_jacreduce_precompute(1,0,0);   
   retval+=test_ec_jacreduce_precompute(1,0,1);   
   retval+=test_ec_jacreduce_precompute(1,1);   
-*/
+
 
   if (retval){
     printf("\033[1;31m");

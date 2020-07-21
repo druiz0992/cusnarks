@@ -1551,16 +1551,11 @@ void computeRoots_h(uint32_t *roots, uint32_t nbits)
   char curve[100];
   fgets(curve,sizeof(curve) , ifp);
   fclose(ifp);
+
   if (strcmp(curve,"_BN256\n")==0) {
-       //printf("XXXXX\n");
        uint32_t prootBN256[NWORDS_FR];
        memcpy(prootBN256, &rootsBN256[nbits*NWORDS_FR*sizeof(uint32_t)],NWORDS_FR*sizeof(uint32_t));
        proots = prootBN256;
-/*
-       for (uint32_t j=0;j<32;j++){
-         printf("%hhu ",rootsBN256[j+nbits*NWORDS_FR*sizeof(uint32_t)]);
-       }
-*/
   } 
   
   memcpy(roots, One, NWORDS_FR*sizeof(uint32_t));
