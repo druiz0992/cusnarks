@@ -242,16 +242,16 @@ class GrothProver(object):
         self.logger.info('Initializing memories...')
 
         if self.proving_key_f.endswith('.zkey'):
+          print("Regenerating verif key")
           #generate verification_key
           self.launch_snarkjs("verification_key")
 
           #generate pkbin
-          out_fname = self.proving_key_f
-          out_fname[-5:-1] = ".bin"
-          out_fname[-1] = ""
-          zKeyToPkFile_h(out_fname.encode("UTF-8",self.proving_key_f.encode("UTF-8")))
+          out_fname = self.proving_key_f[:-5]+".bin"
+          zKeyToPkFile_h(out_fname.encode("UTF-8"),self.proving_key_f.encode("UTF-8"))
           self.proving_key_f = out_fname
           self.pkbin_mode = 1
+          print("proving key f "+self.proving_key_f)
 
         # PK_BIN
         pkbin_nWords = int(os.path.getsize(self.proving_key_f)/4)
@@ -265,6 +265,9 @@ class GrothProver(object):
         domainSize = int(pkbin_vars[1][0])
         delta_1 = pkbin_vars[2]
         hExps = pkbin_vars[3]
+        #print(self.nVars, domainSize, delta_1)
+        #print(2*(domainSize+1)*NWORDS_256BIT,2*(domainSize+2)*NWORDS_256BIT)
+        #print(len(hExps))
         hExps[2*(domainSize+1)*NWORDS_256BIT:2*(domainSize+2)*NWORDS_256BIT] = delta_1
         nPublic = int(pkbin_vars[4][0])
 
@@ -274,9 +277,10 @@ class GrothProver(object):
           sys.exit(1)
 
         # scl_array
-        self.scl_array_sh = RawArray(c_uint32, domainSize * NWORDS_256BIT)     
+        #TODO DOMAINS SIZE
+        self.scl_array_sh = RawArray(c_uint32, 2*domainSize * NWORDS_256BIT)     
         self.scl_array = np.frombuffer(
-                     self.scl_array_sh, dtype=np.uint32).reshape((domainSize, NWORDS_256BIT))
+                     self.scl_array_sh, dtype=np.uint32).reshape((2*domainSize, NWORDS_256BIT))
         # Size is domainSize To store polH + three additional coeffs
         self.sorted_scl_array_idx_sh = RawArray(c_uint32, domainSize + 4)
         self.sorted_scl_array_idx =\
@@ -326,6 +330,7 @@ class GrothProver(object):
             nroots3 = nroots2+1
           else:
             nroots3 = nroots2-1
+          #print("pAT_shape", self.pA_T.shape[0], nroots,nroots2, nroots3)
           self.roots_rdc_u256_sh = RawArray(c_uint32,  ((1 << nroots) + (1<< nroots2) + (1 << nroots3)) * NWORDS_256BIT)
           self.roots_rdc_u256 =\
                 np.frombuffer(
@@ -582,9 +587,9 @@ class GrothProver(object):
         pk_bin = pkbin_get(pk,['nVars', 'domainSize', 'polsA', 'polsB','hExps'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]
-        pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
 
         if self.pkbin_mode == 0:
+          pA = np.reshape(pk_bin[2][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
           pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
           self.logger.info(' Process server - Evaluating Poly A...')
           np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FR))
@@ -593,10 +598,14 @@ class GrothProver(object):
           self.logger.info(' Process server - Completed Evaluating Poly B...')
 
         else :
+          pA = pk_bin[2]
+          #print("PA ", pA)
           self.logger.info(' Process server - Evaluating Polys...')
           pa = self.evalPolys(w[:wnElems], pA, m, MOD_FR)
-          np.copyto(pA_T,pa[:m*NWORDS_FR])
-          np.copyto(pB_T,pa[m*NWORDS_FR:])
+         # print("M ", m, len(pA), pA_T.shape)
+          np.copyto(pA_T,pa[:m])
+          np.copyto(pB_T,pa[m:])
+          #print(pA_T, pB_T)
 
         end = time.time()
 
@@ -604,15 +613,18 @@ class GrothProver(object):
         if self.compute_ntt_gpu is False:
           self.logger.info(' Process server - Calculate H...')
           ifft_params = ntt_build_h(self.pA_T.shape[0])
+          #print("MODE ", self.pkbin_mode)
           polH = ntt_interpolandmul_h(
                      np.reshape(self.pA_T,-1),
                      np.reshape(self.pB_T,-1),
-                     np.reshape(
-            self.roots_rdc_u256,
-                    -1
-                               ),
+                     np.reshape( self.roots_rdc_u256, -1),
                      2,
+                     self.pkbin_mode,
                      MOD_FR)
+          if self.pkbin_mode == 0:
+            polH = polH[m:-1]
+          else :
+            m=m+1
 
         end1 = time.time()
 
@@ -630,11 +642,13 @@ class GrothProver(object):
             ep_vector = np.reshape(self.ect_A,-1)
             offset = self.G1_woffset
             total_words = self.ec_table['woffset_B2'] - self.G1_woffset
-
+          w0 = np.zeros(w[:nVars].shape,np.uint32)
+          #w0[:61] = w[:61]
           np.copyto(self.pi_a_eccf1,
                     ec_jacreduce_h(
                             np.reshape( 
-                              np.concatenate((
+                                              #w[:nVars], -1),
+                             np.concatenate((
                                               w[:nVars],
                                               np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
                                               [self.r_scl] )),
@@ -649,6 +663,8 @@ class GrothProver(object):
                             self.pippen_conf))
 
           self.logger.info(' Process server - Mexp A Done... ')
+          #print("A", self.pi_a_eccf1)
+          #print(ec_isoncurve_h(np.reshape(self.pi_a_eccf1,-1), 1,0,MOD_FP))
 
           if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
              ep_vector = pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS]
@@ -674,9 +690,13 @@ class GrothProver(object):
                             MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
           self.logger.info(' Process server - Mexp B2 Done...')
+          #print(self.pi_b_eccf2)
 
           if not self.read_table_en or self.ec_table['woffset_C'] == self.ec_table['woffset_hExps']:
-             ep_vector = pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS]
+             if self.pkbin_mode == 0:
+               ep_vector = pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS]
+             else :
+               ep_vector = pk_bin2[3][:(nVars-nPublic-1)*NWORDS_256BIT*ECP_JAC_INDIMS]
           else :
              self.G1_woffset -= self.ec_table['woffset_A'] 
              self.G1_woffset += self.ec_table['woffset_C'] 
@@ -697,6 +717,8 @@ class GrothProver(object):
                     )
 
           self.logger.info(' Process server - Mexp C Done...')
+          #print("C1")
+          #print(self.pi_c_eccf1)
 
           if self.zk:
             if not self.read_table_en or self.ec_table['woffset_B1'] == self.ec_table['woffset_C']:
@@ -725,6 +747,8 @@ class GrothProver(object):
                               MOD_FP, 1, 1, 1, 
                               self.pippen_conf)
                     )
+            #print("B1")
+            #print(self.pi_b1_eccf1)
 
             if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
              self.G1_woffset -= self.ec_table['woffset_B1'] 
@@ -745,7 +769,7 @@ class GrothProver(object):
           self.logger.info(' Process server - hExps Mexp common part started ...')
           scalar_vector = np.reshape(
                                  np.concatenate((
-                                      polH[m:-1],
+                                      polH,
                                      [self.neg_rs_scl]
                                     )),-1)
 
@@ -754,6 +778,7 @@ class GrothProver(object):
                                   pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],
                                   delta_1,
                              ))
+            #print("M", len(scalar_vector), len(EP_vector))
           else :
              EP_vector =   np.reshape(self.ect_hExps,-1)
              offset = self.G1_woffset
@@ -771,6 +796,7 @@ class GrothProver(object):
                          MOD_FP, 1, 1, 1, self.pippen_conf)
                      )
           self.logger.info(' Process server - hExps Mexp common part completed ...')
+          #print("C2",self.pi_c2_eccf1)
 
           
         else:
@@ -780,7 +806,7 @@ class GrothProver(object):
           if conn is not None:
             conn.recv()
           if self.compute_ntt_gpu is False:
-            np.copyto(w[:m-1], polH[m:-1])
+            np.copyto(w, polH)
             self.logger.info(' Process server - Copying polH...')
   
         end3 = time.time()
@@ -1006,6 +1032,8 @@ class GrothProver(object):
                 readWitnessFile_h(self.witness_f.encode("UTF-8"),0, nVars ))
 
            elif self.witness_f.endswith('.wtns'):
+             #print("Nelems shape ",self.scl_array.shape, nVars)
+             #print(readWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
              np.copyto(
                 self.scl_array[:nVars],
                 readWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
@@ -1259,15 +1287,17 @@ class GrothProver(object):
              self.logger.error(' To launch snarkjs, verification file %s needs to be a json file', self.verification_key_f)
              sys.exit(1)
         
+          #if self.pkbin_mode == 0:
           snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
+          #else :
+             #snarkjs['verify'] = call(["snarkjs", "groth16", "verify", verification_key_file,snarkjs['pd_f'], snarkjs['p_f']])
 
         elif mode == "verification_key":
-          self.verification_key_f = self.proving_key_f
-          self.verification_key_f[-5:] = "_vk.j" 
-          self.verification_key_f =  self.verification_key_f + "son"
-          print(self.verification_key_f)
+          self.verification_key_f = self.proving_key_f[:-5]
+          self.verification_key_f =  self.verification_key_f + "_vk.json"
         
-          call([snarkjs, "zkey", "export", "verificationkey", self.proving_key_f, self.verification_key_f])
+          call(["snarkjs", "zkey", "export", "verificationkey", self.proving_key_f, "verification_key.json"])
+          call(["mv", "verification_key.json", self.verification_key_f])
        
         return snarkjs
 
@@ -1288,6 +1318,7 @@ class GrothProver(object):
                       random.randint(
                              1,
                              ZField.get_extended_p().as_long()-1)).as_uint256())
+          #print("SSSSSSSSSSSSSSSSSSSSSSSSSSSS",self.r_scl,self.s_scl)
         else:
           np.copyto(
                 self.r_scl,
@@ -1510,6 +1541,10 @@ class GrothProver(object):
                                        self.pi_b1_eccf1 )),
                                  -1)
            self.logger.info(' Process server - hExps Mexp ZK part started ...')
+           #print("A", self.pi_a_eccf1)
+           #print("C2", self.pi_c2_eccf1)
+           #print("C", self.pi_c_eccf1)
+           #print("B1", self.pi_b1_eccf1)
            np.copyto(self.pi_c_eccf1,
               ec_jacreduce_h(
                             scalar_v,
@@ -1522,6 +1557,7 @@ class GrothProver(object):
                             MOD_FP, 1, 1, 1, self.pippen_conf))
 
            self.logger.info(' Process server - hExps Mexp ZK part completed ...')
+           #print("CC", self.pi_c_eccf1)
            if self.p_CPU is not None:
              self.t_GP['Mexp2'] = t[2]
      
@@ -1791,7 +1827,8 @@ class GrothProver(object):
         return polX_T
     
     def evalPolys(self, w, pA, m, pidx):
-       pa = mpoly_evals_h(np.reshape(w,-1), np.reshape(pA, -1), m, pidx)
+       pa = mpoly_evals_h(np.reshape(w,-1), pA, m, pidx)
+       #print("PA ", pa)
        return pa
    
 

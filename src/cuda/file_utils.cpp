@@ -647,6 +647,9 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
   uint32_t *buffer;
   uint32_t *buffer2;
   zkey_t zkey;
+  FP_INIT_ARRZERO(zero);
+  const uint32_t *ECInf = CusnarksG1InfGet();
+  const uint32_t *EC2Inf = CusnarksG2InfGet();
 
   // initialize section offsets
   zKeyInit_h(&zkey, zkey_filename);
@@ -654,14 +657,24 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
   // Section 2 -> 
   //      n8q (1W),  q(),  n8r,  r,   NVars,  NPub,   DomainSize  (multiple of 2
   //      alpha1 , beta1,  delta1,  beta2,   gamma2,     delta2
-  buffer2 = readZKeySection_h(&zkey, 2, zkey_filename);
+  buffer2 = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_2, zkey_filename);
   zKeyToPkFileAddHdr_h(buffer2, &zkey, pkbin_filename);
 
-  FILE *ofp = fopen(pkbin_filename,"wb");
+  FILE *ofp = fopen(pkbin_filename,"a+");
   fseek(ofp, 0, SEEK_END);
+
+  //printf("Start of pols : %lu %lu\n",ftell(ofp), zkey.section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t));
   // Section 4 Coeffs
-  buffer = readZKeySection_h(&zkey, 4, zkey_filename);
-  fwrite(buffer, sizeof(uint32_t), zkey.section_len[4]/sizeof(uint32_t), ofp); 
+  buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_4, zkey_filename);
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t), ofp); 
+  //printf("%x, %x\n",buffer[0], buffer[1]);
+  //printf("%x\n",buffer[zkey.section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t)-1]);
+  unsigned long long polsA_nWords = zkey.section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t);
+  unsigned long long extra_words = 0;
+  if (polsA_nWords < buffer2[ZKEY_HDR_SECTION2_DOMAINSIZE_OFFSET] * NWORDS_FR){
+     extra_words = buffer2[ZKEY_HDR_SECTION2_DOMAINSIZE_OFFSET] * NWORDS_FR - polsA_nWords;
+  }
+  //printf("polsAnW : %lu, Extra words : %lu, domain size : %u\n",polsA_nWords,extra_words, buffer2[ZKEY_HDR_SECTION2_DOMAINSIZE_OFFSET]);
 /*
   printf("N coeffs : %d\n",buffer[0]);
   uint32_t coeff_idx = 0;
@@ -683,60 +696,151 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
 */
   free(buffer);
 
+  //printf("start of alphas : %lu\n",ftell(ofp));
   // alpha1
-  fwrite(&buffer[21], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_ALPHA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
   // beta1 
-  fwrite(&buffer[21+2*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_BETA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
   // delta1 
-  fwrite(&buffer[21+4*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
   //  beta2
-  fwrite(&buffer[21+6*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_BETA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
   // delta2 
-  fwrite(&buffer[21+14*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
 
 
+  //printf("start of A : %lu\n",ftell(ofp));
   // Section 5 A
-  buffer = readZKeySection_h(&zkey, 5, zkey_filename);
-  fwrite(buffer, sizeof(uint32_t), zkey.section_len[5]/sizeof(uint32_t), ofp); 
+  buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_5, zkey_filename);
+  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_5]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+     if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
+        memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
+  /*
+        printf("000000000000\n");
+        printUBINumber(&buffer[2*i*NWORDS_FP], 8);
+       printUBINumber(&buffer[2*i*NWORDS_FP+NWORDS_FP], 8);
+  */
+     }
+  }
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_5]/sizeof(uint32_t), ofp); 
   // alpha1
-  fwrite(&buffer[21], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_ALPHA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+/*
+   printf("alpha1\n");
+    for(uint32_t f=0; f < 16; f++) {
+      for (uint32_t f2=0; f2 < 4; f2++){
+       printf("%x ",(buffer2[ZKEY_HDR_SECTION2_ALPHA1_OFFSET+f] >> (8 * f2)) & 0xFF);
+     }
+    }
+*/
   // delta1 
-  fwrite(&buffer[21+4*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+/*
+   printf("delta1\n");
+    for(uint32_t f=0; f < 16; f++) {
+      for (uint32_t f2=0; f2 < 4; f2++){
+       printf("%u ",(buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET+f] >> (8 * f2)) & 0xFF);
+     }
+    }
+*/
   free(buffer);
 
+  //printf("start of B1 : %lu\n",ftell(ofp));
   // Section 6 B1
-  buffer = readZKeySection_h(&zkey, 6, zkey_filename);
-  fwrite(buffer, sizeof(uint32_t), zkey.section_len[6]/sizeof(uint32_t), ofp); 
+  buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_6, zkey_filename);
+  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_6]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+     if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
+        memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
+/*
+        printf("000000000000\n");
+        printUBINumber(&buffer[2*i*NWORDS_FP], 8);
+       printUBINumber(&buffer[2*i*NWORDS_FP+NWORDS_FP], 8);
+*/
+     }
+  }
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_6]/sizeof(uint32_t), ofp); 
   // beta1 
-  fwrite(&buffer[21+2*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_BETA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
   // delta1 
-  fwrite(&buffer[21+4*NWORDS_FP], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
   free(buffer);
 
+  //printf("start of B2 : %lu\n",ftell(ofp));
   // Section 7 B2
-  buffer = readZKeySection_h(&zkey, 7, zkey_filename);
-  fwrite(buffer, sizeof(uint32_t), zkey.section_len[7]/sizeof(uint32_t), ofp); 
+  buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_7, zkey_filename);
+  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_7]/(NWORDS_FP * sizeof(uint32_t) * 4) ; i++){
+     if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP)) &&
+        (equBI_h(&buffer[i*2*NWORDS_FP+2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*2*NWORDS_FP+3*NWORDS_FP], zero, NWORDS_FP)))) {
+        memcpy(&buffer[i*2*NWORDS_FP],EC2Inf, 4*NWORDS_FP*sizeof(uint32_t));
+/*
+        printf("000000000000\n");
+        printUBINumber(&buffer[2*i*NWORDS_FP], 8);
+       printUBINumber(&buffer[2*i*NWORDS_FP+NWORDS_FP], 8);
+*/
+     }
+  }
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_7]/sizeof(uint32_t), ofp); 
   //  beta2
-  fwrite(&buffer[21+6*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_BETA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
   // delta2 
-  fwrite(&buffer[21+14*NWORDS_FP], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
   free(buffer);
 
+  //printf("start of C : %lu\n",ftell(ofp));
   // Section 8 C
-  buffer = readZKeySection_h(&zkey, 8, zkey_filename);
-  fwrite(buffer, sizeof(uint32_t), zkey.section_len[8]/sizeof(uint32_t), ofp); 
+  buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_8, zkey_filename);
+  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_8]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+/*
+    for(uint32_t f=0; f < 16; f++) {
+      for (uint32_t f2=0; f2 < 4; f2++){
+       printf("%u ",(buffer[i*NWORDS_FP+f] >> (8 * f2)) & 0xFF);
+     }
+    }
+*/
+     if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
+        memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
+/*
+        printf("000000000000\n");
+        printUBINumber(&buffer[2*i*NWORDS_FP], 8);
+       printUBINumber(&buffer[2*i*NWORDS_FP+NWORDS_FP], 8);
+*/
+     }
+
+  }
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_8]/sizeof(uint32_t), ofp); 
   free(buffer);
 
+  //printf("start of H : %lu\n",ftell(ofp));
   // Section 9 H
-  buffer = readZKeySection_h(&zkey, 9, zkey_filename);
-  fwrite(buffer, sizeof(uint32_t), zkey.section_len[9]/sizeof(uint32_t), ofp); 
+  buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_9, zkey_filename);
+  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_9]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+     if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
+        memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
+/*
+        printf("000000000000\n");
+        printUBINumber(&buffer[2*i*NWORDS_FP], 8);
+       printUBINumber(&buffer[2*i*NWORDS_FP+NWORDS_FP], 8);
+*/
+     }
+
+  }
+  fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_9]/sizeof(uint32_t), ofp); 
   // delta1 
-  // not needed
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
 
+  //printf("end of H : %lu\n",ftell(ofp));
   free(buffer);
-
 
   free(buffer2);
+
   fclose(ofp);
 
 }
@@ -764,6 +868,7 @@ static void  zKeyInit_h(zkey_t *zkey, const char *filename)
        printf("section : %u. Offset : %lu, length : %lu\n", i, zkey->section_offset[i], zkey->section_len[i]);
   }
   */
+  
  
   fclose(ifp);  
 }
@@ -800,20 +905,25 @@ static uint32_t *readZKeySection_h(zkey_t *zkey, uint32_t section_id, const char
 
 static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pkbin_filename)
 {
-  uint32_t nVars = buffer[18];
-  uint32_t nPublic = buffer[19];
-  uint32_t domainSize = buffer[20];
+  uint32_t nVars = buffer[ZKEY_HDR_SECTION2_NVARS_OFFSET];
+  uint32_t nPublic = buffer[ZKEY_HDR_SECTION2_NPUBLIC_OFFSET];
+  //TODO DOMAIN SIZE * 2
+  uint32_t domainSize = buffer[ZKEY_HDR_SECTION2_DOMAINSIZE_OFFSET];
   uint32_t domainBits =  31-msbuBI_h(&domainSize,1);
   uint32_t tmp;
+  buffer[ZKEY_HDR_SECTION2_DOMAINSIZE_OFFSET] = domainSize;
 
   FILE *ofp = fopen(pkbin_filename,"wb");
+  //      n8q (1W),  q(),  n8r,  r,   NVars,  NPub,   DomainSize  (multiple of 2
+  //      alpha1 , beta1,  delta1,  beta2,   gamma2,     delta2
 
- /*
+/* 
   printf("Nvars : %d\n",nVars);
   printf("nPub : %d\n",nPublic);
   printf("Domain Size : %d\n",domainSize);
   printf("Domain Bits : %d\n", domainBits);
 */
+
 
   //nWords
   tmp=0;
@@ -825,9 +935,13 @@ static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pk
   tmp = PROTOCOL_T_GROTH;
   fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
   // RBitLen
-  tmp = NWORDS_FR * NBITS_WORD;
+  //TODO
+  //tmp = NWORDS_FR*sizeof(uint32_t) | ((NWORDS_FR * sizeof(uint32_t))<< 16); 
+  tmp = NWORDS_FR | (NWORDS_FR<< 16); 
+  fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
   // MOnt
   tmp = FMT_MONT;
+  fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
   // Affine 
   tmp = EC_T_AFFINE;
   fwrite(&tmp, sizeof(uint32_t), 1, ofp); 
@@ -841,15 +955,17 @@ static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pk
   tmp = domainSize;
   fwrite(&domainSize, sizeof(uint32_t), 1, ofp); 
   // MOD_FP
-  fwrite(&buffer[1], sizeof(uint32_t), buffer[0], ofp); 
+  fwrite(&buffer[ZKEY_HDR_SECTION2_FP_OFFSET], sizeof(uint32_t), buffer[ZKEY_HDR_SECTION2_FPLEN_OFFSET]/sizeof(uint32_t), ofp); 
   // MOD_FR
-  fwrite(&buffer[10], sizeof(uint32_t), buffer[9], ofp); 
-
+  fwrite(&buffer[ZKEY_HDR_SECTION2_FR_OFFSET], sizeof(uint32_t), buffer[ZKEY_HDR_SECTION2_FRLEN_OFFSET]/sizeof(uint32_t), ofp); 
   unsigned long long polsA_nWords = zkey->section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t);
-  unsigned long long polsB_nWords = zkey->section_len[ZKEY_HDR_SECTION_4]/sizeof(uint32_t);
-  polsA_nWords = polsA_nWords > 2*domainSize * NWORDS_FR ? polsA_nWords : 2*domainSize * NWORDS_FR;
-  //polsB_nWords = polsB_nWords > domainSize * NWORDS_FR ? polsB_nWords : domainSize * NWORDS_FR;
-  polsB_nWords = 0;
+  unsigned long long polsB_nWords = 0;
+  unsigned long long extra_words = 0;
+  if (polsA_nWords < domainSize * NWORDS_FR){
+     extra_words = domainSize * NWORDS_FR - polsA_nWords;
+  }
+  polsA_nWords = polsA_nWords  + extra_words;
+
   // polsA_nWords
   fwrite(&polsA_nWords, sizeof(unsigned long long), 1, ofp); 
   fwrite(&polsB_nWords, sizeof(unsigned long long), 1, ofp); 
@@ -857,6 +973,7 @@ static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pk
   printf("polsA_nWords : %lu\n", polsA_nWords);
   printf("polsB_nWords : %lu\n", polsB_nWords);
 */
+
 
   unsigned long long AnWords = zkey->section_len[ZKEY_HDR_SECTION_5]/sizeof(uint32_t) + 4 * NWORDS_FP;
   unsigned long long B1nWords = zkey->section_len[ZKEY_HDR_SECTION_6]/sizeof(uint32_t) + 4 * NWORDS_FP;
@@ -875,13 +992,14 @@ static void  zKeyToPkFileAddHdr_h(uint32_t *buffer, zkey_t *zkey, const char *pk
   // HnWords
   fwrite(&HnWords, sizeof(unsigned long long), 1, ofp); 
 
-  /*
+ /* 
   printf("AnWords : %lu\n", AnWords);
   printf("B1nWords : %lu\n", B1nWords);
   printf("B2nWords : %lu\n", B2nWords);
   printf("CnWords : %lu\n", CnWords);
   printf("HnWords : %lu\n", HnWords);
-  */
+*/
+ 
 
   fclose(ofp);
 }
