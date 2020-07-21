@@ -68,6 +68,7 @@ class FF(object):
          self.FR_IScalerMont.append(self.FR_IScaler[i].reduce())
 
       pr = zp.find_primitive_root()
+      #pr = ZFieldElRedc(BigInt.from_uint256(np.asarray([ 2161196444, 1668182869, 608567254, 2720789364, 514982872, 1447373504, 694417895, 409005972],dtype=np.uint32), NW=self.FR_NWORDS)).extend()
       self.FR_roots_rdc = []
       for i in range(self.nFrRoots+1):
         r = pow(pr.as_long(), 1<<i, self.FR.as_long())

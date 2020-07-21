@@ -617,6 +617,7 @@ def pkbin_get(pk_bin, labels):
          hExps_offset = offset_ec_data + 14*NWORDS_FP + A_nWords + \
                      B1_nWords + B2_nWords + C_nWords
          ret_val.append(pk_bin[hExps_offset:hExps_offset+hExps_nWords])
+         #print("XXX",hExps_offset, hExps_nWords)
        else: 
          sys.exit(1)
 

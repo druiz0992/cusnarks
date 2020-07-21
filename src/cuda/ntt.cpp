@@ -47,8 +47,42 @@ static  uint32_t parallelism_enabled =  1;
 static  uint32_t parallelism_enabled =  0;
 #endif
 
+static char rootsBN256[] = {
+ 251,255,255,79,28,52,150,172,41,205,96,159,149,118,252,54,46,70,121,120,111,163,110,102,47,223,7,154,193,119,10,14, //0
+  6,0,0,160,119,193,75,151,103,163,88,218,178,113,55,241,46,18,8,9,71,162,225,81,250,192,41,71,177,214,89,34,        //1 
+  139,239,220,158,151,61,117,127,32,145,71,177,44,23,63,95,110,108,9,116,121,98,177,141,207,8,193,57,53,123,55,43,   //2
+ 63,124,173,181,226,74,173,248,190,133,203,131,255,198,96,45,247,41,148,93,43,253,118,217,169,217,154,63,231,124,64,36, //3
+ 3,143,47,116,124,125,182,244,204,104,208,99,220,45,27,104,106,87,251,27,239,188,229,140,254,60,182,210,81,41,124,22,  //4
+  100,76,87,191,177,247,20,34,242,125,49,247,47,35,249,40,205,117,173,176,168,132,117,229,3,109,23,220,89,251,129,43,  //5
+  191,97,143,129,229,3,144,142,194,254,248,155,52,191,155,140,78,83,1,63,205,238,220,83,60,170,41,229,107,150,144,38,  //6
+ 177,123,129,38,48,196,121,10,240,125,83,153,124,204,178,123,222,230,65,2,213,39,202,182,76,240,50,54,63,179,122,0,   //7
+ 204,74,162,131,63,184,175,162,110,83,93,82,217,85,242,146,25,221,134,2,8,102,117,94,73,37,45,197,166,177,123,24,    //8
+ 222,35,164,34,231,59,83,156,13,110,223,124,18,157,42,100,5,192,154,64,70,117,188,13,130,80,61,178,141,76,240,0,    //9
+ 132,17,12,40,180,179,244,30,44,42,94,174,194,212,122,207,24,101,163,197,108,59,6,184,140,192,223,101,185,196,72,35, //10
+ 178,207,79,174,137,33,231,72,7,90,248,141,60,251,3,10,10,46,155,234,53,138,77,255,119,29,156,205,46,140,169,40,  //11
+ 211,219,236,179,47,82,212,29,173,243,85,208,147,42,34,104,232,85,213,179,102,125,156,190,70,248,148,97,184,246,146,27 ,  //12
+ 214,78,160,121,190,220,76,137,135,7,211,68,106,222,108,149,95,193,219,215,43,182,161,89,78,111,128,154,16,228,235,18,  //13
+ 184,234,5,77,199,160,19,186,22,49,171,17,99,93,1,46,90,160,165,140,44,146,3,181,218,148,227,254,215,21,190,6,  //14
+ 84,184,253,91,5,247,78,128,242,234,206,64,113,107,167,122,203,137,254,178,104,90,201,252,199,6,196,241,53,28,70,29, //15
+ 51,116,57,57,89,231,179,71,209,36,28,13,146,58,58,109,67,95,247,116,81,18,52,161,86,213,106,238,1,31,130,27,   //16
+ 124,220,4,18,216,184,5,218,65,141,48,6,230,42,50,72,44,137,158,132,39,142,53,53,146,213,45,214,251,202,15,4,   //17
+ 132,11,112,9,47,198,102,37,96,134,191,160,118,58,24,51,241,88,80,87,89,143,57,217,52,205,209,57,206,46,109,5,  //18
+ 54,122,162,230,183,163,158,4,188,219,62,5,3,230,235,239,212,158,206,58,90,180,36,132,94,121,136,166,144,131,124,40,  //19
+ 26,147,141,170,101,212,50,218,156,143,128,97,133,246,105,38,133,176,200,228,70,171,123,36,26,2,214,129,135,102,59,13,  //20
+ 60,47,50,245,146,33,234,39,167,233,143,101,233,132,24,177,105,192,83,160,188,35,134,58,166,57,225,37,240,243,143,18,   //21
+ 242,26,239,188,110,34,142,155,96,107,64,223,171,241,69,158,61,187,167,213,87,210,141,83,188,163,130,120,3,147,56,10,   //22
+ 0,145,158,192,4,36,72,110,178,37,0,89,199,145,117,13,17,190,94,58,121,39,2,164,168,76,169,193,195,166,100,1,      //23
+ 48,208,79,216,105,189,34,199,44,22,82,207,38,74,14,96,233,167,243,69,215,126,114,251,92,39,251,105,178,167,82,22,  //24
+ 226,7,92,87,255,250,14,64,197,154,143,75,73,115,35,85,55,173,231,129,237,171,121,170,57,46,77,8,184,229,198,26,   //25
+ 254,32,138,201,34,148,162,160,157,92,147,101,202,98,212,115,247,130,69,212,110,74,186,225,182,130,58,12,192,20,252,40,  //26
+ 103,2,137,128,20,100,89,135,73,3,192,228,181,120,58,74,126,177,166,82,221,79,0,73,18,234,230,101,221,23,69,40,  //27
+ 156,61,209,128,85,115,110,99,214,255,69,36,116,243,43,162,216,3,178,30,192,42,69,86,231,249,99,41,148,239,96,24};  //28
+ 
+
 #define MIN(X,Y)  ((X)<(Y) ? (X) : (Y))
 #define MAX(X,Y)  ((X)>(Y) ? (X) : (Y))
+
+static char config_curve_filename[]="./.curve";
 
 static uint32_t *M_transpose = NULL;
 static uint32_t *M_mul = NULL;
@@ -693,6 +727,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
    
   pthread_t *workers = (pthread_t *) malloc(args->max_threads * sizeof(pthread_t));
   ntt_interpolandmul_t *w_args  = (ntt_interpolandmul_t *)malloc(args->max_threads * sizeof(ntt_interpolandmul_t));
+
   init_barrier_h(args->max_threads);
 
   /*
@@ -705,8 +740,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   printf("rstride : %d\n", args->rstride);
   printf("pidx : %d\n", args->pidx);
   */
-  
-  
+ 
   
   ntt_interpolandmul_init_h(args->A, args->B, &args->mNrows,&args->mNcols, args->Nrows, args->Ncols);
 
@@ -722,12 +756,13 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
      w_args[i].last_idx = last_idx;
      w_args[i].thread_id = i;
      
-     /*
+    /* 
      printf("Thread : %d, start_idx : %d, end_idx : %d\n",
              w_args[i].thread_id, 
              w_args[i].start_idx,
              w_args[i].last_idx);   
-     */
+   */
+    
   }
 
   /*
@@ -1032,7 +1067,7 @@ void *interpol_and_mul_h(void *args)
               1<<wargs->mNrows, 1<<wargs->mNcols,
               TRANSPOSE_BLOCK_SIZE);
 
-  
+ 
   wait_h(wargs->thread_id, NULL, NULL);
 
   // A = IFFT_N(A); B = IFFT_N(B)
@@ -1099,7 +1134,7 @@ void *interpol_and_muls_h(void *args)
   };
 
   t_mulm mulm_cb =  ff.mulm_cb;
-  t_addm addm_cb =  ff.addm_cb;
+  t_addm subm_cb =  ff.subm_cb;
   t_frommont fromm_cb = getcb_frommont_h(wargs->pidx);
   
   roffset1 = wargs->Ncols + wargs->Nrows;
@@ -1110,7 +1145,7 @@ void *interpol_and_muls_h(void *args)
      roffset1 = 1 << (roffset1+1); 
      roffset2 = roffset1;
   }
-
+  wait_h(wargs->thread_id, NULL, NULL);
 
   // multiply M_mul[i] = A * B = polC
   for (i=wargs->start_idx; i < wargs->last_idx; i++){
@@ -1123,6 +1158,7 @@ void *interpol_and_muls_h(void *args)
                &wargs->A[i * NWORDS_FR],
                &wargs->B[i * NWORDS_FR]);
   }
+
   wait_h(wargs->thread_id, NULL, NULL);
 
   // A = IFFT_N/2(A); B = IFFT_N/2(B); C = IFFT_N/2(M) . step 1
@@ -1139,9 +1175,9 @@ void *interpol_and_muls_h(void *args)
               1<<wargs->Nrows, 1<<wargs->Ncols,
               TRANSPOSE_BLOCK_SIZE);
 
-  
   wait_h(wargs->thread_id, NULL, NULL);
 
+  //printf("N rows %d\n", wargs->Nrows);
   for (i=start_col; i<last_col; i++){
     ntt_h(&M_transpose1_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, -1,  &ff);
   }
@@ -1153,7 +1189,6 @@ void *interpol_and_muls_h(void *args)
   }
 
   wait_h(wargs->thread_id, NULL, NULL);
-
   // A[i] = A[i] * l2_IW[i]
 
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
@@ -1183,8 +1218,9 @@ void *interpol_and_muls_h(void *args)
                &M_transpose3_ptr[i * NWORDS_FR],
                &wargs->roots[ridx1 * NWORDS_FR]);
   }
-  wait_h(wargs->thread_id, NULL, NULL);
 
+
+  wait_h(wargs->thread_id, NULL, NULL);
   transposeBlock_h(wargs->A, M_transpose1_ptr,
               start_col, last_col,
               1<<wargs->Ncols, 1<<wargs->Nrows,
@@ -1212,6 +1248,8 @@ void *interpol_and_muls_h(void *args)
     ntt_h(&M_mul[(i*NWORDS_FR)<<wargs->Ncols],&wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, -1, &ff);
   }
 
+
+  wait_h(wargs->thread_id, NULL, NULL);
   transposeBlock_h(M_transpose1_ptr, wargs->A,
               start_row, last_row,
               1<<wargs->Nrows, 1<<wargs->Ncols,
@@ -1224,6 +1262,7 @@ void *interpol_and_muls_h(void *args)
               M_mul, start_row, last_row,
               1<<wargs->Nrows, 1<<wargs->Ncols,
               TRANSPOSE_BLOCK_SIZE);
+
   wait_h(wargs->thread_id, NULL, NULL);
 
   save_A = wargs->A;
@@ -1231,7 +1270,7 @@ void *interpol_and_muls_h(void *args)
   save_C = M_mul;
   wargs->A = M_transpose1_ptr;
   wargs->B = M_transpose2_ptr;
-  M_mul = M_transpose3_ptr;
+  uint32_t *M_mul_ptr = M_transpose3_ptr;
   M_transpose1_ptr = save_A;
   M_transpose2_ptr = save_B;
   M_transpose3_ptr = save_C;
@@ -1249,6 +1288,7 @@ void *interpol_and_muls_h(void *args)
                  &wargs->A[i * NWORDS_FR],
                  &wargs->roots[i * NWORDS_FR]);
   }
+
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
       __builtin_prefetch(&wargs->B[(i+1) * NWORDS_FR]);
@@ -1266,14 +1306,15 @@ void *interpol_and_muls_h(void *args)
       __builtin_prefetch(&M_mul[(i+1) * NWORDS_FR]);
       __builtin_prefetch(&wargs->roots[(i+1) * NWORDS_FR]);
     }
-      mulm_cb(&M_mul[i * NWORDS_FR],
-                 &M_mul[i * NWORDS_FR],
+      mulm_cb(&M_mul_ptr[i * NWORDS_FR],
+                 &M_mul_ptr[i * NWORDS_FR],
                  &scaler_mont[(wargs->Nrows + wargs->Ncols) * NWORDS_FR]);
-      mulm_cb(&M_mul[i * NWORDS_FR],
-                 &M_mul[i * NWORDS_FR],
+      mulm_cb(&M_mul_ptr[i * NWORDS_FR],
+                 &M_mul_ptr[i * NWORDS_FR],
                  &wargs->roots[i * NWORDS_FR]);
   }
   wait_h(wargs->thread_id, NULL, NULL);
+
 
   // A = FFT_N/2(A); B = FFT_N/2(B); C = FFT_N/2(C). Step 1
   transposeBlock_h(M_transpose1_ptr, wargs->A,
@@ -1285,7 +1326,7 @@ void *interpol_and_muls_h(void *args)
               1<<wargs->Nrows, 1<<wargs->Ncols,
               TRANSPOSE_BLOCK_SIZE);
   transposeBlock_h(M_transpose3_ptr,
-              M_mul, start_row, last_row,
+              M_mul_ptr, start_row, last_row,
               1<<wargs->Nrows, 1<<wargs->Ncols,
               TRANSPOSE_BLOCK_SIZE);
   
@@ -1301,7 +1342,6 @@ void *interpol_and_muls_h(void *args)
     ntt_h(&M_transpose3_ptr[(i*NWORDS_FR)<<wargs->Nrows], &wargs->roots[roffset1*NWORDS_FR], wargs->Nrows, 1,  &ff);
   }
   wait_h(wargs->thread_id, NULL, NULL);
-
   
   // A[i] = A[i] * l2_W[i]
   for (i=wargs->start_idx;i < wargs->last_idx; i++){
@@ -1341,7 +1381,7 @@ void *interpol_and_muls_h(void *args)
               start_col, last_col,
               1<<wargs->Ncols, 1<<wargs->Nrows,
               TRANSPOSE_BLOCK_SIZE);
-  transposeBlock_h(M_mul,M_transpose3_ptr,
+  transposeBlock_h(M_mul_ptr,M_transpose3_ptr,
               start_col, last_col,
               1<<wargs->Ncols, 1<<wargs->Nrows,
               TRANSPOSE_BLOCK_SIZE);
@@ -1358,37 +1398,37 @@ void *interpol_and_muls_h(void *args)
     ntt_h(&wargs->B[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, 1, &ff);
   }
   for (i=start_row;i < last_row; i++){
-    ntt_h(&M_mul[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, 1, &ff);
+    ntt_h(&M_mul_ptr[(i*NWORDS_FR)<<wargs->Ncols], &wargs->roots[roffset2*NWORDS_FR], wargs->Ncols, 1, &ff);
   }
 
+  wait_h(wargs->thread_id, NULL, NULL);
   M_transpose1_ptr = wargs->A;
   M_transpose2_ptr = wargs->B;
-  M_transpose3_ptr = M_mul;
+  M_transpose3_ptr = M_mul_ptr;
   wargs->A=save_A;
   wargs->B=save_B;
-  M_mul=save_C;
+  M_mul_ptr=save_C;
 
   transposeBlock_h(wargs->A,M_transpose1_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
   transposeBlock_h(wargs->B,M_transpose2_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
-  transposeBlock_h(M_mul,M_transpose3_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
+  transposeBlock_h(M_mul_ptr,M_transpose3_ptr, start_row, last_row,1<<wargs->Nrows, 1<<wargs->Ncols, TRANSPOSE_BLOCK_SIZE);
   wait_h(wargs->thread_id, NULL, NULL);
 
   // tmp = A * B
   for (i=wargs->start_idx; i < wargs->last_idx; i++){
     if (i < wargs->last_idx -1){
-      __builtin_prefetch(&M_mul[(i+1) * NWORDS_FR]);
+      __builtin_prefetch(&M_mul_ptr[(i+1) * NWORDS_FR]);
       __builtin_prefetch(&wargs->A[(i+1) * NWORDS_FR]);
       __builtin_prefetch(&wargs->B[(i+1) * NWORDS_FR]);
     }
     mulm_cb(&wargs->A[i*NWORDS_FR],
                &wargs->A[i * NWORDS_FR],
                &wargs->B[i * NWORDS_FR]);
-    addm_cb(&M_mul[i*NWORDS_FR],
-               &M_mul[i * NWORDS_FR],
-               &wargs->A[i * NWORDS_FR]);
-    fromm_cb(&M_transpose[i*NWORDS_FR], &M_mul[i*NWORDS_FR]);
+    subm_cb(&M_mul_ptr[i*NWORDS_FR],
+               &wargs->A[i * NWORDS_FR],
+               &M_mul_ptr[i * NWORDS_FR]);
+    fromm_cb(&M_transpose[i*NWORDS_FR], &M_mul_ptr[i*NWORDS_FR]);
   }
-  wait_h(wargs->thread_id, NULL, NULL);
 
   return NULL;
 }
@@ -1507,14 +1547,29 @@ void computeRoots_h(uint32_t *roots, uint32_t nbits)
   uint32_t i, pidx = MOD_FR;
   const  uint32_t *One = CusnarksOneMontGet((mod_t)pidx);
   const uint32_t *proots = CusnarksPrimitiveRootsFieldGet(nbits);
+  FILE *ifp = fopen(config_curve_filename,"r");
+  char curve[100];
+  fgets(curve,sizeof(curve) , ifp);
+  fclose(ifp);
+  if (strcmp(curve,"_BN256\n")==0) {
+       //printf("XXXXX\n");
+       uint32_t prootBN256[NWORDS_FR];
+       memcpy(prootBN256, &rootsBN256[nbits*NWORDS_FR*sizeof(uint32_t)],NWORDS_FR*sizeof(uint32_t));
+       proots = prootBN256;
+/*
+       for (uint32_t j=0;j<32;j++){
+         printf("%hhu ",rootsBN256[j+nbits*NWORDS_FR*sizeof(uint32_t)]);
+       }
+*/
+  } 
   
   memcpy(roots, One, NWORDS_FR*sizeof(uint32_t));
   if (nbits > 1){
-    memcpy(&roots[NWORDS_FR], proots, NWORDS_FR*sizeof(uint32_t));
+     memcpy(&roots[NWORDS_FR], proots, NWORDS_FR*sizeof(uint32_t));
   }
 
   for(i=2; i < (1 << nbits); i++){
-     montmult_h(&roots[i*NWORDS_FR],&roots[(i-1)*NWORDS_FR], proots, pidx);
+    montmult_h(&roots[i*NWORDS_FR],&roots[(i-1)*NWORDS_FR], proots, pidx);
   }
 }
 

@@ -242,7 +242,6 @@ void *mpoly_eval_h(void *vargs)
     }
     zcoeff_d_offset = accum_n_zcoeff*(NWORDS_FR+1) +1 + n_zpoly;
   }
-  //wait_h(args->thread_id, mpoly_addm, args);
 
   return NULL;
 }
@@ -252,32 +251,35 @@ void *mpolys_eval_h(void *vargs)
 {
   mpoly_eval_t *args = (mpoly_eval_t *) vargs;
   uint32_t *pin = args->pin;
-  uint32_t *pout;
-  uint32_t *coeff;
-  uint32_t scl[NWORDS_FR], tmp[NWORDS_FR];
+  uint32_t *pout, *coeff, *scl;
+  uint32_t tmp[NWORDS_FR];
   uint32_t w_idx, p_idx;
 
   t_addm addm_cb =  getcb_addm_h(args->pidx);
   t_mulm mulm_cb =  getcb_mulm_h(args->pidx);
-  t_tomont tom_cb = getcb_tomont_h(args->pidx);
-  
+ 
+  //printf("last_idx : %d\n",args->last_idx); 
   for (uint32_t i=args->start_idx; i<args->last_idx; i+=ZKEY_COEFF_NWORDS){
       coeff = &pin[i];
       w_idx = coeff[ZKEY_COEFF_SIGNAL_OFFSET];
-      //tom_cb(scl, &args->scalar[w_idx*NWORDS_FR]);
-      memcpy(scl, &args->scalar[w_idx*NWORDS_FR], NWORDS_FR*sizeof(uint32_t));
-      
+      scl = (uint32_t *)&args->scalar[w_idx*NWORDS_FR];
       if (coeff[ZKEY_COEFF_MATRIX_OFFSET] == 0) {
          p_idx = 0 + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
-         
       } else {
          p_idx = args->reduce_coeff + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
       }
       pout = &args->pout[p_idx*NWORDS_FR];
       mulm_cb(tmp, &coeff[ZKEY_COEFF_VAL_OFFSET], scl);
       addm_cb(pout, pout, tmp);
+      //printf("%d, %d, %d\n", coeff[0], coeff[1], coeff[2]);
   }
-  //wait_h(args->thread_id, mpoly_addm, args);
+/*
+  for (uint32_t i=0; i < 64; i++){
+     for (uint32_t j=0; j < 4; j++){
+       printf("%u ",(args->pout[i] >> (8 * j)) & 0xFF);
+     }
+  }
+*/
 
   return NULL;
 }

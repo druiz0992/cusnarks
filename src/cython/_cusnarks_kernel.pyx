@@ -486,14 +486,16 @@ def mpoly_evals_h(np.ndarray[ndim=1, dtype=np.uint32_t] scldata, np.ndarray[ndim
          
      args_c.pout = &pa[0]
      args_c.scalar = &scldata[0]
-     args_c.pin = &p1data[0]
+     args_c.pin = &p1data[1]
      args_c.start_idx = 0
-     args_c.last_idx = <unsigned long long> (len(p1data)/sizeof(ct.uint32_t))
-     args_c.max_threads = max_threads
-     args_c.pidx = pidx
-     args_c.ncoeff = <ct.uint32_t> (len(p1data)/ZKEY_COEFF_NWORDS)
-     args_c.mode = 1
      args_c.reduce_coeff = ncoeff
+     args_c.last_idx = <unsigned long long> len(p1data)-1
+     args_c.max_threads = MAX_NCORES_OMP
+     #args_c.max_threads = 1
+     args_c.pidx = pidx
+     args_c.ncoeff = <ct.uint32_t> p1data[0]
+     args_c.mode = 1
+     #print("n coeff ", args_c.ncoeff)
 
      with nogil:
         uh.cmpoly_eval_server_h(args_c)
@@ -504,7 +506,7 @@ def mpoly_evals_h(np.ndarray[ndim=1, dtype=np.uint32_t] scldata, np.ndarray[ndim
 
 
 def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[ndim=1, dtype=np.uint32_t] invb,
-                         np.ndarray[ndim=1, dtype=np.uint32_t] invroots, ct.uint32_t rstride, ct.uint32_t pidx):
+                         np.ndarray[ndim=1, dtype=np.uint32_t] invroots, ct.uint32_t rstride, ct.uint32_t mode, ct.uint32_t pidx):
 
      cdef ct.ntt_interpolandmul_t *args_c = <ct.ntt_interpolandmul_t *> malloc(sizeof(ct.ntt_interpolandmul_t))
      cdef ct.uint32_t Ncols = np.log2(inva.shape[0]/NWORDS_FR)/2
@@ -519,7 +521,8 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
      args_c.rstride = rstride
      args_c.pidx = pidx
      args_c.max_threads = MAX_NCORES_OMP
-     args_c.mode = 0
+     #args_c.max_threads = 1
+     args_c.mode = mode
 
      with nogil:
        uh.cntt_interpolandmul_server_h(args_c)
@@ -577,11 +580,12 @@ def readWtnsFile_h(bytes fname, unsigned long long insize ):
 
   cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(nElems * NWORDS_FR,dtype=np.uint32)
   uh.creadWtnsFile_h(&vout[0], nElems, start, fname)
+  #print("Nelems ",nElems)
 
   return vout.reshape((-1,NWORDS_256BIT))
 
 def zKeyToPkFile_h(bytes out_fname, bytes in_fname):
-   uh.czKeyToPkFile_h(out_name, in_fname)
+   uh.czKeyToPkFile_h(out_fname, in_fname)
 
 def readU256DataFile_h(bytes fname, ct.uint32_t insize, ct.uint32_t outsize):
     cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(outsize * NWORDS_256BIT,dtype=np.uint32)
