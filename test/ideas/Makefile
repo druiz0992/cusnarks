@@ -23,7 +23,7 @@ EXTRA_CFLAGS=-I $(AUX_INCLUDES)
 LINKFLAGS= -arch=sm_61 -L $(LIB_PATH)
 LDFLAGS=-lm -lcudart -lgomp -lcusnarks
 
-CUSRC = test_fft.cu
+CUSRC = test_shmem_read.c
 
 CUDA_INSTALLED = $(shell which $(NVCC))
 

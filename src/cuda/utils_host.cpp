@@ -153,17 +153,19 @@ void utils_free_h()
 
   See example in test/ideas/test_shmem_read.c and test/ideas/test_shmem_create.c
 */
-int shared_new_h(void **shmem, unsigned long long size)
+int shared_get_h(void **shmem, unsigned long long size)
 {
   int shmid;
   // give your shared memory an id, anything will do
   key_t key = SHMEM_WITNESS_KEY;
+  printf("Key : %d\n", sizeof(key_t));
  
   // Setup shared memory
   if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0)
   {
      return -1;
   }
+  printf("Shid : %d\n", sizeof(shmid));
   // Attached shared memory
   if ((*shmem = shmat(shmid, NULL, 0)) == (char *) -1)
   {
@@ -172,6 +174,32 @@ int shared_new_h(void **shmem, unsigned long long size)
 
   return shmid;
 }
+int shared_new_h(void **shmem, unsigned long long size)
+{
+  int shmid;
+  // give your shared memory an id, anything will do
+  key_t key = SHMEM_WITNESS_KEY;
+  printf("Key : %d\n", sizeof(key_t));
+ 
+  // Setup shared memory
+  if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0)
+  {
+     shmid = shmget(key, 4, IPC_CREAT | 0666);
+     shmctl(shmid, IPC_RMID, NULL);
+     if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0){
+       return -1;
+     }
+  }
+  printf("Shid : %d\n", sizeof(shmid));
+  // Attached shared memory
+  if ((*shmem = shmat(shmid, NULL, 0)) == (char *) -1)
+  {
+     return -1;
+  }
+
+  return shmid;
+}
+
 /*
   Destroy Shared Memory Buffer 
   
