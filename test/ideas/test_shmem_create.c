@@ -1,3 +1,6 @@
+//g++ test_shmem_create.c -I ../../src/cuda/ -L ../../lib/ -lcusnarks -o create
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,12 +8,15 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/stat.h>
 
 #include "types.h"
 #include "constants.h"
+#include "bigint.h"
 #include "utils_host.h"
+#include "ff.h"
 
-int main()
+int main(int argc, char *argv[])
 {
    shmem_t type = SHMEM_T_WITNESS_32M;
    uint32_t *shmp;
@@ -33,30 +39,38 @@ int main()
    memset(buffer, 0, size);
 
    for (uint32_t i=0; i< 10; i++){
-     printU256Number(&buffer[i*NWORDS_256BIT]);
+     printUBINumber(&buffer[i*NWORDS_256BIT],8);
    }
 
    // write access
-   shared_new_h((void **) &shmp, size);
+   int shmid = shared_new_h((void **) &shmp, 3*size);
+   if (shmid == -1){
+      return -1;
+   }
+   // check size
 
    printf("\nShared mem created\n");
 
-   setRandom256(buffer, nels , P);
+   setRandomBI(buffer, nels , P, 8);
    memcpy(shmp, buffer, size);
    printf("\nCreate buffer\n");
    for (uint32_t i=0; i< 10; i++){
-     printU256Number(&buffer[i*NWORDS_256BIT]);
+     printUBINumber(&buffer[i*NWORDS_256BIT],8);
    }
    printf("\nCreate shmem\n");
    for (uint32_t i=0; i< 10; i++){
-     printU256Number(&shmp[i*NWORDS_256BIT]);
+     printUBINumber(&shmp[i*NWORDS_256BIT],8);
    }
 
    free(buffer);
 
    printf("\nCreate shmem after free buffer\n");
    for (uint32_t i=0; i< 10; i++){
-     printU256Number(&shmp[i*NWORDS_256BIT]);
+     printUBINumber(&shmp[i*NWORDS_256BIT],8);
+   }
+
+   if (argc > 1){
+     shared_free_h((void *) shmp, shmid);
    }
 
    return 1;

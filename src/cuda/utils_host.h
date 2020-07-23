@@ -42,6 +42,7 @@ uint32_t launch_client_h( void * (*f_ptr) (void* ), pthread_t *workers, void *w_
 void wait_h(uint32_t thread_id, void (*f_ptr) (void *), void * args);
 extern "C" void fail_h();
 int shared_new_h(void **shmem, unsigned long long size);
+int shared_get_h(void **shmem, unsigned long long size);
 void shared_free_h(void *shmem, int shmid);
 void init_barrier_h(uint32_t nthreads);
 void del_barrier_h();

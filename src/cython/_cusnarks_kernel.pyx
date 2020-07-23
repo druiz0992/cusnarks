@@ -581,6 +581,18 @@ def readWtnsFile_h(bytes fname, unsigned long long insize ):
 
   return vout.reshape((-1,NWORDS_256BIT))
 
+def readSharedMWtnsFile_h(bytes fname, unsigned long long insize ):
+  cdef unsigned long long nElems, start
+
+  nElems = uh.creadNWtnsNEls_h(&start, fname)
+  nElems = min(nElems, insize)
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] vout = np.zeros(nElems * NWORDS_FR,dtype=np.uint32)
+  uh.creadSharedMWtnsFile_h(&vout[0], nElems, start, fname)
+  #print("Nelems ",nElems)
+
+  return vout.reshape((-1,NWORDS_256BIT))
+
 def zKeyToPkFile_h(bytes out_fname, bytes in_fname):
    uh.czKeyToPkFile_h(out_fname, in_fname)
 

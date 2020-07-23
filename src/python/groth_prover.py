@@ -49,7 +49,7 @@ import os.path
 import signal
 import numpy as np
 import time
-from subprocess import call, run
+from subprocess import call, run, PIPE
 import logging
 import logging.handlers as handlers
 from multiprocessing import RawArray, Process, Pipe
@@ -86,7 +86,7 @@ class GrothProver(object):
                  n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
                  benchmark_f=None, seed=None, snarkjs=None, verify_en=0,
                  keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1, grouping=DEFAULT_U256_BSELM,
-                 pippen_conf=DEFAULT_PIPPENGERS_CONF):
+                 pippen_conf=DEFAULT_PIPPENGERS_CONF, write_table_f=None, table_type=None):
 
         # Check valid folder exists
         if keep_f is None:
@@ -132,6 +132,13 @@ class GrothProver(object):
         self.compute_last_mexp_gpu = True
 
         self.pkbin_mode = 0
+
+        self.write_table_en = False
+        self.table_type = table_type
+        self.write_table_f = None
+        if write_table_f is not None and self.table_type is not None:
+          self.write_table_en = True
+          self.write_table_f = write_table_f
 
         self.read_table_en = False
         self.read_table_f = read_table_f
@@ -271,6 +278,9 @@ class GrothProver(object):
           self.logger.error('Insufficient number of roots (%s) for a domainSize of %s',
                             1<<self.n_bits_roots, domainSize)
           sys.exit(1)
+
+        if self.write_table_en:
+          self.write_tables(all_tables=self.table_type)
 
         # scl_array
         witLen = domainSize
@@ -441,19 +451,20 @@ class GrothProver(object):
           self.logger.info('# Reading Tables (%s Words)...', self.ec_table['nwords_tdata'])
           self.ect_G1_woffset = ((self.ec_table['table_order'] << EC_JACREDUCE_BATCH_SIZE) * 2 * NWORDS_256BIT) << self.ec_table['table_order']
           self.ect_G2_woffset = ((self.ec_table['table_order'] << EC_JACREDUCE_BATCH_SIZE) * 4 * NWORDS_256BIT) << self.ec_table['table_order']
-          self.ect_A = readU256DataFileFromOffset_h(
+          if self.ec_table['woffset_A'] != self.ec_table['woffset_B1']:
+             self.ect_A = readU256DataFileFromOffset_h(
                                self.read_table_f.encode("UTF-8"),
                                self.ec_table['woffset_A'],    # Offset
                                self.ect_G1_woffset )            # N words
-          self.ect_B2 = readU256DataFileFromOffset_h(
+             self.ect_B2 = readU256DataFileFromOffset_h(
                                self.read_table_f.encode("UTF-8"),
                                self.ec_table['woffset_B2'],    # Offset
                                self.ect_G2_woffset )            # N words
-          self.ect_C = readU256DataFileFromOffset_h(
+             self.ect_C = readU256DataFileFromOffset_h(
                                self.read_table_f.encode("UTF-8"),
                                self.ec_table['woffset_C'],    # Offset
                                self.ect_G1_woffset )            # N words
-          self.ect_B1 = readU256DataFileFromOffset_h(
+             self.ect_B1 = readU256DataFileFromOffset_h(
                                self.read_table_f.encode("UTF-8"),
                                self.ec_table['woffset_B1'],    # Offset
                                self.ect_G1_woffset )            # N words
@@ -631,10 +642,13 @@ class GrothProver(object):
           nPublic = pk_bin2[4][0]
           if not self.read_table_en or self.ec_table['woffset_A'] == self.ec_table['woffset_B2']:
              ep_vector = pk_bin2[0][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
+             table_f = ""
           else :
             ep_vector = np.reshape(self.ect_A,-1)
             offset = self.G1_woffset
             total_words = self.ec_table['woffset_B2'] - self.G1_woffset
+            table_f = self.read_table_f
+          tt = time.time()
           np.copyto(self.pi_a_eccf1,
                     ec_jacreduce_h(
                             np.reshape( 
@@ -644,7 +658,7 @@ class GrothProver(object):
                                               [self.r_scl] )),
                                     -1),
                             ep_vector,
-                            self.read_table_f.encode("UTF-8"),
+                            table_f.encode("UTF-8"),
                             offset,
                             total_words,
                             self.grouping,
@@ -652,15 +666,19 @@ class GrothProver(object):
                             MOD_FP, 1, 1, 1,
                             self.pippen_conf))
 
-          self.logger.info(' Process server - Mexp A Done... ')
+          tt = time.time()-tt
+          self.logger.info(' Process server - Mexp A Done... %s',tt)
 
           if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
              ep_vector = pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS]
+             table_f = ""
           else :
             ep_vector = np.reshape(self.ect_B2,-1)
             offset = self.G2_woffset
             total_words = self.ec_table['woffset_B1'] - self.G2_woffset
+            table_f = self.read_table_f
 
+          tt = time.time()
           np.copyto(self.pi_b_eccf2,
                  ec_jacreduce_h(
                             np.reshape( 
@@ -670,16 +688,18 @@ class GrothProver(object):
                                               [self.s_scl] )),
                                     -1),
                             ep_vector,
-                            self.read_table_f.encode("UTF-8"),
+                            table_f.encode("UTF-8"),
                             offset,
                             total_words,
                             self.grouping,
                             1,
                             MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
-          self.logger.info(' Process server - Mexp B2 Done...')
+          tt = time.time()-tt
+          self.logger.info(' Process server - Mexp B2 Done...%s',tt)
 
           if not self.read_table_en or self.ec_table['woffset_C'] == self.ec_table['woffset_hExps']:
+             table_f = ""
              if self.pkbin_mode == 0:
                ep_vector = pk_bin2[3][(nPublic+1)*NWORDS_256BIT*ECP_JAC_INDIMS:nVars*NWORDS_256BIT*ECP_JAC_INDIMS]
              else :
@@ -690,31 +710,37 @@ class GrothProver(object):
              ep_vector = np.reshape(self.ect_C,-1)
              offset = self.G1_woffset
              total_words = self.ec_table['woffset_hExps'] - self.G1_woffset
+             table_f = self.read_table_f
 
+          tt = time.time()
           np.copyto(self.pi_c_eccf1,
                     ec_jacreduce_h(
                             np.reshape( w[nPublic+1:nVars], -1),
                             ep_vector,
-                            self.read_table_f.encode("UTF-8"),
+                            table_f.encode("UTF-8"),
                             offset,
                             total_words,
                             self.grouping,
                             0,
                             MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
+          tt = time.time()-tt
 
-          self.logger.info(' Process server - Mexp C Done...')
+          self.logger.info(' Process server - Mexp C Done... %s',tt)
 
           if self.zk:
             if not self.read_table_en or self.ec_table['woffset_B1'] == self.ec_table['woffset_C']:
                ep_vector = pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
+               table_f = ""
             else :
                self.G1_woffset -= self.ec_table['woffset_C'] 
                self.G1_woffset += self.ec_table['woffset_B1'] 
                ep_vector = np.reshape(self.ect_B1,-1)
                offset = self.G1_woffset
                total_words = self.ec_table['woffset_C'] - self.G1_woffset
+               table_f = self.read_table_f
 
+            tt = time.time()
             np.copyto(self.pi_b1_eccf1,
                     ec_jacreduce_h(
                          np.reshape(
@@ -724,7 +750,7 @@ class GrothProver(object):
                                               [self.s_scl] )),
                               -1),
                               ep_vector,
-                              self.read_table_f.encode("UTF-8"),
+                              table_f.encode("UTF-8"),
                               offset,
                               total_words,
                               self.grouping,
@@ -733,10 +759,11 @@ class GrothProver(object):
                               self.pippen_conf)
                     )
 
+            tt = time.time()-tt
             if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
              self.G1_woffset -= self.ec_table['woffset_B1'] 
              self.G1_woffset += self.ec_table['woffset_hExps'] 
-            self.logger.info(' Process server - Mexp B1  Done...')
+            self.logger.info(' Process server - Mexp B1  Done...%s',tt)
 
           end2 = time.time()
 
@@ -761,23 +788,27 @@ class GrothProver(object):
                                   pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],
                                   delta_1,
                              ))
+            table_f = ""
           else :
              EP_vector =   np.reshape(self.ect_hExps,-1)
              offset = self.G1_woffset
              total_words = self.ec_table['nwords_tdata'] - self.G1_woffset
+             table_f = self.read_table_f
 
+          tt = time.time()
           np.copyto(self.pi_c2_eccf1,
                   ec_jacreduce_h(
                          scalar_vector,
                          EP_vector,
-                         self.read_table_f.encode("UTF-8"),
+                         table_f.encode("UTF-8"),
                          offset,
                          total_words,
                          self.grouping,
                          0,
                          MOD_FP, 1, 1, 1, self.pippen_conf)
                      )
-          self.logger.info(' Process server - hExps Mexp common part completed ...')
+          tt = time.time()-tt
+          self.logger.info(' Process server - hExps Mexp common part completed ...%s',tt)
 
           
         else:
@@ -1016,6 +1047,11 @@ class GrothProver(object):
              np.copyto(
                 self.scl_array[:nVars],
                 readWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
+
+           elif self.witness_f.endswith('.wshm'):
+             np.copyto(
+                self.scl_array[:nVars],
+                readSharedMWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
 
            else:
              np.copyto(
@@ -1266,11 +1302,14 @@ class GrothProver(object):
              self.logger.error(' To launch snarkjs, verification file %s needs to be a json file', self.verification_key_f)
              sys.exit(1)
         
-          print(self.pkbin_mode)
           if self.pkbin_mode == 0:
              snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
           else :
-             snarkjs['verify'] = call(["snarkjs", "groth16", "verify", verification_key_file,snarkjs['pd_f'], snarkjs['p_f']])
+             result = run(["snarkjs", "groth16", "verify", verification_key_file,snarkjs['pd_f'], snarkjs['p_f']], stdout=PIPE)
+             snarkjs['verify'] = 0
+             if result.stdout.decode('utf-8').split()[2] == "Invalid":
+                snarkjs['verify'] = 1
+
 
         elif mode == "verification_key":
           self.verification_key_f = self.proving_key_f[:-5]
@@ -1838,3 +1877,148 @@ class GrothProver(object):
         np.copyto(self.scl_array[:m-1], pH[m:-1])
 
         return time.time()-start
+
+    def write_tables(self, all_tables=1):
+       self.logger.info('#################################### ')
+       self.logger.info('')
+       self.logger.info('Writing Table files')
+
+       pk_bin = pkbin_get(self.pk,['domainSize','nPublic','A', 'B2', 'B1','C','hExps', 'delta_1'])
+       domainSize   =  pk_bin[0][0]
+       nPublic =  pk_bin[1][0]
+       A = pk_bin[2]
+       B2 = pk_bin[3]
+       B1 = pk_bin[4]
+       C = pk_bin[5]
+       hExps = pk_bin[6]
+       delta_1 = pk_bin[7]
+
+       nWords_offset = ECTABLE_DATA_OFFSET_WORDS
+       nWords_offset_dw = dw2w(nWords_offset)
+
+       if all_tables:
+         nTables_A = int((len(A) / (NWORDS_FP * ECP_JAC_INDIMS) + self.grouping - 1)/self.grouping) 
+         nWords1_A = (nTables_A << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords_offset
+         nWords1_A_dw = dw2w(nWords1_A)
+         nTables_B2 = int((len(B2) / (NWORDS_FP * ECP2_JAC_INDIMS) + self.grouping - 1)/self.grouping) 
+         nWords1_B2 = (nTables_B2 << self.grouping ) * NWORDS_FP * ECP2_JAC_INDIMS + nWords1_A
+         nWords1_B2_dw = dw2w(nWords1_B2)
+         nTables_B1 = int((len(B1) / (NWORDS_FP * ECP_JAC_INDIMS) + self.grouping - 1)/self.grouping)
+         nWords1_B1 = (nTables_B1 << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_B2
+         nWords1_B1_dw = dw2w(nWords1_B1)
+         if self.pkbin_mode == 1:
+            nTables_C = int((len(C) / (NWORDS_FP * ECP_JAC_INDIMS) + self.grouping - 1)/self.grouping)
+            nWords1_C = (nTables_C << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_B1
+            nWords1_C_dw = dw2w(nWords1_C)
+         else:
+            nTables_C = int((len(C[2*(nPublic+1)*NWORDS_FP:]) / (NWORDS_FP * ECP_JAC_INDIMS) + self.grouping - 1)/self.grouping)
+            nWords1_C = (nTables_C << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_B1
+            nWords1_C_dw = dw2w(nWords1_C)
+       else:
+         nWords1_A_dw = dw2w(nWords_offset)
+         nWords1_B2_dw = dw2w(nWords_offset)
+         nWords1_B1_dw = dw2w(nWords_offset)
+         nWords1_C_dw = dw2w(nWords_offset)
+         nTables_A = 0
+         nTables_B2 = 0
+         nTables_B1 = 0
+         nTables_C = 0
+         nWords1_C = 0
+
+       nTables_hExps = int((domainSize + self.grouping - 1)/self.grouping) 
+       nWords1_hExps = (nTables_hExps << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_C
+       nWords1_hExps_dw = dw2w(nWords1_hExps)
+
+       nWords = np.concatenate(([np.uint32(self.grouping)], nWords_offset_dw, 
+                                nWords1_A_dw,  
+                                nWords1_B2_dw, 
+                                nWords1_B1_dw, 
+                                nWords1_C_dw,  nWords1_hExps_dw))
+
+       writeU256DataFile_h(nWords, self.write_table_f.encode("UTF-8"))
+       write_group_size = 1000
+
+       if all_tables == 1:
+         self.logger.info(' Computing EC Point A Tables')
+         super_group =  np.reshape(A,(-1,NWORDS_FP))
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         
+         self.logger.info(' Done computing EC Point A Tables')
+  
+         self.logger.info(' Computing EC Point B2 Tables')
+         super_group =  np.reshape(B2, (-1, NWORDS_FP))
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP2_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec2_inittable_h(
+                              np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                   -1), self.grouping, MOD_FP, 1)
+           table = ec2_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         self.logger.info(' Done computing EC Point B2 Tables')
+
+         self.logger.info(' Computing EC Point B1 Tables')
+         super_group =  np.reshape(B1, (-1,NWORDS_FP))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         self.logger.info(' Done computing EC Point B1 Tables')
+
+         self.logger.info(' Computing EC Point C Tables')
+         if self.pkbin_mode == 0:
+           super_group =  np.reshape(C[2*(nPublic+1)*NWORDS_FP:],(-1,NWORDS_FP))
+         else :
+           super_group =  np.reshape(C,(-1,NWORDS_FP))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         self.logger.info(' Done computing EC Point C Tables')
+
+       self.logger.info(' Computing EC Point hExps Tables')
+       super_group =  np.concatenate((
+                                          hExps[:2*(domainSize-1)*NWORDS_FP],
+                                          delta_1
+                                     ))
+       groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+       groups = np.append(groups, len(super_group)+1)
+       for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_FP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_FP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         
+       self.logger.info(' Done computing EC Point hExps Tables')
+
+       self.logger.info('')
+       if all_tables:
+         self.logger.info('Table1 A     : %s elements', nTables_A)
+         self.logger.info('Table1 B2    : %s elements', nTables_B2)
+         self.logger.info('Table1 B1    : %s elements', nTables_B1)
+         self.logger.info('Table1 C     : %s elements', nTables_C)
+       self.logger.info('Table1 hExps : %s elements', nTables_hExps)
+
+
+       self.logger.info('')
+       self.logger.info('')
+       self.logger.info('#################################### ')
+

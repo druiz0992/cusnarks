@@ -207,6 +207,9 @@ cdef extern from "../cuda/file_utils.h" nogil:
     void creadWtnsFile_h "readWtnsFile_h"(ct.uint32_t *samples, unsigned long long nElems,
                                            unsigned long long start, const char *filename)
 
+    void creadSharedMWtnsFile_h "readSharedMWtnsFile_h"(ct.uint32_t *samples, unsigned long long nElems,
+                                           unsigned long long start, const char *filename)
+
     void czKeyToPkFile_h "zKeyToPkFile_h" (const char *pkbin_filename, const char *zkey_filename)
 
 cdef extern from "../cuda/mpoly.h" nogil: 

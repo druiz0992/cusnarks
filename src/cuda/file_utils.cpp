@@ -620,6 +620,16 @@ void readWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long
   fclose(ifp);
 }
 
+void readSharedMWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long long start, const char *filename)
+{
+  FILE *ifp = fopen(filename,"rb");
+
+  fseek(ifp, start, SEEK_SET);
+  fread(samples, sizeof(uint32_t), nElems*NWORDS_FR, ifp); 
+  
+  fclose(ifp);
+}
+
 unsigned long long readNWtnsNEls_h(unsigned long long *start, const char *filename)
 {
   uint32_t section_id;
@@ -756,9 +766,12 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
   }
   fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_9]/sizeof(uint32_t), ofp); 
   // delta1 
-  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
-  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
-  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA2_OFFSET], sizeof(uint32_t), 4*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
+  fwrite(&buffer2[ZKEY_HDR_SECTION2_DELTA1_OFFSET], sizeof(uint32_t), 2*NWORDS_FP, ofp); 
 
   free(buffer);
   free(buffer2);

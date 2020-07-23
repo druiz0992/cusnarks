@@ -1,3 +1,5 @@
+//g++ test_shmem_read.c -I ../../src/cuda/ -L ../../lib/ -lcusnarks -o read 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +11,7 @@
 #include "types.h"
 #include "constants.h"
 #include "utils_host.h"
+#include "bigint.h"
 
 int main(int argc, char *argv[])
 {
@@ -28,10 +31,10 @@ int main(int argc, char *argv[])
 
    printf("\nClient Create shmem before\n");
    for (uint32_t i=0; i< 10; i++){
-     printU256Number(&buffer[i*NWORDS_256BIT]);
+     printUBINumber(&buffer[i*NWORDS_256BIT],8);
    }
 
-   int32_t shmid = shared_new((void **) &buffer, size);
+   int32_t shmid = shared_get_h((void **) &buffer, size);
    if (shmid == -1)
    {
      printf("Error");
@@ -39,11 +42,11 @@ int main(int argc, char *argv[])
 
    printf("\nClient Create shmem\n");
    for (uint32_t i=0; i< 10; i++){
-     printU256Number(&buffer[i*NWORDS_256BIT]);
+     printUBINumber(&buffer[i*NWORDS_256BIT],8);
    }
 
    if (argc > 1){
-     shared_free((void *) buffer, shmid);
+     shared_free_h((void *) buffer, shmid);
    }
 
    return 1;

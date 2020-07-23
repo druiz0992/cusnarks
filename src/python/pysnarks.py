@@ -418,7 +418,7 @@ def run(opt, parser):
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'], n_gpu=opt['max_gpus'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
                     snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'], 
-                    write_table_f=opt['table_f'], table_type=opt['table_type'],
+                    table_type=opt['table_type'],
                     grouping=opt['grouping'])
       
       GS.setup()
@@ -480,7 +480,7 @@ def run(opt, parser):
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
                       benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'],
-                      read_table_f=opt['table_f'], zk=opt['zero_knowledge'], grouping=opt['grouping'], pippen_conf=opt['pippen_conf'])
+                      read_table_f=opt['table_f'], write_table_f=opt['table_f'],table_type=opt['table_type'],zk=opt['zero_knowledge'], grouping=opt['grouping'], pippen_conf=opt['pippen_conf'])
           end = time.time() - start
           print("GP init : "+str(end))
 
