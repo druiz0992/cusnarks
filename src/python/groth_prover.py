@@ -567,7 +567,12 @@ class GrothProver(object):
                                          start_gpu_idx=0,
                                          ec_lable = np.asarray(['B2']))
 
-        nsamplesH = domainSize - 1 + 1 +1 +1 +1  # a + b1 + delta_1 + c
+        if self.pkbin_mode:
+            m = domainSize
+        else:
+            m = domainSize -1
+
+        nsamplesH = m + 1 +1 +1 +1  # a + b1 + delta_1 + c
         self.tableH = buildDispatchTable( math.ceil(nsamplesH/self.batch_size),
                                          1,
                                          self.n_gpu, self.n_streams, self.batch_size,
@@ -804,7 +809,6 @@ class GrothProver(object):
                      )
           tt = time.time()-tt
           self.logger.info(' Process server - hExps Mexp common part completed ...%s',tt)
-
           
         else:
           self.logger.info(' Process server - Waiting for Mexp to be completed...')
@@ -1445,11 +1449,15 @@ class GrothProver(object):
                  self.logger.info('Client stopped...')
                  return 1
 
+          
           # C 
           self.logger.info(' Mexp C  started...')
 
           scl_vector = self.scl_array[nPublic+1:self.nVars]
-          ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
+          if self.pkbin_mode == 1:
+               ecp_vector = pk_bin[3][:(self.nVars-nPublic-1)*NWORDS_FP*ECP_JAC_INDIMS]
+          else:
+               ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
 
           if self.compute_last_mexp_gpu == False:
               used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True)
@@ -1466,6 +1474,7 @@ class GrothProver(object):
           if self.compute_last_mexp_gpu == False:
              self.assignECPvalues('C')
           self.logger.info(' First Mexp completed GPU...')
+          
 
           end = time.time()
           self.t_GP['Mexp1'] = (end - start)
@@ -1500,16 +1509,20 @@ class GrothProver(object):
            start = time.time()
            self.logger.info(' Starting Last Mexp GPU...')
 
+           if self.pkbin_mode:
+               m = domainSize
+           else:
+               m = domainSize - 1
            
            scl_vector = np.concatenate( 
-                                 (self.scl_array[:domainSize-1],
+                                 (self.scl_array[:m],
                                   [self.s_scl],
                                   [self.r_scl],
                                   [self.neg_rs_scl],
                                   np.asarray([[1,0,0,0,0,0,0,0]],dtype=np.uint32)))
            
            ecp_vector = np.concatenate(
-                                (pk_bin[4][:(domainSize-1)*ECP_JAC_INDIMS*NWORDS_FP],
+                                (pk_bin[4][:m*ECP_JAC_INDIMS*NWORDS_FP],
                                  np.reshape(self.pi_a_eccf1,-1),
                                  np.reshape(self.pi_b1_eccf1,-1),
                                  pk_bin[5],
@@ -1517,9 +1530,9 @@ class GrothProver(object):
 
 
            self.findECPointsDispatch( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
-
         
            self.assignECPvalues('C')
+
            end = time.time()
            self.t_GP['Mexp2'] = (end - start)
            self.logger.info(' Last Mexp completed')
@@ -1593,7 +1606,6 @@ class GrothProver(object):
                                 1,   # to affine
                                 1,   # Add z coordinate to inout
                                 1)   # strip z coordinate from affine result
-
 
         if label == 'A':
             np.copyto(self.pi_a_eccf1, ecp)
