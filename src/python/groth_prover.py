@@ -1903,6 +1903,11 @@ class GrothProver(object):
        nWords_offset = ECTABLE_DATA_OFFSET_WORDS
        nWords_offset_dw = dw2w(nWords_offset)
 
+       if self.pkbin_mode:
+           m = domainSize
+       else:
+           m = domainSize - 1
+
        if all_tables:
          nTables_A = int((len(A) / (NWORDS_FP * ECP_JAC_INDIMS) + self.grouping - 1)/self.grouping) 
          nWords1_A = (nTables_A << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords_offset
@@ -1932,7 +1937,7 @@ class GrothProver(object):
          nTables_C = 0
          nWords1_C = 0
 
-       nTables_hExps = int((domainSize + self.grouping - 1)/self.grouping) 
+       nTables_hExps = int((m + 1 + self.grouping - 1)/self.grouping) 
        nWords1_hExps = (nTables_hExps << self.grouping ) * NWORDS_FP * ECP_JAC_INDIMS + nWords1_C
        nWords1_hExps_dw = dw2w(nWords1_hExps)
 
@@ -2002,7 +2007,7 @@ class GrothProver(object):
 
        self.logger.info(' Computing EC Point hExps Tables')
        super_group =  np.concatenate((
-                                          hExps[:2*(domainSize-1)*NWORDS_FP],
+                                          hExps[:2*m*NWORDS_FP],
                                           delta_1
                                      ))
        groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
