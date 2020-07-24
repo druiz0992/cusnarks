@@ -181,11 +181,6 @@ class GrothProver(object):
         if self.compute_first_mexp_gpu or self.compute_last_mexp_gpu:
           self.ecbn128  = ECBN128(max(2*self.batch_size,2<<(8+8+4)),   seed=self.seed)
           self.ec2bn128 = self.ecbn128
-          #self.ec2bn128 =\
-                #EC2BN128(
-                              #int((ECP2_JAC_OUTDIMS/ECP2_JAC_INDIMS) * self.batch_size),
-                              #seed=self.seed
-                        #)
         else:
           self.ecbn128  = None
           self.ec2bn128 = None
@@ -818,7 +813,7 @@ class GrothProver(object):
           if conn is not None:
             conn.recv()
           if self.compute_ntt_gpu is False:
-            np.copyto(w, polH)
+            np.copyto(w[:m-1], polH)
             self.logger.info(' Process server - Copying polH...')
   
         end3 = time.time()

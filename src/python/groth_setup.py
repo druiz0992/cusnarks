@@ -580,8 +580,8 @@ class GrothSetup(object):
                  1)
 
       if self.n_gpu :
-        self.ecbn128    =  ECBN128(self.batch_size,seed=self.seed)
-        self.ec2bn128    = EC2BN128(self.batch_size,seed=self.seed)
+        self.ecbn128    =  ECBN128(2*self.batch_size+4,seed=self.seed)
+        self.ec2bn128    = self.ecbn128
       else :
         self.ecbn128    =  None
         self.ec2bn128    = None
