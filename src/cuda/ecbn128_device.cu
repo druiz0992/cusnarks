@@ -1814,7 +1814,7 @@ __device__ void scmulecjac_step_l2r(T1 *Q,T1 *N, uint32_t *scl, uint32_t offset,
 {
    uint32_t  b0 = bselu256(scl,NWORDS_FR * NBITS_WORD -1 -offset);
    //int tid = threadIdx.x + blockDim.x * blockIdx.x;
-   logInfoTid("B0 : %d\n",b0);
+   //logInfoTid("B0 : %d\n",b0);
    doublecjac<T1, T2>(Q,Q, midx);
    //logInfoBigNumberTid(3*T1::getN(),"Q-D : \n",Q);
    if (b0) {
