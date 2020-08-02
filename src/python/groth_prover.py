@@ -278,9 +278,9 @@ class GrothProver(object):
           self.write_tables(all_tables=self.table_type)
 
         # scl_array
-        witLen = domainSize
+        witLen = domainSize + 8
         if self.pkbin_mode == 1:
-          witLen = 2 * domainSize
+          witLen = 2 * domainSize + 8
         self.scl_array_sh = RawArray(c_uint32, witLen * NWORDS_256BIT)     
         self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((witLen, NWORDS_256BIT))
@@ -567,6 +567,9 @@ class GrothProver(object):
                                          start_gpu_idx=0,
                                          ec_lable = np.asarray(['B2']))
 
+        self.mexp1Batch = np.zeros((self.batch_size*3, NWORDS_FP),dtype=np.uint32)
+        self.mexp2Batch = np.zeros((self.batch_size*5, NWORDS_FP),dtype=np.uint32)
+
         if self.pkbin_mode:
             m = domainSize
         else:
@@ -580,7 +583,6 @@ class GrothProver(object):
                                          start_pidx=0,
                                          start_gpu_idx=0,
                                          ec_lable = np.asarray(['hExps']))
-
 
     def pysnarkP_CPU(self, conn, wnElems, w_sh, w_shape, pA_T_sh, pA_T_shape, pB_T_sh, pB_T_shape, pi_c2_eccf1_sh):
         self.logger.info(' Launching Poly Process Client')
@@ -1358,7 +1360,6 @@ class GrothProver(object):
         self.logger.info(' - s : %s',str(BigInt.from_uint256(self.s_scl).as_long()) )
         self.logger.info('#################################### ')
 
-
         ######################
         # Beginning of P1 - Read Witness
         ######################
@@ -1407,7 +1408,6 @@ class GrothProver(object):
 
           ecp_vector = pk_bin[1][:(self.nVars+2)*ECP2_JAC_INDIMS*NWORDS_FP]
 
-         
           self.findECPointsDispatch( self.tableB2, scl_vector, ecp_vector, ec2=1 )
           self.assignECPvalues('B2')
    
@@ -1513,23 +1513,24 @@ class GrothProver(object):
                m = domainSize
            else:
                m = domainSize - 1
-           
-           scl_vector = np.concatenate( 
-                                 (self.scl_array[:m],
+
+           self.scl_array[m:m+4] = scl_vector = np.concatenate( (
                                   [self.s_scl],
                                   [self.r_scl],
                                   [self.neg_rs_scl],
                                   np.asarray([[1,0,0,0,0,0,0,0]],dtype=np.uint32)))
-           
-           ecp_vector = np.concatenate(
-                                (pk_bin[4][:m*ECP_JAC_INDIMS*NWORDS_FP],
+           scl_vector = self.scl_array[:m+4]
+
+           pk_bin[4][m*ECP_JAC_INDIMS*NWORDS_FP:(m+4)*ECP_JAC_INDIMS*NWORDS_FP] = np.concatenate((
                                  np.reshape(self.pi_a_eccf1,-1),
                                  np.reshape(self.pi_b1_eccf1,-1),
                                  pk_bin[5],
                                  np.reshape(self.pi_c_eccf1,-1)))
+           ecp_vector = pk_bin[4][:(m+4)*ECP_JAC_INDIMS*NWORDS_FP]
 
-
+           self.logger.info(' Starting Dispatch...')
            self.findECPointsDispatch( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
+           self.logger.info(' Collecting Results...')
         
            self.assignECPvalues('C')
 
@@ -1640,7 +1641,8 @@ class GrothProver(object):
           cuda_ec128 = self.ec_type_dict[P][0]
           gpu_id = p[3]
           stream_id = p[4]
-          cuda_ec128.streamSync(gpu_id,stream_id)
+          #cuda_ec128.streamSync(gpu_id,stream_id)
+          cuda_ec128.streamDel(gpu_id,stream_id)
 
     def getECResults(self, dispatch_table):
        for bidx,p in enumerate(dispatch_table):
@@ -1694,7 +1696,9 @@ class GrothProver(object):
            edims = ECP2_JAC_INDIMS + 1
     
        if used_streams is None:
-           used_streams = [set([])] * self.n_gpu
+           used_streams = [] 
+           for i in range(self.n_gpu):
+             used_streams.append(set([]))
 
        for bidx, p in enumerate(dispatch_table):
           #Retrieve point name : A,B1,B2,..
@@ -1709,14 +1713,20 @@ class GrothProver(object):
           pidx = self.ec_type_dict[P][4]
 
           #nsamples needs to be multiple of 128
+          start1=time.time()
           nsamples = int((end_idx - start_idx+128-1)/(128))*128
           offset = nsamples - (end_idx - start_idx)
-          batch = np.zeros((nsamples*edims, NWORDS_FR),dtype=np.uint32)
+          if bidx != len(dispatch_table) -1:
+              batch = self.mexp1Batch
+              if ec2:
+                batch = self.mexp2Batch
+          else:
+            batch = np.zeros((nsamples*edims, NWORDS_FR),dtype=np.uint32)
+          
           batch[offset:nsamples] = scl_vector[start_idx:end_idx]
           batch[nsamples+indims*offset:] = np.reshape(
                                             ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],
                                             (-1,NWORDS_FP))
-
           first_time = 1
           if stream_id in used_streams[gpu_id] :
             first_time = 0
@@ -1754,6 +1764,7 @@ class GrothProver(object):
 
        # Collect final results
        self.streamsDel(pending_dispatch_table)
+
        if reduce_en :
           for gpu_id, streams  in enumerate(used_streams):
               for stream_id in streams:
@@ -1777,7 +1788,6 @@ class GrothProver(object):
           return None                  
        else:
           return used_streams
-
 
     def write_pdata(self):
         if self.out_public_f.endswith('.json'):

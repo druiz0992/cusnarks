@@ -982,7 +982,7 @@ void ec2_jacsc1mul_h(uint32_t *z, uint32_t *x, uint32_t n, uint32_t pidx, uint32
 }
 
 
-void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last=0)
+void ec_jac2aff_h(uint32_t *y, uint32_t *x, t_uint64 n, uint32_t pidx, uint32_t strip_last=0)
 {
   const uint32_t *One = CusnarksOneMontGet((mod_t)pidx);
   const uint32_t *ECInf = CusnarksMiscKGet();
@@ -995,7 +995,7 @@ void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t 
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
-  for (uint32_t i=0; i< n; i++){
+  for (t_uint64 i=0; i< n; i++){
      uint32_t tid = omp_get_thread_num();
      if (equBI_h(&x[i*ECP_JAC_OUTDIMS*NWORDS_FP+2*NWORDS_FP], zero, NWORDS_FP)){
            memmove(&y[i*ndims*NWORDS_FP],
@@ -1033,7 +1033,7 @@ void ec_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t 
   }
 }
 
-void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t strip_last=0)
+void ec2_jac2aff_h(uint32_t *y, uint32_t *x, t_uint64 n, uint32_t pidx, uint32_t strip_last=0)
 {
   const uint32_t *One = CusnarksOneMont2Get((mod_t)pidx);
   const uint32_t *ECInf = CusnarksMiscKGet();
@@ -1047,7 +1047,7 @@ void ec2_jac2aff_h(uint32_t *y, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t
   #ifndef TEST_MODE
     #pragma omp parallel for if(parallelism_enabled)
   #endif
-  for (uint32_t i=0; i< n; i++){
+  for (t_uint64 i=0; i< n; i++){
      uint32_t tid = omp_get_thread_num();
      if (equBI_h(&x[i*ECP2_JAC_OUTDIMS*NWORDS_FP+4*NWORDS_FP], zero, NWORDS_FP) &&
         equBI_h(&x[i*ECP2_JAC_OUTDIMS*NWORDS_FP+5*NWORDS_FP], zero, NWORDS_FP)){
@@ -2028,7 +2028,7 @@ static void ec_jacdouble_finish_h(void *args)
   uint32_t outdims = ECP_JAC_OUTDIMS;
   void (*ec_jacdouble_cb)(uint32_t *, uint32_t *, uint32_t) = &ec_jacdouble_h;
   void (*ec_jacadd_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t) = &ec_jacadd_h;
-  void (*ec_jac2aff_cb)(uint32_t *, uint32_t *, uint32_t, uint32_t, uint32_t) = &ec_jac2aff_h;
+  void (*ec_jac2aff_cb)(uint32_t *, uint32_t *, t_uint64, uint32_t, uint32_t) = &ec_jac2aff_h;
 
   if (wargs->ec2){
     outdims = ECP2_JAC_OUTDIMS;
@@ -2078,7 +2078,7 @@ static void ec_jacdouble_pippengers_finish_h(void *args)
   uint32_t outdims = ECP_JAC_OUTDIMS;
   void (*ec_jacdouble_cb)(uint32_t *, uint32_t *, uint32_t) = &ec_jacdouble_h;
   void (*ec_jacadd_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t) = &ec_jacadd_h;
-  void (*ec_jac2aff_cb)(uint32_t *, uint32_t *, uint32_t, uint32_t, uint32_t) = &ec_jac2aff_h;
+  void (*ec_jac2aff_cb)(uint32_t *, uint32_t *, t_uint64, uint32_t, uint32_t) = &ec_jac2aff_h;
 
   if (wargs->ec2){
     outdims = ECP2_JAC_OUTDIMS;

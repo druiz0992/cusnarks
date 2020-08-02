@@ -162,16 +162,19 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
             [int((kernel_config['blockD'][0] +
                    kernel_params['in_length'][0]-indims-1) /
                                          kernel_config['blockD'][0])]
-
-       result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params,
+       gpu_id=1
+       stream_id = 1
+       pysnark.kernelLaunch(vector, kernel_config, kernel_params,
                                        gpu_id, stream_id, n_kernels=1 )
-       pysnark.streamDel(gpu_id,stream_id)
+       result, t = pysnark.streamSync(gpu_id,stream_id)
    
     else:
       start = time.time()
       new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
       result = np.zeros(((nsamples-indims) * outdims ,NWORDS_256BIT), dtype=np.uint32)
       t=0.0
+      gpu_id=1
+      stream_id = 1
 
       for start_idx in xrange(0,nsamples-indims, batch_size-indims):
           new_vector[:min(batch_size-indims, nsamples-indims-start_idx)] =\
@@ -187,10 +190,11 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
                                          kernel_config['blockD'][0])]
 
           if pysnark is not None:
+            pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
             result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
-                 pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
-            pysnark.streamDel(gpu_id,stream_id)
+            pysnark.streamSync(gpu_id,stream_id)
             t+=t1
+
           elif ec2:
             result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims]= \
                  ec2_jacsc1mul_h(
@@ -307,6 +311,7 @@ def ec_pippen_mul(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=8 ,
 
    kernel_params['in_length'] = [indims_e*nsamples]
    kernel_params['out_length'] = outdims 
+   #kernel_params['out_length'] = outdims*nblocks*(1<<(pippen_binsize+pippen_blocksize))
    kernel_params['stride'] = [indims_e*int((nsamples+npoints_out*nblocks-1)/(npoints_out*nblocks))]
    kernel_params['premul']    = [first_time]
    kernel_params['premod'] = [nblocks]
@@ -358,6 +363,8 @@ def ec_pippen_reduce(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=
    kernel_config['smemS'] = [0] * nkernels
    kernel_config['smemS'][nkernels-1] = (1<<(pippen_blocksize-5)) * NWORDS_FP * outdims * 4
    kernel_config['gridD'] = [nblocks,1,1] 
+   kernel_config['input_val'] = [0,0,0] 
+
 
    #writeU256DataFile_h(np.reshape(vector,-1), "/home/edu/david/cusnarks/pippen.bin".encode("UTF-8"))
    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )

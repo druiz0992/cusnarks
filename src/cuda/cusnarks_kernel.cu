@@ -45,6 +45,9 @@
 
 using namespace std;
 
+#define PREALLOC_BUFF (1)
+ 
+
 
 // Prime information for finitie fields. Includes 3 numbers : p. p_ and r_ that 
 // follow p x p_ - r * r_ = 1 whrere r is 1^256. This is used for Montgomery reduction
@@ -250,6 +253,12 @@ void CUSnarks::allocateCudaResources(uint32_t in_size, uint32_t out_size, uint32
       CCHECK(cudaMalloc((void**) &this->in_vector_device[i][j].data, in_size));
       CCHECK(cudaMalloc((void**) &this->out_vector_device[i][j].data, out_size));
 
+#if PREALLOC_BUFF
+      CCHECK(cudaMallocHost((void **)&in_data_host[i][j], in_len*NWORDS_FP*sizeof(uint32_t)));
+      CCHECK(cudaMallocHost((void **)&out_data_host[i][j], in_len*NWORDS_FP*sizeof(uint32_t)));
+#endif
+
+
       // Allocate kernel params in global memory 
       CCHECK(cudaMalloc((void**) &this->params_device[i][j], sizeof(kernel_params_t)));
       logInfo("in size (%d-%d) : %d, out size : %d,  data  in: %x, data out : %x, params : %x \n",
@@ -381,6 +390,7 @@ void CUSnarks::releaseCudaStreamResources(void)
   free(stream);
   free(start_event);
   free(end_event);
+
 }
 
 void CUSnarks::releaseCudaResources(void)
@@ -395,6 +405,13 @@ void CUSnarks::releaseCudaResources(void)
       free(in_vector_device[i]);
       free(out_vector_device[i]);
       free(params_device[i]);
+
+#if PREALLOC_BUFF
+      for (j=0; j < N_STREAMS_PER_GPU; j++){
+        CCHECK(cudaFreeHost(out_data_host[i][j]));
+        CCHECK(cudaFreeHost(in_data_host[i][j]));
+      }
+#endif
 
       free(out_data_host[i]);
       free(in_data_host[i]);
@@ -464,21 +481,44 @@ double CUSnarks::kernelLaunch(
   cudaSetDevice(gpu_id);
   double _total_start, _total_end;
   _total_start = elapsedTime();
+#if PREALLOC_BUFF==0
   in_data_host[gpu_id][stream_id] = in_vector_host->data;
+#endif
   start_copy_in = elapsedTime();
   if (stream_id == 0){
+#if PREALLOC_BUFF
+           if (config[0].input_val){
+#endif
      CCHECK(cudaMemcpy(
               &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
+#if PREALLOC_BUFF
+             (const void *)in_data_host[gpu_id][stream_id],
+#else
               in_vector_host->data,
+#endif
               in_vector_host->size,
               cudaMemcpyHostToDevice));
+#if PREALLOC_BUFF
+  }
+#endif
   } else {
+#if PREALLOC_BUFF
+           if (config[0].input_val){
+#endif
+
     CCHECK(cudaMemcpyAsync(
              &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
+#if PREALLOC_BUFF
+             (const void *)in_data_host[gpu_id][stream_id],
+#else
              in_vector_host->data,
+#endif
              in_vector_host->size,
              cudaMemcpyHostToDevice,
              this->stream[gpu_id][stream_id]));
+#if PREALLOC_BUFF
+  }
+#endif
   }
   end_copy_in = elapsedTime() - start_copy_in;
   logInfo("In Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
@@ -548,7 +588,9 @@ double CUSnarks::kernelLaunch(
     // retrieve kernel output data from GPU to host
   start_copy_out = elapsedTime();
   if (config[0].return_val){
+#if PREALLOC_BUFF == 0
      out_data_host[gpu_id][stream_id] = out_vector_host->data;
+#endif
      if (stream_id == 0){
         CCHECK(cudaMemcpy(
             out_vector_host->data,
@@ -605,11 +647,13 @@ void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)
       gpu_id, stream_id);
   // free params, in_host_data and out_host_data
 
+#if PREALLOC_BUFF == 0
   logInfo("Release in_data_host[%d][%d] : %x\n",gpu_id, stream_id,in_data_host[gpu_id][stream_id]);
   CCHECK(cudaFreeHost(in_data_host[gpu_id][stream_id]));
 
   logInfo("Release out_data_host[%d][%d] : %x\n",gpu_id, stream_id,out_data_host[gpu_id][stream_id]);
   CCHECK(cudaFreeHost(out_data_host[gpu_id][stream_id]));
+#endif
 
   logInfo("Release params_hostt[%d][%d] : %x\n",gpu_id, stream_id,params_host[gpu_id][stream_id]);
   CCHECK(cudaFreeHost(params_host[gpu_id][stream_id]));
@@ -665,6 +709,10 @@ double CUSnarks::elapsedTime(void)
   return ((double)tp.tv_sec + (double)tp.tv_usec*1e-6);
 }
 
+void CUSnarks::inDataHostCopy(uint32_t *data, uint32_t size, uint32_t gpu_id, uint32_t stream_id)
+{
+     memcpy(in_data_host[gpu_id][stream_id], data, size*sizeof(uint32_t));
+}
 /*
   Professional CUDA C Programming by John Cheng, Max Grossman, Ty McKercher
 */

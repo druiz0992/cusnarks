@@ -100,10 +100,10 @@ cdef extern from "../cuda/ntt.h" nogil:
     ct.uint32_t * cget_Mtranspose_h "get_Mtranspose_h" ()
 
 cdef extern from "../cuda/ec.h" nogil: 
-    void cec_jac2aff_h "ec_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t n,
+    void cec_jac2aff_h "ec_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.t_uint64 n,
                                        ct.uint32_t pidx, ct.uint32_t strip_last)
 
-    void cec2_jac2aff_h "ec2_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.uint32_t n,
+    void cec2_jac2aff_h "ec2_jac2aff_h" (ct.uint32_t *y, ct.uint32_t *x, ct.t_uint64 n,
                                          ct.uint32_t pidx, ct.uint32_t strip_last)
 
     void cec_jacadd_h "ec_jacadd_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t *y,

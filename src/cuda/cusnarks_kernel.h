@@ -93,6 +93,7 @@ class CUSnarks {
         uint32_t  streamGetOutputDataLen(uint32_t gpu_id, uint32_t stream_id);
         void streamDel(uint32_t gpu_id, uint32_t stream_id);
         double elapsedTime(void);
+	void inDataHostCopy(uint32_t *data, uint32_t size, uint32_t gpu_id, uint32_t stream_id);
 };
 
 #endif

@@ -105,6 +105,10 @@ IF CUDA_DEF:
                  kconfig[i].gridD  = config['gridD'][i]
              else :
                  kconfig[i].gridD  = 0
+             if 'input_val' in config:
+                 kconfig[i].input_val  = config['input_val'][i]
+             else :
+                 kconfig[i].input_val  = 1
              if 'smemS' in config:
                  kconfig[i].smemS  = config['smemS'][i]
              else:
@@ -123,25 +127,36 @@ IF CUDA_DEF:
           cdef C_AsyncBuf *in_vec_flat_async 
           cdef C_AsyncBuf *out_vec_flat_async 
           cdef C_AsyncBuf *kparams_buffer_async
+          cdef PREALLOC_BUFF = 1
 
           if stream_id == -1:
 
-             in_vec_flat_sync = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
-             in_vec_flat_sync = np.concatenate(in_vec)
-             in_v.data  = <ct.uint32_t *>&in_vec_flat_sync[0]
+             if PREALLOC_BUFF == 0:
+               in_vec_flat_sync = np.zeros(in_v.length * in_vec.shape[1], dtype=np.uint32)
+               in_vec_flat_sync = np.concatenate(in_vec)
+               in_v.data  = <ct.uint32_t *>&in_vec_flat_sync[0]
   
-             out_vec_flat_sync = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
-             out_v.data = <ct.uint32_t *>&out_vec_flat_sync[0]
+               out_vec_flat_sync = np.zeros(out_v.length * in_vec.shape[1], dtype=np.uint32)
+               out_v.data = <ct.uint32_t *>&out_vec_flat_sync[0]
+             else :
+               if kconfig[i].input_val  != 0:
+                  self._cusnarks_ptr.inDataHostCopy(&in_vec[0,0], in_v.length*in_vec.shape[1], 0,0);
   
-             kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+             #kparams = <ct.kernel_params_t *> malloc(n_kernels * sizeof(ct.kernel_params_t))
+             kparams_buffer_async = new C_AsyncBuf(n_kernels, sizeof(ct.kernel_params_t))
+             kparams = <ct.kernel_params_t *>kparams_buffer_async.getBuf()
 
           else :
-             in_vec_flat_async = new C_AsyncBuf(in_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
-             in_vec_flat_async.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
-             in_v.data  = <ct.uint32_t *>in_vec_flat_async.getBuf()
+             if PREALLOC_BUFF == 0:
+                 in_vec_flat_async = new C_AsyncBuf(in_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+                 in_vec_flat_async.setBuf(&in_vec[0,0], in_v.length*in_vec.shape[1])
+                 in_v.data  = <ct.uint32_t *>in_vec_flat_async.getBuf()
+                 out_vec_flat_async = new C_AsyncBuf(out_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
+                 out_v.data = <ct.uint32_t *>out_vec_flat_async.getBuf()
+             else :
+               if kconfig[i].input_val  != 0:
+                  self._cusnarks_ptr.inDataHostCopy(&in_vec[0,0], in_v.length*in_vec.shape[1], gpu_id, stream_id);
   
-             out_vec_flat_async = new C_AsyncBuf(out_v.length  * in_vec.shape[1], sizeof(ct.uint32_t))
-             out_v.data = <ct.uint32_t *>out_vec_flat_async.getBuf()
   
              # create kernel params data
              kparams_buffer_async = new C_AsyncBuf(n_kernels, sizeof(ct.kernel_params_t))
@@ -181,7 +196,11 @@ IF CUDA_DEF:
 
           cdef double exec_time = self._cusnarks_ptr.kernelLaunch(&out_v, &in_v, kconfig, kparams,gpu_id, stream_id, n_kernels) 
           start_k = self._cusnarks_ptr.elapsedTime()
-          cdef ct.uint32_t [:] kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
+          cdef ct.uint32_t [:] kdata
+          if PREALLOC_BUFF== 1:
+             kdata= <ct.uint32_t [:out_v.length * in_vec.shape[1]]> self._cusnarks_ptr.streamGetOutputData(gpu_id, stream_id)
+          else:
+            kdata = <ct.uint32_t [:out_v.length * in_vec.shape[1]]>out_v.data
 
           if stream_id == -1:  
             free(kparams)
@@ -196,6 +215,7 @@ IF CUDA_DEF:
 
       def streamSync(self, ct.uint32_t gpu_id, ct.uint32_t stream_id):
 
+          cdef double start_k = self._cusnarks_ptr.elapsedTime()
           cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
           cdef ct.uint32_t vlen = self._cusnarks_ptr.streamGetOutputDataLen(gpu_id, stream_id)
           cdef ct.uint32_t *data = self._cusnarks_ptr.streamGetOutputData(gpu_id, stream_id)
@@ -207,8 +227,11 @@ IF CUDA_DEF:
 
           # copy  C data to python data and delete C pointer
           out_v = np.copy(np.asarray(kdata))
-          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+          cdef double end_k = self._cusnarks_ptr.elapsedTime()
 
+          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+          cdef double end_k2 = self._cusnarks_ptr.elapsedTime()
+          #print(end_k - start_k, end_k2 - end_k)
           return np.asarray(out_v).reshape(-1, NWORDS_256BIT), t 
    
       def randuBI(self, ct.uint32_t n_samples, ct.uint32_t biSize, np.ndarray[ndim=1, dtype=np.uint32_t] mod):
@@ -871,7 +894,7 @@ def GrothSetupComputeeT_h( np.ndarray[ndim=1, dtype=np.uint32_t]in_t,
      return out_vec
 
 def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
-     cdef ct.uint32_t lenv = <unsigned int>(len(in_v)/(NWORDS_FP*ECP_JAC_OUTDIMS))
+     cdef unsigned long long lenv = <unsigned long long >(len(in_v)/(NWORDS_FP*ECP_JAC_OUTDIMS))
      cdef unsigned long long out_len
      if strip_last == 0:
          out_len = <unsigned long long int>len(in_v)
@@ -886,7 +909,7 @@ def ec_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, c
      return out_vec.reshape((-1,NWORDS_FP))
 
 def ec2_jac2aff_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_v, ct.uint32_t pidx, ct.uint32_t strip_last=0 ):
-     cdef ct.uint32_t lenv = <unsigned int>(len(in_v)/(NWORDS_FP*ECP2_JAC_OUTDIMS))
+     cdef unsigned long long lenv = <unsigned long long>(len(in_v)/(NWORDS_FP*ECP2_JAC_OUTDIMS))
      cdef unsigned long long out_len
      if strip_last == 0:
          out_len = <unsigned long long int>len(in_v)
