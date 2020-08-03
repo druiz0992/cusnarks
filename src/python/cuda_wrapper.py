@@ -173,7 +173,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
       new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
       result = np.zeros(((nsamples-indims) * outdims ,NWORDS_256BIT), dtype=np.uint32)
       t=0.0
-      gpu_id=1
+      gpu_id=0
       stream_id = 1
 
       for start_idx in xrange(0,nsamples-indims, batch_size-indims):
