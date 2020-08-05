@@ -333,7 +333,7 @@ class GrothSetup(object):
         self.write_pk()
         self.write_vk()
 
-        copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
+        #copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
         self.test_results()
 
         return
