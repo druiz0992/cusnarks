@@ -27,7 +27,7 @@ LOG_LEVEL=$(LOG_LEVEL)
 NVCC = nvcc
 CC  = g++
 ASM = nasm
-GENCODE_ARCH_COMPUTE=-gencode arch=compute_75,code=sm_75 -gencode arch=compute_61,code=sm_61
+GENCODE_ARCH_COMPUTE=-gencode arch=compute_75,code=sm_75 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_52,code=sm_52
 DEBUG=0
 ifeq ($(DEBUG),1)
   CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE $(DEFINES_DEBUG) -std=c++11 -I $(INCLUDE_PATH) -w

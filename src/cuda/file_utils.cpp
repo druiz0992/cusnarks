@@ -698,7 +698,7 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
 
   // Section 5 A
   buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_5, zkey_filename);
-  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_5]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+  for (t_uint64 i=0; i < zkey.section_len[ZKEY_HDR_SECTION_5]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
      if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
         (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
         memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
@@ -713,7 +713,7 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
 
   // Section 6 B1
   buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_6, zkey_filename);
-  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_6]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+  for (t_uint64 i=0; i < zkey.section_len[ZKEY_HDR_SECTION_6]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
      if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
         (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
         memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
@@ -728,7 +728,7 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
 
   // Section 7 B2
   buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_7, zkey_filename);
-  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_7]/(NWORDS_FP * sizeof(uint32_t) * 4) ; i++){
+  for (t_uint64 i=0; i < zkey.section_len[ZKEY_HDR_SECTION_7]/(NWORDS_FP * sizeof(uint32_t) * 4) ; i++){
      if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
         (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP)) &&
         (equBI_h(&buffer[i*2*NWORDS_FP+2*NWORDS_FP], zero, NWORDS_FP) && 
@@ -745,7 +745,7 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
 
   // Section 8 C
   buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_8, zkey_filename);
-  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_8]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+  for (t_uint64 i=0; i < zkey.section_len[ZKEY_HDR_SECTION_8]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
      if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
         (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
         memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
@@ -757,7 +757,7 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
 
   // Section 9 H
   buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_9, zkey_filename);
-  for (uint32_t i=0; i < zkey.section_len[ZKEY_HDR_SECTION_9]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
+  for (t_uint64 i=0; i < zkey.section_len[ZKEY_HDR_SECTION_9]/(NWORDS_FP * sizeof(uint32_t) * 2) ; i++){
      if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
         (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
         memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
