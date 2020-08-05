@@ -151,7 +151,7 @@ class GrothSetup(object):
           batch_size = 20
         self.batch_size = 1<<batch_size
 
-        copy_input_files([in_circuit_f], self.keep_f)
+        #copy_input_files([in_circuit_f], self.keep_f)
 
         self.write_table_en = False
         self.write_table_f = write_table_f
