@@ -38,6 +38,7 @@
 #include "log.h"
 #include "bigint.h"
 #include "ff.h"
+#include "utils_host.h"
 #include "file_utils.h"
 
 static void  zKeyInit_h(zkey_t *zkey, const char *filename);
@@ -620,14 +621,30 @@ void readWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long
   fclose(ifp);
 }
 
-void readSharedMWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long long start, const char *filename)
+uint32_t *readSharedMWtnsFile_h(unsigned long long nElems, const char *filename)
 {
+  uint32_t *samples;
+  int32_t status;
+  uint32_t shKey, shID;
+
   FILE *ifp = fopen(filename,"rb");
 
-  fseek(ifp, start, SEEK_SET);
-  fread(samples, sizeof(uint32_t), nElems*NWORDS_FR, ifp); 
-  
+  fseek(ifp, WTNS_SHARED_HDR_START_OFFSET_NBYTES, SEEK_SET);
+  fread(&shKey, sizeof(uint32_t), 1, ifp); 
+  fread(&status, sizeof(int32_t), 1, ifp); 
+  fread(&shID, sizeof(uint32_t), 1, ifp); 
+
+  if (status) {
+	  return NULL;
+  }
+
+  int32_t shmid = shared_get_h((void **) &samples, nElems*NWORDS_FR*sizeof(uint32_t));
+  if (shmid == -1){
+	  return NULL;
+  }
+
   fclose(ifp);
+  return samples;
 }
 
 unsigned long long readNWtnsNEls_h(unsigned long long *start, const char *filename)

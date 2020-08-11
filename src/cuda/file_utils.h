@@ -51,6 +51,8 @@
 
 
 #define WTNS_HDR_START_OFFSET_NBYTES (12)
+// 12B HDR2 + 12BHDR1 + 40B SECTION1 + 12B HDR2
+#define WTNS_SHARED_HDR_START_OFFSET_NBYTES (76) 
 
 
 typedef enum {
@@ -93,7 +95,7 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename);
 uint32_t *readZKeySection_h(uint32_t section_id, const char *zkey_filename);
 unsigned long long readNWtnsNEls_h(unsigned long long *start, const char *filename);
 void readWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long long start, const char *filename);
-void readSharedMWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long long start, const char *filename);
+uint32_t *readSharedMWtnsFile_h(unsigned long long nElems, const char *filename);
 
 
 #endif
