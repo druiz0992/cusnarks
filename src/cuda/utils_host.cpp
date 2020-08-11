@@ -158,14 +158,13 @@ int shared_get_h(void **shmem, unsigned long long size)
   int shmid;
   // give your shared memory an id, anything will do
   key_t key = SHMEM_WITNESS_KEY;
-  printf("Key : %d\n", sizeof(key_t));
  
   // Setup shared memory
   if ((shmid = shmget(key, size, IPC_CREAT | 0666)) < 0)
   {
      return -1;
   }
-  printf("Shid : %d\n", sizeof(shmid));
+
   // Attached shared memory
   if ((*shmem = shmat(shmid, NULL, 0)) == (char *) -1)
   {
