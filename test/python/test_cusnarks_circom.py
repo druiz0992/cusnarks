@@ -56,18 +56,18 @@ from subprocess import call
 import cusnarks_config as cfg
 from termcolor import colored
 
-INPUT_R1CS_F = "test_circom.cir.r1cs"
+INPUT_R1CS_F = "test_circuit_c.r1cs"
 INPUT_PKBIN_F      = "test_circom_pk.bin"
-INPUT_PKJSON_F      = "test_circom_pk.json"
+INPUT_PKZKEY_F      = "test_circom_pk.zkey"
 INPUT_VK_F      = "test_circom_vk.json"
-INPUT_W_F       = "test_circom_w.dat"
 OUTPUT_P_F      = "test_circom_p.json"
 OUTPUT_PD_F      = "test_circom_pd.json"
 
 
 INPUT_CIRCUIT_F = "test_circom.cir"
 INPUT_DATA_F = "test_circom_input.json"
-WITNESS_F = "test_circom_w.json"
+WITNESS_WTNS_F = "test_circuit_w.wtns"
+WITNESS_WSHM_F = "test_circuit_w.wshm"
 
 
 def test_printResults(result,ftype):
@@ -84,45 +84,61 @@ def test_cusnarks():
     if use_pycusnarks:
       circuits_folder = cfg.get_circuits_folder()
       cusnarks_folder = cfg.get_cusnarks_folder()+"test/python"
-      in_circom_circuit_f = cusnarks_folder+"/aux_data/" + INPUT_CIRCUIT_F 
-      out_circom_circuit_f = cusnarks_folder+"/aux_data/" + INPUT_CIRCUIT_F +".wasm"
-      in_circom_data_f = cusnarks_folder+"/aux_data/" + INPUT_DATA_F
-      witness_f = circuits_folder+ WITNESS_F
-      constraints_f = in_circom_circuit_f+".r1cs"
+      witness_wtns_f = circuits_folder+ WITNESS_WTNS_F
+      witness_wshm_f = circuits_folder+ WITNESS_WSHM_F
   
       os.chdir(cusnarks_folder+"/aux_data")
 
-      print("Compiling Circuit "+in_circom_circuit_f +" ---> "+out_circom_circuit_f+" ....\n")
+      print("Compiling Circuit...\n")
 
-      call(["circom", in_circom_circuit_f,"-r1cs", "--wasm", "--sym"])
-  
-      print("Generating Witness ---> "+ witness_f+" ....\n")
-      call(["snarkjs", "calculatewitness", "--wasm", out_circom_circuit_f, "--input", in_circom_data_f, "--witness", witness_f])
-      call(["mv", constraints_f, circuits_folder])
-      os.remove(in_circom_circuit_f+".cpp")
-      os.remove(in_circom_circuit_f+".wasm")
-      os.remove(in_circom_circuit_f+".sym")
-
+      call(["./build_zkey.sh", "12"])
   
       snarkjs_folder = cfg.get_snarkjs_folder()
-  
+ 
       os.chdir(cusnarks_folder)
+
+      pkfile_bin=INPUT_PKBIN_F
+      pkfile_zkey=INPUT_PKZKEY_F
+      
+      
       print("Launching Setup .....\n")
-      pkfile=INPUT_PKBIN_F
-      GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_R1CS_F, out_pk_f=circuits_folder+pkfile,
+      GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_R1CS_F, out_pk_f=circuits_folder+pkfile_bin,
                       out_vk_f=circuits_folder+INPUT_VK_F, keep_f=circuits_folder, 
                       snarkjs=snarkjs_folder, seed=123)
       GS.setup()
       del GS
-  
-      print("Launching Prover......\n")
-      GP = GrothProver(circuits_folder+pkfile, verification_key_f = circuits_folder+INPUT_VK_F, 
+      
+     
+      GP = GrothProver(circuits_folder+pkfile_bin, verification_key_f = circuits_folder+INPUT_VK_F, 
                        start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
-      result = GP.proof(witness_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+      result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+      del GP
 
-      return result
+      test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WTNS")
+     
+      GP = GrothProver(circuits_folder+pkfile_bin, verification_key_f = circuits_folder+INPUT_VK_F, 
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+      result = GP.proof(witness_wshm_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+
+      del GP
+      
+      test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WSHM")
+      
+      GP = GrothProver(circuits_folder+pkfile_zkey, 
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+      result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+
+      del GP
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WTNS")
+      
+      GP = GrothProver(circuits_folder+pkfile_zkey, 
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+      result = GP.proof(witness_wshm_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+
+      del GP
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WSHM")
+
 
 if __name__ == "__main__":
     result_pkbin = test_cusnarks()
-    test_printResults(result_pkbin, "PKBIN")
 

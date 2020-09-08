@@ -2205,7 +2205,7 @@ uint32_t test_ec2aff(uint32_t ec2)
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
 
  if (ec2){
@@ -2278,7 +2278,7 @@ uint32_t test_ec_jacadd(uint32_t ec2)
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
  void (*jacadd_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t ) = &ec_jacadd_h;
 
@@ -2357,7 +2357,7 @@ uint32_t test_ec_jacaddmixed(uint32_t ec2)
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
  void (*jacaddmixed_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t ) = &ec_jacaddmixed_h;
 
@@ -2437,7 +2437,7 @@ uint32_t test_ec_jacscmul(uint32_t ec2)
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
  void (*jacscmul_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t, uint32_t , uint32_t ) = &ec_jacscmul_h;
 
@@ -2520,7 +2520,7 @@ uint32_t test_ec_jacreduce_opt(uint32_t ec2)
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
 
  if (ec2){
@@ -2627,7 +2627,7 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file, uint32_t com
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64, uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
  void (*inittable_cb)(uint32_t *x, uint32_t *ectable, uint32_t n, uint32_t table_order, uint32_t pidx, uint32_t add_last) = &ec_inittable_h;
  if (ec2) {
@@ -2771,7 +2771,7 @@ uint32_t test_ec_jacdouble(uint32_t ec2)
  uint32_t ec2_offset = 0;
  uint32_t indims = ECP_JAC_INDIMS;
  uint32_t outdims = ECP_JAC_OUTDIMS;
- void (*jac2aff_cb)(uint32_t *, uint32_t *, uint32_t , uint32_t, uint32_t) = &ec_jac2aff_h;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
  int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
  void (*jacdouble_cb)(uint32_t *, uint32_t *, uint32_t ) = &ec_jacdouble_h;
 

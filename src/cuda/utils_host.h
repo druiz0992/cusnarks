@@ -44,6 +44,7 @@ extern "C" void fail_h();
 int shared_new_h(void **shmem, unsigned long long size);
 int shared_get_h(void **shmem, unsigned long long size);
 void shared_free_h(void *shmem, int shmid);
+void shared_detach_h(void *shmem);
 void init_barrier_h(uint32_t nthreads);
 void del_barrier_h();
 

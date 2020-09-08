@@ -44,6 +44,7 @@
 // ------------------------------------------------------------------
 
 """
+
 import json,ast
 import os.path
 import signal
@@ -54,6 +55,7 @@ import logging
 import logging.handlers as handlers
 from multiprocessing import RawArray, Process, Pipe
 from ctypes import c_uint32
+
 
 from zutils import ZUtils
 import random
@@ -68,6 +70,7 @@ import socket
 import sys
 import json_socket
 
+
 sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
 try:
   from pycusnarks import *
@@ -78,6 +81,7 @@ except ImportError:
 sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
 import cusnarks_config as cfg
+
 
 class GrothProver(object):
     
@@ -210,6 +214,7 @@ class GrothProver(object):
         self.verify = 2
         self.stop_client = mp.Value('i',0)
         self.active_client = mp.Value('i',0)
+        self.status_client = mp.Value('i',0)
 
         self.public_signals = None
         self.witness_f = None
@@ -669,6 +674,9 @@ class GrothProver(object):
                             self.pippen_conf))
 
           tt = time.time()-tt
+          if self.stop_client.value :
+             self.logger.info(' Process server Cancelled ... %s',tt)
+             return
           self.logger.info(' Process server - Mexp A Done... %s',tt)
 
           if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
@@ -698,6 +706,9 @@ class GrothProver(object):
                             MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
           tt = time.time()-tt
+          if self.stop_client.value :
+             self.logger.info(' Process server Cancelled ... %s',tt)
+             return
           self.logger.info(' Process server - Mexp B2 Done...%s',tt)
 
           if not self.read_table_en or self.ec_table['woffset_C'] == self.ec_table['woffset_hExps']:
@@ -728,6 +739,9 @@ class GrothProver(object):
                     )
           tt = time.time()-tt
 
+          if self.stop_client.value :
+             self.logger.info(' Process server Cancelled ... %s',tt)
+             return
           self.logger.info(' Process server - Mexp C Done... %s',tt)
 
           if self.zk:
@@ -765,6 +779,10 @@ class GrothProver(object):
             if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
              self.G1_woffset -= self.ec_table['woffset_B1'] 
              self.G1_woffset += self.ec_table['woffset_hExps'] 
+
+            if self.stop_client.value :
+              self.logger.info(' Process server Cancelled ... %s',tt)
+              return
             self.logger.info(' Process server - Mexp B1  Done...%s',tt)
 
           end2 = time.time()
@@ -810,6 +828,9 @@ class GrothProver(object):
                          MOD_FP, 1, 1, 1, self.pippen_conf)
                      )
           tt = time.time()-tt
+          if self.stop_client.value :
+              self.logger.info(' Process server Cancelled ... %s',tt)
+              return
           self.logger.info(' Process server - hExps Mexp common part completed ...%s',tt)
           
         else:
@@ -859,6 +880,7 @@ class GrothProver(object):
            s.bind((jsocket.host,jsocket.port))
            s.listen(1)
            print('Server listening on port ' +str(port) +' ready...')
+           self.status_client.value = 1
            while True: # Accept connections from multiple clients
                conn, addr = s.accept()
                msg = jsocket.receive_message(conn)
@@ -871,7 +893,8 @@ class GrothProver(object):
                     sys.exit(1)
                  elif 'is_alive' in parsed_dict:
                     new_msg = {}
-                    new_msg['status']=1
+                    #new_msg['status']=1
+                    new_msg['status']=self.status_client.value
                     jsocket.send_message(new_msg, conn)
                     conn.close()
                     continue
@@ -879,6 +902,11 @@ class GrothProver(object):
                  elif 'stop_client' in parsed_dict:
                      self.stop_client.value = 1
                      self.logger.info('Stopping client...')
+                     conn.close()
+
+                 elif 'pid' in parsed_dict:
+                     new_msg = {'pid' : os.getpid()}
+                     jsocket.send_message(new_msg, conn)
                      conn.close()
 
                  elif 'status' in parsed_dict:
@@ -889,7 +917,25 @@ class GrothProver(object):
 
                  elif 'list' in parsed_dict:
                      if len(self.proof_repo) > int(parsed_dict['list']):
-                       new_msg = dict(self.proof_repo[int(parsed_dict['list'])])
+                       if len(self.proof_repo):
+                         new_msg = dict(self.proof_repo[int(parsed_dict['list'])])
+                       else :
+                         new_msg = {
+                              'witness_f' : "",
+                              'proof_f' : "",
+                              'public_data_f' : "",
+                              'verify_en' : 0,
+                              'proof_id' : -1,
+                              'result' : 2,
+                              'Init' : [ 0.0, 0.0],
+                              'Read_W' : [ 0.0, 0.0],
+                              'Eval' : [ 0.0, 0.0],
+                              'Mexp' : [ 0.0, 0.0],
+                              'Mexp1' : [ 0.0, 0.0],
+                              'Mexp2' : [ 0.0, 0.0],
+                              'H' : [ 0.0, 0.0],
+                              'Proof' : 0.0,
+                             }
                        jsocket.send_message(new_msg, conn)
                      elif int(parsed_dict['list']) == -1:
                        new_msg = dict(self.proof_repo[int(parsed_dict['list'][-1])])
@@ -906,7 +952,15 @@ class GrothProver(object):
                               'public_data_f' : parsed_dict['public_data_f'],
                               'verify_en' : parsed_dict['verify_en'],
                               'proof_id' : self.proof_id,
-                              'result' : -1
+                              'result' : -1,
+                              'Init' : [ 0.0, 0.0],
+                              'Read_W' : [ 0.0, 0.0],
+                              'Eval' : [ 0.0, 0.0],
+                              'Mexp' : [ 0.0, 0.0],
+                              'Mexp1' : [ 0.0, 0.0],
+                              'Mexp2' : [ 0.0, 0.0],
+                              'H' : [ 0.0, 0.0],
+                              'Proof' : 0.0,
                              }
                         self.proof_id+=1
                         self.logger.info('Request for new proof received in primary server')
@@ -1050,9 +1104,7 @@ class GrothProver(object):
                 readWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
 
            elif self.witness_f.endswith('.wshm'):
-             np.copyto(
-                self.scl_array[:nVars],
-                readSharedMWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
+             readSharedMWtnsFile_h(np.reshape(self.scl_array,-1),self.witness_f.encode("UTF-8"), nVars )
 
            else:
              np.copyto(
@@ -1116,8 +1168,7 @@ class GrothProver(object):
        self.logger.info('')
 
     def logTimeResults(self):
-    
-      self.t_GP['init'] = [round(self.t_GP['init'],4), round(100*self.t_GP['init']/self.t_GP['Proof'],2)] 
+      self.t_GP['Init'] = [round(self.t_GP['Init'],4), round(100*self.t_GP['Init']/self.t_GP['Proof'],2)] 
       self.t_GP['Read_W'] = [round(self.t_GP['Read_W'],4), round(100*self.t_GP['Read_W']/self.t_GP['Proof'],2)] 
       self.t_GP['Mexp'] = self.t_GP['Mexp1'] + self.t_GP['Mexp2']
       self.t_GP['Mexp'] = [round(self.t_GP['Mexp'],4), round(100*self.t_GP['Mexp']/self.t_GP['Proof'],2)] 
@@ -1131,7 +1182,7 @@ class GrothProver(object):
       self.logger.info('#################################### ')
       self.logger.info('Total Time to generate proof : %s seconds', self.t_GP['Proof'])
       self.logger.info('')
-      self.logger.info('------ Initialization          : %s ', str(self.t_GP['init'][0]) + ' sec. (' + str(self.t_GP['init'][1]) + ' %)')
+      self.logger.info('------ Initialization          : %s ', str(self.t_GP['Init'][0]) + ' sec. (' + str(self.t_GP['Init'][1]) + ' %)')
       self.logger.info('------ Time Read Witness       : %s ', str(self.t_GP['Read_W'][0]) + ' sec. (' + str(self.t_GP['Read_W'][1]) + ' %)')
       self.logger.info('------ Time Multi-exp          : %s ', str(self.t_GP['Mexp'][0]) + ' sec.(' + str(self.t_GP['Mexp'][1]) + ' %)')
       self.logger.info('------ * Time Multi-exp 1      : %s ', str(self.t_GP['Mexp1'][0]) + ' sec.(' + str(self.t_GP['Mexp1'][1]) + ' %)')
@@ -1161,6 +1212,7 @@ class GrothProver(object):
       if self.active_client.value :
           return
       self.active_client.value = 1
+      self.status_client.value = 2
 
       if (self.verify_en):
         self.verify = 0
@@ -1182,18 +1234,28 @@ class GrothProver(object):
       self.logger.info('')
       self.logger.info('')
 
-      self.t_GP['init'] = time.time() - start
+      self.t_GP['Init'] = time.time() - start
       ##### Starting proof
 
       # Proof fails for internal reasons
       if self.gen_proof() == 0:
          self.verify = -3
+         self.t_GP['Init'] = [0,0]
          self.active_client.value = 0
+         self.status_client.value = 1
          return self.verify
       
       if self.stop_client.value:
           self.active_client.value = 0
           self.verify = -2
+          self.status_client.value = 1
+          self.t_GP['Init'] = [0,0]
+          self.t_GP['Read_W'] = [0,0]
+          self.t_GP['Mexp'] = [0,0]
+          self.t_GP['Mexp1'] = [0,0]
+          self.t_GP['Mexp2'] = [0,0]
+          self.t_GP['Eval'] = [0,0]
+          self.t_GP['H'] = [0,0]
           return self.verify
 
       self.t_GP['Proof'] = time.time() - start
@@ -1215,6 +1277,7 @@ class GrothProver(object):
       #copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
 
       self.active_client.value = 0
+      self.status_client.value = 1
       return self.verify
 
     def test_results(self):
@@ -1368,10 +1431,15 @@ class GrothProver(object):
         self.logger.info(' Reading Witness...')
         if self.read_witness_data() == 0:
            return 0
-
         end = time.time()
+        self.t_GP['Init'] = 0
         self.t_GP['Read_W'] = end - start
         self.t_GP['Eval'] = 0
+        self.t_GP['Mexp'] = 0
+        self.t_GP['Mexp1'] = 0
+        self.t_GP['Mexp2'] = 0
+        self.t_GP['H'] = 0
+        self.t_GP['Proof'] = 0
        
         start = time.time()
         if self.p_CPU is not None:
@@ -1484,6 +1552,9 @@ class GrothProver(object):
         #  P3 - Poly Eval
         #  P4 - Poly Operations
         ######################
+        if self.stop_client.value :
+              self.logger.info(' Stopping tests...')
+              return 1
 
         # Retrieve Poly Eval Results
         if self.compute_last_mexp_gpu:
@@ -1790,6 +1861,8 @@ class GrothProver(object):
           return used_streams
 
     def write_pdata(self):
+        if self.public_signals is None :
+            return
         if self.out_public_f.endswith('.json'):
            # Write public file
            ZField.set_field(MOD_FR)

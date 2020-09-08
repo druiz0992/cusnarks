@@ -621,7 +621,7 @@ void readWtnsFile_h(uint32_t *samples, unsigned long long nElems,  unsigned long
   fclose(ifp);
 }
 
-uint32_t *readSharedMWtnsFile_h(unsigned long long nElems, const char *filename)
+uint32_t *readSharedMWtnsFile_h(uint32_t *samples_out, unsigned long long nElems, const char *filename)
 {
   uint32_t *samples;
   int32_t status;
@@ -644,6 +644,9 @@ uint32_t *readSharedMWtnsFile_h(unsigned long long nElems, const char *filename)
   }
 
   fclose(ifp);
+  memcpy(samples_out, samples, nElems*NWORDS_FR*sizeof(uint32_t));
+  shared_detach_h(samples);
+  
   return samples;
 }
 
