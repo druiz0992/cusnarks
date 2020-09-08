@@ -1070,7 +1070,7 @@ class GrothSetup(object):
     def timeStats(self, t):
       for s in t:
         for k, v in s.items():
-           if k is not 'total':
+           if k != 'total':
              s[k] = str(round(v,2)) + '(' + str(round(100*v/s['total'],2)) + '%)'
 
     def logTimeResults(self):

@@ -199,6 +199,10 @@ int shared_new_h(void **shmem, unsigned long long size)
   return shmid;
 }
 
+void shared_detach_h(void *shmem)
+{
+   shmdt(shmem);
+}
 /*
   Destroy Shared Memory Buffer 
   

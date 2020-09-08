@@ -216,6 +216,10 @@ def init():
     parser.add_argument(
        '-stop_client', '--stop_client', required=False)  
 
+    help_str = 'Get Pid' 
+    parser.add_argument(
+       '-pid', '--pid', required=False)  
+
     help_str = 'Is proof server alive' 
     parser.add_argument(
        '-alive', '--is_alive', required=False)  
@@ -290,7 +294,6 @@ def run(opt, parser):
           query = { 'stop_server' : 1 }
           jsocket = jsonSocket(port = PORT)
           result = jsocket.send_message(query)
-          print("Stopping proof server")
       return
 
     if args.stop_client is not None :
@@ -298,17 +301,25 @@ def run(opt, parser):
           query = { 'stop_client' : 1 }
           jsocket = jsonSocket()
           result = jsocket.send_message(query)
-          print("Stopping proof client")
+      return
+
+    if args.pid is not None :
+      if is_port_in_use(PORT):
+          query = { 'pid' : 1 }
+          jsocket = jsonSocket()
+          result = jsocket.send_message(query)
+          print(result)
       return
 
     if args.is_alive is not None :
-      if is_port_in_use(PORT2):
+      if is_port_in_use(PORT):
           query = { 'is_alive' : 1 }
-          jsocket = jsonSocket(port = PORT2)
+          jsocket = jsonSocket(port = PORT)
           result = jsocket.send_message(query)
           print(result)
           return 1
       else: 
+        print("{\"status\": 0}")
         return 0
 
     if args.list is not None:
@@ -362,7 +373,7 @@ def run(opt, parser):
     if args.snarkjs is not None:
          opt['snarkjs'] = args.snarkjs
 
-    if args.debug is 0 or args.debug is None:
+    if args.debug == 0 or args.debug is None:
          opt['debug_f'] = None
     else:
          opt['debug_f'] = opt['debug_f']
