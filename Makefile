@@ -64,10 +64,10 @@ SNARKJS_PATH = $(AUX_PATH)/snarkjs
 SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
 
 RUST_CIRCOM_PATH = $(AUX_PATH)/za
-RUST_CIRCOM_REPO = http://github.com/iden3/za.git
+RUST_CIRCOM_REPO = https://github.com/iden3/za.git
 
 FFIASM_PATH = $(AUX_PATH)/ffiasm
-FFIASM_REPO = http://github.com/iden3/ffiasm.git
+FFIASM_REPO = https://github.com/iden3/ffiasm.git
 
 CUSNARKS_LIB = libcusnarks.so
 CUBIN_NAME = cusnarks.cubin
@@ -78,6 +78,7 @@ dirs= $(CUSRC_PATH) \
 aux_cdirs  = $(PCG_PATH) 
 aux_jsdirs = $(SNARKJS_PATH) \
              $(FFIASM_PATH)
+
 aux_rdirs  = $(RUST_CIRCOM_PATH)
 
 test_dirs = $(CTEST_PATH) \
@@ -86,8 +87,7 @@ test_dirs = $(CTEST_PATH) \
 
 aux_repos = $(PCG_REPO) \
             $(SNARKJS_REPO) \
-            $(FFIASM_REPO) \
-            $(RUST_CIRCOM_REPO)
+            $(FFIASM_REPO) 
 
 config_dirs = $(CONFIG_PATH)
 
@@ -147,7 +147,9 @@ build:
 		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
 
 
-all: third_party_libs config
+all: reduced_third_party_libs third_party_libs config
+
+docker_all: reduced_third_party_libs config_docker
 
 force_all: clean third_party_libs_clean all
 
@@ -183,15 +185,32 @@ endif
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
 
+config_docker:  
+ifeq ($(CUSNARKS_CURVE),"") 
+	     read -p "Enter Curve <BN256 | BLS12381> " CURVE; \
+	     (cd ${CUSRC_PATH}; ./ff.sh $$CURVE; cd -;) 
+else
+	     (cd ${CUSRC_PATH}; ./ff.sh $(CUSNARKS_CURVE); cd -;) 
+endif
+	make clean_docker build 
+	@for i in $(CONFIG_SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
+
 clean:
-	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(SCRIPTS_SUBDIRS) $(CTEST_IDEAS_PATH); do \
+	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(CTEST_IDEAS_PATH); do \
+	echo "clearing all in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
+
+clean_docker:
+	@for i in $(SUBDIRS); do \
 	echo "clearing all in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
 
 cubin:
 	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
 
-third_party_libs:
+reduced_third_party_libs:
 	echo "checking third pary libs...";
 	if ! test -d $(AUX_PATH); \
 		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done;  fi
@@ -199,8 +218,15 @@ third_party_libs:
 		(cd $$i; $(MAKE)); done
 	@for i in $(AUX_JSSUBDIRS); do \
 		(cd $$i; $(NPM)); done
+
+third_party_libs:
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
 	@for i in $(AUX_RSUBDIRS); do \
 		(cd $$i; $(CARGO)); done
+
+
 
 clib:
 	echo "checking third pary libs...";
@@ -219,5 +245,5 @@ clib:
 third_party_libs_clean:
 	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
 
-.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_unit test_system clib debug_gpu
+.PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_unit test_system clib debug_gpu docker_all reduced_third_party_libs config_docker clean_docker
 

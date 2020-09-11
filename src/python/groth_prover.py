@@ -249,12 +249,12 @@ class GrothProver(object):
         self.logger.info('Initializing memories...')
 
         if self.proving_key_f.endswith('.zkey'):
-          self.logger.info("Regenerating verif key")
+          self.logger.info("Regenerating verification key")
           #generate verification_key
           self.launch_snarkjs("verification_key")
 
           #generate pkbin
-          out_fname = self.proving_key_f[:-5]+".bin"
+          out_fname = self.proving_key_f[:-5]+"_zkey.bin"
           zKeyToPkFile_h(out_fname.encode("UTF-8"),self.proving_key_f.encode("UTF-8"))
           self.proving_key_f = out_fname
           self.pkbin_mode = 1
@@ -1270,8 +1270,11 @@ class GrothProver(object):
         self.pk =  pkbin_to_vars(self.pk_short)
         del self.pk_short
 
+      self.logger.info(" Writing PData to %s", self.out_public_f)
       self.write_pdata()
+      self.logger.info(" Writing Proof to %s", self.out_public_f)
       self.write_proof()
+      self.logger.info(" Testing Proof")
       self.test_results()
 
       #copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
