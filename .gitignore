@@ -64,3 +64,5 @@ circuits/*
 *_ff*
 *.casm
 src/cuda/constants.cpp
+*.ptau
+*.dat

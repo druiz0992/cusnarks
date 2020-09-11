@@ -37,7 +37,11 @@ fi
 cp ../../../src/cuda/fr.casm .
 nasm -felf64 fr.casm
 
-
+shmem=$( ipcs -m | grep 1e240 | awk '{print $5}')
+if [ ! $shmem ]; then
+  ipcrm -M 0x0001e240
+fi
+   
 g++ -std=c++11 calcwit.cpp main.cpp utils.cpp fr.c fr.o test_circom.cpp fail.cpp -DADX_DEF=$ADX_DEF -o ./wit_calc -lpthread -lgmp
 
 mem=$(ipcs -m | grep 0x0001e240)
@@ -49,10 +53,10 @@ mv test_circom.dat wit_calc.dat
 ./wit_calc test_circom_input.json test_circom_w.wtns
 ./wit_calc test_circom_input.json test_circom_w.wshm
 
-mv circuit.r1cs ../../../circuits/test_circuit_c.r1cs
-mv test_circom_w.wtns ../../../circuits/test_circuit_w.wtns
-mv test_circom_w.wshm ../../../circuits/test_circuit_w.wshm
+mv circuit.r1cs ../../../circuits/test_circom_c.r1cs
+mv test_circom_w.wtns ../../../circuits/test_circom_w.wtns
+mv test_circom_w.wshm ../../../circuits/test_circom_w.wshm
 mv circuit_final.zkey ../../../circuits/test_circom_pk.zkey
 
 
-rm wit_calc* *.o *.casm
+rm wit_calc *.o *.casm
