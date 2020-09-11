@@ -67,3 +67,5 @@ src/cuda/constants.cpp
 *.ptau
 *.dat
 *.sym
+test/python/aux_data/witness_calc
+test/python/aux_data/test_gocusnarks.cpp

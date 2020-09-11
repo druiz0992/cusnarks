@@ -1239,7 +1239,7 @@ class GrothProver(object):
 
       # Proof fails for internal reasons
       if self.gen_proof() == 0:
-         self.verify = -3
+         self.verify = -2
          self.t_GP['Init'] = [0,0]
          self.active_client.value = 0
          self.status_client.value = 1
