@@ -66,3 +66,4 @@ circuits/*
 src/cuda/constants.cpp
 *.ptau
 *.dat
+*.sym
