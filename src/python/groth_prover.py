@@ -1272,7 +1272,7 @@ class GrothProver(object):
 
       self.logger.info(" Writing PData to %s", self.out_public_f)
       self.write_pdata()
-      self.logger.info(" Writing Proof to %s", self.out_public_f)
+      self.logger.info(" Writing Proof to %s", self.out_proof_f)
       self.write_proof()
       self.logger.info(" Testing Proof")
       self.test_results()
