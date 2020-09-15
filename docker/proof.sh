@@ -1,5 +1,7 @@
 #!/bin/bash 
 
+# Launches proof
+
 export CIRCUITS_PATH=/usr/src/app/circuits
 WIT_FILE=${CIRCUITS_PATH}/$1
 PROOF_FILE=${CIRCUITS_PATH}/$2
