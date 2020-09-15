@@ -1,5 +1,7 @@
 #!/bin/bash 
 
+# Starts Go-Cusnarks server
+
 cd /usr/src/app/go-cusnarks
 
 #Generate Cuf Files

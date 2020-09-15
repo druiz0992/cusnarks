@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Creates cusnarks docker
+
 # TODO : as input params, i should pass :
 # 1 : Recompute docker struct -> 1
 # 2 : Number of roots
@@ -43,12 +45,12 @@ if [[ $1 = 1 ]]; then
   #cp -R ../cusnarks/third_party_libs/ffiasm ./docker/third_party_libs
   #cp -R ../cusnarks/third_party_libs/pcg-cpp ./docker/third_party_libs
   
-  cp ../cusnarks/circuits/test_circom_c.r1cs ./docker/circuits
-  cp ../cusnarks/circuits/test_circom_pk.zkey ./docker/circuits
-  cp ../cusnarks/circuits/test_circom_w.wtns ./docker/circuits
-  cp ../cusnarks/circuits/test_circom_w.wshm ./docker/circuits
-  cp ../cusnarks/circuits/test_circom_pk.bin  ./docker/circuits
-  cp ../cusnarks/circuits/test_circom_vk.json  ./docker/circuits
+  cp ../cusnarks/docker/auxdata/test_circom_c.r1cs ./docker/circuits
+  cp ../cusnarks/docker/auxdata/test_circom_pk.zkey ./docker/circuits
+  cp ../cusnarks/docker/auxdata/test_circom_w.wtns ./docker/circuits
+  cp ../cusnarks/docker/auxdata/test_circom_w.wshm ./docker/circuits
+  cp ../cusnarks/docker/auxdata/test_circom_pk.bin  ./docker/circuits
+  cp ../cusnarks/docker/auxdata/test_circom_vk.json  ./docker/circuits
 
   cp ../cusnarks/circuits/_PROVER/taillog.sh  ./docker/cusnarks/circuits/_PROVER
   cp ../cusnarks/circuits/_PROVER/catlog.sh  ./docker/cusnarks/circuits/_PROVER
@@ -58,4 +60,4 @@ if [[ $1 = 1 ]]; then
   git clone https://github.com/iden3/go-cusnarks.git
 fi
 
-sudo docker build --build-arg NVARS=$2 --build-arg WORKDIR -t cusnarks:1.0 .
+sudo docker build --build-arg NVARS=$2 -t cusnarks:1.0 .
