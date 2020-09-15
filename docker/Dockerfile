@@ -1,0 +1,79 @@
+FROM nvidia/cuda:10.2-cudnn7-devel as build_stage
+
+ARG NVARS
+ARG DOCKDIR
+
+ENV LD_LIBRARY_PATH=/usr/src/app/cusnarks/lib:$LD_LIBRARY_PATH
+ENV CUSNARKS_PATH /usr/src/app/cusnarks
+ENV CUSNARKS_NROOTS $NVARS
+ENV CUSNARKS_CURVE BN256
+
+WORKDIR /usr/src/app
+
+RUN mkdir -p cusnarks
+COPY cusnarks ./cusnarks
+
+#RUN mkdir -p third_party_libs
+#COPY third_party_libs ./third_party_libs
+
+WORKDIR /usr/src/app/cusnarks
+
+RUN apt-get update && \
+    apt-get install -y git curl build-essential libssl-dev clang libomp-dev g++ nasm python3 python3-pip && \
+    curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
+    apt-get -yq install nodejs && \
+    npm i -g circom snarkjs && \
+    pip3 install Cython numpy future nvgpu && \
+    sh -s -- --default-toolchain stable -y && \
+    make docker_all
+
+FROM nvidia/cuda:10.2-base
+
+ENV LD_LIBRARY_PATH=/usr/src/app/cusnarks/lib:$LD_LIBRARY_PATH
+ENV CUSNARKS_PATH /usr/src/app/cusnarks
+ENV CUSNARKS_NROOTS $NVARS
+ENV CUSNARKS_CURVE BN256
+#ENV WITNESS_EXTENSION wtns
+#ENV PROVING_KEY_EXTENSION bin
+#ENV CONSTRAINTS_EXTENSION r1cs
+
+
+WORKDIR /usr/src/app
+
+COPY --from=build_stage /usr/src/app /usr/src/app
+
+RUN apt-get update && \
+    apt-get install -y git curl build-essential libssl-dev clang libomp-dev g++ nasm python3 python3-pip sudo libgmp3-dev nlohmann-json-dev vim && \
+    curl -O https://dl.google.com/go/go1.15.1.linux-amd64.tar.gz && \
+    tar xvf go1.15.1.linux-amd64.tar.gz -C . && \
+    mv ./go /usr/local && \
+    ln -s /usr/local/go/bin/go /usr/local/bin/go && \
+    curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
+    apt-get -yq install nodejs && \
+    #npm i -g ffiasm@0.1.1 circom@0.5.23 snarkjs@0.3.25 && \
+    npm i -g circom@0.5.23 snarkjs@0.3.25 && \
+    pip3 install Cython numpy future nvgpu 
+
+RUN rm -rf go1.15.1.linux-amd64.tar.gz
+
+COPY entrypoint.sh /usr/local/bin/entrypoint
+COPY proof.sh /usr/local/bin/proof
+COPY launch_server.sh /usr/local/bin/launch_server
+COPY stop.sh /usr/local/bin/stop
+#COPY verify.sh /usr/local/bin/verify
+
+
+#COPY circuits/* ./cusnarks/circuits/
+
+RUN mkdir -p go-cusnarks
+COPY go-cusnarks ./go-cusnarks
+
+WORKDIR /usr/src/app/go-cusnarks
+
+RUN go build -o gocusnarks .
+
+COPY server_config.yaml .
+
+WORKDIR /usr/src/app
+
+ENTRYPOINT ["entrypoint"]
