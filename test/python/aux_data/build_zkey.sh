@@ -38,11 +38,11 @@ cp ../../../src/cuda/fr.casm .
 nasm -felf64 fr.casm
 
 shmem=$( ipcs -m | grep 1e240 | awk '{print $5}')
-if [ ! $shmem ]; then
+if [ $shmem ]; then
   ipcrm -M 0x0001e240
 fi
    
-g++ -std=c++11 calcwit.cpp main.cpp utils.cpp fr.c fr.o test_circom.cpp fail.cpp -DADX_DEF=$ADX_DEF -o ./wit_calc -lpthread -lgmp
+g++ -std=c++11 calcwit.cpp main.cpp utils.cpp fr.c fr.o test_circom.cpp fail.cpp -DADX_DEF=0 -o ./wit_calc -lpthread -lgmp
 
 mem=$(ipcs -m | grep 0x0001e240)
 if [ "$mem" ]; then
