@@ -9,6 +9,10 @@ if [ "$shmem" ]; then
 	ipcrm -M 0x0001e240 
 fi
 
+cd ${HERMEZ}/circuits
+tar -xvzf hermez_pk.tgz
+cd -
+
 cp ${HERMEZ}/runtime/hermez_witbuild.dat .
 ./hermez_witbuild ${HERMEZ}/runtime/hermez_input.json hermez.wtns
 ./hermez_witbuild ${HERMEZ}/runtime/hermez_input.json hermez.wshm
