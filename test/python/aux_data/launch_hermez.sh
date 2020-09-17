@@ -10,14 +10,14 @@ if [ "$shmem" ]; then
 fi
 
 cd ${HERMEZ}/circuits
-tar -xvzf hermez_pk.tgz
-cd -
+tar -xvzf hermez_pk.tgz >  /dev/null
+cd - > /dev/null
 
 cp ${HERMEZ}/runtime/hermez_witbuild.dat .
-./hermez_witbuild ${HERMEZ}/runtime/hermez_input.json hermez.wtns
-./hermez_witbuild ${HERMEZ}/runtime/hermez_input.json hermez.wshm
-
-cp ${HERMEZ}/circuits/hermez* ../../../circuits
+./hermez_witbuild ${HERMEZ}/runtime/hermez_input.json hermez_w.wtns
+./hermez_witbuild ${HERMEZ}/runtime/hermez_input.json hermez_w.wshm
+cp ${HERMEZ}/circuits/hermez_pk.zkey ../../../circuits
+mv hermez_w.* ../../../circuits
 
 
 rm hermez_witbuild* 
