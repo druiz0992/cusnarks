@@ -283,9 +283,13 @@ class GrothProver(object):
           self.write_tables(all_tables=self.table_type)
 
         # scl_array
+        """
         witLen = domainSize + 8
         if self.pkbin_mode == 1:
           witLen = 2 * domainSize + 8
+        #witLen = self.nVars  
+        """
+        witLen = max(self.nVars, domainSize + 8 )
         self.scl_array_sh = RawArray(c_uint32, witLen * NWORDS_256BIT)     
         self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((witLen, NWORDS_256BIT))
@@ -656,6 +660,7 @@ class GrothProver(object):
             total_words = self.ec_table['woffset_B2'] - self.G1_woffset
             table_f = self.read_table_f
           tt = time.time()
+
           np.copyto(self.pi_a_eccf1,
                     ec_jacreduce_h(
                             np.reshape( 
@@ -705,6 +710,7 @@ class GrothProver(object):
                             1,
                             MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
+
           tt = time.time()-tt
           if self.stop_client.value :
              self.logger.info(' Process server Cancelled ... %s',tt)
@@ -757,6 +763,7 @@ class GrothProver(object):
                table_f = self.read_table_f
 
             tt = time.time()
+
             np.copyto(self.pi_b1_eccf1,
                     ec_jacreduce_h(
                          np.reshape(
@@ -802,7 +809,6 @@ class GrothProver(object):
                                       polH,
                                      [self.neg_rs_scl]
                                     )),-1)
-
           if not self.read_table_en or self.ec_table['woffset_hExps'] == self.ec_table['nwords_tdata']:
             EP_vector =  np.concatenate((
                                   pk_bin[4][:(m-1)*NWORDS_256BIT*ECP_JAC_INDIMS],
@@ -1928,8 +1934,11 @@ class GrothProver(object):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
         reduce_coeff = 0
-        egs = 1 << 17
-        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, int((m + egs-1)/egs) , pidx)
+        #egs = 1 << 17
+        #polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, int((m + egs-1)/egs) , pidx)
+        # Set 1 thread only as i cannot fix race conditions otherwise. Not too damaging since we will use zkey mechanism which
+        # allow parallellism
+        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, 1 , pidx)
         return polX_T
     
     def evalPolys(self, w, pA, m, pidx):

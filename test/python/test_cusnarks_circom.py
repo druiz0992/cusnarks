@@ -59,15 +59,20 @@ from termcolor import colored
 INPUT_R1CS_F = "test_circom_c.r1cs"
 INPUT_PKBIN_F      = "test_circom_pk.bin"
 INPUT_PKZKEY_F      = "test_circom_pk.zkey"
+INPUT_HERMEZ_PKZKEY_F      = "hermez_pk.zkey"
 INPUT_VK_F      = "test_circom_vk.json"
 OUTPUT_P_F      = "test_circom_p.json"
 OUTPUT_PD_F      = "test_circom_pd.json"
+OUTPUT_HERMEZP_F      = "hermez_p.json"
+OUTPUT_HERMEZPD_F      = "hermez_pd.json"
 
 
 INPUT_CIRCUIT_F = "test_circom.cir"
 INPUT_DATA_F = "test_circom_input.json"
 WITNESS_WTNS_F = "test_circom_w.wtns"
 WITNESS_WSHM_F = "test_circom_w.wshm"
+WITNESS_HERMEZ_WTNS_F = "hermez_w.wtns"
+WITNESS_HERMEZ_WSHM_F = "hermez_w.wshm"
 
 
 def test_printResults(result,ftype):
@@ -86,12 +91,15 @@ def test_cusnarks():
       cusnarks_folder = cfg.get_cusnarks_folder()+"test/python"
       witness_wtns_f = circuits_folder+ WITNESS_WTNS_F
       witness_wshm_f = circuits_folder+ WITNESS_WSHM_F
+      witness_hermez_wtns_f = circuits_folder+ WITNESS_HERMEZ_WTNS_F
+      witness_hermez_wshm_f = circuits_folder+ WITNESS_HERMEZ_WSHM_F
   
       os.chdir(cusnarks_folder+"/aux_data")
 
-      print("Compiling Circuit...\n")
+      print("Compiling Circuit and runinning TS with Snarkjs...\n")
 
       call(["./build_zkey.sh", "12"])
+      call(["./launch_circom.sh"])
   
       snarkjs_folder = cfg.get_snarkjs_folder()
  
@@ -99,13 +107,15 @@ def test_cusnarks():
 
       pkfile_bin=INPUT_PKBIN_F
       pkfile_zkey=INPUT_PKZKEY_F
+      pkfile_hermez_zkey=INPUT_HERMEZ_PKZKEY_F
+      
       
       if os.path.exists(circuits_folder+pkfile_bin):
          os.remove(circuits_folder+pkfile_bin)
       if os.path.exists(circuits_folder+INPUT_VK_F):
          os.remove(circuits_folder+INPUT_VK_F)
 
-      print("Launching Setup .....\n")
+      print("Launching Setup with Cusnarks.....\n")
       GS = GrothSetup(in_circuit_f = circuits_folder+INPUT_R1CS_F, out_pk_f=circuits_folder+pkfile_bin,
                       out_vk_f=circuits_folder+INPUT_VK_F, keep_f=circuits_folder, 
                       snarkjs=snarkjs_folder, seed=123)
@@ -140,6 +150,7 @@ def test_cusnarks():
          os.remove(circuits_folder+OUTPUT_PD_F)
       if os.path.exists(circuits_folder+OUTPUT_P_F):
          os.remove(circuits_folder+OUTPUT_P_F)
+      
       GP = GrothProver(circuits_folder+pkfile_zkey, 
                        start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
       result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
@@ -158,6 +169,32 @@ def test_cusnarks():
       del GP
       test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WSHM")
 
+      os.chdir(cusnarks_folder+"/aux_data")
+      call(["./launch_hermez.sh"])
+      os.chdir(cusnarks_folder)
+
+      if os.path.exists(circuits_folder+OUTPUT_HERMEZPD_F):
+         os.remove(circuits_folder+OUTPUT_HERMEZPD_F)
+      if os.path.exists(circuits_folder+OUTPUT_HERMEZP_F):
+         os.remove(circuits_folder+OUTPUT_HERMEZP_F)
+      
+      GP = GrothProver(circuits_folder+pkfile_hermez_zkey, 
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+      result = GP.proof(witness_hermez_wtns_f, circuits_folder+OUTPUT_HERMEZP_F, circuits_folder+OUTPUT_HERMEZPD_F, verify_en=1)
+
+      del GP
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WTNS")
+      
+      if os.path.exists(circuits_folder+OUTPUT_HERMEZPD_F):
+         os.remove(circuits_folder+OUTPUT_HERMEZPD_F)
+      if os.path.exists(circuits_folder+OUTPUT_HERMEZP_F):
+         os.remove(circuits_folder+OUTPUT_HERMEZP_F)
+      GP = GrothProver(circuits_folder+pkfile_hermez_zkey, 
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+      result = GP.proof(witness_hermez_wshm_f, circuits_folder+OUTPUT_HERMEZP_F, circuits_folder+OUTPUT_HERMEZPD_F, verify_en=1)
+
+      del GP
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WSHM")
 
 if __name__ == "__main__":
     result_pkbin = test_cusnarks()

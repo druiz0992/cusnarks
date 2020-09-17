@@ -6,11 +6,11 @@ proofservice:
   loopinterval: 5
 proverparams:
   cusnarkspath: "/usr/src/app/cusnarks"
-  circompath :  "/usr/src/app/cusnarks/circom_runtime"
-  filepath   : "/usr/src/app/circuits"
+  #circompath :  "/usr/src/app/cusnarks/circom_runtime"
+  #filepath   : "/usr/src/app/circuits"
   cufiledescriptor :
      circuitcpp :  "test_circom.cpp"
-     circuitdat :  "witness_calc.dat"
+     circuitdat :  "test_circom_witbuild.dat"
      inputsfile:   "test_circom_input.json"
      pkfile   : "test_circom_pk.bin"
      vkfile   : "test_circom_vk.json"

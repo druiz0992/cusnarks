@@ -31,8 +31,8 @@ fi
 cd third_party_libs
 
 if [ ! -d "ffiasm" ]; then
-  echo "clone ffiasm repo"
-  git clone https://github.com/iden3/ffiasm.git
+   echo "clone ffiasm repo"
+   git clone https://github.com/iden3/ffiasm.git
 fi
 
 cd ffiasm;
@@ -42,6 +42,9 @@ echo ${ADX_SUPPORT}
 if [ -z $ADX_SUPPORT ]; then 
     echo "system does not support adx"
     git checkout cdabe2242a9bd1dc61285fec918f9e7cd610d7ef;
+else
+    echo "system does support adx"
+    #git checkout af581d6f0f78d8ac9256b556512f69501d59c368;
 fi
 
 npm i;
@@ -121,6 +124,8 @@ echo "${DEF}" > .curve_tmp
 cd -
 ../src/buildzqfield.js -q ${FR} -n Fr;
 ../src/buildzqfield.js -q ${FP} -n Fp;
+
+cp fr.* ../../circom_runtime/c 
 
 add_correct_labels "fr.asm"
 add_correct_labels "fp.asm"

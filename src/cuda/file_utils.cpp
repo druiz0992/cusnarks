@@ -749,12 +749,14 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
   // Section 7 B2
   buffer = readZKeySection_h(&zkey, ZKEY_HDR_SECTION_7, zkey_filename);
   for (t_uint64 i=0; i < zkey.section_len[ZKEY_HDR_SECTION_7]/(NWORDS_FP * sizeof(uint32_t) * 4) ; i++){
-     if (equBI_h(&buffer[i*2*NWORDS_FP], zero, NWORDS_FP) && 
-        (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP)) &&
-        (equBI_h(&buffer[i*2*NWORDS_FP+2*NWORDS_FP], zero, NWORDS_FP) && 
-        (equBI_h(&buffer[i*2*NWORDS_FP+3*NWORDS_FP], zero, NWORDS_FP)))) {
-        memcpy(&buffer[i*2*NWORDS_FP],EC2Inf, 4*NWORDS_FP*sizeof(uint32_t));
+	  
+     if (equBI_h(&buffer[i*4*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*4*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP)) &&
+        (equBI_h(&buffer[i*4*NWORDS_FP+2*NWORDS_FP], zero, NWORDS_FP) && 
+        (equBI_h(&buffer[i*4*NWORDS_FP+3*NWORDS_FP], zero, NWORDS_FP)))) {
+        memcpy(&buffer[i*4*NWORDS_FP],EC2Inf, 4*NWORDS_FP*sizeof(uint32_t));
      }
+     
   }
   fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_7]/sizeof(uint32_t), ofp); 
   //  beta2
@@ -770,7 +772,6 @@ void zKeyToPkFile_h(const char *pkbin_filename, const char *zkey_filename)
         (equBI_h(&buffer[i*2*NWORDS_FP+NWORDS_FP], zero, NWORDS_FP))) {
         memcpy(&buffer[i*2*NWORDS_FP],ECInf, 2*NWORDS_FP*sizeof(uint32_t));
      }
-
   }
   fwrite(buffer, sizeof(uint32_t), zkey.section_len[ZKEY_HDR_SECTION_8]/sizeof(uint32_t), ofp); 
   free(buffer);

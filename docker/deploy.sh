@@ -1,3 +1,8 @@
 #!/bin/bash 
 
-sudo docker run  --rm  -d -ti -p 3000:3000 -p 3001:3001 --name=docker_cusnarks4 -v /home/david/iden3/cusnarks/docker/circuits:/usr/src/app/circuits cusnarks:1.0
+if [ -z $1 ]; then
+   echo "Usage: ./deploy.sh <path to local directory that mapps into cusnarksdata in docker>"
+   exit
+fi
+
+sudo docker run  --gpus all --rm  -d -ti -p 3000:3000 -p 3001:3001 --name=cusnarks -v $1:/usr/src/app/cusnarksdata cusnarks:latest

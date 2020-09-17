@@ -502,7 +502,7 @@ def run(opt, parser):
              if os.path.isfile(opt['witness_f']) :
                  GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'])
              else :
-                print('Witness file %s doesn\'t exist', self.witness_f)
+                print('Witness file %s doesn\'t exist', opt['witness_f'])
            
                       
 

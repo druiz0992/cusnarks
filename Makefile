@@ -69,6 +69,9 @@ RUST_CIRCOM_REPO = https://github.com/iden3/za.git
 FFIASM_PATH = $(AUX_PATH)/ffiasm
 FFIASM_REPO = https://github.com/iden3/ffiasm.git
 
+CIRCOM_RUNTIM_PATH = $(AUX_PATH)/circom_runtime
+CIRCOM_RUNTIME_REPO = https://github.com/iden3/circom_runtime.git
+
 CUSNARKS_LIB = libcusnarks.so
 CUBIN_NAME = cusnarks.cubin
 
@@ -76,8 +79,7 @@ dirs= $(CUSRC_PATH) \
       $(CTSRC_PATH) 
 
 aux_cdirs  = $(PCG_PATH) 
-aux_jsdirs = $(SNARKJS_PATH) \
-             $(FFIASM_PATH)
+aux_jsdirs = $(SNARKJS_PATH) 
 
 aux_rdirs  = $(RUST_CIRCOM_PATH)
 
@@ -87,7 +89,7 @@ test_dirs = $(CTEST_PATH) \
 
 aux_repos = $(PCG_REPO) \
             $(SNARKJS_REPO) \
-            $(FFIASM_REPO) 
+	    $(CIRCOM_RUNTIME_REPO)
 
 config_dirs = $(CONFIG_PATH)
 
@@ -221,8 +223,8 @@ reduced_third_party_libs:
 
 third_party_libs:
 	echo "checking third pary libs...";
-	if ! test -d $(AUX_PATH); \
-		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
+	if ! test -d $(RUST_CIRCOM_PATH); \
+		then mkdir -p $(RUST_CIRCOM_PATH); cd $(AUX_PATH); mkdir $(RUST_CIRCOM_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
 	@for i in $(AUX_RSUBDIRS); do \
 		(cd $$i; $(CARGO)); done
 

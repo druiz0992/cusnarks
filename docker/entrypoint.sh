@@ -10,4 +10,3 @@ go run cmd/gencuf/main.go
 #Start server
 go run . --config ./server_config.yaml start
 
-
