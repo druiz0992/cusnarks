@@ -35,6 +35,10 @@ if [ ! -d "ffiasm" ]; then
    git clone https://github.com/iden3/ffiasm.git
 fi
 
+if [ ! -d "circom_runtime" ]; then
+   git clone https://github.com/iden3/circom_runtime.git
+fi
+
 cd ffiasm;
 
 ADX_SUPPORT=$(cat /proc/cpuinfo | grep -m1 -oP 'adx')
@@ -125,6 +129,13 @@ cd -
 ../src/buildzqfield.js -q ${FR} -n Fr;
 ../src/buildzqfield.js -q ${FP} -n Fp;
 
+if [ -z $ADX_SUPPORT ]; then 
+  mv fr.c fr.cpp
+  mv fr.h fr.hpp
+  cd ../../circom_runtime/c
+  sed -i '/Fr_toLongNormal/c\Fr_toLongNormal(&v);' main.cpp 
+  cd -
+fi
 cp fr.* ../../circom_runtime/c 
 
 add_correct_labels "fr.asm"
