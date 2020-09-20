@@ -2,8 +2,8 @@
 
 # Creates cusnarks docker
 
-# 1 : Recompute docker struct -> 1
-# 2 : Number of roots
+# Params
+# $1 : Recompute docker struct -> 1
 
 if [[ $1 = 1 ]]; then
   ./clean.sh
@@ -28,4 +28,4 @@ if [[ $1 = 1 ]]; then
   git clone https://github.com/iden3/go-cusnarks.git
 fi
 
-sudo docker build --build-arg NVARS=$2 -t cusnarks .
+docker build -t cusnarks .

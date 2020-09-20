@@ -1,10 +1,8 @@
 FROM nvidia/cuda:10.2-cudnn7-devel as build_stage
 
-ARG NVARS
-
 ENV LD_LIBRARY_PATH=/usr/src/app/cusnarks/lib:$LD_LIBRARY_PATH
 ENV CUSNARKS_PATH /usr/src/app/cusnarks
-ENV CUSNARKS_NROOTS $NVARS
+ENV CUSNARKS_NROOTS 20
 ENV CUSNARKS_CURVE BN256
 
 WORKDIR /usr/src/app
@@ -27,7 +25,7 @@ FROM nvidia/cuda:10.2-base
 
 ENV LD_LIBRARY_PATH=/usr/src/app/cusnarks/lib:$LD_LIBRARY_PATH
 ENV CUSNARKS_PATH /usr/src/app/cusnarks
-ENV CUSNARKS_NROOTS $NVARS
+ENV CUSNARKS_NROOTS 20
 ENV CUSNARKS_CURVE BN256
 
 
