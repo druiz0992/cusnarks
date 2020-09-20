@@ -47,8 +47,6 @@ RUN apt-get update && \
 RUN rm -rf go1.15.1.linux-amd64.tar.gz
 
 COPY entrypoint.sh /usr/local/bin/entrypoint
-COPY proof.sh /usr/local/bin/proof
-COPY launch_server.sh /usr/local/bin/launch_server
 COPY stop.sh /usr/local/bin/stop
 
 RUN mkdir -p go-cusnarks

@@ -23,6 +23,8 @@ if [[ $1 = 1 ]]; then
   cp ../cusnarks/circuits/_PROVER/taillog.sh  ./docker/cusnarks/circuits/_PROVER
   cp ../cusnarks/circuits/_PROVER/catlog.sh  ./docker/cusnarks/circuits/_PROVER
 
+  cp ./docker/server_config.tpl  ./docker/server_config.yaml
+
   cd docker
 
   git clone https://github.com/iden3/go-cusnarks.git

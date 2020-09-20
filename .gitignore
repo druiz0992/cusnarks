@@ -70,3 +70,4 @@ test/python/aux_data/witness_calc
 test/python/aux_data/test_gocusnarks.cpp
 config/test.dat
 docker/auxdata/circuits/hermez_pk.zkey
+docker/server_config.yaml
