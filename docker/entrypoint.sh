@@ -23,11 +23,11 @@ go run cmd/gencuf/main.go
 
 #Update server_config.yalm file
 if [ ! -z $SERVICE_IPPORT ]; then
-  sed -i "/serviceapi/c\serviceapi:${SERVICE_IPPORT}" server_config.yaml
+  sed -i "/serviceapi/c\  serviceapi: ${SERVICE_IPPORT}" server_config.yaml
 fi
 
 if [ ! -z $ADMIN_IPPORT ]; then
-  sed -i "/adminapi/c\adminapi:${ADMIN_IPPORT}" server_config.yaml
+  sed -i "/adminapi/c\  adminapi: ${ADMIN_IPPORT}" server_config.yaml
 fi
 
 if [ ! -z $DEBUG_EN ]; then
@@ -35,8 +35,10 @@ if [ ! -z $DEBUG_EN ]; then
 fi
 
 if [ ! -z $SEED ]; then
-  sed -i "/seed/c\seed : ${SEED}" server_config.yaml
+  sed -i "/seed/c\  seed : ${SEED}" server_config.yaml
 fi
 
 #Start server
 go run . --config ./server_config.yaml start
+
+while true; do sleep 10; done
