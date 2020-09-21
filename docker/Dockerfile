@@ -59,5 +59,7 @@ RUN go build -o gocusnarks .
 COPY server_config.yaml .
 
 WORKDIR /usr/src/app
+RUN rm -rf ./cusnarks/src/cuda
+RUN rm -rf ./cusnarks/src/cython
 
 ENTRYPOINT ["entrypoint"]
