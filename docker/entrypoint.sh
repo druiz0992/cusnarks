@@ -15,6 +15,11 @@ fi
 cd /usr/src/app/cusnarks/config
 python3 cusnarks_config.py ${CUSNARKS_NROOTS} ${CUSNARKS_CURVE}
 
+# Fix some issues
+mv /usr/src/app/cusnarksdata/auxdata/runtime /usr/src/app/cusnarksdata/
+mv /usr/src/app/cusnarksdata/auxdata/circuits /usr/src/app/cusnarksdata/
+rmdir /usr/src/app/cusnarksdata/auxdata
+
 # Starts Go-Cusnarks server
 cd /usr/src/app/go-cusnarks
 
