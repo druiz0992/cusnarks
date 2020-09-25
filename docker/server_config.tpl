@@ -7,14 +7,14 @@ proofservice:
 proverparams:
   cusnarkspath: "/usr/src/app/cusnarks"
   cufiledescriptor :
-     circuitcpp :  "test_circom.cpp"
-     circuitdat :  "test_circom_witbuild.dat"
-     inputsfile:   "test_circom_input.json"
-     pkfile   : "test_circom_pk.bin"
-     vkfile   : "test_circom_vk.json"
-  witdatafile  : "test_circom_w.wtns"
-  pdfile   : "test_circom_pd.json"
-  pfile    : "test_circom_p.json"
+     circuitcpp :  "hermez.cpp"
+     circuitdat :  "hermez_witbuild.dat"
+     inputsfile:   "hermez_input.json"
+     pkfile   : "hermez_pk.zkey"
+     vkfile   : 
+  witdatafile  : "hermez_w.wshm"
+  pdfile   : "hermez_pd.json"
+  pfile    : "hermez_p.json"
   seed: 436442495 
   verifyen   : "1"
 logfile: "/var/log/proof_service/proof_service.log"
