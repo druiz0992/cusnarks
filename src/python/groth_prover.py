@@ -1488,13 +1488,6 @@ class GrothProver(object):
           self.findECPointsDispatch( self.tableB2, scl_vector, ecp_vector, ec2=1 )
           self.assignECPvalues('B2')
    
-          if self.stop_client.value:
-              self.p_CPU.terminate()
-              self.p_CPU.join()
-              self.logger.info('Client stopped...')
-              return 1
-
-
           # A
           self.logger.info(' Mexp A started...')
 
@@ -1502,13 +1495,9 @@ class GrothProver(object):
 
           ecp_vector = pk_bin[0][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
 
-          self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0)
-          self.assignECPvalues('A')
-          if self.stop_client.value and self.p_CPU is not None:
-               self.p_CPU.terminate()
-               self.p_CPU.join()
-               self.logger.info('Client stopped...')
-               return 1
+          if self.stop_client.value == 0 :
+            self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0)
+            self.assignECPvalues('A')
 
           # B1
           if self.zk:
@@ -1517,16 +1506,10 @@ class GrothProver(object):
              scl_vector[-1] = self.s_scl
              ecp_vector = pk_bin[2][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
 
-             self.findECPointsDispatch( self.tableB1, scl_vector, ecp_vector)
+             if self.stop_client.value == 0 :
+                self.findECPointsDispatch( self.tableB1, scl_vector, ecp_vector)
+                self.assignECPvalues('B1')
 
-             self.assignECPvalues('B1')
-             if self.stop_client.value:
-                 self.p_CPU.terminate()
-                 self.p_CPU.join()
-                 self.logger.info('Client stopped...')
-                 return 1
-
-          
           # C 
           self.logger.info(' Mexp C  started...')
 
@@ -1536,19 +1519,14 @@ class GrothProver(object):
           else:
                ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
 
-          if self.compute_last_mexp_gpu == False:
-              used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True)
-          else:
-              used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False)
-
-          if self.stop_client.value and self.p_CPU is not None:
-              self.p_CPU.terminate()
-              self.p_CPU.join()
-              self.logger.info('Client stopped...')
-              return 1
+          if self.stop_client.value == 0 :
+            if self.compute_last_mexp_gpu == False:
+                used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True)
+            else:
+                used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False)
 
           # Assign collected values to pi's
-          if self.compute_last_mexp_gpu == False:
+          if self.compute_last_mexp_gpu == False and self.stop_client.value == 0:
              self.assignECPvalues('C')
           self.logger.info(' First Mexp completed GPU...')
           
@@ -1561,10 +1539,6 @@ class GrothProver(object):
         #  P3 - Poly Eval
         #  P4 - Poly Operations
         ######################
-        if self.stop_client.value :
-              self.logger.info(' Stopping tests...')
-              return 1
-
         # Retrieve Poly Eval Results
         if self.compute_last_mexp_gpu:
           self.parent_conn_CPU.send([])
@@ -1585,7 +1559,8 @@ class GrothProver(object):
         #   - Final EC MultiExp
         ######################
 
-        if self.compute_last_mexp_gpu:
+        if self.stop_client.value == 0:
+          if self.compute_last_mexp_gpu:
            start = time.time()
            self.logger.info(' Starting Last Mexp GPU...')
 
@@ -1618,7 +1593,7 @@ class GrothProver(object):
            self.t_GP['Mexp2'] = (end - start)
            self.logger.info(' Last Mexp completed')
 
-        else:
+          else:
            if self.zk == 0:
              scalar_v = np.reshape(
                               np.concatenate((
