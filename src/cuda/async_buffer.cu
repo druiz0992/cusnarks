@@ -48,7 +48,7 @@ AsyncBuf::AsyncBuf(uint32_t nelems, uint32_t elsize):max_nelems(nelems), el_size
 AsyncBuf::~AsyncBuf()
 {
   logInfo("release async buffer : %x\n",buffer);
-  CCHECK(cudaFreeHost(buffer));
+  //CCHECK(cudaFreeHost(buffer));
 }
 
 void * AsyncBuf::getBuf(void)

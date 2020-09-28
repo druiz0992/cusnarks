@@ -642,6 +642,17 @@ double CUSnarks::kernelLaunch(
 void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)
 {
   uint32_t i;
+  // I need to implement some type of delayed free for params. Otherwise, there is
+  // a memory corruption somewhere and I can't find where
+
+  #define BUFFER_PARAMS_LEN (128)
+  static kernel_params_t **params_buffer = NULL;
+  static uint32_t in_params_idx=0;
+  static uint32_t out_params_idx=0;
+  static uint32_t n_params=0;
+  if (params_buffer == NULL){
+	  params_buffer = (kernel_params_t **)calloc(BUFFER_PARAMS_LEN, sizeof(kernel_params_t *)); 
+  }
   logInfo("Sync del : In Data ptr : %x, Out Data ptr : %x, In Params ptr : %x, gpu_id : %d, stream_id : %d\n\n\n",
       in_data_host[gpu_id][stream_id], out_data_host[gpu_id][stream_id], params_host[gpu_id][stream_id],
       gpu_id, stream_id);
@@ -655,8 +666,19 @@ void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)
   CCHECK(cudaFreeHost(out_data_host[gpu_id][stream_id]));
 #endif
 
-  logInfo("Release params_hostt[%d][%d] : %x\n",gpu_id, stream_id,params_host[gpu_id][stream_id]);
-  CCHECK(cudaFreeHost(params_host[gpu_id][stream_id]));
+  logInfo("Release params_host[%d][%d] : %x\n",gpu_id, stream_id,params_host[gpu_id][stream_id]);
+
+  // delatyed free. Store pointers in circular buffer, and start freeing 
+  // when buffer is at half capacity. 
+  params_buffer[in_params_idx] = params_host[gpu_id][stream_id];
+  in_params_idx = (in_params_idx + 1) % BUFFER_PARAMS_LEN;
+  n_params++;
+  if (n_params >= BUFFER_PARAMS_LEN/2){
+    CCHECK(cudaFreeHost(params_buffer[out_params_idx]));
+    n_params--;
+    out_params_idx = (out_params_idx + 1) % BUFFER_PARAMS_LEN;
+  }
+  //CCHECK(cudaFreeHost(params_host[gpu_id][stream_id]));
 
 }
 

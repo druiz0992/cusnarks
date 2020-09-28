@@ -217,6 +217,8 @@ IF CUDA_DEF:
 
           cdef double start_k = self._cusnarks_ptr.elapsedTime()
           cdef double t=self._cusnarks_ptr.streamSync(gpu_id, stream_id)
+          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
+
           cdef ct.uint32_t vlen = self._cusnarks_ptr.streamGetOutputDataLen(gpu_id, stream_id)
           cdef ct.uint32_t *data = self._cusnarks_ptr.streamGetOutputData(gpu_id, stream_id)
           #cdef ct.uint32_t nwords_256bit = <int>(self.out_size/(self.out_dim*32))
@@ -229,7 +231,6 @@ IF CUDA_DEF:
           out_v = np.copy(np.asarray(kdata))
           cdef double end_k = self._cusnarks_ptr.elapsedTime()
 
-          self._cusnarks_ptr.streamDel(gpu_id, stream_id)
           cdef double end_k2 = self._cusnarks_ptr.elapsedTime()
           #print(end_k - start_k, end_k2 - end_k)
           return np.asarray(out_v).reshape(-1, NWORDS_256BIT), t 
