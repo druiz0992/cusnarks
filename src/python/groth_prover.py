@@ -1379,9 +1379,9 @@ class GrothProver(object):
              snarkjs['verify'] = call([self.snarkjs, "verify", "--vk", verification_key_file, "-p", snarkjs['p_f'],"--pub",snarkjs['pd_f']])
           else :
              result = run(["snarkjs", "groth16", "verify", verification_key_file,snarkjs['pd_f'], snarkjs['p_f']], stdout=PIPE)
-             snarkjs['verify'] = 0
-             if result.stdout.decode('utf-8').split()[2] == "Invalid":
-                snarkjs['verify'] = 1
+             snarkjs['verify'] = 1
+             if result.stdout.decode('utf-8').split()[2] == "OK!":
+                snarkjs['verify'] = 0
 
 
         elif mode == "verification_key":
