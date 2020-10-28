@@ -258,6 +258,8 @@ class GrothProver(object):
           zKeyToPkFile_h(out_fname.encode("UTF-8"),self.proving_key_f.encode("UTF-8"))
           self.proving_key_f = out_fname
           self.pkbin_mode = 1
+        elif self.proving_key_f.endswith('.zkey2'):
+          self.pkbin_mode = 1
 
         # PK_BIN
         pkbin_nWords = int(os.path.getsize(self.proving_key_f)/4)
@@ -1382,7 +1384,6 @@ class GrothProver(object):
              snarkjs['verify'] = 1
              if result.stdout.decode('utf-8').split()[2] == "OK!":
                 snarkjs['verify'] = 0
-
 
         elif mode == "verification_key":
           self.verification_key_f = self.proving_key_f[:-5]

@@ -259,7 +259,7 @@ void *mpolys_eval_h(void *vargs)
   t_mulm mulm_cb =  getcb_mulm_h(args->pidx);
  
   //printf("last_idx : %d\n",args->last_idx); 
-  for (uint32_t i=args->start_idx; i<args->last_idx; i+=ZKEY_COEFF_NWORDS){
+  for (unsigned long long i=args->start_idx; i<args->last_idx; i+=ZKEY_COEFF_NWORDS){
       coeff = &pin[i];
       w_idx = coeff[ZKEY_COEFF_SIGNAL_OFFSET];
       scl = (uint32_t *)&args->scalar[w_idx*NWORDS_FR];
