@@ -46,7 +46,7 @@ Circom_Circuit *circuit;
 void writeOutShmem(Circom_CalcWit *ctx, std::string filename) {
     FILE *write_ptr;
     u64 *shbuf;
-    u32 shmid, status = 0;
+    int32_t shmid, status = 0;
 
     write_ptr = fopen(filename.c_str(),"wb");
 
