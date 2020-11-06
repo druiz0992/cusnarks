@@ -254,7 +254,7 @@ class GrothProver(object):
           self.launch_snarkjs("verification_key")
 
           #generate pkbin
-          out_fname = self.proving_key_f[:-5]+"_zkey.bin"
+          out_fname = self.proving_key_f[:-5]+".zkey2"
           zKeyToPkFile_h(out_fname.encode("UTF-8"),self.proving_key_f.encode("UTF-8"))
           self.proving_key_f = out_fname
           self.pkbin_mode = 1
@@ -875,8 +875,8 @@ class GrothProver(object):
            p.start()
            try:
               self.startServer(self.port_second, nVars)
-           except:
-              self.logger.info('Exception occurred. Server stopped')
+           except Exception as e:
+              self.logger.info('Exception occurred. Server stopped :%s',e)
               run(['killall', '-9', 'python3'])
 
     def startServer(self, port, nVars):    
@@ -1477,34 +1477,36 @@ class GrothProver(object):
         pk_bin = pkbin_get(self.pk,['A','B2','B1','C', 'hExps','delta_1'])
  
         if self.compute_first_mexp_gpu:
-          self.logger.info(' Starting Mexp B2 - GPU...')
+          self.logger.info(' Mexp A started...')
 
           scl_vector = np.concatenate( 
                                  (self.scl_array[:self.nVars],
                                   np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
-                                  [self.s_scl]))
+                                  [self.r_scl]))
 
-          ecp_vector = pk_bin[1][:(self.nVars+2)*ECP2_JAC_INDIMS*NWORDS_FP]
-
-          self.findECPointsDispatch( self.tableB2, scl_vector, ecp_vector, ec2=1 )
-          self.assignECPvalues('B2')
-   
-          # A
-          self.logger.info(' Mexp A started...')
-
-          scl_vector[-1] = self.r_scl
 
           ecp_vector = pk_bin[0][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
 
           if self.stop_client.value == 0 :
-            self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0)
-            self.assignECPvalues('A')
+              self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0)
+              self.assignECPvalues('A')
+
+          # B2
+          self.logger.info(' Mexp B2 started...')
+
+          scl_vector[-1] = self.s_scl
+
+          ecp_vector = pk_bin[1][:(self.nVars+2)*ECP2_JAC_INDIMS*NWORDS_FP]
+
+          if self.stop_client.value == 0 :
+            self.findECPointsDispatch( self.tableB2, scl_vector, ecp_vector, ec2=1 )
+            self.assignECPvalues('B2')
 
           # B1
           if self.zk:
              self.logger.info(' Mexp B1 started...')
              
-             scl_vector[-1] = self.s_scl
+             #scl_vector[-1] = self.s_scl
              ecp_vector = pk_bin[2][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
 
              if self.stop_client.value == 0 :
@@ -1778,7 +1780,7 @@ class GrothProver(object):
                 batch = self.mexp2Batch
           else:
             batch = np.zeros((nsamples*edims, NWORDS_FR),dtype=np.uint32)
-          
+
           batch[offset:nsamples] = scl_vector[start_idx:end_idx]
           batch[nsamples+indims*offset:] = np.reshape(
                                             ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],

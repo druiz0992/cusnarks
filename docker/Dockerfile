@@ -34,14 +34,18 @@ WORKDIR /usr/src/app
 COPY --from=build_stage /usr/src/app /usr/src/app
 
 RUN apt-get update && \
-    apt-get install -y git curl build-essential libssl-dev clang libomp-dev g++ nasm python3 python3-pip sudo libgmp3-dev nlohmann-json-dev vim && \
+    apt-get install -y git curl build-essential libssl-dev clang libomp-dev g++ nasm python3 python3-pip sudo psmisc libgmp3-dev nlohmann-json-dev vim && \
     curl -O https://dl.google.com/go/go1.15.1.linux-amd64.tar.gz && \
     tar xvf go1.15.1.linux-amd64.tar.gz -C . && \
     mv ./go /usr/local && \
-    ln -s /usr/local/go/bin/go /usr/local/bin/go && \
-    curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
-    apt-get -yq install nodejs && \
-    npm i -g circom@0.5.23 snarkjs@0.3.33 && \
+    sh -s -- --default-toolchain stable -y && \
+    ln -s /usr/local/go/bin/go /usr/local/bin/go
+
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
+
+RUN apt-get -yq install nodejs 
+
+RUN npm i -g circom@0.5.23 snarkjs@0.3.33 && \
     pip3 install Cython numpy future nvgpu 
 
 RUN rm -rf go1.15.1.linux-amd64.tar.gz

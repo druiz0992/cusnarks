@@ -41,6 +41,7 @@
 #include "utils_host.h"
 #include "file_utils.h"
 
+#define CHUNK_SIZE (1024 * 1024)
 static void  zKeyInit_h(zkey_t *zkey, const char *filename);
 static uint32_t *readZKeySection_h(zkey_t *zkey, uint32_t section_id, const char *filename);
 static void writeZkeySection_h(zkey_t *zkey,uint32_t *buffer, uint32_t section_id, FILE *ofp);
@@ -83,8 +84,8 @@ void readU256CircuitFile_h(uint32_t *samples, const char *filename, unsigned lon
   } else {
       size_t chunk = 0;
       while (chunk < nwords){
-         if (chunk + 1024*1024 <= nwords) {
-           chunk += fread(&samples[chunk], sizeof(uint32_t), 1024*1024 , ifp);
+         if (chunk + CHUNK_SIZE <= nwords) {
+           chunk += fread(&samples[chunk], sizeof(uint32_t), CHUNK_SIZE , ifp);
          } else {
            chunk += fread(&samples[chunk], sizeof(uint32_t), nwords - chunk , ifp);
          }
@@ -853,8 +854,8 @@ static uint32_t *readZKeySection_h(zkey_t *zkey, uint32_t section_id, const char
   buffer = (uint32_t *) malloc(buffer_len * sizeof(uint32_t));
   size_t chunk = 0;
   while (chunk < buffer_len){
-    if (chunk + 1024*1024 <= buffer_len) {
-       chunk += fread(&buffer[chunk], sizeof(uint32_t), 1024*1024 , ifp);
+    if (chunk + CHUNK_SIZE <= buffer_len) {
+       chunk += fread(&buffer[chunk], sizeof(uint32_t), CHUNK_SIZE , ifp);
     } else {
       chunk += fread(&buffer[chunk], sizeof(uint32_t), buffer_len - chunk , ifp);
     }
@@ -871,8 +872,8 @@ static void writeZkeySection_h(zkey_t *zkey,uint32_t *buffer, uint32_t section_i
   size_t chunk = 0;
   uint32_t nreads=0;
   while (chunk < section_len) {
-    if (chunk + 1024*1024 <= section_len) {
-       chunk += fwrite(&buffer[chunk], sizeof(uint32_t),1020*1024,  ofp);
+    if (chunk + CHUNK_SIZE <= section_len) {
+       chunk += fwrite(&buffer[chunk], sizeof(uint32_t),CHUNK_SIZE,  ofp);
     } else {
        chunk += fwrite(&buffer[chunk], sizeof(uint32_t),section_len - chunk,  ofp);
     }

@@ -246,7 +246,19 @@ void RawFr::fromString(Element &r, std::string s) {
     for (int i=0; i<Fr_N64; i++) r.v[i] = 0;
     mpz_export((void *)(r.v), NULL, -1, 8, -1, 0, mr);
     Fr_rawToMontgomery(r.v,r.v);
+    mpz_clear(mr);
 }
+
+void RawFr::fromUI(Element &r, unsigned long int v) {
+    mpz_t mr;
+    mpz_init(mr);
+    mpz_set_ui(mr, v);
+    for (int i=0; i<Fr_N64; i++) r.v[i] = 0;
+    mpz_export((void *)(r.v), NULL, -1, 8, -1, 0, mr);
+    Fr_rawToMontgomery(r.v,r.v);
+    mpz_clear(mr);
+}
+
 
 
 std::string RawFr::toString(Element &a, uint32_t radix) {
@@ -282,19 +294,27 @@ void RawFr::div(Element &r, Element &a, Element &b) {
     mul(r, a, tmp);
 }
 
-/*
-void RawFr::scalarBits(Scalar &r, Element &a) {
-    Element tmp;
-    Fr_rawFromMontgomery(tmp.v, a.v);
-    r.l = 0;
-    for (int i=0; i<Fr_N64*64; i++) {
-        int word = i >> 6;
-        int bit = i & 0x3F;
-        r.v[i] = (tmp.v[word] & (1LL << bit)) >> bit;
-        if (r.v[i]) r.l = i+1;
+#define BIT_IS_SET(s, p) (s[p>>3] & (1 << (p & 0x7)))
+void RawFr::exp(Element &r, Element &base, uint8_t* scalar, unsigned int scalarSize) {
+    bool oneFound = false;
+    Element copyBase;
+    copy(copyBase, base);
+    for (int i=scalarSize*8-1; i>=0; i--) {
+        if (!oneFound) {
+            if ( !BIT_IS_SET(scalar, i) ) continue;
+            copy(r, copyBase);
+            oneFound = true;
+            continue;
+        }
+        square(r, r);
+        if ( BIT_IS_SET(scalar, i) ) {
+            mul(r, r, copyBase);
+        }
+    }
+    if (!oneFound) {
+        copy(r, fOne);
     }
 }
-*/
 
 void RawFr::toMpz(mpz_t r, Element &a) {
     Element tmp;
@@ -302,6 +322,14 @@ void RawFr::toMpz(mpz_t r, Element &a) {
     mpz_import(r, Fr_N64, -1, 8, -1, 0, (const void *)tmp.v);
 }
 
+void RawFr::fromMpz(Element &r, mpz_t a) {
+    for (int i=0; i<Fr_N64; i++) r.v[i] = 0;
+    mpz_export((void *)(r.v), NULL, -1, 8, -1, 0, a);
+    Fr_rawToMontgomery(r.v, r.v);
+}
+
+
 static bool init = Fr_init();
 
+RawFr RawFr::field;
 

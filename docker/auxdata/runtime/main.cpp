@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <nlohmann/json.hpp>
+#include <omp.h>
 using json = nlohmann::json;
 
 #include "calcwit.hpp"
@@ -46,7 +47,7 @@ Circom_Circuit *circuit;
 void writeOutShmem(Circom_CalcWit *ctx, std::string filename) {
     FILE *write_ptr;
     u64 *shbuf;
-    int32_t shmid, status = 0;
+    int shmid, status = 0;
 
     write_ptr = fopen(filename.c_str(),"wb");
 
@@ -112,8 +113,9 @@ void writeOutShmem(Circom_CalcWit *ctx, std::string filename) {
     fwrite(&shmid, sizeof(u32), 1, write_ptr);
     fclose(write_ptr);
 
-    FrElement v;
+    #pragma omp parallel for
     for (int i=0;i<circuit->NVars;i++) {
+        FrElement v;
         ctx->getWitness(i, &v);
         Fr_toLongNormal(&v, &v);
         memcpy(&shbuf[i*Fr_N64], v.longVal, Fr_N64*sizeof(u64));
@@ -249,7 +251,7 @@ void writeOutBin(Circom_CalcWit *ctx, std::string filename) {
     u32 idSection2 = 2;
     fwrite(&idSection2, 4, 1, write_ptr);
 
-    u64 idSection2length = n8*circuit->NVars;
+    u64 idSection2length = (u64)n8*(u64)circuit->NVars;
     fwrite(&idSection2length, 8, 1, write_ptr);
 
     FrElement v;

@@ -226,7 +226,7 @@ third_party_libs:
 	if ! test -d $(RUST_CIRCOM_PATH); \
 		then mkdir -p $(RUST_CIRCOM_PATH); cd $(AUX_PATH); mkdir $(RUST_CIRCOM_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
 	@for i in $(AUX_RSUBDIRS); do \
-		(cd $$i; $(CARGO)); done
+		(cd $$i; if ! $(CARGO); then echo "za compilation failed"; fi); done
 
 
 
