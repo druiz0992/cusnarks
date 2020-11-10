@@ -1071,7 +1071,7 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
                   ct.t_uint64 offset, ct.t_uint64 total_words,
                   ct.uint32_t order, ct.uint32_t ec2,
                   ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
-                  ct.uint32_t strip_last, ct.uint32_t pippen_conf):
+                  ct.uint32_t strip_last):
 
   cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
   cdef ct.uint32_t indims = ECP_JAC_INDIMS
@@ -1096,6 +1096,7 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
   args_c.scl = &inscl[0]
   args_c.n = n
   args_c.pidx = pidx
+  args_c.pippen = 0
   args_c.max_threads = MAX_NCORES_OMP
   if len(fname) == 0:
     # Compute table 0 -> each thread computes ectable and then does mexp
@@ -1105,18 +1106,57 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
     args_c.ec_table = NULL
     args_c.filename = NULL
     args_c.total_words = int((len(intbl)/(indims * NWORDS_FP) + order - 1) /order)
-    if args_c.total_words > 10:
-       args_c.pippen = pippen_conf
-    else:
-       args_c.pippen = 0
   else :
     args_c.compute_table = 0
     args_c.filename = fname_c
     args_c.ec_table = &intbl[0]
     args_c.total_words = total_words
-    args_c.pippen = 0
   args_c.offset = offset * sizeof(ct.uint32_t)
   args_c.order = order
+  if ec2:
+    args_c.ec2 = 1
+  else :
+    args_c.ec2 = 0
+
+  with nogil:
+     uh.cec_jacreduce_server_h(args_c)
+
+  free(args_c)
+
+  return np.reshape(outv,(-1, NWORDS_FP))
+
+def ec_jacreduce_pippen_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
+                  np.ndarray[ndim=1, dtype = np.uint32_t] ecp,
+                  ct.uint32_t ec2, ct.uint32_t pidx, ct.uint32_t init, ct.uint32_t combine,  ct.uint32_t to_aff,
+                  ct.uint32_t add_in, ct.uint32_t strip_last):
+
+  cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
+  cdef ct.uint32_t indims = ECP_JAC_INDIMS
+
+  if strip_last:
+      outdims = ECP_JAC_INDIMS
+
+  if ec2 :
+    indims = ECP2_JAC_INDIMS
+    if strip_last:
+      outdims = ECP2_JAC_INDIMS
+    else :
+      outdims = ECP2_JAC_OUTDIMS
+    
+
+  cdef np.ndarray[ndim=1, dtype=np.uint32_t] outv = np.zeros(outdims*NWORDS_FP, dtype=np.uint32)
+  cdef ct.uint32_t n = <int> (inscl.shape[0] / NWORDS_FR  )
+  cdef ct.jacadd_reduced_t *args_c = <ct.jacadd_reduced_t *> malloc(sizeof(ct.jacadd_reduced_t))
+
+  args_c.out_ep = &outv[0]
+  args_c.scl = &inscl[0]
+  args_c.x = &ecp[0]
+  args_c.n = n
+  args_c.pidx = pidx
+  args_c.pippen = 1
+  args_c.init = init
+  args_c.combine = combine
+  args_c.max_threads = MAX_NCORES_OMP
   if ec2:
     args_c.ec2 = 1
   else :

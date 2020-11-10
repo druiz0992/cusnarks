@@ -90,7 +90,7 @@ class GrothProver(object):
                  n_streams=N_STREAMS_PER_GPU, n_gpus=1,start_server=1,
                  benchmark_f=None, seed=None, snarkjs=None, verify_en=0,
                  keep_f=None, reserved_cpus=0, batch_size=20, read_table_f=None, zk=1, grouping=DEFAULT_U256_BSELM,
-                 pippen_conf=DEFAULT_PIPPENGERS_CONF, write_table_f=None, table_type=None):
+                 write_table_f=None, table_type=None):
 
         # Check valid folder exists
         if keep_f is None:
@@ -128,7 +128,6 @@ class GrothProver(object):
 
         self.grouping = grouping
         self.grouping_cuda = DEFAULT_U256_BSELM_CUDA
-        self.pippen_conf  = pippen_conf
 
         self.sort_en = 0
         self.compute_ntt_gpu = False
@@ -158,7 +157,7 @@ class GrothProver(object):
         if batch_size > 25:
             batch_size = 25
 
-        self.batch_size = 1<<batch_size  # include roots. Max is 1<<20
+        self.batch_size = 1<<batch_size  
 
         if n_streams > get_nstreams():
           self.n_streams = get_nstreams()
@@ -664,7 +663,7 @@ class GrothProver(object):
           tt = time.time()
 
           np.copyto(self.pi_a_eccf1,
-                    ec_jacreduce_h(
+                    ec_jacreduce_pippen_h(
                             np.reshape( 
                                np.concatenate((
                                               w[:nVars],
@@ -672,13 +671,8 @@ class GrothProver(object):
                                               [self.r_scl] )),
                                     -1),
                             ep_vector,
-                            table_f.encode("UTF-8"),
-                            offset,
-                            total_words,
-                            self.grouping,
                             0,
-                            MOD_FP, 1, 1, 1,
-                            self.pippen_conf))
+                            MOD_FP, 1,1, 1, 1, 1))
 
           tt = time.time()-tt
           if self.stop_client.value :
@@ -697,7 +691,7 @@ class GrothProver(object):
 
           tt = time.time()
           np.copyto(self.pi_b_eccf2,
-                 ec_jacreduce_h(
+                 ec_jacreduce_pippen_h(
                             np.reshape( 
                               np.concatenate((
                                               w[:nVars],
@@ -705,12 +699,8 @@ class GrothProver(object):
                                               [self.s_scl] )),
                                     -1),
                             ep_vector,
-                            table_f.encode("UTF-8"),
-                            offset,
-                            total_words,
-                            self.grouping,
                             1,
-                            MOD_FP, 1, 1, 1, self.pippen_conf)
+                            MOD_FP, 1,1, 1, 1, 1)
                     )
 
           tt = time.time()-tt
@@ -718,6 +708,44 @@ class GrothProver(object):
              self.logger.info(' Process server Cancelled ... %s',tt)
              return
           self.logger.info(' Process server - Mexp B2 Done...%s',tt)
+
+
+          if self.zk:
+            if not self.read_table_en or self.ec_table['woffset_B1'] == self.ec_table['woffset_C']:
+               ep_vector = pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
+               table_f = ""
+            else :
+               self.G1_woffset -= self.ec_table['woffset_C'] 
+               self.G1_woffset += self.ec_table['woffset_B1'] 
+               ep_vector = np.reshape(self.ect_B1,-1)
+               offset = self.G1_woffset
+               total_words = self.ec_table['woffset_C'] - self.G1_woffset
+               table_f = self.read_table_f
+
+            tt = time.time()
+
+            np.copyto(self.pi_b1_eccf1,
+                    ec_jacreduce_pippen_h(
+                         np.reshape(
+                              np.concatenate((
+                                              w[:nVars],
+                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                              [self.s_scl] )),
+                              -1),
+                              ep_vector,
+                              0,
+                              MOD_FP, 1,1, 1, 1, 1)
+                    )
+
+            tt = time.time()-tt
+            if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
+             self.G1_woffset -= self.ec_table['woffset_B1'] 
+             self.G1_woffset += self.ec_table['woffset_hExps'] 
+
+            if self.stop_client.value :
+              self.logger.info(' Process server Cancelled ... %s',tt)
+              return
+            self.logger.info(' Process server - Mexp B1  Done...%s',tt)
 
           if not self.read_table_en or self.ec_table['woffset_C'] == self.ec_table['woffset_hExps']:
              table_f = ""
@@ -735,15 +763,11 @@ class GrothProver(object):
 
           tt = time.time()
           np.copyto(self.pi_c_eccf1,
-                    ec_jacreduce_h(
+                    ec_jacreduce_pippen_h(
                             np.reshape( w[nPublic+1:nVars], -1),
                             ep_vector,
-                            table_f.encode("UTF-8"),
-                            offset,
-                            total_words,
-                            self.grouping,
                             0,
-                            MOD_FP, 1, 1, 1, self.pippen_conf)
+                            MOD_FP, 1,0, 1, 1, 1)
                     )
           tt = time.time()-tt
 
@@ -751,48 +775,6 @@ class GrothProver(object):
              self.logger.info(' Process server Cancelled ... %s',tt)
              return
           self.logger.info(' Process server - Mexp C Done... %s',tt)
-
-          if self.zk:
-            if not self.read_table_en or self.ec_table['woffset_B1'] == self.ec_table['woffset_C']:
-               ep_vector = pk_bin2[2][:(nVars+2)*NWORDS_256BIT*ECP_JAC_INDIMS]
-               table_f = ""
-            else :
-               self.G1_woffset -= self.ec_table['woffset_C'] 
-               self.G1_woffset += self.ec_table['woffset_B1'] 
-               ep_vector = np.reshape(self.ect_B1,-1)
-               offset = self.G1_woffset
-               total_words = self.ec_table['woffset_C'] - self.G1_woffset
-               table_f = self.read_table_f
-
-            tt = time.time()
-
-            np.copyto(self.pi_b1_eccf1,
-                    ec_jacreduce_h(
-                         np.reshape(
-                              np.concatenate((
-                                              w[:nVars],
-                                              np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
-                                              [self.s_scl] )),
-                              -1),
-                              ep_vector,
-                              table_f.encode("UTF-8"),
-                              offset,
-                              total_words,
-                              self.grouping,
-                              0,
-                              MOD_FP, 1, 1, 1, 
-                              self.pippen_conf)
-                    )
-
-            tt = time.time()-tt
-            if self.read_table_en and self.ec_table['woffset_B1'] != self.ec_table['woffset_C']:
-             self.G1_woffset -= self.ec_table['woffset_B1'] 
-             self.G1_woffset += self.ec_table['woffset_hExps'] 
-
-            if self.stop_client.value :
-              self.logger.info(' Process server Cancelled ... %s',tt)
-              return
-            self.logger.info(' Process server - Mexp B1  Done...%s',tt)
 
           end2 = time.time()
 
@@ -824,16 +806,13 @@ class GrothProver(object):
              table_f = self.read_table_f
 
           tt = time.time()
-          np.copyto(self.pi_c2_eccf1,
-                  ec_jacreduce_h(
+          #np.copyto(self.pi_c2_eccf1,
+          np.copyto(self.pi_c_eccf1,
+                  ec_jacreduce_pippen_h(
                          scalar_vector,
                          EP_vector,
-                         table_f.encode("UTF-8"),
-                         offset,
-                         total_words,
-                         self.grouping,
                          0,
-                         MOD_FP, 1, 1, 1, self.pippen_conf)
+                         MOD_FP, 0,1, 1, 1, 1)
                      )
           tt = time.time()-tt
           if self.stop_client.value :
@@ -1597,37 +1576,37 @@ class GrothProver(object):
            self.logger.info(' Last Mexp completed')
 
           else:
-           if self.zk == 0:
-             scalar_v = np.reshape(
-                              np.concatenate((
-                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
-                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32)
-                                       )), 
-                              -1)
-             ep_v     = np.reshape(
-                                 np.concatenate((
-                                       self.pi_c2_eccf1,
-                                       self.pi_c_eccf1
-                                 )),
-                          -1)
-           else :  
+           if self.zk == 1:
+             #scalar_v = np.reshape(
+                              #np.concatenate((
+                                       #np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       #np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32)
+                                       #)), 
+                              #-1)
+             #ep_v     = np.reshape(
+                                 #np.concatenate((
+                                       #self.pi_c2_eccf1,
+                                       #self.pi_c_eccf1
+                                 #)),
+                          #-1)
+           #else :  
              scalar_v =  np.reshape(
                               np.concatenate((
-                                       np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
+                                       #np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
                                        np.asarray([[1,0,0,0,0,0,0,0]], dtype=np.uint32),
                                        [self.s_scl],
                                        [self.r_scl] )),
                               -1)
              ep_v = np.reshape(
                               np.concatenate((
-                                       self.pi_c2_eccf1,
+                                       #self.pi_c2_eccf1,
                                        self.pi_c_eccf1,
                                        self.pi_a_eccf1,
                                        self.pi_b1_eccf1 )),
                                  -1)
-           self.logger.info(' Process server - hExps Mexp ZK part started ...')
-           np.copyto(self.pi_c_eccf1,
-              ec_jacreduce_h(
+             self.logger.info(' Process server - hExps Mexp ZK part started ...')
+             np.copyto(self.pi_c_eccf1,
+                ec_jacreduce_h(
                             scalar_v,
                             ep_v,
                             "".encode("UTF-8"),
@@ -1635,9 +1614,9 @@ class GrothProver(object):
                             0,
                             2,
                             0,
-                            MOD_FP, 1, 1, 1, self.pippen_conf))
+                            MOD_FP, 1, 1, 1))
 
-           self.logger.info(' Process server - hExps Mexp ZK part completed ...')
+             self.logger.info(' Process server - hExps Mexp ZK part completed ...')
            if self.p_CPU is not None:
              self.t_GP['Mexp2'] = t[2]
      
@@ -1679,20 +1658,6 @@ class GrothProver(object):
             self.init_ec_val[:,:,EC_idx][0][idx]  = np.zeros(v.shape, dtype=np.uint32)
 
 
-    def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0, start_idx=0):
-            ZField.set_field(MOD_FP)
-            #TODO : remove in_v
-            #print(ecbn128_samples.shape, ec2, shamir_en, gpu_id, stream_id)
-            ecp,t = ec_pippen_mul(pyCuOjb, ecbn128_samples, MOD_FP,8,8,ec2, gpu_id, stream_id, first_time)
-            if ec2 and stream_id == 0:
-              ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_FP)
-              return ecp[0:6], t
-            elif stream_id == 0:
-              ecp = ec_jac2aff_h(ecp.reshape(-1),MOD_FP)
-              return ecp[0:3], t
-            
-            return None
-
     def streamsDel(self, dispatch_table):
        for bidx,p in enumerate(dispatch_table):
           P = p[0]
@@ -1701,28 +1666,6 @@ class GrothProver(object):
           stream_id = p[4]
           #cuda_ec128.streamSync(gpu_id,stream_id)
           cuda_ec128.streamDel(gpu_id,stream_id)
-
-    def getECResults(self, dispatch_table):
-       for bidx,p in enumerate(dispatch_table):
-          P = p[0]
-          cuda_ec128 = self.ec_type_dict[P][0]
-          step = self.ec_type_dict[P][1]
-          pidx = self.ec_type_dict[P][4]
-          gpu_id = p[3]
-          stream_id = p[4]
-          result, t = cuda_ec128.streamSync(gpu_id,stream_id)
-          if step==4:
-             self.init_ec_val[gpu_id][stream_id][pidx] =\
-                            ec2_jac2aff_h(
-                             result.reshape(-1),
-                             MOD_FP,
-                             strip_last=1) 
-          else:
-             self.init_ec_val[gpu_id][stream_id][pidx] =\
-                        ec_jac2aff_h(
-                              result.reshape(-1),
-                              MOD_FP,
-                              strip_last=1) 
 
     def init_EC_P(self, batch_size):
        nsamples = np.product(get_shfl_blockD(batch_size))
@@ -1912,10 +1855,6 @@ class GrothProver(object):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
         reduce_coeff = 0
-        #egs = 1 << 17
-        #polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, int((m + egs-1)/egs) , pidx)
-        # Set 1 thread only as i cannot fix race conditions otherwise. Not too damaging since we will use zkey mechanism which
-        # allow parallellism
         polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, 1 , pidx)
         return polX_T
     

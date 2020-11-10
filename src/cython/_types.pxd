@@ -52,8 +52,6 @@ cdef extern from "types.h":
   cdef uint32_t MAX_NCORES_OMP
   cdef uint32_t MAX_U256_BSELM
   cdef uint32_t DEFAULT_U256_BSELM
-  cdef uint32_t MAX_PIPPENGERS_CONF
-  cdef uint32_t DEFAULT_PIPPENGERS_CONF
   cdef uint32_t ZKEY_COEFF_NWORDS
 
   ctypedef struct kernel_config_t:
@@ -200,10 +198,13 @@ cdef extern from "types.h":
     uint32_t *ec_table
     uint32_t pidx
     uint32_t max_threads
+    uint32_t pippen;
+    uint32_t inc;
+    uint32_t init;
+    uint32_t combine;
     uint32_t start_idx
     uint32_t last_idx
     uint32_t thread_id
-    uint32_t pippen
     t_uint64 offset
     t_uint64 total_words 
     uint32_t order
@@ -269,6 +270,4 @@ _NSTREAMS_PER_GPU = N_STREAMS_PER_GPU
 _GROTH_PROOF_N_ECPOINTS = GROTH_PROOF_N_ECPOINTS
 _MAX_U256_BSELM = MAX_U256_BSELM
 _DEFAULT_U256_BSELM = DEFAULT_U256_BSELM
-_MAX_PIPPENGERS_CONF = MAX_PIPPENGERS_CONF
-_DEFAULT_PIPPENGERS_CONF = DEFAULT_PIPPENGERS_CONF
 _ZKEY_COEFF_NWORDS = (NWORDS_256BIT + 3)

@@ -43,13 +43,12 @@
 #define NBITS_WORD_MOD       (0x1F)
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
+#define PIPPENGER_CBIN_SIZE  (16)
 
 #define TRANSPOSE_BLOCK_SIZE  (32)
 #define MAX_U256_BSELM  (12)
 #define DEFAULT_U256_BSELM  (6)
 #define DEFAULT_U256_BSELM_CUDA  (8)
-#define MAX_PIPPENGERS_CONF (20)
-#define DEFAULT_PIPPENGERS_CONF (0)
 #define NBITS_BYTE (8)
 #define EC_JACREDUCE_TABLE_LEN (NWORDS_FR * NBITS_WORD)
 #define EC_JACREDUCE_BATCH_SIZE (5)
@@ -564,6 +563,9 @@ typedef struct{
   uint32_t last_idx;
   uint32_t thread_id;
   uint32_t pippen;
+  uint32_t inc;
+  uint32_t init;
+  uint32_t combine;
   t_uint64 offset;
   t_uint64 total_words;
   uint32_t order;

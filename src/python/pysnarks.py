@@ -100,7 +100,6 @@ def init():
     opt['table_fall'] = None
     opt['zero_knowledge']=1
     opt['grouping'] = DEFAULT_U256_BSELM
-    opt['pippen_conf'] = DEFAULT_PIPPENGERS_CONF
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -252,9 +251,6 @@ def init():
     parser.add_argument(
        '-g', '--grouping', type=int, help=help_str, required=False)  
 
-    help_str = 'Pippengers Configuration. Default : ' + str(opt['pippen_conf'])
-    parser.add_argument(
-       '-pippenger', '--pippenger', type=int, help=help_str, required=False)  
     return opt, parser
 
 def run(opt, parser):
@@ -476,9 +472,6 @@ def run(opt, parser):
       if args.start_server is not None:
          opt['start_server'] = args.start_server
 
-      if args.pippenger is not None:
-          opt['pippen_conf'] = args.pippenger
-
       if args.table_f is not None:
         if '/' in args.table_f:
            opt['table_f'] = args.table_f
@@ -491,7 +484,7 @@ def run(opt, parser):
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
                       benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'],
-                      read_table_f=opt['table_f'], write_table_f=opt['table_f'],table_type=opt['table_type'],zk=opt['zero_knowledge'], grouping=opt['grouping'], pippen_conf=opt['pippen_conf'])
+                      read_table_f=opt['table_f'], write_table_f=opt['table_f'],table_type=opt['table_type'],zk=opt['zero_knowledge'], grouping=opt['grouping'])
           end = time.time() - start
           print("GP init : "+str(end))
 

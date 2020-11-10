@@ -65,6 +65,7 @@ SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
 
 RUST_CIRCOM_PATH = $(AUX_PATH)/za
 RUST_CIRCOM_REPO = https://github.com/iden3/za.git
+RUST_CIRCOM_BRANCH = feature/cusnarks
 
 FFIASM_PATH = $(AUX_PATH)/ffiasm
 FFIASM_REPO = https://github.com/iden3/ffiasm.git
@@ -226,7 +227,7 @@ third_party_libs:
 	if ! test -d $(RUST_CIRCOM_PATH); \
 		then mkdir -p $(RUST_CIRCOM_PATH); cd $(AUX_PATH); mkdir $(RUST_CIRCOM_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
 	@for i in $(AUX_RSUBDIRS); do \
-		(cd $$i; if ! $(CARGO); then echo "za compilation failed"; fi); done
+		(cd $$i; git checkout feature/cusnarks; if ! $(CARGO); then echo "za compilation failed"; fi); done
 
 
 

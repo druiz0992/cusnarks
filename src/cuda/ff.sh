@@ -131,7 +131,7 @@ cd -
 
 if [ -z $ADX_SUPPORT ]; then 
   mv fr.c fr.cpp
-  mv fr.h fr.hpp
+  #mv fr.h fr.hpp
   cd ../../circom_runtime/c
   sed -i '/Fr_toLongNormal/c\Fr_toLongNormal(&v);' main.cpp 
   cd -

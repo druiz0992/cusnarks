@@ -73,6 +73,7 @@ uint32_t ec_isoncurve_h(uint32_t *x, uint32_t is_affine, uint32_t pidx);
 uint32_t ec_isinf(const uint32_t *x, const uint32_t pidx);
 void ec_isinf(uint32_t *z, const uint32_t *x, const uint32_t n, const uint32_t pidx);
 void ec_jacreduce_server_h(jacadd_reduced_t *args);
+void ec_jacreduce_pippen_server_h(jacadd_reduced_t *args);
 
 
 void ec2_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);

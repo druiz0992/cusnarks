@@ -2512,7 +2512,6 @@ uint32_t test_ec_jacreduce_opt(uint32_t ec2)
  double elapsed=0.0;
  uint32_t max_order = MAX_U256_BSELM;
  uint32_t min_order = 1;
- uint32_t max_pippen = MAX_PIPPENGERS_CONF;
 
  t_uint64 nwords_ecp, nwords_res, nwords_scl;
  uint32_t necp;
@@ -2566,36 +2565,34 @@ uint32_t test_ec_jacreduce_opt(uint32_t ec2)
      args->pidx = MOD_FP;
      args->ec2 = ec2;
      args->filename = NULL;
+     args->pippen = 0;
 
-     for (uint32_t k=0; k <= max_pippen; k++) {
-       args->pippen = k;
-       for (uint32_t i=max_order; i >= min_order; i--){
-         args->max_threads = get_nprocs_conf();
-         // Multiply points
-         args->order = i;
-         clock_gettime(CLOCK_MONOTONIC, &start);
-         ec_jacreduce_server_h(args);
-         clock_gettime(CLOCK_MONOTONIC, &end);
-         elapsed = (double) (end.tv_sec - start.tv_sec);
-         elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+     for (uint32_t i=max_order; i >= min_order; i--){
+       args->max_threads = get_nprocs_conf();
+       // Multiply points
+       args->order = i;
+       clock_gettime(CLOCK_MONOTONIC, &start);
+       ec_jacreduce_server_h(args);
+       clock_gettime(CLOCK_MONOTONIC, &end);
+       elapsed = (double) (end.tv_sec - start.tv_sec);
+       elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
 
-         from_montgomeryN_h(c,c,indims,pidx,0);
+       from_montgomeryN_h(c,c,indims,pidx,0);
 
-         if (!iseq_cb(r,c)){
-            n_errors1++;
-         }
+       if (!iseq_cb(r,c)){
+          n_errors1++;
+       }
     
-         if (n_errors1){
-           printf("\033[1;31m");
-         }
+       if (n_errors1){
+         printf("\033[1;31m");
+       }
 
-         printf("Pidx %d - N errors(JACREDUCE_OPT-EC2 : %d : N points : %d, Order : %d, Pippen : %d) : %d - Time : %f\n", 
-               pidx,ec2,necp,i, k,n_errors1, elapsed);
+       printf("Pidx %d - N errors(JACREDUCE_OPT-EC2 : %d : N points : %d, Order : %d) : %d - Time : %f\n", 
+           pidx,ec2,necp,i, n_errors1, elapsed);
     
-         printf("\033[0m");
-         n_errors+=n_errors1;
-         n_errors1=0;
-      }
+       printf("\033[0m");
+       n_errors+=n_errors1;
+       n_errors1=0;
     }
   
 
@@ -2606,6 +2603,109 @@ uint32_t test_ec_jacreduce_opt(uint32_t ec2)
     free(r);
     free(args);
     release_h();
+  }
+
+  retval = n_errors;
+  return retval;
+}
+
+uint32_t test_ec_jacreduce_pippen(uint32_t ec2)
+{
+ int i;
+ int pidx;
+ uint32_t pidx_offset=0;
+ int n_errors=0, n_errors1=0;
+ uint32_t retval=0;
+ struct timespec start, end;
+ double elapsed=0.0;
+
+ t_uint64 nwords_ecp, nwords_res, nwords_scl;
+ uint32_t necp;
+ 
+ uint32_t ec2_offset = 0;
+ uint32_t indims = ECP_JAC_INDIMS;
+ uint32_t outdims = ECP_JAC_OUTDIMS;
+ void (*jac2aff_cb)(uint32_t *, uint32_t *, t_uint64 , uint32_t, uint32_t) = &ec_jac2aff_h;
+ int32_t (*iseq_cb)(const uint32_t *, const uint32_t *) = &ec_iseq_h;
+
+ if (ec2){
+   ec2_offset = 2;
+   indims = ECP2_JAC_INDIMS;
+   outdims = ECP2_JAC_OUTDIMS;
+   jac2aff_cb = &ec2_jac2aff_h;
+   iseq_cb = &ec2_iseq_h;
+   
+ }
+ #ifdef _BLS12381
+ pidx_offset = 1 * MOD_N;
+ #endif
+ 
+
+ for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
+     init_h();
+     getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
+     getDataFileSize(&nwords_scl, scl_filename[(pidx+pidx_offset)/2+ec2_offset]);
+     getDataFileSize(&nwords_res, ec_rdc_filename[(pidx+pidx_offset)/2+ec2_offset]);
+     const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
+     necp = nwords_ecp / (PSize * outdims);
+
+     uint32_t *a = (uint32_t *) malloc( nwords_ecp * sizeof(uint32_t));
+     uint32_t *a1 = (uint32_t *) malloc( nwords_ecp * sizeof(uint32_t));
+     uint32_t *scl = (uint32_t *) malloc( nwords_scl * sizeof(uint32_t));
+     uint32_t *c = (uint32_t *) malloc( 2*nwords_res * sizeof(uint32_t));
+     uint32_t *r = (uint32_t *) malloc( nwords_res * sizeof(uint32_t));
+     jacadd_reduced_t *args = (jacadd_reduced_t *)malloc(sizeof(jacadd_reduced_t));
+  
+     readDataFile(a, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
+     readDataFile(scl, scl_filename[(pidx+pidx_offset)/2+ec2_offset]);
+     readDataFile(r, ec_rdc_filename[(pidx+pidx_offset)/2+ec2_offset]);
+
+     to_montgomeryN_h(a,a,necp*outdims,pidx);
+     jac2aff_cb(a1, a, necp, pidx, 1);
+
+     args->out_ep = c;
+     args->scl = scl;
+     args->x = a1;
+     args->n = necp;
+     args->pidx = MOD_FP;
+     args->ec2 = ec2;
+     args->pippen = 1;
+     args->init = 1;
+     args->combine = 1;
+
+     args->max_threads = get_nprocs_conf();
+     // Multiply points
+     clock_gettime(CLOCK_MONOTONIC, &start);
+     ec_jacreduce_server_h(args);
+     clock_gettime(CLOCK_MONOTONIC, &end);
+     elapsed = (double) (end.tv_sec - start.tv_sec);
+     elapsed += (double) (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+     from_montgomeryN_h(c,c,indims,pidx,0);
+
+     if (!iseq_cb(r,c)){
+        n_errors1++;
+     }
+  
+     if (n_errors1){
+       printf("\033[1;31m");
+     }
+
+     printf("Pidx %d - N errors(JACREDUCE_PIPPEN-EC2 : %d : N points : %d, Order : %d) : %d - Time : %f\n", 
+         pidx,ec2,necp,i, n_errors1, elapsed);
+    
+     printf("\033[0m");
+     n_errors+=n_errors1;
+     n_errors1=0;
+  
+
+     free(a);
+     free(a1);
+     free(scl);
+     free(c);
+     free(r);
+     free(args);
+     release_h();
   }
 
   retval = n_errors;
@@ -3000,6 +3100,7 @@ int main()
   retval+=test_ec_jacaddmixed(0);
   retval+= test_ec_jacscmul(0);
   retval+=test_ec_jacreduce_opt(0);   
+  retval+=test_ec_jacreduce_pippen(0);   
   retval+=test_ec_jacreduce_precompute(0,0,0);   
   retval+=test_ec_jacreduce_precompute(0,0,1);  
   retval+=test_ec_jacreduce_precompute(0,1);   
@@ -3011,6 +3112,7 @@ int main()
   retval+=test_ec_jacaddmixed(1);
   retval+= test_ec_jacscmul(1);
   retval+=test_ec_jacreduce_opt(1);   
+  retval+=test_ec_jacreduce_pippen(1);   
   retval+=test_ec_jacreduce_precompute(1,0,0);   
   retval+=test_ec_jacreduce_precompute(1,0,1);   
   retval+=test_ec_jacreduce_precompute(1,1);   
