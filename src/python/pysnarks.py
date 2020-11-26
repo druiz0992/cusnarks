@@ -55,6 +55,14 @@ CUMODE_PROOF  = 1
 PORT = 8192
 PORT2 = 8193
 
+sys.path.append(os.path.abspath(os.path.dirname('../../lib/')))
+try:
+  from pycusnarks import *
+  use_pycusnarks = True
+except ImportError:
+  self.logger.error('PyCUSnarks shared library not found. Exiting...')
+  sys.exit(1)
+
 sys.path.append(os.path.abspath(os.path.dirname('../../config/')))
 
 import cusnarks_config as cfg
@@ -67,7 +75,6 @@ def init():
     opt['data_f'] = cfg.get_circuits_folder()
     opt['input_circuit_f'] = 'circuit.bin'
     opt['verification_key_f'] = 'verification_key.json'
-    opt['debug_f'] = 'toxic.json'
     opt['witness_f'] = 'witness.json'
     opt['proof_f'] = '../../circuits/proof.json'
     opt['public_data_f']= '../../circuits/public.json'
@@ -76,30 +83,22 @@ def init():
     opt['output_circuit_format'] = FMT_MONT
     opt['proving_key_f'] = 'proving_key.bin'
     opt['keys_format'] = FMT_MONT
-    opt['charmander_f'] = '../../../charmander-circuit'
-    opt['benchmark_f'] = '../../../charmander-circuit/test/compiled_circuits'
-    opt['minL'] = 3
-    opt['maxL'] = 10
-    opt['nruns'] = 10
     opt['seed'] = None
     opt['snarkjs'] = cfg.get_snarkjs_folder()
-    opt['debug'] = 0
     opt['witness_format'] = FMT_EXT
     opt['out_proving_key_format'] = FMT_MONT
     opt['out_proving_key_f'] = None
     opt['verify'] = 0
     opt['batch_size'] = 20
+    opt['max_batch_size'] = 23
     opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),8)
+    opt['max_cpus'] = get_nprocs_h()
     opt['max_streams'] = get_nstreams()
     opt['start_server'] = 1
-    opt['reserved_cpus'] = 0
     opt['list'] = 1
-    opt['table_type'] = None
-    opt['table_f'] = None
-    opt['table_f1'] = None
-    opt['table_fall'] = None
     opt['zero_knowledge']=1
     opt['grouping'] = DEFAULT_U256_BSELM
+    opt['last_mexp_gpu'] = 1
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -135,10 +134,6 @@ def init():
     parser.add_argument(
        '-b', '--benchmark', type=str, help=help_str, required=False)  
 
-    help_str = 'Enables debug mode. It will launch snarkjs with known toxic values and will compare output file (Enable:1, Disable:0). Default : ' +str(opt['debug'])
-    parser.add_argument(
-       '-d', '--debug', type=int, help=help_str, required=False)  
-
     help_str = 'Sets seed for random number generator : Default : not set'
     parser.add_argument(
        '-seed', '--seed', type=int, help=help_str, required=False)  
@@ -163,18 +158,6 @@ def init():
     parser.add_argument(
        '-pd', '--public_data', type=str, help=help_str, required=False)  
   
-    help_str = 'Mininum number of levels for benchmark testing. Default : ' +str(opt['minL'])
-    parser.add_argument(
-       '-ml', '--min_levels', type=int, help=help_str, required=False)  
-
-    help_str = 'Maximum number of levels for benchmark testing. Default : ' +str(opt['maxL'])
-    parser.add_argument(
-       '-Ml', '--max_levels', type=int, help=help_str, required=False)  
-
-    help_str = 'Number of repetitions for benchmark testing. Default : ' +str(opt['nruns'])
-    parser.add_argument(
-       '-rep', '--n_rep', type=int, help=help_str, required=False)  
-
     help_str = 'Output proving key file. Default : ' +str(opt['out_proving_key_f'])
     parser.add_argument(
        '-out_pk', '--out_proving_key', type=str, help=help_str, required=False)  
@@ -195,9 +178,17 @@ def init():
     parser.add_argument(
        '-bs', '--batch_size', type=int, help=help_str, required=False)  
 
+    help_str = 'Max batch size (1 << max_batch_size). Default ' + str(opt['batch_size'])
+    parser.add_argument(
+       '-mbs', '--max_batch_size', type=int, help=help_str, required=False)  
+
     help_str = 'Maximum number of GPUs limit. Default ' + str(opt['max_gpus'])
     parser.add_argument(
        '-gpu', '--max_gpus', type=int, help=help_str, required=False)  
+
+    help_str = 'Maximum number of CPUs limit. Default ' + str(opt['max_cpus'])
+    parser.add_argument(
+       '-cpu', '--max_cpus', type=int, help=help_str, required=False)  
 
     help_str = 'Maximum number of Streans limit. Default ' + str(opt['max_streams'])
     parser.add_argument(
@@ -227,22 +218,6 @@ def init():
     parser.add_argument(
        '-l', '--list', required=False)  
 
-    help_str = 'Reserved N CPUs' + str(opt['reserved_cpus'])
-    parser.add_argument(
-       '-r_cpus', '--reserved_cpus', type=int, help=help_str, required=False)  
-
-    help_str = 'Output Table File (hExps only). Default : ' +str(opt['table_f1'])
-    parser.add_argument(
-       '-t1', '--table_f1', type=str, help=help_str, required=False)  
-
-    help_str = 'Output Table File (All EC points). Default : ' +str(opt['table_fall'])
-    parser.add_argument(
-       '-tall', '--table_fall', type=str, help=help_str, required=False)  
-
-    help_str = 'Input Table File (All EC points). Default : ' +str(opt['table_f'])
-    parser.add_argument(
-       '-t', '--table_f', type=str, help=help_str, required=False)  
-
     help_str = 'Zero Knowledge Enabled. Default : ' + str(opt['zero_knowledge'])
     parser.add_argument(
        '-zk', '--zero_knowledge', type=int, help=help_str, required=False)  
@@ -251,28 +226,26 @@ def init():
     parser.add_argument(
        '-g', '--grouping', type=int, help=help_str, required=False)  
 
+    help_str = 'Compute last Multiexp block with GPU. Default : ' + str(opt['last_mexp_gpu'])
+    parser.add_argument(
+       '-lmg', '--last_mexp_gpu', type=int, help=help_str, required=False)  
+
     return opt, parser
 
 def run(opt, parser):
     args = parser.parse_args()
 
-    if args.min_levels is not None:
-       opt['minL'] = args.min_levels
- 
-    if args.max_levels is not None:
-       opt['maxL'] = args.max_levels
-
-    if args.n_rep is not None:
-       opt['nruns'] = args.n_rep
-
-    if args.benchmark is not None:
-        opt['benchmark_f'] = args.benchmark
-
     if args.batch_size is not None:
        opt['batch_size'] = args.batch_size
+
+    if args.max_batch_size is not None:
+       opt['max_batch_size'] = args.max_batch_size
     
     if args.max_gpus is not None:
        opt['max_gpus'] = args.max_gpus
+    
+    if args.max_cpus is not None:
+       opt['max_cpus'] = args.max_cpus
     
     if args.max_streams is not None:
        opt['max_streams'] = args.max_streams
@@ -347,35 +320,11 @@ def run(opt, parser):
         else:
            opt['verification_key_f'] = opt['data_f'] + args.verification_key
 
-    if args.table_f1 is not None:
-        if '/' in args.table_f1:
-           opt['table_f1'] = args.table_f1
-        else:
-           opt['table_f1'] = opt['data_f'] + args.table_f1
-        opt['table_f'] =  opt['table_f1']
-        opt['table_type'] = 0
-
-    if args.table_fall is not None and args.table_f1 is None:
-        if '/' in args.table_fall:
-           opt['table_fall'] = args.table_fall
-        else:
-           opt['table_fall'] = opt['data_f'] + args.table_fall
-        opt['table_f'] =  opt['table_fall']
-        opt['table_type'] = 1
-
     if args.seed is not None:
          opt['seed'] = args.seed
 
     if args.snarkjs is not None:
          opt['snarkjs'] = args.snarkjs
-
-    if args.debug == 0 or args.debug is None:
-         opt['debug_f'] = None
-    else:
-         opt['debug_f'] = opt['debug_f']
-
-    if args.reserved_cpus is not None:
-         opt['reserved_cpus'] = args.reserved_cpus
 
     if args.grouping is not None:
          opt['grouping'] = args.grouping
@@ -404,16 +353,6 @@ def run(opt, parser):
       if args.keys_format is not None:
         opt['keys_format'] = args.keys_format
 
-      if args.benchmark is not None:
-        # Compile circuit if it doesnt exist
-        for level in xrange(opt['minL'], opt['maxL']+1):
-           circuit = opt['benchmark_f'] + 'test-prove-kyc-'+str(level)+'-'+str(level)+'-'+str(level)+'.json'
-           if not os.path.isfile(circuit):
-              call([node, opt['charmander_f']+'inoutsZk/gen-inputs.js', level, level, level])
-              call([node, opt['charmander_f']+'test/compile-circuit.js', level, level, level])
-              
-
-
       if is_port_in_use(PORT):
           query = { 'stop_server' : 1 }
           jsocket = jsonSocket()
@@ -423,9 +362,8 @@ def run(opt, parser):
       GS = GrothSetup(in_circuit_f = opt['input_circuit_f'], out_circuit_f=opt['output_circuit_f'],
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'], n_gpu=opt['max_gpus'],
-                    out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
-                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'], 
-                    table_type=opt['table_type'],
+                    out_k_ecformat=EC_T_AFFINE, seed=opt['seed'],
+                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'],
                     grouping=opt['grouping'])
       
       GS.setup()
@@ -472,19 +410,16 @@ def run(opt, parser):
       if args.start_server is not None:
          opt['start_server'] = args.start_server
 
-      if args.table_f is not None:
-        if '/' in args.table_f:
-           opt['table_f'] = args.table_f
-        else:
-           opt['table_f'] = opt['data_f'] + args.table_f
+      if args.last_mexp_gpu is not None:
+        opt['last_mexp_gpu'] = args.last_mexp_gpu
 
       if not is_port_in_use(PORT) :
           start = time.time()
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
-                      out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
-                      n_streams=opt['max_streams'], start_server=opt['start_server'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'],
-                      read_table_f=opt['table_f'], write_table_f=opt['table_f'],table_type=opt['table_type'],zk=opt['zero_knowledge'], grouping=opt['grouping'])
+                      out_pk_format = opt['out_proving_key_format'], n_gpus=opt['max_gpus'], 
+                      start_server=opt['start_server'], max_batch_size=opt['max_batch_size'],
+                      seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
+                      
           end = time.time() - start
           print("GP init : "+str(end))
 
@@ -493,7 +428,8 @@ def run(opt, parser):
           else:
              # abort if witness is not present
              if os.path.isfile(opt['witness_f']) :
-                 GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'])
+                 GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'], zk=opt['zero_knowledge'],
+                         last_mexp_gpu=opt['last_mexp_gpu'], batch_size=opt['batch_size'], n_streams=opt['max_streams'], cpu=opt['max_cpus'])
              else :
                 print('Witness file %s doesn\'t exist', opt['witness_f'])
            
@@ -502,7 +438,12 @@ def run(opt, parser):
       else :
           query = { 'witness_f' : opt['witness_f'], 'proof_f' : opt['proof_f'],
                     'public_data_f' : opt['public_data_f'],
-                    'verify_en' : opt['verify'] }
+                    'verify_en' : opt['verify'],
+                    'zk' : opt['zero_knowledge'],
+                    'last_mexp_gpu' : opt['last_mexp_gpu'],
+                    'batch_size': opt['batch_size'],
+                    'n_streams' : opt['max_streams'],
+                    'cpu': opt['max_cpus']}
 
           jsocket = jsonSocket()
           jsocket.send_message(query)

@@ -128,46 +128,99 @@ def test_cusnarks():
          os.remove(circuits_folder+OUTPUT_P_F)
      
       GP = GrothProver(circuits_folder+pkfile_bin, verification_key_f = circuits_folder+INPUT_VK_F, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=0, seed=123)
       result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
       del GP
 
-      test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WTNS")
+      test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WTNS. CPU" )
+
+      if use_pycusnarks :
+        if os.path.exists(circuits_folder+OUTPUT_PD_F):
+           os.remove(circuits_folder+OUTPUT_PD_F)
+        if os.path.exists(circuits_folder+OUTPUT_P_F):
+           os.remove(circuits_folder+OUTPUT_P_F)
+       
+        GP = GrothProver(circuits_folder+pkfile_bin, verification_key_f = circuits_folder+INPUT_VK_F, 
+                         start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+        result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+        del GP
+  
+        test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WTNS. GPU" )
      
       if os.path.exists(circuits_folder+OUTPUT_PD_F):
          os.remove(circuits_folder+OUTPUT_PD_F)
       if os.path.exists(circuits_folder+OUTPUT_P_F):
          os.remove(circuits_folder+OUTPUT_P_F)
       GP = GrothProver(circuits_folder+pkfile_bin, verification_key_f = circuits_folder+INPUT_VK_F, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=0, seed=123)
       result = GP.proof(witness_wshm_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
 
       del GP
       
-      test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WSHM")
+      test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WSHM. CPU")
       
+      if use_pycusnarks:
+        if os.path.exists(circuits_folder+OUTPUT_PD_F):
+           os.remove(circuits_folder+OUTPUT_PD_F)
+        if os.path.exists(circuits_folder+OUTPUT_P_F):
+           os.remove(circuits_folder+OUTPUT_P_F)
+        GP = GrothProver(circuits_folder+pkfile_bin, verification_key_f = circuits_folder+INPUT_VK_F, 
+                         start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+        result = GP.proof(witness_wshm_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+
+        del GP
+      
+        test_printResults(result, "TS : Cusnarks R1CS.  Proof: PKBIN + WSHM. GPU")
+
       if os.path.exists(circuits_folder+OUTPUT_PD_F):
          os.remove(circuits_folder+OUTPUT_PD_F)
       if os.path.exists(circuits_folder+OUTPUT_P_F):
          os.remove(circuits_folder+OUTPUT_P_F)
       
       GP = GrothProver(circuits_folder+pkfile_zkey, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=0, seed=123)
       result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
 
       del GP
-      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WTNS")
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WTNS. CPU")
+      
+      if use_pycusnarks:
+        if os.path.exists(circuits_folder+OUTPUT_PD_F):
+           os.remove(circuits_folder+OUTPUT_PD_F)
+        if os.path.exists(circuits_folder+OUTPUT_P_F):
+           os.remove(circuits_folder+OUTPUT_P_F)
+        
+        GP = GrothProver(circuits_folder+pkfile_zkey, 
+                         start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+        result = GP.proof(witness_wtns_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+
+        del GP
+        test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WTNS. GPU")
       
       if os.path.exists(circuits_folder+OUTPUT_PD_F):
          os.remove(circuits_folder+OUTPUT_PD_F)
       if os.path.exists(circuits_folder+OUTPUT_P_F):
          os.remove(circuits_folder+OUTPUT_P_F)
       GP = GrothProver(circuits_folder+pkfile_zkey, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=0, seed=123)
       result = GP.proof(witness_wshm_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
 
       del GP
-      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WSHM")
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WSHM. CPU")
+
+      if use_pycusnarks:
+        if os.path.exists(circuits_folder+OUTPUT_PD_F):
+           os.remove(circuits_folder+OUTPUT_PD_F)
+        if os.path.exists(circuits_folder+OUTPUT_P_F):
+           os.remove(circuits_folder+OUTPUT_P_F)
+        GP = GrothProver(circuits_folder+pkfile_zkey, 
+                         start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+        result = GP.proof(witness_wshm_f, circuits_folder+OUTPUT_P_F, circuits_folder+OUTPUT_PD_F, verify_en=1)
+  
+        del GP
+        test_printResults(result, "TS : SNARKJS. Proof:  ZKEY + WSHM. GPU")
+
+      os.chdir(cusnarks_folder+"/aux_data")
 
       os.chdir(cusnarks_folder+"/aux_data")
       call(["./launch_hermez.sh"])
@@ -179,22 +232,48 @@ def test_cusnarks():
          os.remove(circuits_folder+OUTPUT_HERMEZP_F)
       
       GP = GrothProver(circuits_folder+pkfile_hermez_zkey, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=0, seed=123)
       result = GP.proof(witness_hermez_wtns_f, circuits_folder+OUTPUT_HERMEZP_F, circuits_folder+OUTPUT_HERMEZPD_F, verify_en=1)
 
       del GP
-      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WTNS")
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WTNS. CPU")
+
+      if use_pycusnarks:
+        if os.path.exists(circuits_folder+OUTPUT_HERMEZPD_F):
+           os.remove(circuits_folder+OUTPUT_HERMEZPD_F)
+        if os.path.exists(circuits_folder+OUTPUT_HERMEZP_F):
+           os.remove(circuits_folder+OUTPUT_HERMEZP_F)
+        
+        GP = GrothProver(circuits_folder+pkfile_hermez_zkey, 
+                         start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+        result = GP.proof(witness_hermez_wtns_f, circuits_folder+OUTPUT_HERMEZP_F, circuits_folder+OUTPUT_HERMEZPD_F, verify_en=1)
+  
+        del GP
+        test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WTNS")
+      
       
       if os.path.exists(circuits_folder+OUTPUT_HERMEZPD_F):
          os.remove(circuits_folder+OUTPUT_HERMEZPD_F)
       if os.path.exists(circuits_folder+OUTPUT_HERMEZP_F):
          os.remove(circuits_folder+OUTPUT_HERMEZP_F)
       GP = GrothProver(circuits_folder+pkfile_hermez_zkey, 
-                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+                       start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=0, seed=123)
       result = GP.proof(witness_hermez_wshm_f, circuits_folder+OUTPUT_HERMEZP_F, circuits_folder+OUTPUT_HERMEZPD_F, verify_en=1)
 
       del GP
-      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WSHM")
+      test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WSHM. CPU")
+
+      if use_pycusnarks:
+        if os.path.exists(circuits_folder+OUTPUT_HERMEZPD_F):
+           os.remove(circuits_folder+OUTPUT_HERMEZPD_F)
+        if os.path.exists(circuits_folder+OUTPUT_HERMEZP_F):
+           os.remove(circuits_folder+OUTPUT_HERMEZP_F)
+        GP = GrothProver(circuits_folder+pkfile_hermez_zkey, 
+                         start_server=0, keep_f=circuits_folder, snarkjs=snarkjs_folder, n_gpus=4, seed=123)
+        result = GP.proof(witness_hermez_wshm_f, circuits_folder+OUTPUT_HERMEZP_F, circuits_folder+OUTPUT_HERMEZPD_F, verify_en=1)
+  
+        del GP
+        test_printResults(result, "TS : SNARKJS. Proof:  ZKEY(HERMEZ) + WSHM. GPU")
 
 if __name__ == "__main__":
     result_pkbin = test_cusnarks()

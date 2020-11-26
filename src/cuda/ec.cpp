@@ -2160,21 +2160,29 @@ static void ec_jacdouble_finish_h(void *args)
 static void ec_initP_h(uint32_t *z, uint32_t n, uint32_t ec2, uint32_t pidx)
 {
   const uint32_t *ECInf = CusnarksMiscKGet();
-  for (uint32_t i=0; i < n; i++){
-    if (ec2) {
-       memcpy(
-              &z[i * NWORDS_FP * ECP2_JAC_OUTDIMS],
-              &ECInf[(MISC_K_INF2) * NWORDS_FP],
-              sizeof(uint32_t) * NWORDS_FP * ECP2_JAC_OUTDIMS
-            );
-    } else {
-       memcpy(
-              &z[i * NWORDS_FP * ECP_JAC_OUTDIMS],
-              &ECInf[(MISC_K_INF) * NWORDS_FP],
-              sizeof(uint32_t) * NWORDS_FP * ECP_JAC_OUTDIMS
-            );
-    }
+  uint32_t outdims = ECP_JAC_OUTDIMS;
+  uint32_t infPos = MISC_K_INF;
+  t_uint64 i;
+
+  if (ec2){
+    outdims = ECP2_JAC_OUTDIMS;
+    infPos = MISC_K_INF2;
   }
+
+  for (i=0; i < n-1; i++){
+    // prefetch
+     __builtin_prefetch(&z[(i+1)* NWORDS_FP * outdims]);
+     memcpy(
+              &z[i * NWORDS_FP * outdims],
+              &ECInf[infPos * NWORDS_FP],
+              sizeof(uint32_t) * NWORDS_FP * outdims
+            );
+  }
+  memcpy(
+          &z[i * NWORDS_FP * outdims],
+          &ECInf[infPos * NWORDS_FP],
+          sizeof(uint32_t) * NWORDS_FP * outdims
+        );
 }
 
 

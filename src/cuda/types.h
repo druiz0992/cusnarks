@@ -46,7 +46,7 @@
 #define PIPPENGER_CBIN_SIZE  (16)
 
 #define TRANSPOSE_BLOCK_SIZE  (32)
-#define MAX_U256_BSELM  (12)
+#define MAX_U256_BSELM  (6)
 #define DEFAULT_U256_BSELM  (6)
 #define DEFAULT_U256_BSELM_CUDA  (8)
 #define NBITS_BYTE (8)

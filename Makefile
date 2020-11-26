@@ -140,7 +140,9 @@ MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)'        \
               'CUBIN_NAME=$(CUBIN_NAME)'      \
               'AUX_INCLUDES=$(AUX_INCLUDES)'  \
               'DEFINES=$(DEFINES)'   \
-              'DEFINES_DEBUG=$(DEFINES_DEBUG)'  
+              'DEFINES_DEBUG=$(DEFINES_DEBUG)' \
+              'FORCE_CPU=$(FORCE_CPU)'  
+
  
 build:
 	if ! test -d $(LIB_PATH); \
@@ -249,4 +251,3 @@ third_party_libs_clean:
 	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
 
 .PHONY:	config test build clean all force_all third_party_libs_clean third_party_libs test_unit test_system clib debug_gpu docker_all reduced_third_party_libs config_docker clean_docker
-

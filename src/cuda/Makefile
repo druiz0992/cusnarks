@@ -81,7 +81,9 @@ CASMSRC = fr.casm \
           fp.casm
 
 #Check if CUDA tools are installed.
+ifneq ($(FORCE_CPU),1)
 CUDA_INSTALLED = $(shell which $(NVCC))
+endif
 
 
 NVDISASM_FILE:=$(CUBIN_NAME:.cubin=.asm)

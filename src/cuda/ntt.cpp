@@ -665,8 +665,8 @@ void interpol_odd_h(uint32_t *A, const uint32_t *roots, uint32_t levels,t_uint64
 
 void ntt_init_h(uint32_t nroots)
 {
-  if (M_transpose == NULL){
-    M_transpose = (uint32_t *) malloc ( (t_uint64) (nroots) * NWORDS_FR * sizeof(uint32_t));
+  if (M_transpose == NULL){ 
+    M_transpose = (uint32_t *) malloc ( (t_uint64) (nroots+1) * NWORDS_FR * sizeof(uint32_t));
   }
   if (M_mul == NULL){
     M_mul = (uint32_t *) malloc ( (t_uint64)(nroots) * NWORDS_FR * sizeof(uint32_t));
@@ -714,7 +714,23 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
   #endif
 
   uint32_t nprocs = get_nprocs_h();
+  // max_threads needs to be a power of 2
   args->max_threads = MIN(args->max_threads, MIN(nprocs, 1<<MIN(args->Nrows, args->Ncols)));
+  uint32_t tmpMaxThreads = args->max_threads - 1;
+  tmpMaxThreads  |= tmpMaxThreads  >> 1;
+  tmpMaxThreads  |= tmpMaxThreads  >> 2;
+  tmpMaxThreads  |= tmpMaxThreads  >> 4;
+  tmpMaxThreads  |= tmpMaxThreads  >> 8;
+  tmpMaxThreads  |= tmpMaxThreads  >> 16;
+  tmpMaxThreads++;
+  // I allow using more CPUs than available
+  /*
+   if ( tmpMaxThreads > args->max_threads ){
+    tmpMaxThreads = (tmpMaxThreads >> 1);
+  }
+  */
+  args->max_threads = tmpMaxThreads;
+  
 
   unsigned long long nvars = 1ull<<(args->Nrows+args->Ncols);
   unsigned long long start_idx, last_idx;

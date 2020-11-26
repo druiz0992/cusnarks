@@ -1689,6 +1689,10 @@ def get_gpu_affinity_cuda():
    except:
      return gpu_affinity
 
+def get_gpu_info():
+    info = nvgpu.gpu_info()
+    return info
+
 def get_ngpu(max_used_percent=20.):
      out = run(['which', 'nvidia-smi'],stdout=PIPE)
      out = out.stdout.decode("utf-8")

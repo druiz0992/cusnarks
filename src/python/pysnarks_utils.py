@@ -538,7 +538,6 @@ def pkvars_to_json(out_bin, out_ec, pk):
           pk_dict['vk_beta_2'] = ECC.from_uint256(np.reshape(pk['beta_2'],(-1,2,NWORDS_FP)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)[0].as_str()
           pk_dict['vk_delta_2'] = ECC.from_uint256(np.reshape(pk['delta_2'],(-1,2,NWORDS_FP)), in_ectype=EC_T_AFFINE, out_ectype=out_ec, reduced=True, ec2=True, remove_last=True)[0].as_str()
 
-
         return pk_dict
 
 def pkbin_get(pk_bin, labels):
@@ -617,6 +616,103 @@ def pkbin_get(pk_bin, labels):
          hExps_offset = offset_ec_data + 14*NWORDS_FP + A_nWords + \
                      B1_nWords + B2_nWords + C_nWords
          ret_val.append(pk_bin[hExps_offset:hExps_offset+hExps_nWords])
+       else: 
+         sys.exit(1)
+
+    return ret_val
+
+def pkbinsh_get(pk_sh, labels):
+    #Header + field p + group g + X_nWords
+    pk_bin = np.frombuffer(pk_sh, dtype=np.uint32)
+    fr_words = pk_bin[PKBIN_H_RBITLEN_OFFSET] & 0xFFFF
+    fp_words = pk_bin[PKBIN_H_RBITLEN_OFFSET] >> 16
+    if fp_words != NWORDS_FP:
+             print("Mismatch in NWORDS_FP", fp_words)
+             sys.exit(1)
+    offset_data = PKBIN_H_N_OFFSET + fr_words + fp_words + 14
+    offset = PKBIN_H_N_OFFSET +  fr_words + fp_words
+
+    polsA_nWords = int(w2dw(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + fr_words + fp_words + 2
+    polsB_nWords = int(w2dw(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + fr_words + fp_words + 4
+    A_nWords = int(w2dw(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + fr_words + fp_words + 6
+    B1_nWords = int(w2dw(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + fr_words + fp_words + 8
+    B2_nWords = int(w2dw(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + fr_words + fp_words + 10
+    C_nWords = int(w2dw(pk_bin[offset:offset+2]))
+    offset = PKBIN_H_N_OFFSET + fr_words + fp_words + 12
+    hExps_nWords =int(w2dw(pk_bin[offset:offset+2]))
+
+    offset_ec_data = offset_data + polsA_nWords + polsB_nWords
+    
+    ret_val = []
+    for label in labels:
+       if label=='nVars':
+         nVars = np.frombuffer(pk_sh, dtype=np.uint32, count=1, offset=PKBIN_H_NVARS_OFFSET*4)
+         ret_val.append(nVars)
+       elif label== 'nPublic':
+         nPublic = np.frombuffer(pk_sh, dtype=np.uint32, count=1, offset=PKBIN_H_NPUBLIC_OFFSET*4)
+         ret_val.append(nPublic)
+       elif label== 'domainSize':
+         domainSize = np.frombuffer(pk_sh, dtype=np.uint32, count=1, offset=PKBIN_H_DOMAINSIZE_OFFSET*4)
+         ret_val.append(domainSize)
+       elif label== 'polsA':
+         polsA_offset = offset_data
+         polsA = np.frombuffer(pk_sh, dtype=np.uint32, count=polsA_nWords, offset=polsA_offset*4)
+         ret_val.append(polsA)
+       #elif label== 'polsH':
+       #  polsH_offset = offset_data
+       #  ret_val.append(pk_bin[polsH_offset:polsH_offset+polsH_nWords])
+       elif label== 'polsB':
+         polsB_offset = offset_data + polsA_nWords
+         polsB = np.frombuffer(pk_sh, dtype=np.uint32, count=polsB_nWords, offset=polsB_offset*4)
+         ret_val.append(polsB)
+       elif label== 'alfa_1':
+         alfa_1_offset = offset_ec_data
+         alfa_1 = np.frombuffer(pk_sh, dtype=np.uint32, count=2*NWORDS_FP, offset=alfa_1_offset*4)
+         ret_val.append(alfa_1)
+       elif label== 'beta_1':
+         beta_1_offset = offset_ec_data + 2*NWORDS_FP
+         beta_1 = np.frombuffer(pk_sh, dtype=np.uint32, count=2*NWORDS_FP, offset=beta_1_offset*4)
+         ret_val.append(beta_1)
+       elif label== 'delta_1':
+         delta_1_offset = offset_ec_data + 4*NWORDS_FP
+         delta_1 = np.frombuffer(pk_sh, dtype=np.uint32, count=2*NWORDS_FP, offset=delta_1_offset*4)
+         ret_val.append(delta_1)
+       elif label== 'beta_2':
+         beta_2_offset = offset_ec_data + 6*NWORDS_FP
+         beta_2 = np.frombuffer(pk_sh, dtype=np.uint32, count=4*NWORDS_FP, offset=beta_2_offset*4)
+         ret_val.append(beta_2)
+       elif label== 'delta_2':
+         delta_2_offset = offset_ec_data + 10*NWORDS_FP
+         delta_2 = np.frombuffer(pk_sh, dtype=np.uint32, count=4*NWORDS_FP, offset=delta_2_offset*4)
+         ret_val.append(delta_2)
+       elif label == 'A':
+         A_offset = offset_ec_data + 14*NWORDS_FP
+         A = np.frombuffer(pk_sh, dtype=np.uint32, count=A_nWords, offset=A_offset*4)
+         ret_val.append(A)
+       elif label == 'B1':
+         B1_offset = offset_ec_data + 14*NWORDS_FP + A_nWords
+         B1 = np.frombuffer(pk_sh, dtype=np.uint32, count=B1_nWords, offset=B1_offset*4)
+         ret_val.append(B1)
+       elif label == 'B2':
+         B2_offset = offset_ec_data + 14*NWORDS_FP + A_nWords + \
+                     B1_nWords
+         B2 = np.frombuffer(pk_sh, dtype=np.uint32, count=B2_nWords, offset=B2_offset*4)
+         ret_val.append(B2)
+       elif label == 'C':
+         C_offset = offset_ec_data + 14*NWORDS_FP + A_nWords + \
+                     B1_nWords + B2_nWords
+         C = np.frombuffer(pk_sh, dtype=np.uint32, count=C_nWords, offset=C_offset*4)
+         ret_val.append(C)
+       elif label == 'hExps':
+         hExps_offset = offset_ec_data + 14*NWORDS_FP + A_nWords + \
+                     B1_nWords + B2_nWords + C_nWords
+         hExps = np.frombuffer(pk_sh, dtype=np.uint32, count=hExps_nWords, offset=hExps_offset*4)
+         ret_val.append(hExps)
        else: 
          sys.exit(1)
 

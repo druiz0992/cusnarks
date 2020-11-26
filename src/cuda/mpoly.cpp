@@ -140,7 +140,8 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
 
   if (args->mode==1){
      vars_per_thread = vars_per_thread * ZKEY_COEFF_NWORDS;
-  }
+     memset(args->pout, 0, 2 * args->reduce_coeff * NWORDS_FR * sizeof(uint32_t));
+  } 
    
   pthread_t *workers = (pthread_t *) malloc(nthreads * sizeof(pthread_t));
   mpoly_eval_t *w_args  = (mpoly_eval_t *)malloc(nthreads * sizeof(mpoly_eval_t));
@@ -153,11 +154,6 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   for(i=0; i< nthreads; i++){
      start_idx = i * vars_per_thread;
      last_idx = (i+1) * vars_per_thread;
-     /*
-     if (i > 0){
-        memset(utils_mpoly[i], 0, sizeof(uint32_t) * (1ull << CusnarksGetNRoots()));
-     }
-     */
      if ( (i == nthreads - 1) && (last_idx != nvars) ){
          last_idx = nvars;
          if (args->mode == 1){
@@ -189,6 +185,7 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   for (i=0; i < nthreads; i++){
     pthread_join(workers[i], NULL);
   }
+  
   del_barrier_h();
 
   free(workers);
@@ -259,7 +256,7 @@ void *mpolys_eval_h(void *vargs)
   t_mulm mulm_cb =  getcb_mulm_h(args->pidx);
  
   //printf("last_idx : %d\n",args->last_idx); 
-  for (unsigned long long i=args->start_idx; i<args->last_idx; i+=ZKEY_COEFF_NWORDS){
+  for (unsigned long long i=args->start_idx; i<args->last_idx; i+=(ZKEY_COEFF_NWORDS) ){
       coeff = &pin[i];
       w_idx = coeff[ZKEY_COEFF_SIGNAL_OFFSET];
       scl = (uint32_t *)&args->scalar[w_idx*NWORDS_FR];

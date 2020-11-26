@@ -3,9 +3,13 @@
 # Creates cusnarks docker
 
 # Params
-# $1 : Recompute docker struct -> 1
+# $1 : Dockerfiler
+# $2 : Recompute docker struct -> 1
 
-if [[ $1 = 1 ]]; then
+dockerF=$1
+extension="${dockerF##*.}"
+echo $extension
+if [[ $2 = 1 ]]; then
   ./clean.sh
 
   mkdir -p cusnarks/circuits
@@ -15,6 +19,9 @@ if [[ $1 = 1 ]]; then
   make clean 
   cp -R ../cusnarks/src ./docker/cusnarks
   cp -R ../cusnarks/config ./docker/cusnarks
+  if [[ "$extension" == *"debug"* ]]; then
+     cp -R ../cusnarks/test ./docker/cusnarks
+  fi
   cp ../cusnarks/Makefile ./docker/cusnarks/
   rm -rf ./docker/cusnarks/__pycache__
 
@@ -30,4 +37,4 @@ if [[ $1 = 1 ]]; then
   git clone https://github.com/iden3/go-cusnarks.git
 fi
 
-docker build -t cusnarks .
+docker build -f $dockerF -t cusnarks_$extension .

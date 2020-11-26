@@ -473,10 +473,10 @@ def rangeuBI_h(ct.uint32_t nsamples, np.ndarray[ndim=1, dtype=np.uint32_t] start
   
      return out_samples.reshape((-1,biSize))
 
-def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
+def mpoly_eval_h( np.ndarray[ndim=1, dtype=np.uint32_t]  outd,
+              np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] pdata,
               ct.uint32_t reduce_coeff, ct.uint32_t ncoeff, ct.uint32_t start_idx, ct.uint32_t last_idx, ct.uint32_t max_threads, ct.uint32_t pidx):
 
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] outd = np.zeros(ncoeff*8,dtype=np.uint32)
      cdef np.ndarray[ndim=1, dtype=np.uint32_t] sclflat = np.zeros(scldata.shape[0] * scldata.shape[1],dtype=np.uint32)
      sclflat = np.reshape(scldata,-1)
      cdef ct.mpoly_eval_t *args_c = <ct.mpoly_eval_t *> malloc(sizeof(ct.mpoly_eval_t))
@@ -500,12 +500,10 @@ def mpoly_eval_h(np.ndarray[ndim=2, dtype=np.uint32_t] scldata, np.ndarray[ndim=
 
      free(args_c)
 
-     return np.reshape(outd,(-1,8))
+def mpoly_evals_h(np.ndarray[ndim=1, dtype=np.uint32_t] pa,
+                  np.ndarray[ndim=1, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] p1data,
+                  ct.uint32_t ncoeff, ct.uint32_t n_cpu, ct.uint32_t pidx):
 
-def mpoly_evals_h(np.ndarray[ndim=1, dtype=np.uint32_t] scldata, np.ndarray[ndim=1, dtype=np.uint32_t] p1data,
-                  ct.uint32_t ncoeff, ct.uint32_t pidx):
-
-     cdef np.ndarray[ndim=1, dtype=np.uint32_t] pa = np.zeros(2*ncoeff*NWORDS_FR,dtype=np.uint32)
      cdef ct.mpoly_eval_t *args_c = <ct.mpoly_eval_t *> malloc(sizeof(ct.mpoly_eval_t))
          
      args_c.pout = &pa[0]
@@ -514,35 +512,35 @@ def mpoly_evals_h(np.ndarray[ndim=1, dtype=np.uint32_t] scldata, np.ndarray[ndim
      args_c.start_idx = 0
      args_c.reduce_coeff = ncoeff
      args_c.last_idx = <unsigned long long> len(p1data)-1
-     args_c.max_threads = MAX_NCORES_OMP
+     args_c.max_threads = n_cpu
      args_c.pidx = pidx
      args_c.ncoeff = <ct.uint32_t> p1data[0]
      args_c.mode = 1
 
      with nogil:
-        uh.cmpoly_eval_server_h(args_c)
+       uh.cmpoly_eval_server_h(args_c)
 
      free(args_c)
 
-     return np.reshape(pa,(-1,NWORDS_FR))
-
-
-def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[ndim=1, dtype=np.uint32_t] invb,
-                         np.ndarray[ndim=1, dtype=np.uint32_t] invroots, ct.uint32_t rstride, ct.uint32_t mode, ct.uint32_t pidx):
+def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, 
+        np.ndarray[ndim=1, dtype=np.uint32_t] invroots,
+        unsigned long long m, ct.uint32_t rstride, ct.uint32_t mode, 
+        ct.uint32_t n_cpu, ct.uint32_t pidx):
 
      cdef ct.ntt_interpolandmul_t *args_c = <ct.ntt_interpolandmul_t *> malloc(sizeof(ct.ntt_interpolandmul_t))
-     cdef ct.uint32_t Ncols = np.log2(inva.shape[0]/NWORDS_FR)/2
-     cdef ct.uint32_t Nrows = np.log2(inva.shape[0]/NWORDS_FR) - Ncols
+     cdef ct.uint32_t Ncols = np.log2(m)/2
+     cdef ct.uint32_t Nrows = np.log2(m) - Ncols
+     cdef unsigned long long pos = m * NWORDS_FR
 
      args_c.A = &inva[0]
-     args_c.B = &invb[0]
+     args_c.B = &inva[pos]
      args_c.roots = &invroots[0]
      args_c.Nrows = Nrows
      args_c.Ncols = Ncols
      args_c.nroots = Nrows+Ncols
      args_c.rstride = rstride
      args_c.pidx = pidx
-     args_c.max_threads = MAX_NCORES_OMP
+     args_c.max_threads = n_cpu
      args_c.mode = mode
 
      with nogil:
@@ -552,14 +550,14 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva, np.ndarray[
      cdef ct.uint32_t [:] M
      cdef unsigned long long dims
      if args_c.mode == 0:
-        M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mtranspose_h()
-        dims =1<<(Nrows+Ncols+1)
+        M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8 + 8]> uh.cget_Mtranspose_h()
+        dims =(1<<(Nrows+Ncols+1))+1
      else :
-        M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols)) * 8]> uh.cget_Mtranspose_h()
-        dims =1<<(Nrows+Ncols)
-     #cdef ct.uint32_t [:] M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols+1)) * 8]> uh.cget_Mmul_h()
+        M = <ct.uint32_t [:(<long long unsigned int> 1<<(Nrows+Ncols)) * 8 + 8]> uh.cget_Mtranspose_h()
+        dims =(1<<(Nrows+Ncols))+1
 
      free(args_c)
+
      return np.reshape(M,(dims,NWORDS_FR))
 
 def get_nprocs_h():
@@ -668,7 +666,6 @@ def readU256PKFile_h(bytes fname):
     return pk_data
 
 def readU256PKFileTo_h(bytes fname, np.ndarray[ndim=1, dtype=np.uint32_t] pk_data):
-   
     uh.creadU256PKFile_h(&pk_data[0], <char *>fname, pk_data.shape[0])
 
 def readU256PKFileHeader_h(bytes fname):
@@ -1069,7 +1066,7 @@ def ec2_jacaddreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inv,
 def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
                   np.ndarray[ndim=1, dtype = np.uint32_t] intbl, bytes fname, 
                   ct.t_uint64 offset, ct.t_uint64 total_words,
-                  ct.uint32_t order, ct.uint32_t ec2,
+                  ct.uint32_t order, ct.uint32_t ec2, ct.uint32_t n_cpu,
                   ct.uint32_t pidx, ct.uint32_t to_aff, ct.uint32_t add_in,
                   ct.uint32_t strip_last):
 
@@ -1097,7 +1094,7 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
   args_c.n = n
   args_c.pidx = pidx
   args_c.pippen = 0
-  args_c.max_threads = MAX_NCORES_OMP
+  args_c.max_threads = n_cpu
   if len(fname) == 0:
     # Compute table 0 -> each thread computes ectable and then does mexp
     # Compute table = 1 -> one thread computes ectable and all do mexp
@@ -1127,7 +1124,8 @@ def ec_jacreduce_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
 
 def ec_jacreduce_pippen_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
                   np.ndarray[ndim=1, dtype = np.uint32_t] ecp,
-                  ct.uint32_t ec2, ct.uint32_t pidx, ct.uint32_t init, ct.uint32_t combine,  ct.uint32_t to_aff,
+                  ct.uint32_t ec2, ct.uint32_t n_cpu, ct.uint32_t pidx, ct.uint32_t init,
+                  ct.uint32_t combine,  ct.uint32_t to_aff,
                   ct.uint32_t add_in, ct.uint32_t strip_last):
 
   cdef ct.uint32_t outdims = ECP_JAC_OUTDIMS
@@ -1156,7 +1154,7 @@ def ec_jacreduce_pippen_h(np.ndarray[ndim=1, dtype = np.uint32_t] inscl,
   args_c.pippen = 1
   args_c.init = init
   args_c.combine = combine
-  args_c.max_threads = MAX_NCORES_OMP
+  args_c.max_threads = n_cpu
   if ec2:
     args_c.ec2 = 1
   else :

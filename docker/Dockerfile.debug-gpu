@@ -9,6 +9,7 @@ WORKDIR /usr/src/app
 
 RUN mkdir -p cusnarks
 COPY cusnarks ./cusnarks
+RUN find ./cusnarks -name '.*.swp' -delete
 
 WORKDIR /usr/src/app/cusnarks
 

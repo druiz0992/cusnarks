@@ -107,33 +107,60 @@ t_subm getcb_subm_h( uint32_t pidx)
 {
   t_subm subm_cb;
 
+#ifdef _CASM
   if (pidx == MOD_FP){
      subm_cb = &Fp_rawSub;
   } else {
      subm_cb = &Fr_rawSub;
   }
+#else
+  if (pidx == MOD_FP){
+     subm_cb = &submp_h;
+  } else {
+     subm_cb = &submr_h;
+  }
+#endif
   return subm_cb;
 }
 
 t_addm getcb_addm_h( uint32_t pidx)
 {
   t_addm addm_cb;
+
+#ifdef _CASM
   if (pidx == MOD_FP){
      addm_cb = &Fp_rawAdd;
   } else {
      addm_cb = &Fr_rawAdd;
   }
+#else
+  if (pidx == MOD_FP){
+     addm_cb = &addmp_h;
+  } else {
+     addm_cb = &addmr_h;
+  }
+#endif
   return addm_cb;
 }
 
 t_mulm getcb_mulm_h( uint32_t pidx)
 {
   t_mulm mulm_cb;
+  
+#ifdef _CASM
   if (pidx == MOD_FP){
      mulm_cb = &Fp_rawMMul;
   } else {
      mulm_cb = &Fr_rawMMul;
   }
+#else
+
+  if (pidx == MOD_FP){
+     mulm_cb = &montmultp_h;
+  } else {
+     mulm_cb = &montmultr_h;
+  }
+#endif
   return mulm_cb;
 }
 
@@ -222,6 +249,14 @@ void Fr_fromMont(uint32_t *z, const uint32_t *x)
 *
 * @note  None.
 *****************************************************************************/
+void montmultp_h(uint32_t *z, const uint32_t *x, const uint32_t *y)
+{
+ montmult_h(z,x, y, MOD_FP);
+}
+void montmultr_h(uint32_t *z, const uint32_t *x, const uint32_t *y)
+{
+ montmult_h(z,x, y, MOD_FR);
+}
 void montmult_h(uint32_t *U, const uint32_t *A, const uint32_t *B, uint32_t pidx)
 {
   #ifndef _CASM
@@ -593,6 +628,14 @@ void to_montgomeryN_h(uint32_t *z, const uint32_t *x, uint32_t n, uint32_t pidx)
   uint32_t *y : Input BI bit number 2
   uint32_t pidx    : index of BI modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
+void addmp_h(uint32_t *z, const uint32_t *x, const uint32_t *y)
+{
+ addm_h(z,x, y, MOD_FP);
+}
+void addmr_h(uint32_t *z, const uint32_t *x, const uint32_t *y)
+{
+ addm_h(z,x, y, MOD_FR);
+}
 void addm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
    #ifndef _CASM
@@ -628,6 +671,14 @@ void addm_ext_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx
   uint32_t *y : Input BI bit number 2
   uint32_t pidx    : index of BI modulo to be used. Modulos are retrieved from CusnarksNPGet(pidx)
 */
+void submp_h(uint32_t *z, const uint32_t *x, const uint32_t *y)
+{
+ subm_h(z,x, y, MOD_FP);
+}
+void submr_h(uint32_t *z, const uint32_t *x, const uint32_t *y)
+{
+ subm_h(z,x, y, MOD_FR);
+}
 void subm_h(uint32_t *z, const uint32_t *x, const uint32_t *y, uint32_t pidx)
 {
   #ifndef _CASM

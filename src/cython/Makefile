@@ -44,8 +44,13 @@ PYTHON=python3
 #WS:= $(null) $(null)
 #DEFINE_MACROS:= $(subst $(WS),:,$(DEFINES))
 
+setupScript=setup_nocuda.py
+ifneq ($(FORCE_CPU),1)
+	setupScript=setup.py
+endif
+
 build:
-	$(PYTHON) setup.py build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --library-dirs=$(LIB_PATH)
+	$(PYTHON) ${setupScript} build -b $(OBJECT_PATH) build_ext -b $(LIB_PATH) --library-dirs=$(LIB_PATH)
 
 clean:
 	rm -f $(CTSRC_PATH)/*.cpp $(LIB_PATH)/*.so
