@@ -91,7 +91,7 @@ def init():
     opt['verify'] = 0
     opt['batch_size'] = 20
     opt['max_batch_size'] = 23
-    opt['max_gpus'] = min(get_ngpu(max_used_percent=95.),8)
+    opt['max_gpus'] = 0
     opt['max_cpus'] = get_nprocs_h()
     opt['max_streams'] = get_nstreams()
     opt['start_server'] = 1

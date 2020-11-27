@@ -26,6 +26,14 @@ cd /usr/src/app/go-cusnarks
 #Generate Cuf Files
 go run cmd/gencuf/main.go
 
+#Generate Plugins
+files=$(ls plugin/*.go)
+for i in $files; do
+	f=$(basename -- ${i%.go})
+        go build -buildmode=plugin -o plugin/${f}.so plugin/${f}.go
+done
+
+
 #Update server_config.yalm file
 if [ ! -z $SERVICE_IPPORT ]; then
   sed -i "/serviceapi/c\  serviceapi: ${SERVICE_IPPORT}" server_config.yaml

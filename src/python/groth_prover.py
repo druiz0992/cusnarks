@@ -169,7 +169,7 @@ class GrothProver(object):
           self.n_streams = 1
 
         self.last_n_streams = self.n_streams
-        if self.max_gpu > 0:
+        if self.n_gpu > 0:
            # When working with GPU, we work with batches of elliptic points.  
            # 1 << batch_size  defines the size of the batch.
            # It is left as a parameter to check if speed improves with larger batches. 
@@ -1171,6 +1171,7 @@ class GrothProver(object):
         else:
              ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
 
+        used_streams = []
         if self.stop_client.value == 0 :
           if self.compute_last_mexp_gpu == False:
               used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True, scl_offset=nPublic+1)
