@@ -45,7 +45,6 @@ static  uint32_t parallelism_enabled =  1;
 static  uint32_t parallelism_enabled =  0;
 #endif
 
-#define MAX_NCORES_OMP (32)
 #define MIN(X,Y)  ((X)<(Y) ? (X) : (Y))
 #define MAX(X,Y)  ((X)>(Y) ? (X) : (Y))
 
@@ -1825,6 +1824,123 @@ void *ec_jacreduce_pippen_h(void *args)
 
   return NULL;
 }
+
+#if 0
+void *ec_jacreduce_pippen_h(void *args)
+{
+  void (*ec_jacmixedadd_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t) = &ec_jacaddmixed_h;
+  void (*ec_jacadd_cb)(uint32_t *, uint32_t *, uint32_t *, uint32_t) = &ec_jacadd_h;
+  void (*ec_jacdouble_cb)(uint32_t *, uint32_t *, uint32_t) = &ec_jacdouble_h;
+  void (*ec_jac2aff_cb)(uint32_t *, uint32_t *, t_uint64, uint32_t, uint32_t) = &ec_jac2aff_h;
+  const uint32_t  threadsPerScl = NWORDS_FR * sizeof(uint32_t) * NBITS_BYTE/PIPPENGER_CBIN_SIZE;
+
+  jacadd_reduced_t *wargs = (jacadd_reduced_t *) args;
+  
+
+  uint32_t outdims = ECP_JAC_OUTDIMS;
+  uint32_t indims = ECP_JAC_INDIMS;
+
+  if (wargs->ec2) {
+    ec_jacmixedadd_cb = &ec2_jacaddmixed_h;
+    ec_jacadd_cb      = &ec2_jacadd_h;
+    ec_jacdouble_cb   = &ec2_jacdouble_h;
+    ec_jac2aff_cb     = &ec2_jac2aff_h;
+    outdims = ECP2_JAC_OUTDIMS;
+    indims = ECP2_JAC_INDIMS;
+  }
+
+  uint32_t *EPBins  = &utils_EPin[wargs->thread_id *
+                                  (1<<PIPPENGER_CBIN_SIZE) * 
+                                  outdims * NWORDS_FP];
+
+  // Initialize bins to 0
+  if (wargs->init) {
+     ec_initP_h(EPBins, 1<<PIPPENGER_CBIN_SIZE, wargs->ec2,  wargs->pidx);
+  }
+
+  // bin scalar
+  uint32_t scl, nextScl;
+  t_uint64 j;
+  getBinnedScl(&scl,&wargs->scl[wargs->start_idx*NWORDS_FR], wargs->thread_id % threadsPerScl );
+  for (j= wargs->start_idx; j < wargs->last_idx-wargs->inc; j += wargs->inc){
+    // prefetch
+    getBinnedScl(&nextScl,&wargs->scl[(j+wargs->inc)*NWORDS_FR], wargs->thread_id % threadsPerScl );
+    __builtin_prefetch(&wargs->x[(j+wargs->inc)*NWORDS_FP * indims]);
+    __builtin_prefetch(&EPBins[nextScl * NWORDS_FP * outdims]);
+
+    if (scl) {
+       ec_jacmixedadd_cb(&EPBins[scl * NWORDS_FP * outdims],
+                &wargs->x[j * nwords_fp * indims],
+                &epbins[scl * nwords_fp * outdims],
+                wargs->pidx);
+    }
+    scl = nextScl;
+  }
+  // last iteration
+  if (scl) {
+     ec_jacmixedadd_cb(&EPBins[scl * NWORDS_FP * outdims],
+              &wargs->x[j * NWORDS_FP * indims],
+              &EPBins[scl * NWORDS_FP * outdims],
+              wargs->pidx);
+  }
+  
+  if (wargs->combine) {
+    // bin[j] = bin[j] + bin[j-1] from j=NBINS-2 to j=1
+    for (j= (1 << PIPPENGER_CBIN_SIZE)-1; j >= 3; j--){
+      __builtin_prefetch(&EPBins[(j-2) * NWORDS_FP * outdims]);
+      ec_jacadd_cb(&EPBins[(j-1) * NWORDS_FP * outdims],
+                  &EPBins[j * NWORDS_FP * outdims],
+                  &EPBins[(j-1) * NWORDS_FP * outdims],
+                  wargs->pidx);
+    }
+    ec_jacadd_cb(&EPBins[(j-1) * NWORDS_FP * outdims],
+                &EPBins[j * NWORDS_FP * outdims],
+                &EPBins[(j-1) * NWORDS_FP * outdims],
+                wargs->pidx);
+  
+    // accumulate bins
+    for (j= 1; j < (1 << PIPPENGER_CBIN_SIZE)-1 ; j++){
+      __builtin_prefetch(&EPBins[(j+1) * NWORDS_FP * outdims]);
+      ec_jacadd_cb(&EPBins[0],
+                  &EPBins[0],
+                  &EPBins[j * NWORDS_FP * outdims],
+                  wargs->pidx);
+    }
+    ec_jacadd_cb(&EPBins[0],
+                &EPBins[0],
+                &EPBins[j * NWORDS_FP * outdims],
+                wargs->pidx);
+  
+    // double
+    for (j=0 ; j < ((wargs->thread_id * threadsPerScl) & (( 1 << NWORDS_FR) - 1)) ; j++ ) {
+      ec_jacdouble_cb(EPBins,
+                      EPBins,
+                      wargs->pidx);
+    }
+
+    // add final results
+    //wait_h(wargs->thread_id, ec_jacaddreduce_finish_cb, (void *)wargs);
+    wait_h(wargs->thread_id, NULL, NULL);
+
+    if (wargs->thread_id == 0) {
+      for (j=1; j < wargs->max_threads-1; j++) {
+        __builtin_prefetch(&EPBins[(j+1) * NWORDS_FP * outdims*(1<<PIPPENGER_CBIN_SIZE)]);
+        ec_jacadd_cb(EPBins,
+                     EPBins,
+                     &EPBins[j*NWORDS_FP*outdims*(1<<PIPPENGER_CBIN_SIZE)],
+                     wargs->pidx);
+      }
+      ec_jacadd_cb(EPBins,
+                   EPBins,
+                   &EPBins[j*NWORDS_FP*outdims*(1<<PIPPENGER_CBIN_SIZE)],
+                   wargs->pidx);
+      ec_jac2aff_cb(wargs->out_ep, EPBins, 1, wargs->pidx, 1);
+    }
+  }
+
+  return NULL;
+}
+#endif
 
 // From N bit scalar, retrieve binScl
 void getBinnedScl(uint32_t *out_w, uint32_t *in_w, uint32_t binIdx)

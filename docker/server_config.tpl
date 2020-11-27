@@ -17,5 +17,10 @@ proverparams:
   pfile    : "hermez_p.json"
   seed: 436442495 
   verifyen   : "1"
+  gpuen : 1
+  zken : 0
+  batchsize : 15
+  maxbatchsize : 20
+  nstreams : 5
 logfile: "/var/log/proof_service/proof_service.log"
 
