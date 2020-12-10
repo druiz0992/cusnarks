@@ -53,7 +53,7 @@ RUN rm -rf go1.15.1.linux-amd64.tar.gz
 WORKDIR /usr/src/app/cusnarks
 RUN make docker_all
 
-COPY entrypoint.sh /usr/local/bin/entrypoint
+COPY entrypoint.gpu.sh /usr/local/bin/entrypoint
 COPY stop.sh /usr/local/bin/stop
 
 WORKDIR /usr/src/app

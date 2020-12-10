@@ -50,7 +50,7 @@ RUN npm i -g circom@0.5.23 snarkjs@0.3.44 && \
 
 RUN rm -rf go1.15.1.linux-amd64.tar.gz
 
-COPY entrypoint.sh /usr/local/bin/entrypoint
+COPY entrypoint.gpu.sh /usr/local/bin/entrypoint
 COPY stop.sh /usr/local/bin/stop
 
 RUN mkdir -p go-cusnarks

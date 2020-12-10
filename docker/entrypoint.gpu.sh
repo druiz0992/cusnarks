@@ -12,8 +12,6 @@ if [ ! $CUSNARKS_CURVE ]; then
 fi
 
 # Generate Roots
-cd /usr/src/app/cusnarks
-make clean_docker docker_all
 cd /usr/src/app/cusnarks/config
 python3 cusnarks_config.py ${CUSNARKS_NROOTS} ${CUSNARKS_CURVE}
 
