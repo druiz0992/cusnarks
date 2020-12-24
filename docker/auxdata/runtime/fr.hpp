@@ -32,6 +32,8 @@ extern "C" void Fr_band(PFrElement r, PFrElement a, PFrElement b);
 extern "C" void Fr_bor(PFrElement r, PFrElement a, PFrElement b);
 extern "C" void Fr_bxor(PFrElement r, PFrElement a, PFrElement b);
 extern "C" void Fr_bnot(PFrElement r, PFrElement a);
+extern "C" void Fr_shl(PFrElement r, PFrElement a, PFrElement b);
+extern "C" void Fr_shr(PFrElement r, PFrElement a, PFrElement b);
 extern "C" void Fr_eq(PFrElement r, PFrElement a, PFrElement b);
 extern "C" void Fr_neq(PFrElement r, PFrElement a, PFrElement b);
 extern "C" void Fr_lt(PFrElement r, PFrElement a, PFrElement b);
@@ -72,8 +74,6 @@ void Fr_idiv(PFrElement r, PFrElement a, PFrElement b);
 void Fr_mod(PFrElement r, PFrElement a, PFrElement b);
 void Fr_inv(PFrElement r, PFrElement a);
 void Fr_div(PFrElement r, PFrElement a, PFrElement b);
-void Fr_shl(PFrElement r, PFrElement a, PFrElement b);
-void Fr_shr(PFrElement r, PFrElement a, PFrElement b);
 void Fr_pow(PFrElement r, PFrElement a, PFrElement b);
 
 class RawFr {

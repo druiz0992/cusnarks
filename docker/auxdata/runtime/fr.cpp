@@ -124,69 +124,6 @@ void Fr_mod(PFrElement r, PFrElement a, PFrElement b) {
     mpz_clear(mr);
 }
 
-void Fr_shl(PFrElement r, PFrElement a, PFrElement b) {
-    mpz_t ma;
-    mpz_t mb;
-    mpz_t mr;
-    mpz_init(ma);
-    mpz_init(mb);
-    mpz_init(mr);
-
-    Fr_toMpz(ma, a);
-    Fr_toMpz(mb, b);
-    if (mpz_cmp_ui(mb, nBits) < 0) {
-        mpz_mul_2exp(mr, ma, mpz_get_ui(mb));
-        mpz_and(mr, mr, mask);
-        if (mpz_cmp(mr, q) >= 0) {
-            mpz_sub(mr, mr, q);
-        }
-    } else {
-        mpz_sub(mb, q, mb);
-        if (mpz_cmp_ui(mb, nBits) < 0) {
-            mpz_tdiv_q_2exp(mr, ma, mpz_get_ui(mb));
-        } else {
-            mpz_set(mr, zero);
-        }
-    }
-    Fr_fromMpz(r, mr);
-
-    mpz_clear(ma);
-    mpz_clear(mb);
-    mpz_clear(mr);
-}
-
-void Fr_shr(PFrElement r, PFrElement a, PFrElement b) {
-    mpz_t ma;
-    mpz_t mb;
-    mpz_t mr;
-    mpz_init(ma);
-    mpz_init(mb);
-    mpz_init(mr);
-
-    Fr_toMpz(ma, a);
-    Fr_toMpz(mb, b);
-    if (mpz_cmp_ui(mb, nBits) < 0) {
-        mpz_tdiv_q_2exp(mr, ma, mpz_get_ui(mb));
-    } else {
-        mpz_sub(mb, q, mb);
-        if (mpz_cmp_ui(mb, nBits) < 0) {
-            mpz_mul_2exp(mr, ma, mpz_get_ui(mb));
-            mpz_and(mr, mr, mask);
-            if (mpz_cmp(mr, q) >= 0) {
-                mpz_sub(mr, mr, q);
-            }
-        } else {
-            mpz_set(mr, zero);
-        }
-    }
-    Fr_fromMpz(r, mr);
-    mpz_clear(ma);
-    mpz_clear(mb);
-    mpz_clear(mr);
-
-}
-
-
 void Fr_pow(PFrElement r, PFrElement a, PFrElement b) {
     mpz_t ma;
     mpz_t mb;
