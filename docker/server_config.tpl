@@ -8,14 +8,14 @@ provertype: "cusnarks"
 proverparams:
   path: "/usr/src/app/cusnarks"
   proverfiledescriptor :
-     circuitcpp :  "hermez.cpp"
-     circuitdat :  "hermez_witbuild.dat"
-     inputsfile:   "hermez_input.json"
-     pkfile   : "hermez_pk.zkey"
+     circuitcpp :  "circuit-376-32-256-64.cpp"
+     circuitdat :  "circuit-376-32-256-64.dat"
+     inputsfile:   "input-376-32-256-64.json"
+     pkfile   : "circuit-376-32-256-64_hez1.zkey"
      vkfile   : 
-  witdatafile  : "hermez_w.wshm"
-  pdfile   : "hermez_pd.json"
-  pfile    : "hermez_p.json"
+  witdatafile  : "circuit-376-32-256-64_w.wshm"
+  pdfile   : "circuit-376-32-256-64_pd.json"
+  pfile    : "circuit-376-32-256-64_p.json"
   seed: 436442495 
   verifyen   : 1
   gpu : 4

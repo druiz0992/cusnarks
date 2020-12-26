@@ -1013,6 +1013,7 @@ class GrothProver(object):
          self.t_GP['Mexp1'] = [0,0]
          self.t_GP['Mexp2'] = [0,0]
          self.t_GP['Eval'] = [0,0]
+         self.t_GP['H'] = [0,0]
          self.active_client.value = 0
          self.status_client.value = 1
          return self.verify
