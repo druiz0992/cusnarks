@@ -34,7 +34,7 @@ RUN make docker_all FORCE_CPU=1
 
 WORKDIR /usr/src/app
 
-COPY entrypoint.sh /usr/local/bin/entrypoint
+COPY entrypoint.cpu.sh /usr/local/bin/entrypoint
 COPY stop.sh /usr/local/bin/stop
 
 RUN mkdir -p go-cusnarks

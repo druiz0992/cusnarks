@@ -99,6 +99,7 @@ def init():
     opt['zero_knowledge']=1
     opt['grouping'] = DEFAULT_U256_BSELM
     opt['last_mexp_gpu'] = 1
+    opt['log_file'] = 1
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -229,6 +230,10 @@ def init():
     help_str = 'Compute last Multiexp block with GPU. Default : ' + str(opt['last_mexp_gpu'])
     parser.add_argument(
        '-lmg', '--last_mexp_gpu', type=int, help=help_str, required=False)  
+
+    help_str = 'Keep logs in file. Default : ' + str(opt['log_file'])
+    parser.add_argument(
+       '-log_f', '--log_file', type=int, help=help_str, required=False)  
 
     return opt, parser
 
@@ -413,12 +418,15 @@ def run(opt, parser):
       if args.last_mexp_gpu is not None:
         opt['last_mexp_gpu'] = args.last_mexp_gpu
 
+      if args.log_file is not None:
+        opt['log_file'] = args.log_file
+
       if not is_port_in_use(PORT) :
           start = time.time()
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], n_gpus=opt['max_gpus'], 
                       start_server=opt['start_server'], max_batch_size=opt['max_batch_size'],
-                      seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'])
+                      seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], logf_en=opt['log_file'])
                       
           end = time.time() - start
           print("GP init : "+str(end))

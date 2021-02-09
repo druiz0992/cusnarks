@@ -23,9 +23,6 @@ rmdir /usr/src/app/cusnarksdata/auxdata
 # Starts Go-Cusnarks server
 cd /usr/src/app/go-cusnarks
 
-#Generate Cuf Files
-go run cmd/gencuf/main.go
-
 #Generate Plugins
 files=$(ls plugin/*.go)
 for i in $files; do
@@ -53,5 +50,3 @@ fi
 
 #Start server
 go run . --config ./server_config.yaml start
-
-while true; do sleep 10; done

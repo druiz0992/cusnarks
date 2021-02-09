@@ -85,7 +85,7 @@ import cusnarks_config as cfg
 
 class GrothProver(object):
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128', out_pk_f=None, out_pk_format=FMT_MONT, 
-                 n_gpus=1,start_server=1, max_batch_size=20, seed=None, snarkjs=None, keep_f=None):
+                 n_gpus=1,start_server=1, max_batch_size=20, seed=None, snarkjs=None, keep_f=None, logf_en=1):
         # Check valid folder exists
         if keep_f is None:
             print ("Repo directory needs to be provided\n")
@@ -96,19 +96,26 @@ class GrothProver(object):
 
         # Logger setup
         self.logger = logging.getLogger('cusnarks')
-        self.logger.setLevel(logging.INFO)
 
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        ### Create new log file every day. Keep latest 7
-        logHandler = handlers.TimedRotatingFileHandler(
+
+        if logf_en :
+          ### Create new log file every day. Keep latest 7
+          logHandler = handlers.TimedRotatingFileHandler(
                                 self.keep_f + '/log'+'_'+timestamp,
                                 when='D',
                                 interval=1,
                                 backupCount=7)
-        logHandler.setLevel(logging.INFO)
-        logHandler.setFormatter(formatter)
-        self.logger.addHandler(logHandler)
+          logHandler.setLevel(logging.INFO)
+          logHandler.setFormatter(formatter)
+          self.logger.addHandler(logHandler)
+        else:
+          stdoutHandler = logging.StreamHandler(sys.stdout)
+          stdoutHandler.setLevel(logging.INFO)
+          stdoutHandler.setFormatter(formatter)
+          self.logger.addHandler(stdoutHandler)
 
+        self.logger.setLevel(logging.INFO)
         if not use_pycusnarks :
           self.logger.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
