@@ -225,8 +225,8 @@ reduced_third_party_libs:
 		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done;  fi
 	@for i in $(AUX_CSUBDIRS); do \
 		(cd $$i; $(MAKE)); done
-	if ! test /usr/local/include/nlohmann/json.hpp; \
-		then git clone $(JSON_REPO); cd $(JSON_PATH); mkdir build; cd build; cmake ..; make; sudo make install; fi
+	if ! test -d /usr/local/include/nlohmann; \
+		then cd $(AUX_PATH); git clone $(JSON_REPO); cd $(JSON_PATH); mkdir build; cd build; cmake ..; make; sudo make install; fi
 	@for i in $(AUX_JSSUBDIRS); do \
 		(cd $$i; $(NPM)); done
 
