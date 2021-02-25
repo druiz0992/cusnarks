@@ -83,7 +83,6 @@ dirs= $(CUSRC_PATH) \
       $(CTSRC_PATH) 
 
 aux_cdirs  = $(PCG_PATH) 
-aux_cdirs_cmake  = $(JSON_PATH) 
 
 aux_jsdirs = $(SNARKJS_PATH) 
 
@@ -95,8 +94,7 @@ test_dirs = $(CTEST_PATH) \
 
 aux_repos = $(PCG_REPO) \
             $(SNARKJS_REPO) \
-	    $(CIRCOM_RUNTIME_REPO) \
-	    $(JSON_REPO)
+	    $(CIRCOM_RUNTIME_REPO)
 
 config_dirs = $(CONFIG_PATH)
 
@@ -106,7 +104,6 @@ SUBDIRS := $(dirs)
 TEST_SUBDIRS := $(test_dirs)
 CONFIG_SUBDIRS := $(config_dirs)
 AUX_CSUBDIRS := $(aux_cdirs)
-AUX_CSUBDIRS_CMAKE := $(aux_cdirs_cmake)
 AUX_JSSUBDIRS := $(aux_jsdirs)
 AUX_RSUBDIRS := $(aux_rdirs)
 AUX_REPOS := $(aux_repos)
@@ -228,8 +225,8 @@ reduced_third_party_libs:
 		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done;  fi
 	@for i in $(AUX_CSUBDIRS); do \
 		(cd $$i; $(MAKE)); done
-	@for i in $(AUX_CSUBDIRS_CMAKE); do \
-		(cd $$i; mkdir build; cd build; cmake ..; make; sudo make install); done
+	if ! test /usr/local/include/nlohmann/json.hpp; \
+		then git clone $(JSON_REPO); cd $(JSON_PATH); mkdir build; cd build; cmake ..; make; sudo make install; fi
 	@for i in $(AUX_JSSUBDIRS); do \
 		(cd $$i; $(NPM)); done
 

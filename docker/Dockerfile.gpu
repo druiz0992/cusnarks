@@ -50,6 +50,17 @@ RUN npm i -g circom@0.5.23 snarkjs@0.3.44 && \
 
 RUN rm -rf go1.15.1.linux-amd64.tar.gz
 
+RUN git clone https://github.com/nlohmann/json.git && \
+    cd json && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make && \
+    make install && \
+    cd ../.. && \
+    rm -rf json
+
+
 COPY entrypoint.gpu.sh /usr/local/bin/entrypoint
 COPY stop.sh /usr/local/bin/stop
 
