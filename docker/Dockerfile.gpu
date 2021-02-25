@@ -35,7 +35,7 @@ WORKDIR /usr/src/app
 COPY --from=build_stage /usr/src/app /usr/src/app
 
 RUN apt-get update && \
-    apt-get install -y git curl build-essential libssl-dev clang libomp-dev g++ nasm python3 python3-pip sudo psmisc libgmp3-dev vim && \
+    apt-get install -y git curl build-essential libssl-dev clang libomp-dev g++ nasm python3 python3-pip sudo psmisc libgmp3-dev vim cmake && \
     curl -O https://dl.google.com/go/go1.15.1.linux-amd64.tar.gz && \
     tar xvf go1.15.1.linux-amd64.tar.gz -C . && \
     mv ./go /usr/local && \
