@@ -7,9 +7,11 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <thread>
-#include <nlohmann/json.hpp>
+#include <chrono>
 #include "calcwit.hpp"
 #include "utils.hpp"
+
+using namespace std::chrono_literals;
 
 Circom_CalcWit::Circom_CalcWit(Circom_Circuit *aCircuit) {
     circuit = aCircuit;
@@ -59,7 +61,7 @@ void Circom_CalcWit::reset() {
         signalAssigned[i] = false;
     }
 
-    #pragma omp paallel for
+    #pragma omp parallel for
     for (int i=0; i<circuit->NComponents; i++) {
         inputSignalsToTrigger[i] = circuit->components[i].inputSignals;
     }
@@ -126,7 +128,7 @@ void Circom_CalcWit::getSignal(int currentComponentIdx, int cIdx, int sIdx, PFrE
     if ((circuit->components[cIdx].newThread)&&(currentComponentIdx != cIdx)) {
         std::unique_lock<std::mutex> lk(mutexes[cIdx % NMUTEXES]);
         while (!signalAssigned[sIdx]) {
-            cvs[sIdx % NMUTEXES].wait(lk);
+            cvs[sIdx % NMUTEXES].wait_for(lk, 10ms);
         }
         lk.unlock();
     }
@@ -184,7 +186,7 @@ void Circom_CalcWit::setSignal(int currentComponentIdx, int cIdx, int sIdx, PFrE
     if ((circuit->components[currentComponentIdx].newThread)&&(currentComponentIdx == cIdx)) {
     // syncPrintf("Finished: %d\n", cIdx);
        cvs[sIdx % NMUTEXES].notify_all();
-    } 
+    }
 
 }
 
@@ -241,7 +243,7 @@ void Circom_CalcWit::join() {
     for (int i=0; i<circuit->NComponents; i++) {
         std::unique_lock<std::mutex> lk(mutexes[i % NMUTEXES]);
         while (inputSignalsToTrigger[i] != -1) {
-            cvs[i % NMUTEXES].wait(lk);
+            cvs[i % NMUTEXES].wait_for(lk, 10ms);
         }
         // cvs[i % NMUTEXES].wait(lk, [&]{return inputSignalsToTrigger[i] == -1;});
         lk.unlock();
@@ -289,7 +291,7 @@ void Circom_CalcWit::itFunc(int o, json val) {
     setSignal(0, 0, o, &v);
 }
 
-/*
+
 void Circom_CalcWit::calculateProve(void *wtns, json &input, std::function<bool()> _isCanceledCB) {
     isCanceledCB = _isCanceledCB;
     reset();
@@ -333,4 +335,4 @@ void Circom_CalcWit::calculateProve(void *wtns, std::string &input, std::functio
 }
 
 
-*/
+

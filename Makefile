@@ -225,8 +225,6 @@ reduced_third_party_libs:
 		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done;  fi
 	@for i in $(AUX_CSUBDIRS); do \
 		(cd $$i; $(MAKE)); done
-	if ! test -d /usr/local/include/nlohmann; \
-		then cd $(AUX_PATH); git clone $(JSON_REPO); cd $(JSON_PATH); mkdir build; cd build; cmake ..; make; sudo make install; fi
 	@for i in $(AUX_JSSUBDIRS); do \
 		(cd $$i; $(NPM)); done
 
@@ -234,6 +232,8 @@ third_party_libs:
 	echo "checking third pary libs...";
 	if ! test -d $(RUST_CIRCOM_PATH); \
 		then mkdir -p $(RUST_CIRCOM_PATH); cd $(AUX_PATH); mkdir $(RUST_CIRCOM_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
+	if ! test -d /usr/local/include/nlohmann; \
+		then cd $(AUX_PATH); git clone $(JSON_REPO); cd $(JSON_PATH); mkdir build; cd build; cmake ..; make; sudo make install; fi
 	@for i in $(AUX_RSUBDIRS); do \
 		(cd $$i; git checkout feature/cusnarks; if ! $(CARGO); then echo "za compilation failed"; fi); done
 
