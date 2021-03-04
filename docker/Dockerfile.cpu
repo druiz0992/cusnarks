@@ -1,9 +1,11 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 ENV LD_LIBRARY_PATH=/usr/src/app/cusnarks/lib:$LD_LIBRARY_PATH
 ENV CUSNARKS_PATH /usr/src/app/cusnarks
 ENV CUSNARKS_NROOTS 20
 ENV CUSNARKS_CURVE BN256
+ENV TZ=Europe/Madrid
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /usr/src/app
 
