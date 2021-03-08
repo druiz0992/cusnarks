@@ -52,8 +52,7 @@ import numpy as np
 import time
 import linecache
 from subprocess import call, run, PIPE
-import logging
-import logging.handlers as handlers
+from log import *
 from multiprocessing import RawArray, Process, Pipe
 from ctypes import c_uint32
 
@@ -95,27 +94,12 @@ class GrothProver(object):
         self.keep_f = gen_reponame(keep_f, sufix="_PROVER")
 
         # Logger setup
-        self.logger = logging.getLogger('cusnarks')
-
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
         if logf_en :
-          ### Create new log file every day. Keep latest 7
-          logHandler = handlers.TimedRotatingFileHandler(
-                                self.keep_f + '/log'+'_'+timestamp,
-                                when='D',
-                                interval=1,
-                                backupCount=7)
-          logHandler.setLevel(logging.INFO)
-          logHandler.setFormatter(formatter)
-          self.logger.addHandler(logHandler)
+            logf = self.keep_f + '/log'+'_'+timestamp
         else:
-          stdoutHandler = logging.StreamHandler(sys.stdout)
-          stdoutHandler.setLevel(logging.INFO)
-          stdoutHandler.setFormatter(formatter)
-          self.logger.addHandler(stdoutHandler)
+            logf = None
+        self.logger = CuLogger(logging.INFO, logf)
 
-        self.logger.setLevel(logging.INFO)
         if not use_pycusnarks :
           self.logger.error('PyCUSnarks shared library not found. Exiting...')
           sys.exit(1)
@@ -127,6 +111,7 @@ class GrothProver(object):
           self.seed = int(x.hex(),16)
 
         random.seed(self.seed) 
+        self.logger.info("Starting server")
 
         # Configures who (CPU or GPU) computes NTT, first mexp block and last mexp block
         # Default setup is that NTT is computed by CPU and mexps are computed by GPU if exists.
@@ -1215,6 +1200,7 @@ class GrothProver(object):
         if self.stop_client.value == 0:
            #TODO AA
            #self.scl_array[self.nVars:self.nVars+2] = save_scl 
+           self.logger.info(' Starting Mexp2...')
            self.scl_array[m] = self.s_scl
            self.scl_array[m+1] = self.r_scl
            self.scl_array[m+2] = self.neg_rs_scl
