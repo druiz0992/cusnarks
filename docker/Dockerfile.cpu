@@ -26,7 +26,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
     apt-get -yq install nodejs 
 
 RUN npm i -g circom@0.5.23 snarkjs@0.3.44 && \
-    pip3 install Cython numpy future 
+    pip3 install Cython numpy future sysv_ipc
 
 RUN rm -rf go1.15.1.linux-amd64.tar.gz
 

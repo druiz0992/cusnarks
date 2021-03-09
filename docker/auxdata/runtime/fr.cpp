@@ -15,15 +15,15 @@ static bool initialized = false;
 
 
 void Fr_toMpz(mpz_t r, PFrElement pE) {
-    Fr_toNormal(pE, pE);
-    if (!(pE->type & Fr_LONG)) {
-        mpz_set_si(r, pE->shortVal);
-        if (pE->shortVal<0) {
+    FrElement tmp;
+    Fr_toNormal(&tmp, pE);
+    if (!(tmp.type & Fr_LONG)) {
+        mpz_set_si(r, tmp.shortVal);
+        if (tmp.shortVal<0) {
             mpz_add(r, r, q);
         }
     } else {
-        Fr_toNormal(pE, pE);
-        mpz_import(r, Fr_N64, -1, 8, -1, 0, (const void *)pE->longVal);
+        mpz_import(r, Fr_N64, -1, 8, -1, 0, (const void *)tmp.longVal);
     }
 }
 
@@ -62,6 +62,7 @@ void Fr_str2element(PFrElement pE, char const *s) {
 }
 
 char *Fr_element2str(PFrElement pE) {
+    FrElement tmp;
     mpz_t r;
     if (!(pE->type & Fr_LONG)) {
         if (pE->shortVal>=0) {
@@ -73,9 +74,9 @@ char *Fr_element2str(PFrElement pE) {
             mpz_add(r, r, q);
         }
     } else {
-        Fr_toNormal(pE, pE);
+        Fr_toNormal(&tmp, pE);
         mpz_init(r);
-        mpz_import(r, Fr_N64, -1, 8, -1, 0, (const void *)pE->longVal);
+        mpz_import(r, Fr_N64, -1, 8, -1, 0, (const void *)tmp.longVal);
     }
     char *res = mpz_get_str (0, 10, r);
     mpz_clear(r);

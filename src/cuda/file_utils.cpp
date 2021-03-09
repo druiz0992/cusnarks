@@ -653,8 +653,8 @@ uint32_t *readSharedMWtnsFile_h(uint32_t *samples_out, unsigned long long nElems
   }
 
   fclose(ifp);
-  memcpy(samples_out, samples, nElems*NWORDS_FR*sizeof(uint32_t));
-  shared_detach_h(samples);
+  //memcpy(samples_out, samples, nElems*NWORDS_FR*sizeof(uint32_t));
+  //shared_detach_h(samples);
   
   return samples;
 }

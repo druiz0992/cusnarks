@@ -47,6 +47,8 @@ static  uint32_t parallelism_enabled =  1;
 static  uint32_t parallelism_enabled =  0;
 #endif
 
+static uint32_t M_supplied=0;
+
 static char rootsBN256[] = {
  251,255,255,79,28,52,150,172,41,205,96,159,149,118,252,54,46,70,121,120,111,163,110,102,47,223,7,154,193,119,10,14, //0
   6,0,0,160,119,193,75,151,103,163,88,218,178,113,55,241,46,18,8,9,71,162,225,81,250,192,41,71,177,214,89,34,        //1 
@@ -663,11 +665,16 @@ void interpol_odd_h(uint32_t *A, const uint32_t *roots, uint32_t levels,t_uint64
   _ntt_h(A, roots, levels,1, rstride,1, pidx);
 }
 
-void ntt_init_h(uint32_t nroots)
+void ntt_init_h(uint32_t nroots, uint32_t *M)
 {
-  if (M_transpose == NULL){ 
+
+  if (M_transpose == NULL && M == NULL){ 
     M_transpose = (uint32_t *) malloc ( (t_uint64) (nroots+1) * NWORDS_FR * sizeof(uint32_t));
+  } else if (M_transpose == NULL) {
+    M_transpose = M;
+    M_supplied=1;
   }
+
   if (M_mul == NULL){
     M_mul = (uint32_t *) malloc ( (t_uint64)(nroots) * NWORDS_FR * sizeof(uint32_t));
   }
@@ -676,7 +683,9 @@ void ntt_init_h(uint32_t nroots)
 
 void ntt_free_h(void)
 {
-  free (M_transpose);
+  if (M_supplied) {
+    free (M_transpose);
+  }
   free (M_mul);
   M_transpose = NULL;
   M_mul = NULL;

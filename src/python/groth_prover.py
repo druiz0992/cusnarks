@@ -55,6 +55,7 @@ from subprocess import call, run, PIPE
 from log import *
 from multiprocessing import RawArray, Process, Pipe
 from ctypes import c_uint32
+import sysv_ipc
 
 
 from zutils import ZUtils
@@ -219,7 +220,7 @@ class GrothProver(object):
         ZField.set_field(MOD_FR)
         self.t_GP = {}
 
-        init_h()
+        #init_h()
         
         # ZK set to one enables zero knowledge to the proof. If Zero knowledge is not 
         # needed, scalars r and s are set to 0, and B1 mexp can be bypassed. Final value of ZK is set when client is launched
@@ -293,6 +294,12 @@ class GrothProver(object):
         self.scl_array = np.frombuffer(
                      self.scl_array_sh, dtype=np.uint32).reshape((witLen, NWORDS_256BIT))
         self.scl_array_shape = self.scl_array.shape
+
+        self.polH_sh = RawArray(c_uint32, witLen * NWORDS_256BIT)     
+        self.polH = np.frombuffer(
+                     self.polH_sh, dtype=np.uint32).reshape((witLen, NWORDS_256BIT))
+        
+        init_h(np.reshape(self.polH,-1))
 
         # pA_T
         self.pA_T_sh = RawArray(c_uint32, 2 * self.domainSize * NWORDS_256BIT)
@@ -617,8 +624,8 @@ class GrothProver(object):
 
         #write polH once MEXP is done (not before)
         conn.recv()
-        self.logger.info(' Process server - Copying polH...')
-        np.copyto(w[:m-1], polH[:m-1])
+        self.logger.info(' Process server - Copying polH %d...',m-1)
+        #np.copyto(w[:m-1], polH[:m-1])
 
         conn.send([self.t_GP['Eval'], self.t_GP['H']])
         conn.close()
@@ -878,6 +885,9 @@ class GrothProver(object):
                 readWtnsFile_h(self.witness_f.encode("UTF-8"), nVars ))
 
            elif self.witness_f.endswith('.wshm'):
+             self.scl_array_sh = sysv_ipc.SharedMemory(WIT_SHMEMKEY)
+             self.scl_array = np.frombuffer(
+                     self.scl_array_sh, dtype=np.uint32).reshape((-1, NWORDS_256BIT))
              readSharedMWtnsFile_h(np.reshape(self.scl_array,-1),self.witness_f.encode("UTF-8"), nVars )
 
            else:
@@ -1006,14 +1016,11 @@ class GrothProver(object):
          self.t_GP['Mexp2'] = [0,0]
          self.t_GP['Eval'] = [0,0]
          self.t_GP['H'] = [0,0]
-         self.active_client.value = 0
-         self.status_client.value = 1
+         self.finish()
          return self.verify
       
       if self.stop_client.value:
-          self.active_client.value = 0
           self.verify = -2
-          self.status_client.value = 1
           self.t_GP['Init'] = [0,0]
           self.t_GP['Read_W'] = [0,0]
           self.t_GP['Mexp'] = [0,0]
@@ -1021,6 +1028,7 @@ class GrothProver(object):
           self.t_GP['Mexp2'] = [0,0]
           self.t_GP['Eval'] = [0,0]
           self.t_GP['H'] = [0,0]
+          self.finish()
           return self.verify
 
       self.t_GP['Proof'] = time.time() - start
@@ -1039,9 +1047,15 @@ class GrothProver(object):
 
       #copy_input_files([self.out_proof_f, self.out_public_f, self.out_proving_key_f, witness_f],self.keep_f)
 
+      self.finish()
+      return self.verify
+
+    def finish(self):
       self.active_client.value = 0
       self.status_client.value = 1
-      return self.verify
+      if self.p_CPU is not None:
+        self.p_CPU.terminate()
+        self.p_CPU.join()
 
     def test_results(self):
       proof_r = True
@@ -1200,13 +1214,20 @@ class GrothProver(object):
         if self.stop_client.value == 0:
            #TODO AA
            #self.scl_array[self.nVars:self.nVars+2] = save_scl 
+           w = np.frombuffer(self.polH_sh, dtype=np.uint32).reshape(self.scl_array_shape)
            self.logger.info(' Starting Mexp2...')
-           self.scl_array[m] = self.s_scl
-           self.scl_array[m+1] = self.r_scl
-           self.scl_array[m+2] = self.neg_rs_scl
-           self.scl_array[m+3] = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
+           #self.scl_array[m] = self.s_scl
+           #self.scl_array[m+1] = self.r_scl
+           #self.scl_array[m+2] = self.neg_rs_scl
+           #self.scl_array[m+3] = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
    
-           scl_vector = self.scl_array[:m+4]
+           #scl_vector = self.scl_array[:m+4]
+           w[m] = self.s_scl
+           w[m+1] = self.r_scl
+           w[m+2] = self.neg_rs_scl
+           w[m+3] = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
+   
+           scl_vector = w[:m+4]
    
            pk_bin[0][m*ECP_JAC_INDIMS*NWORDS_FP:(m+1)*ECP_JAC_INDIMS*NWORDS_FP] = np.reshape(self.pi_a_eccf1,-1)
            pk_bin[0][(m+1)*ECP_JAC_INDIMS*NWORDS_FP:(m+2)*ECP_JAC_INDIMS*NWORDS_FP] = np.reshape(self.pi_b1_eccf1,-1)
@@ -1324,8 +1345,8 @@ class GrothProver(object):
             self.parent_conn_CPU.send([])
 
           [self.t_GP['Eval'], self.t_GP['H']] = self.parent_conn_CPU.recv()
-          self.p_CPU.terminate()
-          self.p_CPU.join()
+          #self.p_CPU.terminate()
+          #self.p_CPU.join()
 
         else:
           self.Mexp1_CPU(self.scl_array)

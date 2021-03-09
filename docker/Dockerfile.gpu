@@ -18,7 +18,7 @@ RUN apt-get update && \
     curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
     apt-get -yq install nodejs && \
     npm i -g circom snarkjs && \
-    pip3 install Cython numpy future nvgpu && \
+    pip3 install Cython numpy future nvgpu sysv_ipc && \
     sh -s -- --default-toolchain stable -y && \
     make docker_all
 
@@ -48,7 +48,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
     apt-get -yq install nodejs 
 
 RUN npm i -g circom@0.5.23 snarkjs@0.3.44 && \
-    pip3 install Cython numpy future nvgpu 
+    pip3 install Cython numpy future nvgpu sysv_ipc
 
 RUN rm -rf go1.15.1.linux-amd64.tar.gz
 

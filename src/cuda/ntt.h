@@ -53,7 +53,7 @@ uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args);
 void field_roots_compute_h(uint32_t *roots, uint32_t nbits);
 uint32_t *get_Mmul_h();
 uint32_t *get_Mtranspose_h();
-void ntt_init_h(uint32_t nroots);
+void ntt_init_h(uint32_t nroots, uint32_t *M);
 void ntt_free_h(void);
 
 void computeRoots_h(uint32_t *roots, uint32_t nbits);

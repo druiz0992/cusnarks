@@ -42,12 +42,12 @@
 /*
   General initialization function. To be called at the beginning of program
 */
-void init_h(void)
+void init_h(uint32_t *M)
 {
   utils_init_h();
   ec_init_h();
   //mpoly_init_h(1 << CusnarksGetNRoots());
-  ntt_init_h(1<< CusnarksGetNRoots());
+  ntt_init_h(1<< CusnarksGetNRoots(), M);
 }
 
 /*

@@ -33,7 +33,7 @@
 #ifndef _INIT_H_
 #define _INIT_H
 
-void init_h(void);
+void init_h(uint32_t *M);
 void release_h(void);
 
 #endif

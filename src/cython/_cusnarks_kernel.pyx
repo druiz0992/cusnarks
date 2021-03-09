@@ -560,6 +560,12 @@ def ntt_interpolandmul_h(np.ndarray[ndim=1, dtype=np.uint32_t] inva,
 
      return np.reshape(M,(dims,NWORDS_FR))
 
+def get_Mtranspose_h(ct.uint32_t N):
+     cdef ct.uint32_t [:] M
+     M = <ct.uint32_t [:(<long long unsigned int> N * NWORDS_FR) ]> uh.cget_Mtranspose_h()
+
+     return np.reshape(M,(-1,NWORDS_FR))
+
 def get_nprocs_h():
     return uh.cget_nprocs_h()
 
@@ -1243,8 +1249,8 @@ def mpoly_from_montgomery_h(np.ndarray[ndim=1, dtype=np.uint32_t] in_vec, ct.uin
      uh.cmpoly_from_montgomery_h(&in_vec[0], pidx)
      return
 
-def init_h():
-     uh.cinit_h()
+def init_h(np.ndarray[ndim=1, dtype=np.uint32_t] M):
+     uh.cinit_h(&M[0])
 
 def release_h():
     uh.crelease_h()

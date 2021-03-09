@@ -25,5 +25,6 @@ proverparams:
   nstreams : 5
   cpu : 64
   timeout : 5
+  log : 0
 logfile: "/var/log/proof_service/proof_service.log"
 

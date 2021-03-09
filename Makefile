@@ -70,7 +70,7 @@ RUST_CIRCOM_BRANCH = feature/cusnarks
 FFIASM_PATH = $(AUX_PATH)/ffiasm
 FFIASM_REPO = https://github.com/iden3/ffiasm.git
 
-CIRCOM_RUNTIM_PATH = $(AUX_PATH)/circom_runtime
+CIRCOM_RUNTIME_PATH = $(AUX_PATH)/circom_runtime
 CIRCOM_RUNTIME_REPO = https://github.com/iden3/circom_runtime.git
 
 CUSNARKS_LIB = libcusnarks.so
@@ -222,7 +222,7 @@ cubin:
 reduced_third_party_libs:
 	echo "checking third pary libs...";
 	if ! test -d $(AUX_PATH); \
-		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done;  fi
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done; cd $(CIRCOM_RUNTIME_PATH) && git checkout feature/server; fi
 	@for i in $(AUX_CSUBDIRS); do \
 		(cd $$i; $(MAKE)); done
 	@for i in $(AUX_JSSUBDIRS); do \

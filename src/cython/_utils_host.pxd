@@ -232,7 +232,7 @@ cdef extern from "../cuda/mpoly.h" nogil:
 
 
 cdef extern from "../cuda/init.h" :
-    void cinit_h "init_h"()
+    void cinit_h "init_h"(ct.uint32_t *M)
 
     void crelease_h "release_h"()
 
