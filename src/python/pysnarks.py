@@ -229,7 +229,7 @@ def init():
 
     help_str = 'Compute last Multiexp block with GPU. Default : ' + str(opt['last_mexp_gpu'])
     parser.add_argument(
-       '-lmg', '--last_mexp_gpu', type=int, help=help_str, required=False)  
+       '-lmg', '--last_mexp_gpu', type=float, help=help_str, required=False)  
 
     help_str = 'Keep logs in file. Default : ' + str(opt['log_file'])
     parser.add_argument(

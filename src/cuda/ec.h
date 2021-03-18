@@ -61,6 +61,7 @@ inline int32_t ec2_iseq_h(const uint32_t *x, const uint32_t *y)
 }
 
 void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
+void ec_jacaddaff_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
 void ec_jacaddmixed_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx);
 void ec_jacdouble_h(uint32_t *z, uint32_t *x, uint32_t pidx);
 void ec_jacscmul_h(uint32_t *z, uint32_t *scl, uint32_t *x, uint32_t n, uint32_t pidx, uint32_t add_last);

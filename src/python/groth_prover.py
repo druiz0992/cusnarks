@@ -119,7 +119,8 @@ class GrothProver(object):
         # We leave this configurable because depending on the HW, it may be possible to speed
         # process is last mexp is computed by CPU
         self.compute_first_mexp_gpu = True
-        self.compute_last_mexp_gpu = True
+        self.compute_last_mexp_gpu = 1
+        self.last_samples_cpu = 0
 
         # Two modes available, which define format of pk_bin variable
         #  0 : Trusted setup is done with cusnarks => pk format is .bin
@@ -156,7 +157,7 @@ class GrothProver(object):
         if self.n_gpu == 0 :
           self.logger.info('No available GPUs')
           self.compute_first_mexp_gpu = False
-          self.compute_last_mexp_gpu = False
+          self.compute_last_mexp_gpu = 0
         elif not self.compute_first_mexp_gpu and not self.compute_last_mexp_gpu:
           self.n_gpu = 0
           self.n_streams = 1
@@ -211,6 +212,11 @@ class GrothProver(object):
         self.stop_client = mp.Value('i',0)
         self.active_client = mp.Value('i',0)
         self.status_client = mp.Value('i',0)
+        self.polH_done = mp.Value('i',0)
+        self.Mexp2_CPU_done = mp.Value('i',0)
+        self.t_Eval = mp.Value('d',0.0)
+        self.t_H = mp.Value('d',0.0)
+        self.t_Mexp2 = mp.Value('d',0.0)
 
         self.public_signals = None
         self.witness_f = None
@@ -288,6 +294,12 @@ class GrothProver(object):
                             1<<self.n_bits_roots, self.domainSize)
           sys.exit(1)
 
+        # pi_c 
+        self.pi_c2_eccf1_sh = RawArray(c_uint32,  ECP_JAC_INDIMS * NWORDS_FR)     
+        self.pi_c2_eccf1 = np.frombuffer(
+                     self.pi_c2_eccf1_sh, dtype=np.uint32).reshape((ECP_JAC_INDIMS, NWORDS_FR))
+
+
         # scl_array (witness)
         witLen = max(self.nVars, 2*self.domainSize + 8 )
         self.scl_array_sh = RawArray(c_uint32, witLen * NWORDS_256BIT)     
@@ -344,7 +356,6 @@ class GrothProver(object):
               readU256DataFile_h(
                   self.roots_f.encode("UTF-8"),
                   1<<self.n_bits_roots, 1<<nroots3) )
-
 
 
         self.logger.info('#################################### ')
@@ -439,7 +450,9 @@ class GrothProver(object):
         else:
             m = self.domainSize -1
 
-        nsamplesH = m + 1 +1 +1 +1  # a + b1 + delta_1 + c
+        self.last_samples_cpu = m - int(self.compute_last_mexp_gpu * m)
+        nsamplesH = int(self.compute_last_mexp_gpu * m) + 1 +1 +1 +1  # a + b1 + delta_1 + c
+        #print("nsamplesH", m, nsamplesH, self.last_samples_cpu)
         self.tableH = buildDispatchTable( math.ceil(nsamplesH/self.batch_size),
                                          1,
                                          self.n_gpu, self.n_streams, self.batch_size,
@@ -590,29 +603,33 @@ class GrothProver(object):
     def Mexp2_CPU(self, polH, m):
         tt = time.time()
         pk_bin = pkbinsh_get(self.pk_sh,['delta_1', 'hExps'])
-        #m = polH.shape[0]
         self.logger.info(' Process server - Starting Last Mexp...')
-        self.logger.info(' Process server - hExps Mexp common part started ...')
+        self.logger.info(' Process server - hExps Mexp common part started...')
 
-        polH[m-1] = self.neg_rs_scl
+        pippen_init = 1
+        if self.compute_last_mexp_gpu == 0 :
+           polH[m-1] = self.neg_rs_scl
+           pk_bin[1][(m-1)*ECP_JAC_INDIMS*NWORDS_FP:(m)*ECP_JAC_INDIMS*NWORDS_FP] = pk_bin[0]
+           pippen_init = 0
+
         scalar_vector = np.reshape( polH, -1)
-        self.logger.info(' Process server - scalar copied.')
-        pk_bin[1][(m-1)*ECP_JAC_INDIMS*NWORDS_FP:(m)*ECP_JAC_INDIMS*NWORDS_FP] = pk_bin[0]
         EP_vector =  pk_bin[1][:m*NWORDS_256BIT*ECP_JAC_INDIMS]
-        self.logger.info(' Process server - vector copied.')
 
         if self.stop_client.value == 0:
-           np.copyto(self.pi_c_eccf1,
+           np.copyto(self.pi_c2_eccf1,
                 ec_jacreduce_pippen_h(
                        scalar_vector,
                        EP_vector,
                        0,
                        self.n_cpu,
-                       MOD_FP, 0,1, 1, 1, 1)
+                       #pidx, init, combine, to_affine, add_in, strip_last
+                       MOD_FP, pippen_init,1, 1, 1, 1)
                    )
-           self.t_GP['Mexp2']= time.time()-tt
+           self.t_Mexp2.value = time.time()-tt
+           if self.compute_last_mexp_gpu == 0 :
+               np.copyto(self.pi_c_eccf1, self.pi_c2_eccf1)
 
-           self.logger.info(' Process server - hExps Mexp common part completed ...%s',self.t_GP['Mexp2'])
+           self.logger.info(' Process server - hExps Mexp common part completed ...%s',self.t_Mexp2.value)
 
 
     def pysnarkP_CPU(self, conn, wnElems):
@@ -623,12 +640,13 @@ class GrothProver(object):
         m=polH.shape[0]
 
         #write polH once MEXP is done (not before)
-        conn.recv()
-        self.logger.info(' Process server - Copying polH %d...',m-1)
-        #np.copyto(w[:m-1], polH[:m-1])
+        self.polH_done.value = 1
+        if self.last_samples_cpu and self.compute_first_mexp_gpu :
+          self.Mexp2_CPU(polH[:self.last_samples_cpu], self.last_samples_cpu)
+          self.Mexp2_CPU_done.value = 1
 
-        conn.send([self.t_GP['Eval'], self.t_GP['H']])
-        conn.close()
+        self.t_Eval.value = self.t_GP['Eval']
+        self.t_H.value = self.t_GP['H']
 
         self.logger.info(' Process server - Completed')
 
@@ -675,7 +693,6 @@ class GrothProver(object):
                     sys.exit(1)
                  elif 'is_alive' in parsed_dict:
                     new_msg = {}
-                    #new_msg['status']=1
                     new_msg['status']=self.status_client.value
                     jsocket.send_message(new_msg, conn)
                     conn.close()
@@ -948,6 +965,8 @@ class GrothProver(object):
       self.t_GP['H'] = 0
       self.t_GP['Proof'] = 0
       self.stop_client.value = 0
+      self.polH_done.value = 0
+      self.Mexp2_CPU_done.value = 0
       self.zk = zk
 
       if cpu is None or cpu == 0 or cpu > self.max_cpu:
@@ -956,7 +975,22 @@ class GrothProver(object):
           self.n_cpu =  cpu
 
       if self.n_gpu :
-          self.compute_last_mexp_gpu = last_mexp_gpu == 1
+          if self.compute_last_mexp_gpu != last_mexp_gpu:
+             if self.pkbin_mode:
+               m = self.domainSize
+             else:
+               m = self.domainSize -1
+             self.compute_last_mexp_gpu = last_mexp_gpu
+             self.last_samples_cpu = m - int(self.compute_last_mexp_gpu * m)
+             nsamplesH = int(self.compute_last_mexp_gpu * m) + 1 +1 +1 +1  # a + b1 + delta_1 + c
+             #print("nsamplesH", m, nsamplesH, self.last_samples_cpu)
+             self.tableH = buildDispatchTable( math.ceil(nsamplesH/self.batch_size),
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamplesH,
+                                         start_pidx=0,
+                                         start_gpu_idx=0,
+                                         ec_lable = np.asarray(['hExps']))
           self.n_streams = max(min(n_streams, N_STREAMS_PER_GPU),2)
 
           if (1 << batch_size)  <=  self.max_batch_size :
@@ -972,7 +1006,7 @@ class GrothProver(object):
       self.active_client.value = 1
       self.status_client.value = 2
 
-      if (self.verify_en):
+      if self.verify_en:
         self.verify = 0
       else :
         self.verify = 2
@@ -1185,13 +1219,13 @@ class GrothProver(object):
 
         used_streams = []
         if self.stop_client.value == 0 :
-          if self.compute_last_mexp_gpu == False:
+          if self.compute_last_mexp_gpu == 0:
               used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True, scl_offset=nPublic+1)
           else:
               used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False, scl_offset=nPublic+1)
 
         # Assign collected values to pi's
-        if self.compute_last_mexp_gpu == False and self.stop_client.value == 0:
+        if self.compute_last_mexp_gpu == 0 and self.stop_client.value == 0:
            self.assignECPvalues('C')
         self.logger.info(' First Mexp completed GPU...')
         
@@ -1216,25 +1250,20 @@ class GrothProver(object):
            #self.scl_array[self.nVars:self.nVars+2] = save_scl 
            w = np.frombuffer(self.polH_sh, dtype=np.uint32).reshape(self.scl_array_shape)
            self.logger.info(' Starting Mexp2...')
-           #self.scl_array[m] = self.s_scl
-           #self.scl_array[m+1] = self.r_scl
-           #self.scl_array[m+2] = self.neg_rs_scl
-           #self.scl_array[m+3] = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
    
-           #scl_vector = self.scl_array[:m+4]
            w[m] = self.s_scl
            w[m+1] = self.r_scl
            w[m+2] = self.neg_rs_scl
            w[m+3] = np.asarray([1,0,0,0,0,0,0,0],dtype=np.uint32)
    
-           scl_vector = w[:m+4]
+           scl_vector = w[self.last_samples_cpu:m+4]
    
            pk_bin[0][m*ECP_JAC_INDIMS*NWORDS_FP:(m+1)*ECP_JAC_INDIMS*NWORDS_FP] = np.reshape(self.pi_a_eccf1,-1)
            pk_bin[0][(m+1)*ECP_JAC_INDIMS*NWORDS_FP:(m+2)*ECP_JAC_INDIMS*NWORDS_FP] = np.reshape(self.pi_b1_eccf1,-1)
            pk_bin[0][(m+2)*ECP_JAC_INDIMS*NWORDS_FP:(m+3)*ECP_JAC_INDIMS*NWORDS_FP] = pk_bin[1]
            pk_bin[0][(m+3)*ECP_JAC_INDIMS*NWORDS_FP:(m+4)*ECP_JAC_INDIMS*NWORDS_FP] = np.reshape(self.pi_c_eccf1,-1)
    
-           ecp_vector = pk_bin[0][:(m+4)*ECP_JAC_INDIMS*NWORDS_FP]
+           ecp_vector = pk_bin[0][self.last_samples_cpu*ECP_JAC_INDIMS*NWORDS_FP:(m+4)*ECP_JAC_INDIMS*NWORDS_FP]
    
            self.logger.info(' Starting Dispatch...')
            self.findECPointsDispatch( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
@@ -1342,9 +1371,11 @@ class GrothProver(object):
 
           # Synchronize CPU/GPU
           if self.compute_last_mexp_gpu:
-            self.parent_conn_CPU.send([])
+            while self.polH_done.value == 0:
+                  time.sleep(0.1)
+            #self.parent_conn_CPU.send([])
 
-          [self.t_GP['Eval'], self.t_GP['H']] = self.parent_conn_CPU.recv()
+          #[self.t_GP['Eval'], self.t_GP['H']] = self.parent_conn_CPU.recv()
           #self.p_CPU.terminate()
           #self.p_CPU.join()
 
@@ -1354,10 +1385,21 @@ class GrothProver(object):
         # Mexp 2
         if self.compute_last_mexp_gpu:
           self.Mexp2_GPU(used_streams)
+          if self.last_samples_cpu:
+            while self.Mexp2_CPU_done.value == 0:
+                  time.sleep(0.1)
+            self.t_GP['Mexp2'] += self.t_Mexp2.value
+            tmp_c_eccf1 = ec_jacaddaff_h(np.reshape(self.pi_c_eccf1,-1), np.reshape(self.pi_c2_eccf1,-1), MOD_FP)
+            self.pi_c_eccf1 = ec_jac2aff_h( tmp_c_eccf1.reshape(-1), MOD_FP, strip_last=1) 
         else :
           self.Mexp2_CPU(polH, m)
+          self.t_GP['Mexp2'] = self.t_Mexp2.value
           if self.zk == 1:
              self.Mexp2_GPU_CPU()
+
+        if self.compute_last_mexp_gpu:
+            self.t_GP['Eval'] = self.t_Eval.value
+            self.t_GP['H'] = self.t_H.value
      
         return 1
  

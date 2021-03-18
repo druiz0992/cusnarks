@@ -15,15 +15,8 @@ fi
 cd /usr/src/app/cusnarks/config
 python3 cusnarks_config.py ${CUSNARKS_NROOTS} ${CUSNARKS_CURVE}
 
-# Fix some issues
-#mv /usr/src/app/cusnarksdata/auxdata/runtime /usr/src/app/cusnarksdata/
-#mv /usr/src/app/cusnarksdata/auxdata/circuits /usr/src/app/cusnarksdata/
-#rmdir /usr/src/app/cusnarksdata/auxdata
-
-cp /usr/src/app/cusnarks/third_party_libs/circom_runtime/c/*.{cpp,hpp,asm}  /usr/src/app/cusnarksdata/runtime
-
 #Fix parsing issue with nvgpu library
-/bin/sed -i "s#if cuda_version <.*#if cuda_version < 12:#g" /usr/local/lib/python3.8/dist-packages/nvgpu/__init__.py
+#/bin/sed -i "s#if cuda_version <.*#if cuda_version < 12:#g" /usr/local/lib/python3.8/dist-packages/nvgpu/__init__.py
 # Starts Go-Cusnarks server
 cd /usr/src/app/go-cusnarks
 

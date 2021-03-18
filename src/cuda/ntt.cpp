@@ -88,6 +88,9 @@ static char config_curve_filename[]="./.curve";
 
 static uint32_t *M_transpose = NULL;
 static uint32_t *M_mul = NULL;
+static uint32_t *M_reordering1R2 = NULL;
+static uint32_t *M_reordering2R2 = NULL;
+static uint32_t M_firstR2 = 0;
 
 static void _ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
@@ -95,11 +98,14 @@ static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, int32_t 
 static void _intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx);
 static void _intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t levels, t_uint64 rstride,  uint32_t pidx);
 static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride);
+static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride, uint32_t *table);
 static void ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx);
 static void _ntt_parallel_T_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, t_uint64 rstride, int32_t direction, fft_mode_t fft_mode, uint32_t pidx);
 static void montmult_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t levels, uint32_t pidx);
 static void montmult_parallel_reorder_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows, uint32_t Ncols, uint32_t rstride, uint32_t direction, uint32_t pidx);
 static void ntt_interpolandmul_init_h(uint32_t *A, uint32_t *B, uint32_t *mNrows, uint32_t *mNcols, uint32_t nRows, uint32_t nCols);
+static void buildReordingTable(uint32_t *table, uint32_t levels, uint32_t thread_id, uint32_t n_samples);
+static void initReordingTable(uint32_t *table, uint32_t levels);
 void *interpol_and_mul_h(void *args);
 void *interpol_and_muls_h(void *args);
 
@@ -489,13 +495,23 @@ static void _ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, int32_t 
 
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx)
 {
-   ntt_reorder_h(A, levels, astride);
+   uint32_t *table = M_reordering2R2;
+   if (levels == M_firstR2)  {
+      table = M_reordering1R2;
+   }
+
+   ntt_reorder_h(A, levels, astride, table);
    _ntt_h(A, roots, levels, astride, rstride, direction, pidx);
 }
 
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t levels, int32_t direction, t_ff *ff)
 {
-   ntt_reorder_h(A, levels, 1);
+   uint32_t *table = M_reordering2R2;
+   if (levels == M_firstR2)  {
+      table = M_reordering1R2;
+   }
+
+   ntt_reorder_h(A, levels, 1, table);
    _ntt_h(A, roots, levels, direction, ff);
 }
 
@@ -544,6 +560,46 @@ static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride)
       if (j > i){
          swapuBI_h(&A[astride* i * NWORDS_FR],&A[astride*j * NWORDS_FR], NWORDS_FR);
       }
+   }
+}
+
+static void ntt_reorder_h(uint32_t *A, uint32_t levels, uint32_t astride, uint32_t *table)
+{
+   #ifndef TEST_MODE
+    #pragma omp parallel for if(parallelism_enabled)
+   #endif
+   for (uint32_t i=0; i < 1 << levels ; i++){
+      if (table[i] > i){
+         swapuBI_h(&A[astride* i * NWORDS_FR],&A[astride* table[i] * NWORDS_FR], NWORDS_FR);
+      }
+   }
+}
+
+static void initReordingTable(uint32_t *table, uint32_t levels){
+   for (uint32_t i=0; i < 1 << levels ; i++){
+      table[i] = i;
+   }
+}
+
+static void buildReordingTable(uint32_t *table, uint32_t levels, uint32_t thread_id, uint32_t n_samples) {
+  uint32_t (*reverse_ptr) (uint32_t, uint32_t);
+  
+   if (levels <= 8){
+      reverse_ptr = reverse8;
+   } else if (levels <= 16 ) {
+      reverse_ptr = reverse16;
+   } else {
+      reverse_ptr = reverse32;
+   }
+
+   uint32_t start_idx = thread_id * n_samples;
+
+   for (uint32_t i=start_idx; i < start_idx + n_samples ; i++){
+      uint32_t j = reverse_ptr(i, levels);
+      if (j > i){
+         table[i] = j;
+         table[j] = i;
+      } 
    }
 }
 
@@ -667,7 +723,6 @@ void interpol_odd_h(uint32_t *A, const uint32_t *roots, uint32_t levels,t_uint64
 
 void ntt_init_h(uint32_t nroots, uint32_t *M)
 {
-
   if (M_transpose == NULL && M == NULL){ 
     M_transpose = (uint32_t *) malloc ( (t_uint64) (nroots+1) * NWORDS_FR * sizeof(uint32_t));
   } else if (M_transpose == NULL) {
@@ -679,6 +734,13 @@ void ntt_init_h(uint32_t nroots, uint32_t *M)
     M_mul = (uint32_t *) malloc ( (t_uint64)(nroots) * NWORDS_FR * sizeof(uint32_t));
   }
   
+  uint32_t levels = (uint32_t) ceil(log2(nroots));
+  if (M_reordering1R2 == NULL) {
+    // Radix2 reordering 1
+    M_reordering1R2 = (uint32_t *) malloc ( (1 << (levels/2)) * sizeof(uint32_t));
+    // Radix2 reordering 2
+    M_reordering2R2 = (uint32_t *) malloc ( (1 << (levels - levels/2)) * sizeof(uint32_t));
+  }
 }
 
 void ntt_free_h(void)
@@ -689,7 +751,12 @@ void ntt_free_h(void)
   free (M_mul);
   M_transpose = NULL;
   M_mul = NULL;
+  free(M_reordering1R2);
+  free(M_reordering2R2);
+  M_reordering1R2 = NULL;
+  M_reordering2R2 = NULL;
 }
+
 
 uint32_t *get_Mmul_h()
 {
@@ -715,6 +782,9 @@ void interpol_parallel_odd_h(uint32_t *A, const uint32_t *roots, uint32_t Nrows,
 
 uint32_t * ntt_interpolandmul_server_h(ntt_interpolandmul_t *args)
 {
+  initReordingTable(M_reordering1R2, args->Ncols+1);
+  initReordingTable(M_reordering2R2, args->Ncols);
+
   if ((!args->max_threads) || (!utils_isinit_h())) {
     return ntt_interpolandmul_parallel_h(args->A, args->B, args->roots, args->Nrows, args->Ncols, args->rstride, args->pidx);
   }
@@ -1152,6 +1222,7 @@ void *interpol_and_muls_h(void *args)
   uint32_t *M_transpose2_ptr = &M_transpose[B_offset];
   uint32_t *M_transpose3_ptr = &M_mul[C_offset];
   unsigned long long roffset1, roffset2;
+  static uint32_t lastNcols=0;
   t_ff  ff = {
              .subm_cb = getcb_subm_h(wargs->pidx),
              .addm_cb = getcb_addm_h(wargs->pidx),
@@ -1199,6 +1270,10 @@ void *interpol_and_muls_h(void *args)
               M_mul, start_row, last_row,
               1<<wargs->Nrows, 1<<wargs->Ncols,
               TRANSPOSE_BLOCK_SIZE);
+
+  buildReordingTable(M_reordering1R2, wargs->Ncols+1, wargs->thread_id, (1 << (wargs->Ncols+1))/wargs->max_threads);
+  buildReordingTable(M_reordering2R2, wargs->Ncols, wargs->thread_id, (1 << wargs->Ncols)/wargs->max_threads);
+  M_firstR2 = wargs->Ncols+1;
 
   wait_h(wargs->thread_id, NULL, NULL);
 
@@ -1260,7 +1335,6 @@ void *interpol_and_muls_h(void *args)
               TRANSPOSE_BLOCK_SIZE);
 
   wait_h(wargs->thread_id, NULL, NULL);
-
 
   // A[i] = IFFT_N/2(A).T; B[i] = IFFT_N/2(B).T; C[i] = IFFT_N/2(M).T step 2
   for (i=start_row;i < last_row; i++){

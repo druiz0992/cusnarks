@@ -151,6 +151,7 @@ void transposeBlock_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t
 }
 void transposeBlock_h(uint32_t *mout, uint32_t *min, uint32_t start_row, uint32_t last_row, uint32_t in_nrows, uint32_t in_ncols, uint32_t block_size)
 {
+
     for (uint32_t i = start_row; i < last_row; i += block_size) {
         for(uint32_t j = 0; j < in_ncols; ++j) {
             for(uint32_t b = 0; b < block_size && i + b < last_row; ++b) {

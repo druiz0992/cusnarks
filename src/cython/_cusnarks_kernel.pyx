@@ -932,6 +932,14 @@ def ec_jacadd_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_eca,
 
      return np.reshape(out_ecz,(-1, NWORDS_FP))
 
+def ec_jacaddaff_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_eca, 
+                np.ndarray[ndim=1, dtype=np.uint32_t] in_ecb,  ct.uint32_t pidx):
+     cdef np.ndarray[ndim=1, dtype=np.uint32_t] out_ecz = np.zeros(ECP_JAC_OUTDIMS*NWORDS_FR, dtype=np.uint32)
+
+     uh.cec_jacaddaff_h(&out_ecz[0], &in_eca[0], &in_ecb[0], pidx)
+
+     return np.reshape(out_ecz,(-1, NWORDS_FP))
+
 def ec_jacscmul_h(np.ndarray[ndim=1, dtype = np.uint32_t] in_scl, 
                 np.ndarray[ndim=1, dtype=np.uint32_t] in_eca,  ct.uint32_t pidx, ct.uint32_t add_last=0):
      cdef ct.uint32_t n

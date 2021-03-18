@@ -109,6 +109,9 @@ cdef extern from "../cuda/ec.h" nogil:
     void cec_jacadd_h "ec_jacadd_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t *y,
                                      ct.uint32_t pidx)
 
+    void cec_jacaddaff_h "ec_jacaddaff_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t *y,
+                                     ct.uint32_t pidx)
+
     void cec_jacdouble_h "ec_jacdouble_h" (ct.uint32_t *z, ct.uint32_t *x, ct.uint32_t pidx)
 
     void cec_jacscmul_h "ec_jacscmul_h" (ct.uint32_t *z, ct.uint32_t *scl, ct.uint32_t *x,

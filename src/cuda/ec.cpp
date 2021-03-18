@@ -223,6 +223,16 @@ void ec_jacadd_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
 }
 
 /*
+ * EC_P JAC = EC_P AFF + EC_P AFF
+*/
+void ec_jacaddaff_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx) {
+  uint32_t y_jac[NWORDS_FP * ECP_JAC_OUTDIMS];
+  const uint32_t *One = CusnarksOneMontGet((mod_t)pidx);
+  memcpy(&y_jac, y, sizeof(uint32_t) * NWORDS_FP * ECP_JAC_INDIMS);
+  memcpy(&y_jac[2 * NWORDS_FP], One, sizeof(uint32_t) * NWORDS_FP);
+  ec_jacaddmixed_h(z, x, y_jac, pidx);
+}
+/*
  * EC_P JAC = EC_P AFF + EC_P JAC
 */
 void ec_jacaddmixed_h(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t pidx)
@@ -1945,7 +1955,6 @@ void *ec_jacreduce_pippen_h(void *args)
 // From N bit scalar, retrieve binScl
 void getBinnedScl(uint32_t *out_w, uint32_t *in_w, uint32_t binIdx)
 {
-    const uint32_t binSize = PIPPENGER_CBIN_SIZE;
     const uint32_t mask = (1 << PIPPENGER_CBIN_SIZE) - 1; 
     const uint32_t binWords = (NWORDS_FR * sizeof(uint32_t)) / PIPPENGER_CBIN_SIZE;
     const uint32_t n = binIdx/binWords;
