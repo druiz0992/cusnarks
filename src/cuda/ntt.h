@@ -35,6 +35,7 @@
 
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t L, t_uint64 astride, t_uint64 rstride, int32_t direction, uint32_t pidx);
 void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t L, int32_t direction, t_ff *ff);
+void ntt_h(uint32_t *A, const uint32_t *roots, uint32_t L, int32_t direction, t_ff *ff, uint32_t *preA, uint32_t levels2, uint32_t *postA);
 void intt_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t L, t_uint64 rstride, uint32_t pidx);
 void ntt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t levels, t_uint64 astride, t_uint64 rstride,int32_t direction,uint32_t pidx);
 void intt_dif_h(uint32_t *A, const uint32_t *roots, uint32_t format, uint32_t L, t_uint64 rstride, uint32_t pidx);

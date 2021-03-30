@@ -45,6 +45,7 @@
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 #define PIPPENGER_CBIN_SIZE  (16)
 
+#define BUFFER_PARAMS_LEN (512)
 #define TRANSPOSE_BLOCK_SIZE  (32)
 #define MAX_U256_BSELM  (6)
 #define DEFAULT_U256_BSELM  (6)
@@ -125,7 +126,7 @@
 #define U256_BLOCK_DIM          (256)
 #define ECBN128_BLOCK_DIM          (256)
 
-#define N_STREAMS_PER_GPU (1+4)
+#define N_STREAMS_PER_GPU (1+7)
 
 #define SHMEM_WITNESS_KEY (123456)
 
@@ -134,6 +135,7 @@
 #define ZKEY_COEFF_SIGNAL_OFFSET  (2)
 #define ZKEY_COEFF_VAL_OFFSET  (3)
 #define ZKEY_COEFF_NWORDS (NWORDS_FR + ZKEY_COEFF_VAL_OFFSET)
+
 
 typedef unsigned int uint32_t;
 typedef int int32_t;

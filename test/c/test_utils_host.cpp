@@ -257,7 +257,7 @@ uint32_t test_addm(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_param1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -313,7 +313,7 @@ uint32_t test_subm(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_param1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -369,7 +369,7 @@ uint32_t test_tomont(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_param1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -421,7 +421,7 @@ uint32_t test_mul(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_param1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -479,7 +479,7 @@ uint32_t test_square(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_param1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -533,7 +533,7 @@ uint32_t test_inv(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_param1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -588,7 +588,7 @@ uint32_t test_addm_ext(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_extparam1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -645,7 +645,7 @@ uint32_t test_subm_ext(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_extparam1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -702,7 +702,7 @@ uint32_t test_mul_ext(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_extparam1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -764,7 +764,7 @@ uint32_t test_square_ext(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_extparam1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -824,7 +824,7 @@ uint32_t test_inv_ext(void)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx++){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords, ff_extparam1_filename[pidx+pidx_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
 
@@ -893,7 +893,7 @@ uint32_t test_mul_prof(void)
     setRandomBI(a, ncores, 0, PSize, P, PSize);
     setRandomBI(b, ncores, 0, PSize, P, PSize);
  
-    init_h();
+    init_h(NULL);
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     #pragma omp parallel for 
@@ -929,7 +929,7 @@ uint32_t test_addm_prof(void)
  uint32_t ncores = get_nprocs_conf();
   
  for (pidx=MOD_FP; pidx < MOD_N; pidx++){   
-   init_h();
+   init_h(NULL);
    samples = 1000000000;
    clock_gettime(CLOCK_MONOTONIC, &start);
    const uint32_t *P =  CusnarksPGet((mod_t)pidx);
@@ -975,7 +975,7 @@ uint32_t test_subm_prof(void)
  uint32_t ncores = get_nprocs_conf();
   
  for (pidx=MOD_FP; pidx < MOD_N; pidx++){   
-   init_h();
+   init_h(NULL);
    samples = 1000000000;
    clock_gettime(CLOCK_MONOTONIC, &start);
    const uint32_t *P =  CusnarksPGet((mod_t)pidx);
@@ -1093,7 +1093,7 @@ uint32_t test_ntt_parallel(void)
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
 
   memcpy(result, samples, nroots * NWORDS_FR * sizeof(uint32_t));
-  init_h();
+  init_h(NULL);
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
@@ -1213,7 +1213,7 @@ uint32_t test_ntt_parallel_65K(void)
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
 
   memcpy(result, samples, nroots * NWORDS_FR * sizeof(uint32_t));
-  init_h();
+  init_h(NULL);
 
   ntt_parallel_h(samples, roots, Nrows, Ncols,1,1, FFT_T_DIT, pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
@@ -1384,7 +1384,7 @@ uint32_t test_interpol_parallel_500K()
   intt_h(result, roots, 1, levels,2, pidx);
   ntt_h(result, roots, levels+1,1, 1,1, pidx);
 
-  init_h();
+  init_h(NULL);
   interpol_parallel_odd_h(samples, roots,Nrows, Ncols, 2, pidx); 
   release_h();
 
@@ -1430,7 +1430,7 @@ uint32_t test_ntt_parallel_1M(void)
   readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
 
   memcpy(result, samples, nroots * NWORDS_FR * sizeof(uint32_t));
-  init_h();
+  init_h(NULL);
 
   ntt_parallel_h(samples, roots, Nrows,Ncols,1,1, FFT_T_DIT,pidx);
   intt_parallel_h(samples, roots,1, Nrows, Ncols,1, FFT_T_DIT,pidx);
@@ -1493,7 +1493,7 @@ uint32_t test_ntt_parallel2D_65K()
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
-   init_h();
+   init_h(NULL);
 
    for (k=0; k < MAX_ITER_65K; k++){
      setRandomBI(samples,nroots, N, NWORDS_FR);
@@ -1550,7 +1550,7 @@ uint32_t test_nttmul_parallel2D_65K(void)
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
-   init_h();
+   init_h(NULL);
 
    for (k=0; k <MAX_ITER_65K; k++){
      memset(X1,0, NWORDS_FR * sizeof(uint32_t)); 
@@ -1612,7 +1612,7 @@ uint32_t test_ntt_parallel3D_131K()
    uint32_t retval=0;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
-   init_h();
+   init_h(NULL);
 
    uint32_t *samples = (uint32_t *)malloc(nroots * NWORDS_FR * sizeof(uint32_t));
    uint32_t *samples2 = (uint32_t *)malloc(nroots * NWORDS_FR * sizeof(uint32_t));
@@ -1675,7 +1675,7 @@ uint32_t test_ntt_parallel2D_1M()
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
-   init_h();
+   init_h(NULL);
 
    for (k=0; k <MAX_ITER_1M; k++){
      setRandomBI(samples, nroots, N, NWORDS_FR);
@@ -1732,7 +1732,7 @@ uint32_t test_nttmul_parallel2D_1M(void)
 
    readU256DataFile_h(roots,roots_f,cusnarks_nroots,nroots);
    computeIRoots_h(iroots, roots, nroots);
-   init_h();
+   init_h(NULL);
 
    for (k=0; k <MAX_ITER_1M; k++){
      memset(X1,0, NWORDS_FR * sizeof(uint32_t)); 
@@ -1801,7 +1801,7 @@ uint32_t test_nttmul_randomsize(void)
    uint32_t min_k=6, max_k = 11;
 
    CusnarksGetFRoots(roots_f, sizeof(roots_f)); 
-   init_h();
+   init_h(NULL);
 
    for (k=min_k; k < max_k; k++){
      npoints_raw = (rand() %  ( (1<< k) - (1 << (k - 1))+1)) + (1 << (k-1));
@@ -1913,7 +1913,7 @@ uint32_t test_interpol_mul_randomsize(void)
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
    nroots2 = CusnarksGetNRoots()/2;
 
-   init_h();
+   init_h(NULL);
    X1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_FR * sizeof(uint32_t));
    Y1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_FR * sizeof(uint32_t));
    X2 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_FR * sizeof(uint32_t));
@@ -2067,7 +2067,7 @@ uint32_t test_interpol_mul_randomsize_prof(void)
    CusnarksGetFRoots(roots_f, sizeof(roots_f));
    nroots2 = CusnarksGetNRoots()/2;
 
-   init_h();
+   init_h(NULL);
    X1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_FR * sizeof(uint32_t));
    Y1 = (uint32_t *)malloc((cusnarks_nroots) * NWORDS_FR * sizeof(uint32_t));
    roots = (uint32_t *)malloc((cusnarks_nroots + (1<<nroots2) + (1<<(nroots2+1))) * NWORDS_FR * sizeof(uint32_t));
@@ -2164,7 +2164,7 @@ uint32_t test_mul_ext_prof(void)
     setRandomBI(a, 2*ncores, 0, 8, P, PSize);
     setRandomBI(b, 2*ncores, 0, 8, P, PSize);
   
-    init_h();
+    init_h(NULL);
     clock_gettime(CLOCK_MONOTONIC, &start);
   
     #pragma omp parallel for 
@@ -2219,7 +2219,7 @@ uint32_t test_ec2aff(uint32_t ec2)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_aff_filename[(pidx+pidx_offset)/2+ec2_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
@@ -2294,7 +2294,7 @@ uint32_t test_ec_jacadd(uint32_t ec2)
  uint32_t c[NWORDS_FP * outdims], c1[NWORDS_FP * indims];
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_add_filename[(pidx+pidx_offset)/2+ec2_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
@@ -2372,7 +2372,7 @@ uint32_t test_ec_jacaddmixed(uint32_t ec2)
  }
  uint32_t c[NWORDS_FP * outdims], c1[NWORDS_FP * indims];
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_add_filename[(pidx+pidx_offset)/2+ec2_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
@@ -2452,7 +2452,7 @@ uint32_t test_ec_jacscmul(uint32_t ec2)
  }
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_scl, scl_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_mul_filename[(pidx+pidx_offset)/2+ec2_offset]);
@@ -2536,7 +2536,7 @@ uint32_t test_ec_jacreduce_opt(uint32_t ec2)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_scl, scl_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_rdc_filename[(pidx+pidx_offset)/2+ec2_offset]);
@@ -2642,7 +2642,7 @@ uint32_t test_ec_jacreduce_pippen(uint32_t ec2)
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_scl, scl_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_rdc_filename[(pidx+pidx_offset)/2+ec2_offset]);
@@ -2748,7 +2748,7 @@ uint32_t  test_ec_jacreduce_precompute(uint32_t ec2, uint32_t file, uint32_t com
  
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_scl, scl_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_rdc_filename[(pidx+pidx_offset)/2+ec2_offset]);
@@ -2887,7 +2887,7 @@ uint32_t test_ec_jacdouble(uint32_t ec2)
  uint32_t c[NWORDS_FP * outdims], c1[NWORDS_FP * indims];
 
  for (pidx = MOD_FP; pidx < MOD_N; pidx+=2){
-     init_h();
+     init_h(NULL);
      getDataFileSize(&nwords_ecp, ecp1_filename[(pidx+pidx_offset)/2+ec2_offset]);
      getDataFileSize(&nwords_res, ec_dbl_filename[(pidx+pidx_offset)/2+ec2_offset]);
      const uint32_t PSize = CusnarksPSizeGet((mod_t)pidx);
@@ -3043,7 +3043,7 @@ uint32_t test_transpose_square(void)
 int main()
 {
   uint32_t retval;
-
+/*
   retval+=test_mul_prof();  // Profile montgomery mul 
   retval+=test_mul_ext_prof();  // Profile montgomery mul 
   retval+=test_interpol_mul_randomsize_prof();
@@ -3069,8 +3069,9 @@ int main()
 
   retval+=test_transpose_square();
   retval+=test_transpose();
-
+*/
   retval+=test_ntt();
+/*
   retval+=test_ntt_parallel();
 
   retval+=test_ntt_65K();
@@ -3116,7 +3117,7 @@ int main()
   retval+=test_ec_jacreduce_precompute(1,0,0);   
   retval+=test_ec_jacreduce_precompute(1,0,1);   
   retval+=test_ec_jacreduce_precompute(1,1);   
-
+*/
 
   if (retval){
     printf("\033[1;31m");

@@ -69,6 +69,8 @@ cdef extern from "../cuda/cusnarks_kernel.h":
         void getDeviceInfo()
         double elapsedTime()
         void inDataHostCopy(ct.uint32_t *data, ct.uint32_t size, ct.uint32_t gpu_id, ct.uint32_t stream_id);
+        void inDataHostCopyAndAlign(ct.uint32_t *data, unsigned long long nWords, unsigned long long offset, ct.uint32_t fill_zeros, ct.uint32_t gpu_id, ct.uint32_t stream_id)
+        ct.kernel_params_t * getNextParamsBuffer(ct.uint32_t nkernels)
 
 cdef extern from "../cuda/u256.h":
     cdef cppclass C_U256 "U256" (C_CUSnarks) :

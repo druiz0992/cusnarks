@@ -344,7 +344,6 @@ def ec_pippen_reduce(pysnark, vector, fidx, pippen_binsize=8 , pippen_blocksize=
       kernel = [CB_EC_JAC_RED1_PIPPEN, CB_EC_JAC_RED2_PIPPEN, CB_EC_JAC_RED3_PIPPEN]
 
  
-   nsamples = int(len(vector)/indims_e)
    nkernels = 3
    nblocks = 16
    nbins =int((NWORDS_FR * NBITS_WORD) / pippen_binsize) 
@@ -819,21 +818,21 @@ def zpoly_interp_and_mul_single_cuda(pysnark, vector, interp_params, fidx, roots
      # Data fits in single kernel lot, so no need to use streams
      zpoly_vector, t_interp = zpoly_interp_cuda(pysnark, zpoly_vector, interp_params,
                                   fidx, gpu_id=0, stream_id=0)
-     try:
-       pysnark.streamDel(0,0)
-     except ValueError:
-       print("Error releasing stream")
-       sys.exit(1)
+     #try:
+       #pysnark.streamDel(0,0)
+     #except ValueError:
+       #print("Error releasing stream")
+       #sys.exit(1)
 
      if mul == 1:
         ifft_params = ntt_build_h(zpoly_vector.shape[0])
         zpoly_vector,t_ifft = zpoly_fft_cuda(pysnark, zpoly_vector,ifft_params, fidx,
                                  as_mont=0, roots=roots, fft=0, gpu_id=0, stream_id=0)
-        try:
-          pysnark.streamDel(0,0)
-        except ValueError:
-          print("Error releasing stream")
-          sys.exit(1)
+        #try:
+          #pysnark.streamDel(0,0)
+        #except ValueError:
+          #print("Error releasing stream")
+          #sys.exit(1)
 
      t = t_interp + t_ifft
 
@@ -1100,11 +1099,11 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
           pAB_vector[voffset1:voffset1+nsamples] = result[nsamples:2*nsamples]
           vector[voffset1:voffset1+nsamples] = result[:nsamples]
           vector[voffset2:voffset2+nsamples] = result[2*nsamples:]
-          try:
-            pysnark.streamDel(gpu_id,stream_id)
-          except ValueError:
-            print("Error releasing stream")
-            sys.exit(1)
+          #try:
+            #pysnark.streamDel(gpu_id,stream_id)
+          #except ValueError:
+            #print("Error releasing stream")
+            #sys.exit(1)
         else :
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1149,11 +1148,11 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         if stream_id == 0:
            vector[voffset1:voffset1+nsamples] = result[:nsamples]
            vector[voffset2:voffset2+nsamples] = result[nsamples:]
-           try:
-              pysnark.streamDel(gpu_id,stream_id)
-           except ValueError:
-              print("Error releasing stream")
-              sys.exit(1)
+           #try:
+              #pysnark.streamDel(gpu_id,stream_id)
+           #except ValueError:
+              #print("Error releasing stream")
+              #sys.exit(1)
 
         else:
            pending_dispatch_table.append(de)
@@ -1220,11 +1219,11 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
         if stream_id==0:
           vector[voffset1:voffset1+nsamples] = result[:nsamples]
           vector[voffset2:voffset2+nsamples] = result[nsamples:]
-          try:
-              pysnark.streamDel(gpu_id,stream_id)
-          except ValueError:
-              print("Error releasing stream")
-              sys.exit(1)
+          #try:
+              #pysnark.streamDel(gpu_id,stream_id)
+          #except ValueError:
+              #print("Error releasing stream")
+              #sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1267,11 +1266,11 @@ def zpoly_interp_batch_cuda(pysnark, vector, interp_params, fidx, roots, batch_s
 
         if stream_id == 0:
            vector[voffset1:voffset1+nsamples] = result[:nsamples]
-           try:
-              pysnark.streamDel(gpu_id,stream_id)
-           except ValueError:
-              print("Error releasing stream")
-              sys.exit(1)
+           #try:
+              #pysnark.streamDel(gpu_id,stream_id)
+           #except ValueError:
+              #print("Error releasing stream")
+              #sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1385,11 +1384,11 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         if stream_id == 0:
           vector[voffset1:voffset1+nsamples] = result
-          try:
-              pysnark.streamDel(gpu_id,stream_id)
-          except ValueError:
-              print("Error releasing stream")
-              sys.exit(1)
+          #try:
+              #pysnark.streamDel(gpu_id,stream_id)
+          #except ValueError:
+              #print("Error releasing stream")
+              #sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1426,11 +1425,11 @@ def zpoly_mul_batch_cuda(pysnark, vector, mul_params, fidx, roots, batch_size, n
 
         if stream_id == 0:
           vector[voffset1:voffset1+nsamples] = result
-          try:
-              pysnark.streamDel(gpu_id,stream_id)
-          except ValueError:
-              print("Error releasing stream")
-              sys.exit(1)
+          #try:
+              #pysnark.streamDel(gpu_id,stream_id)
+          #except ValueError:
+              #print("Error releasing stream")
+              #sys.exit(1)
         else:
            pending_dispatch_table.append(de)
            n_dispatch+=1
@@ -1740,7 +1739,7 @@ def get_affinity(r_cpu=0, add_single_cpu=1):
     return affinity
 
 def buildDispatchTable(nbatches, nP, ngpu, nstreams, step, start_idx, end_idx,
-                           start_pidx=0, start_gpu_idx=0, start_stream_idx=1, ec_lable=None):
+                           start_pidx=0, start_gpu_idx=0, start_stream_idx=0, ec_lable=None):
       dispatch_table = np.zeros( (nP * nbatches, 5), dtype=object)
 
       # Add EC point : Column 0

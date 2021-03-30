@@ -49,7 +49,17 @@ static  uint32_t parallelism_enabled =  0;
 void mpoly_addm(void *args);
 
 static  pthread_cond_t utils_cond;        
-
+/*
+#define TRANSPOSE_IDX(X, R, N)         \
+  do {                    \
+    uint32_t tmp_R = (X) << (R); \
+    uint32_t tmp_N = 1 << (N); \
+    uint32_t tmp_RN = (X) >> (N - R); \
+    tmp_R & (tmpN - 1) + tmp_RN; \
+  } while(0)
+#endif
+*/
+	
 /*
 static uint32_t **utils_mpoly;
 
@@ -115,7 +125,6 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
     }
     return;
   }
-
   #ifndef PARALLEL_EN
     if (args->mode==0) {
       mpoly_eval_h((void *)args);
@@ -132,7 +141,7 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   }
 
   //printf("N threads : %d\n", nthreads);
-  //printf("N vars    : %d\n", nvars);
+  ////printf("N vars    : %d\n", nvars);
 
   unsigned long long vars_per_thread = nvars/nthreads;
   uint32_t i;
@@ -140,7 +149,7 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
 
   if (args->mode==1){
      vars_per_thread = vars_per_thread * ZKEY_COEFF_NWORDS;
-     memset(args->pout, 0, 2 * args->reduce_coeff * NWORDS_FR * sizeof(uint32_t));
+     //memset(args->pout, 0, 2 * args->reduce_coeff * NWORDS_FR * sizeof(uint32_t));
   } 
    
   pthread_t *workers = (pthread_t *) malloc(nthreads * sizeof(pthread_t));
@@ -148,8 +157,8 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
   init_barrier_h(args->max_threads);
 
   
-  //printf ("Creating  %d threads, with %d vars per thread. Start idx: %d, Last idx %d\n",
-   //       nthreads, vars_per_thread,args->start_idx, args->last_idx);
+  //printf ("Creating  %d threads, with %d vars per thread. Start idx: %d, Last idx %d, N coeff : %d\n",
+  //        nthreads, vars_per_thread,args->start_idx, args->last_idx, 2*args->reduce_coeff);
 
   for(i=0; i< nthreads; i++){
      start_idx = i * vars_per_thread;
@@ -190,6 +199,7 @@ void mpoly_eval_server_h(mpoly_eval_t *args)
 
   free(workers);
   free(w_args);
+
 }
 
 void *mpoly_eval_h(void *vargs)
@@ -243,7 +253,6 @@ void *mpoly_eval_h(void *vargs)
   return NULL;
 }
 
-
 void *mpolys_eval_h(void *vargs)
 {
   mpoly_eval_t *args = (mpoly_eval_t *) vargs;
@@ -255,16 +264,23 @@ void *mpolys_eval_h(void *vargs)
   t_addm addm_cb =  getcb_addm_h(args->pidx);
   t_mulm mulm_cb =  getcb_mulm_h(args->pidx);
  
+  uint32_t ncoeff = 2 * args->reduce_coeff / args->max_threads;
+  uint32_t start_coeff = ncoeff * args->thread_id;
+  uint32_t last_coeff = args->thread_id == args->max_threads - 1 ? 2 * args->reduce_coeff : ncoeff * (args->thread_id+1);
+
+  //printf("ncoeff[%d] %d %d %d\n", args->thread_id, start_coeff, last_coeff, 2 * args->reduce_coeff);
+  //memset(&args->pout[start_coeff*NWORDS_FR], 0, sizeof(uint32_t) * (last_coeff - start_coeff) * NWORDS_FR);
+  for (unsigned long long i=start_coeff*NWORDS_FR; i<last_coeff*NWORDS_FR; i++){
+    args->pout[i] = 0;
+  }
+
+  wait_h(args->thread_id, NULL, NULL);
   //printf("last_idx : %d\n",args->last_idx); 
   for (unsigned long long i=args->start_idx; i<args->last_idx; i+=(ZKEY_COEFF_NWORDS) ){
       coeff = &pin[i];
       w_idx = coeff[ZKEY_COEFF_SIGNAL_OFFSET];
       scl = (uint32_t *)&args->scalar[w_idx*NWORDS_FR];
-      if (coeff[ZKEY_COEFF_MATRIX_OFFSET] == 0) {
-         p_idx = 0 + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
-      } else {
-         p_idx = args->reduce_coeff + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
-      }
+      p_idx = coeff[ZKEY_COEFF_MATRIX_OFFSET] * args->reduce_coeff + coeff[ZKEY_COEFF_CONSTRAINT_OFFSET];
       pout = &args->pout[p_idx*NWORDS_FR];
       mulm_cb(tmp, &coeff[ZKEY_COEFF_VAL_OFFSET], scl);
       addm_cb(pout, pout, tmp);

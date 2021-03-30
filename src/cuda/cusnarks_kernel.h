@@ -42,6 +42,8 @@ class CUSnarks {
         uint32_t   ***in_data_host;         // input vector (host side)
         uint32_t   ***out_data_host;        // output vector (host side)
         kernel_params_t ***params_host;     // input params (host side)
+	kernel_params_t *params_buffer;
+        uint32_t params_buffer_idx;
 
         cudaStream_t **stream;
         cudaEvent_t **start_event;
@@ -94,6 +96,8 @@ class CUSnarks {
         void streamDel(uint32_t gpu_id, uint32_t stream_id);
         double elapsedTime(void);
 	void inDataHostCopy(uint32_t *data, uint32_t size, uint32_t gpu_id, uint32_t stream_id);
+        void inDataHostCopyAndAlign(uint32_t *data, unsigned long long nWords, unsigned long long offset, uint32_t fill_zeros, uint32_t gpu_id, uint32_t stream_id);
+        kernel_params_t * getNextParamsBuffer(uint32_t nkernels);
 };
 
 #endif

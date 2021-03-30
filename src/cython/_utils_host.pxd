@@ -249,3 +249,5 @@ cdef extern from "../cuda/utils_host.h" :
 
     void cshared_detach_h "shared_detach_h" (void *shmem)
 
+    void clockMem_h "lockMem_h"(ct.uint32_t *buf, ct.t_uint64 nWords)
+

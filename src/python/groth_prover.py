@@ -86,6 +86,9 @@ import cusnarks_config as cfg
 class GrothProver(object):
     def __init__(self, proving_key_f, verification_key_f=None,curve='BN128', out_pk_f=None, out_pk_format=FMT_MONT, 
                  n_gpus=1,start_server=1, max_batch_size=20, seed=None, snarkjs=None, keep_f=None, logf_en=1):
+        self.p_CPU = None
+        self.buffer_fit = False
+
         # Check valid folder exists
         if keep_f is None:
             print ("Repo directory needs to be provided\n")
@@ -174,8 +177,8 @@ class GrothProver(object):
                                     * 2  * 4 * NWORDS_FP * ECP_JAC_OUTDIMS * 2 
            batch_size = min(int(math.log(available_gpu_buffer / required_gpu_buffer, 2)),max_batch_size)
 
-           self.max_batch_size = 1 << batch_size
-           self.batch_size = min(1<<20, self.max_batch_size)
+           self.max_batch_size = (1 << batch_size) + EC_ALIGNMENT_FACTOR
+           self.batch_size = min((1<<20)+EC_ALIGNMENT_FACTOR, self.max_batch_size)
            self.last_batch_size = self.batch_size
            self.ecbn128_buffer_size = max(2*self.max_batch_size,2<<(8+8+4))
 
@@ -405,10 +408,12 @@ class GrothProver(object):
         nPublic = pk_bin[1][0]
 
         next_gpu_idx = 0
-        first_stream_idx = min(self.n_streams-1,1)
 
         nsamples = self.nVars+2
-        nsamplesC = self.nVars - nPublic -1
+        ## TODOA
+        nsamplesC = self.nVars
+        #nsamplesC = self.nVars - nPublic - 1
+
 
         self.tableA = buildDispatchTable( math.ceil(nsamples/self.batch_size),
                                          1,
@@ -417,6 +422,14 @@ class GrothProver(object):
                                          start_pidx=0,
                                          start_gpu_idx=0,
                                          ec_lable = np.asarray(['A']))
+        self.tableB2 = buildDispatchTable( math.ceil(nsamples/self.batch_size),
+                                         1,
+                                         self.n_gpu, self.n_streams, self.batch_size,
+                                         0, nsamples,
+                                         start_pidx=0,
+                                         start_gpu_idx=0,
+                                         start_stream_idx=0,
+                                         ec_lable = np.asarray(['B2']))
 
         self.tableB1 = buildDispatchTable( math.ceil(nsamples/self.batch_size),
                                          1,
@@ -424,6 +437,7 @@ class GrothProver(object):
                                          0, nsamples,
                                          start_pidx=0,
                                          start_gpu_idx=0,
+                                         start_stream_idx=0,
                                          ec_lable = np.asarray(['B1']))
 
         self.tableC = buildDispatchTable( math.ceil(nsamplesC/self.batch_size),
@@ -432,16 +446,12 @@ class GrothProver(object):
                                          0, nsamplesC,
                                          start_pidx=0,
                                          start_gpu_idx=0,
+                                         start_stream_idx=0,
                                          ec_lable = np.asarray(['C']))
-
-        self.tableB2 = buildDispatchTable( math.ceil(nsamples/self.batch_size),
-                                         1,
-                                         self.n_gpu, self.n_streams, self.batch_size,
-                                         0, nsamples,
-                                         start_pidx=0,
-                                         start_gpu_idx=0,
-                                         ec_lable = np.asarray(['B2']))
-
+        self.buffer_fit = False
+        if len(self.tableA) < self.n_gpu * self.n_streams :
+            self.buffer_fit = True
+       
         self.mexp1Batch = np.zeros((self.batch_size*3, NWORDS_FP),dtype=np.uint32)
         self.mexp2Batch = np.zeros((self.batch_size*5, NWORDS_FP),dtype=np.uint32)
 
@@ -460,6 +470,11 @@ class GrothProver(object):
                                          start_pidx=0,
                                          start_gpu_idx=0,
                                          ec_lable = np.asarray(['hExps']))
+        print("TA",self.tableA)
+        print("TB2",self.tableB2)
+        print("TC",self.tableC)
+        print("TH",self.tableH)
+        print("Fit", self.buffer_fit)
 
     def FFT_CPU(self, w, wnElems):
 
@@ -637,6 +652,7 @@ class GrothProver(object):
         w = np.frombuffer(self.scl_array_sh, dtype=np.uint32).reshape(self.scl_array_shape)
 
         polH, m = self.FFT_CPU(w, wnElems)
+        #polH=np.zeros((33554433,8),dtype=np.uint32)
         m=polH.shape[0]
 
         #write polH once MEXP is done (not before)
@@ -993,12 +1009,14 @@ class GrothProver(object):
                                          ec_lable = np.asarray(['hExps']))
           self.n_streams = max(min(n_streams, N_STREAMS_PER_GPU),2)
 
-          if (1 << batch_size)  <=  self.max_batch_size :
-             self.batch_size = 1 << batch_size
+          if ((1 << batch_size) + EC_ALIGNMENT_FACTOR)  <=  self.max_batch_size :
+             self.batch_size = (1 << batch_size) + EC_ALIGNMENT_FACTOR
           else:
              self.batch_size = self.max_batch_size
       else:
-          self.batch_size = 0
+          #self.batch_size = 0
+          self.compute_first_mexp_gpu = False
+          self.compute_last_mexp_gpu = 0
 
       if self.active_client.value :
           return
@@ -1087,7 +1105,7 @@ class GrothProver(object):
     def finish(self):
       self.active_client.value = 0
       self.status_client.value = 1
-      if self.p_CPU is not None:
+      if self.n_gpu > 0:
         self.p_CPU.terminate()
         self.p_CPU.join()
 
@@ -1182,9 +1200,10 @@ class GrothProver(object):
         scl_vector = self.scl_array
 
         ecp_vector = pk_bin[0][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
-
         if self.stop_client.value == 0 :
-            self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0)
+            #used_streams = self.prepareMulPippen( self.tableA, scl_vector, ecp_vector, ec2=0)
+            #self.findECPointsDispatch( self.tableA, scl_vector, ecp_vector, ec2=0, used_streams=used_streams[0], stream_len = used_streams[1])
+            self.findECPointsDispatchBk( self.tableA, scl_vector, ecp_vector, ec2=0)
             self.assignECPvalues('A')
 
         # B2
@@ -1193,10 +1212,12 @@ class GrothProver(object):
         scl_vector[self.nVars + 1] = self.s_scl
 
         ecp_vector = pk_bin[1][:(self.nVars+2)*ECP2_JAC_INDIMS*NWORDS_FP]
-
+        
         if self.stop_client.value == 0 :
-          self.findECPointsDispatch( self.tableB2, scl_vector, ecp_vector, ec2=1 )
+          self.findECPointsDispatchBk( self.tableB2, scl_vector, ecp_vector, ec2=1 )
           self.assignECPvalues('B2')
+        
+        
 
         # B1
         if self.zk:
@@ -1206,7 +1227,7 @@ class GrothProver(object):
            ecp_vector = pk_bin[2][:(self.nVars+2)*ECP_JAC_INDIMS*NWORDS_FP]
 
            if self.stop_client.value == 0 :
-              self.findECPointsDispatch( self.tableB1, scl_vector, ecp_vector)
+              self.findECPointsDispatchBk( self.tableB1, scl_vector, ecp_vector)
               self.assignECPvalues('B1')
 
         # C 
@@ -1218,12 +1239,13 @@ class GrothProver(object):
              ecp_vector = pk_bin[3][(nPublic+1)*ECP_JAC_INDIMS*NWORDS_FP:(self.nVars)*ECP_JAC_INDIMS*NWORDS_FP]
 
         used_streams = []
+        
         if self.stop_client.value == 0 :
           if self.compute_last_mexp_gpu == 0:
-              used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = True, scl_offset=nPublic+1)
+              used_streams = self.findECPointsDispatchBk( self.tableC, scl_vector, ecp_vector, reduce_en = True, scl_offset=nPublic+1)
           else:
-              used_streams = self.findECPointsDispatch( self.tableC, scl_vector, ecp_vector, reduce_en = False, scl_offset=nPublic+1)
-
+              used_streams = self.findECPointsDispatchBk( self.tableC, scl_vector, ecp_vector, reduce_en = False, scl_offset=nPublic+1)
+        
         # Assign collected values to pi's
         if self.compute_last_mexp_gpu == 0 and self.stop_client.value == 0:
            self.assignECPvalues('C')
@@ -1266,7 +1288,7 @@ class GrothProver(object):
            ecp_vector = pk_bin[0][self.last_samples_cpu*ECP_JAC_INDIMS*NWORDS_FP:(m+4)*ECP_JAC_INDIMS*NWORDS_FP]
    
            self.logger.info(' Starting Dispatch...')
-           self.findECPointsDispatch( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
+           self.findECPointsDispatchBk( self.tableH, scl_vector, ecp_vector, ec2=0, used_streams=used_streams)
            self.logger.info(' Collecting Results...')
         
            self.assignECPvalues('C')
@@ -1388,7 +1410,6 @@ class GrothProver(object):
           if self.last_samples_cpu:
             while self.Mexp2_CPU_done.value == 0:
                   time.sleep(0.1)
-            self.t_GP['Mexp2'] += self.t_Mexp2.value
             tmp_c_eccf1 = ec_jacaddaff_h(np.reshape(self.pi_c_eccf1,-1), np.reshape(self.pi_c2_eccf1,-1), MOD_FP)
             self.pi_c_eccf1 = ec_jac2aff_h( tmp_c_eccf1.reshape(-1), MOD_FP, strip_last=1) 
         else :
@@ -1438,6 +1459,13 @@ class GrothProver(object):
         for idx,v in enumerate(self.init_ec_val[:,:,EC_idx][0]):
             self.init_ec_val[:,:,EC_idx][0][idx]  = np.zeros(v.shape, dtype=np.uint32)
 
+    def streamsSync(self, dispatch_table):
+       for bidx,p in enumerate(dispatch_table):
+          P = p[0]
+          cuda_ec128 = self.ec_type_dict[P][0]
+          gpu_id = p[3]
+          stream_id = p[4]
+          cuda_ec128.streamSync(gpu_id,stream_id)
 
     def streamsDel(self, dispatch_table):
        for bidx,p in enumerate(dispatch_table):
@@ -1448,12 +1476,176 @@ class GrothProver(object):
           #cuda_ec128.streamSync(gpu_id,stream_id)
           cuda_ec128.streamDel(gpu_id,stream_id)
 
-    def findECPointsDispatch(self, dispatch_table, scl_vector, ecp_vector, ec2=0, reduce_en=True, used_streams=None, scl_offset=0):
+    def prepareMulPippen(self, dispatch_table, scl_vector, ecp_vector, ec2=0, used_streams=None, scl_offset=0):
 
-       ZField.set_field(MOD_FP)
+       t_total=0.0
+       t_sync1=0.0
+       t_sync2=0.0
+       t_sync3=0.0
+       t_copy=0.0
+       t_begin=time.time()
+       #ZField.set_field(MOD_FP)
        n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
        pending_dispatch_table = []
-       n_dispatch=len(pending_dispatch_table)
+       #n_dispatch=len(pending_dispatch_table)
+       n_dispatch=0
+       last_iter=0
+       indims = ECP_JAC_INDIMS
+       outdims = ECP_JAC_OUTDIMS
+       edims = ECP_JAC_OUTDIMS
+       if ec2 == 1:
+           indims = ECP2_JAC_INDIMS
+           outdims = ECP2_JAC_OUTDIMS
+           edims = ECP2_JAC_INDIMS + 1
+    
+       if used_streams is None:
+           used_streams = [] 
+           used_streams_len = []
+           for i in range(self.n_gpu):
+             used_streams.append(set([]))
+
+       for bidx, p in enumerate(dispatch_table):
+          #Retrieve point name : A,B1,B2,..
+          P = p[0]    
+          # Retrieve cuda pointer
+          cuda_ec128 = self.ec_type_dict[P][0]
+          # Retrieve EC type : EC -> 0, EC2 -> 1
+          start_idx = p[1]
+          end_idx   = p[2]
+          gpu_id    = p[3]
+          stream_id = p[4]
+          pidx = self.ec_type_dict[P][4]
+
+          t_1=time.time()
+          #nsamples needs to be multiple of EC_ALIGNMENT_FACTOR (128)
+          nsamples = int((end_idx - start_idx+EC_ALIGNMENT_FACTOR-1)/(EC_ALIGNMENT_FACTOR))*EC_ALIGNMENT_FACTOR
+          offset = nsamples - (end_idx - start_idx)
+          #TODOA
+          ep_offset=scl_offset
+          ep_end_idx=end_idx-ep_offset
+          if bidx != len(dispatch_table) -1:
+              batch = self.mexp1Batch
+              if ec2:
+                batch = self.mexp2Batch
+          else:
+            batch = np.zeros((nsamples*edims, NWORDS_FR),dtype=np.uint32)
+
+          ep_offset_idx=0
+          ep_start_idx = start_idx - ep_offset
+
+          if bidx == 0:
+            ep_start_idx = 0
+            ep_offset_idx = ep_offset
+
+          cuda_ec128.inDataHostCopyAndAlign(np.reshape(scl_vector,-1),
+                  start_idx*NWORDS_FR,
+                  (end_idx-start_idx)*NWORDS_FR,
+                  offset*NWORDS_FR,
+                  (offset+ep_offset_idx)*NWORDS_FR,
+                  gpu_id,
+                  stream_id)
+
+          cuda_ec128.inDataHostCopyAndAlign(ecp_vector, 
+                  ep_start_idx*NWORDS_FP*indims,
+                  (ep_end_idx-ep_start_idx)*NWORDS_FP*indims,
+                  (nsamples+indims*(offset+ep_offset_idx))*NWORDS_FR,
+                  0,
+                  gpu_id,
+                  stream_id)
+
+          first_time = 1
+          if stream_id in used_streams[gpu_id] :
+            first_time = 0
+
+          t_copy+=time.time()-t_1
+          ec_pippen_mul(cuda_ec128, batch ,MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id, first_time=first_time)
+          used_streams[gpu_id].add(stream_id)
+
+          pending_dispatch_table.append(p)
+          used_streams_len.append(batch.shape[0])
+          n_dispatch +=1
+
+
+          # Collect results. Leave last batch uncollected to maximize parallelization
+          if n_dispatch == n_par_batches:
+              t_1=time.time()
+              n_dispatch=0
+
+              try:
+                 #self.streamsDel(pending_dispatch_table)
+                 self.streamsSync(pending_dispatch_table)
+              except ValueError:
+                 self.logger.error('Exception occurred when getting EC results. Exiting program...')
+                 sys.exit(1)
+              pending_dispatch_table = []
+              t_sync1+=time.time() - t_1
+
+       return [used_streams, used_streams_len]
+
+    def findECPointsDispatch(self, dispatch_table, scl_vector, ecp_vector, ec2=0, reduce_en=True, used_streams=None, stream_len=None, scl_offset=0):
+
+       t_total=0.0
+       t_sync1=0.0
+       t_sync2=0.0
+       t_sync3=0.0
+       t_copy=0.0
+       t_begin=time.time()
+       #ZField.set_field(MOD_FP)
+       n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
+       pending_dispatch_table = []
+       #n_dispatch=len(pending_dispatch_table)
+       n_dispatch=0
+       last_iter=0
+       cuda_ec128 = self.ec_type_dict['A'][0]
+       pidx = self.ec_type_dict['A'][4]
+    
+
+       if reduce_en :
+          stream_idx=0
+          for gpu_id, streams  in enumerate(used_streams):
+              for stream_id in streams:
+                 batch = self.mexp2Batch[:stream_len[stream_idx]]
+                 ec_pippen_reduce(cuda_ec128, batch, MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id)
+                 stream_idx+=1
+  
+          for gpu_id, streams  in enumerate(used_streams):
+              for stream_id in streams:
+                t_1=time.time()
+                result, t = cuda_ec128.streamSync(gpu_id,stream_id)
+                t_sync3+=time.time()-t_1
+                if len(result) == ECP_JAC_OUTDIMS:
+                    self.init_ec_val[gpu_id][stream_id][pidx] =\
+                               ec_jac2aff_h(
+                                result.reshape(-1),
+                                MOD_FP,
+                                strip_last=1) 
+                else:
+                   self.init_ec_val[gpu_id][stream_id][pidx] =\
+                            ec2_jac2aff_h(
+                                 result.reshape(-1),
+                                 MOD_FP,
+                                 strip_last=1) 
+          t_total=time.time() - t_begin
+                            
+          return None                  
+       else:
+          t_total=time.time() - t_begin
+          return used_streams
+
+    def findECPointsDispatchBk(self, dispatch_table, scl_vector, ecp_vector, ec2=0, reduce_en=True, used_streams=None, scl_offset=0):
+
+       t_total=0.0
+       t_sync1=0.0
+       t_sync2=0.0
+       t_sync3=0.0
+       t_copy=0.0
+       t_begin=time.time()
+       #ZField.set_field(MOD_FP)
+       n_par_batches = self.n_gpu * max((self.n_streams - 1),1)
+       pending_dispatch_table = []
+       #n_dispatch=len(pending_dispatch_table)
+       n_dispatch=0
+       last_iter=0
        indims = ECP_JAC_INDIMS
        outdims = ECP_JAC_OUTDIMS
        edims = ECP_JAC_OUTDIMS
@@ -1479,10 +1671,13 @@ class GrothProver(object):
           stream_id = p[4]
           pidx = self.ec_type_dict[P][4]
 
-          #nsamples needs to be multiple of 128
-          start1=time.time()
-          nsamples = int((end_idx - start_idx+128-1)/(128))*128
+          t_1=time.time()
+          #nsamples needs to be multiple of EC_ALIGNMENT_FACTOR (128)
+          nsamples = int((end_idx - start_idx+EC_ALIGNMENT_FACTOR-1)/(EC_ALIGNMENT_FACTOR))*EC_ALIGNMENT_FACTOR
           offset = nsamples - (end_idx - start_idx)
+          #TODOA
+          ep_offset=scl_offset
+          ep_end_idx=end_idx-ep_offset
           if bidx != len(dispatch_table) -1:
               batch = self.mexp1Batch
               if ec2:
@@ -1490,47 +1685,99 @@ class GrothProver(object):
           else:
             batch = np.zeros((nsamples*edims, NWORDS_FR),dtype=np.uint32)
 
-          batch[offset:nsamples] = scl_vector[start_idx+scl_offset:end_idx+scl_offset]
-          batch[nsamples+indims*offset:] = np.reshape(
-                                            ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],
-                                            (-1,NWORDS_FP))
+          ep_offset_idx=0
+          ep_start_idx = start_idx - ep_offset
+
+          if bidx == 0:
+            ep_start_idx = 0
+            ep_offset_idx = ep_offset
+
+          #batch[offset:nsamples] = scl_vector[start_idx+scl_offset:end_idx+scl_offset]
+          #batch[nsamples+indims*offset:] = np.reshape(
+                                            #ecp_vector[start_idx*NWORDS_FP*indims:end_idx*NWORDS_FP*indims],
+                                            #(-1,NWORDS_FP))
+
+          #TODOA
+          #cuda_ec128.inDataHostCopyAndAlign(np.reshape(scl_vector,-1),
+                  #(start_idx+scl_offset)*NWORDS_FR,
+                  #(end_idx-start_idx)*NWORDS_FR,
+                  #offset*NWORDS_FR,
+                  #offset*NWORDS_FR,
+                  #gpu_id,
+                  #stream_id)
+          #if P=="C":
+             #print("SCL",P,start_idx+scl_offset,scl_vector[start_idx+scl_offset])
+          cuda_ec128.inDataHostCopyAndAlign(np.reshape(scl_vector,-1),
+                  start_idx*NWORDS_FR,
+                  (end_idx-start_idx)*NWORDS_FR,
+                  offset*NWORDS_FR,
+                  (offset+ep_offset_idx)*NWORDS_FR,
+                  gpu_id,
+                  stream_id)
+          #if P=="C":
+             #print("SCL",P,start_idx+ep_offset_idx,scl_vector[start_idx+ep_offset_idx])
+             #print("SCL. Start/N samples/Offset/Fill Zeros", start_idx, end_idx-start_idx, offset, offset+ep_offset_idx)
+
+
+          #TODOA
+          #cuda_ec128.inDataHostCopyAndAlign(ecp_vector, 
+                  #start_idx*NWORDS_FP*indims,
+                  #(end_idx-start_idx)*NWORDS_FP*indims,
+                  #(nsamples+indims*offset)*NWORDS_FR,
+                  #0,
+                  #gpu_id,
+                  #stream_id)
+          #if P=="C":
+            #print("EP",start_idx, ecp_vector[start_idx*NWORDS_FR*indims:start_idx*NWORDS_FR*indims+8])
+
+          cuda_ec128.inDataHostCopyAndAlign(ecp_vector, 
+                  ep_start_idx*NWORDS_FP*indims,
+                  (ep_end_idx-ep_start_idx)*NWORDS_FP*indims,
+                  (nsamples+indims*(offset+ep_offset_idx))*NWORDS_FR,
+                  0,
+                  gpu_id,
+                  stream_id)
+          #if P=="C":
+            #print("EP",ep_start_idx,ep_end_idx-ep_start_idx,ecp_vector[ep_start_idx*NWORDS_FP*indims:ep_start_idx*NWORDS_FP*indims+8])
+            #print("EP. Start/N samples/Offset/Fill Zeros", ep_start_idx, ep_end_idx-ep_start_idx, nsamples+offset+ep_offset_idx,0)
+
           first_time = 1
           if stream_id in used_streams[gpu_id] :
             first_time = 0
 
+          t_copy+=time.time()-t_1
           ec_pippen_mul(cuda_ec128, batch ,MOD_FP, ec2=ec2, gpu_id=gpu_id, stream_id=stream_id, first_time=first_time)
           used_streams[gpu_id].add(stream_id)
 
-          if stream_id == 0:
-             try:
-               cuda_ec128.streamDel(gpu_id, stream_id)
-             except ValueError:
-               self.logger.error('Exception occurred when getting EC results. Exiting program...')
-               sys.exit(1)
-               
-          else :
-             pending_dispatch_table.append(p)
-             n_dispatch +=1
+          pending_dispatch_table.append(p)
+          n_dispatch +=1
+          print("EEE",batch.shape)
 
 
-             # Collect results. Leave last batch uncollected to maximize parallelization
-             if n_dispatch == n_par_batches:
-                 n_dispatch=0
+          # Collect results. Leave last batch uncollected to maximize parallelization
+          if n_dispatch == n_par_batches:
+              t_1=time.time()
+              n_dispatch=0
 
-                 try:
-                    self.streamsDel(pending_dispatch_table)
-                 except ValueError:
-                    self.logger.error('Exception occurred when getting EC results. Exiting program...')
-                    sys.exit(1)
-                 pending_dispatch_table = []
+              try:
+                 #self.streamsDel(pending_dispatch_table)
+                 self.streamsSync(pending_dispatch_table)
+              except ValueError:
+                 self.logger.error('Exception occurred when getting EC results. Exiting program...')
+                 sys.exit(1)
+              pending_dispatch_table = []
+              t_sync1+=time.time() - t_1
 
-          if self.stop_client.value:
+          #if self.stop_client.value:
              # Collect final results
-             self.streamsDel(pending_dispatch_table)
-             return
+             #self.streamsDel(pending_dispatch_table)
+             #return
 
        # Collect final results
-       self.streamsDel(pending_dispatch_table)
+       #self.streamsDel(pending_dispatch_table)
+       t_1=time.time()
+       #self.streamsSync(pending_dispatch_table)
+       t_sync2+=time.time()-t_1
 
        if reduce_en :
           for gpu_id, streams  in enumerate(used_streams):
@@ -1539,7 +1786,9 @@ class GrothProver(object):
   
           for gpu_id, streams  in enumerate(used_streams):
               for stream_id in streams:
+                t_1=time.time()
                 result, t = cuda_ec128.streamSync(gpu_id,stream_id)
+                t_sync3+=time.time()-t_1
                 if len(result) == ECP_JAC_OUTDIMS:
                     self.init_ec_val[gpu_id][stream_id][pidx] =\
                                ec_jac2aff_h(
@@ -1552,8 +1801,15 @@ class GrothProver(object):
                                  result.reshape(-1),
                                  MOD_FP,
                                  strip_last=1) 
+          t_total=time.time() - t_begin
+          #print("Time: (total/sync1/sync2/sync3/copy)",round(t_total,2), round(t_sync1,2), round(t_sync2,2), round(t_sync3,2), round(t_copy,2))
+          #print("Time %: (sync1/sync2/sync3/copy)",round(t_sync1/t_total,2), round(t_sync2/t_total,2), round(t_sync3/t_total,2), round(t_copy/t_total,2))
+                            
           return None                  
        else:
+          t_total=time.time() - t_begin
+          #print("Time: (total/sync1/sync2/sync3/copy)",round(t_total,2), round(t_sync1,2), round(t_sync2,2), round(t_sync3,2), round(t_copy,2))
+          #print("Time %: (sync1/sync2/sync3/copy)",round(t_sync1/t_total,2), round(t_sync2/t_total,2), round(t_sync3/t_total,2), round(t_copy/t_total,2))
           return used_streams
 
     def write_pdata(self):

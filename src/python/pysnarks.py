@@ -437,7 +437,8 @@ def run(opt, parser):
              # abort if witness is not present
              if os.path.isfile(opt['witness_f']) :
                  GP.proof(opt['witness_f'], opt['proof_f'], opt['public_data_f'], verify_en=opt['verify'], zk=opt['zero_knowledge'],
-                         last_mexp_gpu=opt['last_mexp_gpu'], batch_size=opt['batch_size'], n_streams=opt['max_streams'], cpu=opt['max_cpus'])
+                         last_mexp_gpu=opt['last_mexp_gpu'], 
+                         batch_size=opt['batch_size'], n_streams=opt['max_streams'], cpu=opt['max_cpus'], gpu=opt['max_gpus'])
              else :
                 print('Witness file %s doesn\'t exist', opt['witness_f'])
            
@@ -457,14 +458,16 @@ def run(opt, parser):
           jsocket.send_message(query)
           query = {'list' : -1}
           jsocket = jsonSocket()
-          while(True):
-            time.sleep(5)
-            result = jsocket.send_message(query)
-            result_dict = ast.literal_eval(result)
-            if result_dict['result'] != -1:
-                break
+          result = jsocket.send_message(query)
+          result_dict = ast.literal_eval(result)
+          #while(True):
+            #time.sleep(5)
+            #result = jsocket.send_message(query)
+            #result_dict = ast.literal_eval(result)
+            #if result_dict['result'] != -1:
+                #break
 
-          print(result)
+          #print(result)
 
 def isOpen(ip,port):
    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

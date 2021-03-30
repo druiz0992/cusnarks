@@ -159,6 +159,9 @@ void CUSnarks::allocateCudaStreamResources(void)
   start_event = (cudaEvent_t **)malloc(deviceCount * sizeof(cudaEvent_t *));
   end_event = (cudaEvent_t **)malloc(deviceCount * sizeof(cudaEvent_t *));
 
+  CCHECK(cudaMallocHost((void **)&params_buffer, BUFFER_PARAMS_LEN * sizeof(kernel_params_t)));
+  params_buffer_idx=0;
+
   if ((stream== NULL) || 
        (start_event == NULL) || (end_event == NULL) ) { 
     logInfo("Cannot allocate memory. Exiting program...\n");
@@ -373,6 +376,8 @@ void CUSnarks::releaseCudaStreamResources(void)
   /*
     logInfo("Release common resources\n");
   */ 
+  CCHECK(cudaFreeHost(params_buffer));
+
   for (i=0; i < deviceCount; i++){
       CCHECK(cudaSetDevice(i));
     
@@ -485,27 +490,9 @@ double CUSnarks::kernelLaunch(
   in_data_host[gpu_id][stream_id] = in_vector_host->data;
 #endif
   start_copy_in = elapsedTime();
-  if (stream_id == 0){
 #if PREALLOC_BUFF
-           if (config[0].input_val){
+  if (config[0].input_val){
 #endif
-     CCHECK(cudaMemcpy(
-              &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
-#if PREALLOC_BUFF
-             (const void *)in_data_host[gpu_id][stream_id],
-#else
-              in_vector_host->data,
-#endif
-              in_vector_host->size,
-              cudaMemcpyHostToDevice));
-#if PREALLOC_BUFF
-  }
-#endif
-  } else {
-#if PREALLOC_BUFF
-           if (config[0].input_val){
-#endif
-
     CCHECK(cudaMemcpyAsync(
              &in_vector_device[gpu_id][stream_id].data[config[0].in_offset],
 #if PREALLOC_BUFF
@@ -519,7 +506,6 @@ double CUSnarks::kernelLaunch(
 #if PREALLOC_BUFF
   }
 #endif
-  }
   end_copy_in = elapsedTime() - start_copy_in;
   logInfo("In Data : Ptr : %x, gpu_id : %u, stream_id : %u, Time : %f\n",
          in_data_host[gpu_id][stream_id], gpu_id, stream_id, end_copy_in);
@@ -530,18 +516,11 @@ double CUSnarks::kernelLaunch(
   params_host[gpu_id][stream_id]= (kernel_params_t *) params;
   for (i=0; i < n_kernel; i++){
     start_copy_in = elapsedTime();
-    if (stream_id == 0){
-      CCHECK(cudaMemcpy(params_device[gpu_id][stream_id],
-                        &params_host[gpu_id][stream_id][i],
-                        sizeof(kernel_params_t),
-                        cudaMemcpyHostToDevice));
-    } else {
-      CCHECK(cudaMemcpyAsync(params_device[gpu_id][stream_id],
+    CCHECK(cudaMemcpyAsync(params_device[gpu_id][stream_id],
                         &params_host[gpu_id][stream_id][i],
                         sizeof(kernel_params_t),
                         cudaMemcpyHostToDevice,
                         this->stream[gpu_id][stream_id]));
-    }
     end_copy_in += (elapsedTime() - start_copy_in);
     logInfo("In Params : Ptr : %x, gpu_id : %u, stream_id : %u, time : %f\n",
            params_host[gpu_id][stream_id], gpu_id, stream_id, end_copy_in);
@@ -556,22 +535,13 @@ double CUSnarks::kernelLaunch(
     //_start = elapsedTime();
     // launch kernel
     start_kernel = elapsedTime();
-    if (stream_id == 0){
-       kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS>>>(
-                                                  out_vector_device[gpu_id][stream_id].data,
-                                                  in_vector_device[gpu_id][stream_id].data,
-                                                   params_device[gpu_id][stream_id]
-                                                             );
-      CCHECK(cudaDeviceSynchronize());
-    } else {
-       CCHECK(cudaEventRecord(start_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
-       kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS, this->stream[gpu_id][stream_id]>>>(
+    CCHECK(cudaEventRecord(start_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
+    kernel_callbacks[kernel_idx]<<<gridD, blockD, smemS, this->stream[gpu_id][stream_id]>>>(
                                                                   out_vector_device[gpu_id][stream_id].data,
                                                                   in_vector_device[gpu_id][stream_id].data,
                                                                   params_device[gpu_id][stream_id]
                                                                   );
-       CCHECK(cudaEventRecord(end_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
-    }
+    CCHECK(cudaEventRecord(end_event[gpu_id][stream_id], stream[gpu_id][stream_id]));
     end_kernel = elapsedTime() - start_kernel;
     total_kernel += end_kernel;
     logInfo("Launch stream : ptr: %x, gpu_id : %d, stream_id : %d, Time : %f\n",
@@ -591,21 +561,13 @@ double CUSnarks::kernelLaunch(
 #if PREALLOC_BUFF == 0
      out_data_host[gpu_id][stream_id] = out_vector_host->data;
 #endif
-     if (stream_id == 0){
-        CCHECK(cudaMemcpy(
-            out_vector_host->data,
-            out_vector_device[gpu_id][stream_id].data + config[0].return_offset,
-            out_vector_host->size,
-            cudaMemcpyDeviceToHost));
-     } else {
-        //out_data_host[gpu_id][stream_id] = out_vector_host->data;
-        CCHECK(cudaMemcpyAsync(
+     //out_data_host[gpu_id][stream_id] = out_vector_host->data;
+     CCHECK(cudaMemcpyAsync(
             out_data_host[gpu_id][stream_id],
             out_vector_device[gpu_id][stream_id].data + config[0].return_offset,
             out_vector_host->size,
             cudaMemcpyDeviceToHost,
             stream[gpu_id][stream_id]));
-     }
   }
   total_launch = elapsedTime();  
   end_copy_out = total_launch - start_copy_out;
@@ -645,7 +607,6 @@ void CUSnarks::streamDel(uint32_t gpu_id, uint32_t stream_id)
   // I need to implement some type of delayed free for params. Otherwise, there is
   // a memory corruption somewhere and I can't find where
 
-  #define BUFFER_PARAMS_LEN (128)
   static kernel_params_t **params_buffer = NULL;
   static uint32_t in_params_idx=0;
   static uint32_t out_params_idx=0;
@@ -690,14 +651,21 @@ double CUSnarks::streamSync(uint32_t gpu_id, uint32_t stream_id)
            stream[gpu_id][stream_id], gpu_id, stream_id);
   logInfo("Sync Event  : Ptr : %x, gpu_id : %u, stream_id : %u\n",
            end_event[gpu_id][stream_id], gpu_id, stream_id);
-  CCHECK(cudaStreamSynchronize(stream[gpu_id][stream_id]));
-  //CCHECK(cudaEventSynchronize(end_event[gpu_id][stream_id]));
-
   /*
+  uint32_t status = cudaEventQuery(end_event[gpu_id][stream_id]);
+
+  double start_launch = elapsedTime();
+ */
+  CCHECK(cudaStreamSynchronize(stream[gpu_id][stream_id]));
+
+  /* 
   CCHECK(cudaEventElapsedTime(
                 &kernel_time,
                 start_event[gpu_id][stream_id],
                 end_event[gpu_id][stream_id]));
+  double end_launch = elapsedTime();
+  
+  printf("Event %d-%d : status; %d, sync time:%f, exec time:%f\n", gpu_id, stream_id, status, end_launch - start_launch, kernel_time);
   */
 
   return  (double) kernel_time;
@@ -734,6 +702,15 @@ double CUSnarks::elapsedTime(void)
 void CUSnarks::inDataHostCopy(uint32_t *data, uint32_t size, uint32_t gpu_id, uint32_t stream_id)
 {
      memcpy(in_data_host[gpu_id][stream_id], data, size*sizeof(uint32_t));
+}
+
+void CUSnarks::inDataHostCopyAndAlign(uint32_t *data, unsigned long long nWords, unsigned long long offset, uint32_t fill_zeros, uint32_t gpu_id, uint32_t stream_id)
+{
+     //printf("inData :%d %d %llu %llu\n",gpu_id, stream_id, offset, nWords);
+     memcpy(&in_data_host[gpu_id][stream_id][offset], data, nWords*sizeof(uint32_t));
+     if (fill_zeros) {
+        memset(in_data_host[gpu_id][stream_id], 0, fill_zeros * sizeof(uint32_t));
+     }
 }
 /*
   Professional CUDA C Programming by John Cheng, Max Grossman, Ty McKercher
@@ -808,4 +785,16 @@ void CUSnarks::getDeviceInfo(void)
       deviceProp.maxGridSize[2]);
    logInfo(" Maximum memory pitch:                                    %lu bytes\n", 
       deviceProp.memPitch);
+}
+
+kernel_params_t * CUSnarks::getNextParamsBuffer(uint32_t n_kernels) {
+   //printf("Nexyt %d %d\n", params_buffer_idx, n_kernels);
+   kernel_params_t *buf = &params_buffer[params_buffer_idx];
+   
+   params_buffer_idx+=n_kernels;
+   if (params_buffer_idx >= BUFFER_PARAMS_LEN) {
+     params_buffer_idx = params_buffer_idx - BUFFER_PARAMS_LEN;
+   } 
+
+   return buf;
 }

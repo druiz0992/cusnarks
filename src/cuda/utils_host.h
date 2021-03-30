@@ -47,5 +47,6 @@ void shared_free_h(void *shmem, int shmid);
 void shared_detach_h(void *shmem);
 void init_barrier_h(uint32_t nthreads);
 void del_barrier_h();
+void lockMem_h(uint32_t *buf, t_uint64 nWords);
 
 #endif

@@ -22,7 +22,7 @@ proverparams:
   zken : 0
   batchsize : 15
   maxbatchsize : 20
-  nstreams : 5
+  nstreams : 8
   cpu : 64
   timeout : 5
   log : 0

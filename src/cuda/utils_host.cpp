@@ -33,9 +33,11 @@
 #include <sys/sysinfo.h>
 #include <pthread.h>
 #include <omp.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/mman.h>
 
 #include "types.h"
 #include "utils_host.h"
@@ -220,4 +222,18 @@ void fail_h(void)
   assert(NULL);
 }
 
+void lockMem_h(uint32_t *buf, t_uint64 nWords) {
+  unsigned long    page_offset, page_size;
+  uint32_t *addr = buf;
+  t_uint64 size = nWords * sizeof(uint32_t);
+
+  page_size = sysconf(_SC_PAGE_SIZE);
+  page_offset = (unsigned long) buf % page_size;
+
+  addr -= page_offset;  /* Adjust addr to page boundary */
+  size += page_offset;  /* Adjust size with page_offset */
+   
+  uint32_t status = mlock(addr, size);
+  printf("MEM status : %d, new Addr :%x, old Addr: %x, New size:%llu, Old size:%llu\n", status, addr, buf, size, nWords*sizeof(uint32_t));
+}
 
