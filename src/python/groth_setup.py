@@ -78,7 +78,8 @@ class GrothSetup(object):
 
     def __init__(self, curve='BN128', in_circuit_f=None, out_circuit_f=None, out_circuit_format=FMT_MONT,
                  out_pk_f=None, out_vk_f=None, out_k_binformat=FMT_MONT, out_k_ecformat=EC_T_AFFINE, test_f=None,
-                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0):
+                 benchmark_f=None, seed=None, snarkjs=None, keep_f=None, batch_size=20, reserved_cpus=0, write_table_f=None,
+                 table_type=None, grouping=DEFAULT_U256_BSELM):
  
         # Check valid folder exists
         if keep_f is None:
@@ -100,6 +101,9 @@ class GrothSetup(object):
           self.seed = int(x.hex(),16)
 
         random.seed(self.seed) 
+
+        self.n_gpu = get_ngpu(max_used_percent=99.)
+        self.grouping = grouping
 
         self.curve_data = ZUtils.CURVE_DATA[curve]
         # Initialize Group
@@ -149,7 +153,14 @@ class GrothSetup(object):
 
         copy_input_files([in_circuit_f], self.keep_f)
 
-        self.sort_en = 1
+        self.write_table_en = False
+        self.write_table_f = write_table_f
+        self.table_type = table_type
+        if write_table_f is not None:
+          self.write_table_en = True
+            
+
+        self.sort_en = 0
 
         logging.info('#################################### ')
         logging.info('Staring Groth setup with the follwing arguments :')
@@ -168,6 +179,10 @@ class GrothSetup(object):
         logging.info(' - keep_f : %s', keep_f)
         logging.info(' - bs : %s', batch_size)
         logging.info(' - sort enable : %s', self.sort_en)
+        logging.info(' - write_table_en : %s', self.write_table_en)
+        logging.info(' - table_f : %s', self.write_table_f)
+        logging.info(' - grouping : %s', self.grouping)
+        logging.info(' - n available GPUs : %s', self.n_gpu)
         logging.info('#################################### ')
         logging.info('')
         logging.info('')
@@ -292,10 +307,11 @@ class GrothSetup(object):
         logging.info('#################################### ')
         logging.info('')
         logging.info('EC P Density')
-        logging.info('A  : %s',round(self.pk['A_density'],2))
-        logging.info('B1 : %s',round(self.pk['B1_density'],2))
-        logging.info('B2 : %s',round(self.pk['B2_density'],2))
-        logging.info('C  : %s',round(self.pk['C_density'],2))
+        logging.info('A      : %s',round(self.pk['A_density'],2))
+        logging.info('B1     : %s',round(self.pk['B1_density'],2))
+        logging.info('B2     : %s',round(self.pk['B2_density'],2))
+        logging.info('C      : %s',round(self.pk['C_density'],2))
+        logging.info('hExps  : %s',round(self.pk['hExps_density'],2))
         logging.info('')
         logging.info('#################################### ')
 
@@ -308,12 +324,15 @@ class GrothSetup(object):
 
         self.logTimeResults()
 
-        self.write_pk()
-        self.write_vk()
         # TODO : The idea is to do some precalculations to compute multiexp later during
         # proof. However, the way is is laid out it takes to much space. I comment this part
         # for now until I come up with a better way
-        #self.write_auxdata()
+        if self.write_table_en:
+          self.write_tables(all_tables=self.table_type)
+
+        self.write_pk()
+        self.write_vk()
+
         copy_input_files([self.out_vk_f, self.out_pk_f, self.out_circuit_f],self.keep_f)
         self.test_results()
 
@@ -497,24 +516,75 @@ class GrothSetup(object):
 
       # vk coeff MONT
       logging.info(' Computing alfas')
-      self.pk['alfa_1'] = G1 * self.toxic['kalfa']
-      self.pk['beta_1'] = G1 * self.toxic['kbeta']
-      self.pk['delta_1'] = G1 * self.toxic['kdelta']
-
-      self.pk['alfa_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['alfa_1']).reshape(-1),ZField.get_field(),1)
-      self.pk['beta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['beta_1']).reshape(-1),ZField.get_field(),1)
-      self.pk['delta_1'] = ec_jac2aff_h(G1.as_uint256(self.pk['delta_1']).reshape(-1),ZField.get_field(),1)
     
-      self.pk['beta_2'] = G2 * self.toxic['kbeta']
-      self.pk['delta_2'] = G2 * self.toxic['kdelta']
-      self.pk['gamma_2'] = G2 * self.toxic['kgamma']
+      self.pk['alfa_1'] = ec_jac2aff_h(
+                 np.reshape(
+                     ec_jacscmul_h(
+                              self.toxic['kalfa'].as_uint256().reshape(-1), 
+                              G1.as_uint256(G1).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['beta_1'] = ec_jac2aff_h(
+                 np.reshape(
+                     ec_jacscmul_h(
+                              self.toxic['kbeta'].as_uint256().reshape(-1), 
+                              G1.as_uint256(G1).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['delta_1'] = ec_jac2aff_h(
+                 np.reshape(
+                     ec_jacscmul_h(
+                              self.toxic['kdelta'].as_uint256().reshape(-1), 
+                              G1.as_uint256(G1).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
     
-      self.pk['beta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['beta_2']).reshape(-1),ZField.get_field(),1)
-      self.pk['delta_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['delta_2']).reshape(-1),ZField.get_field(),1)
-      self.pk['gamma_2'] = ec2_jac2aff_h(G2.as_uint256(self.pk['gamma_2']).reshape(-1),ZField.get_field(),1)
+      self.pk['beta_2'] = ec2_jac2aff_h(
+                 np.reshape(
+                     ec2_jacscmul_h(
+                              self.toxic['kbeta'].as_uint256().reshape(-1), 
+                              G2.as_uint256(G2).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['delta_2'] = ec2_jac2aff_h(
+                 np.reshape(
+                     ec2_jacscmul_h(
+                              self.toxic['kdelta'].as_uint256().reshape(-1), 
+                              G2.as_uint256(G2).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
+      self.pk['gamma_2'] = ec2_jac2aff_h(
+                 np.reshape(
+                     ec2_jacscmul_h(
+                              self.toxic['kgamma'].as_uint256().reshape(-1), 
+                              G2.as_uint256(G2).reshape(-1),
+                              ZField.get_field(),
+                              0),
+                     -1),
+                 ZField.get_field(),
+                 1)
 
-      self.ecbn128    =  ECBN128(self.batch_size,seed=self.seed)
-      self.ec2bn128    = EC2BN128(self.batch_size,seed=self.seed)
+      if self.n_gpu :
+        self.ecbn128    =  ECBN128(self.batch_size,seed=self.seed)
+        self.ec2bn128    = EC2BN128(self.batch_size,seed=self.seed)
+      else :
+        self.ecbn128    =  None
+        self.ec2bn128    = None
 
       logging.info(' Computing EC Point A')
       end = time.time()
@@ -526,8 +596,7 @@ class GrothSetup(object):
       self.pk['A'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point A to Affine coordinates')
       self.pk['A'] = ec_jac2aff_h(self.pk['A'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('A', samples= ecbn128_samples)
+      self.assert_isoncurve('A', samples= ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['A'] = np.reshape(self.pk['A'],(-1,2,NWORDS_256BIT))[unsorted_idx]
@@ -535,8 +604,6 @@ class GrothSetup(object):
       self.pk['A_nWords'] = np.uint32(self.pk['A'].shape[0] * NWORDS_256BIT )
       infv = ec_isinf(np.reshape(self.pk['A'],-1), ZField.get_field())
       self.pk['A_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
-
-      #self.pk['A_table'] = ec_inittable_h(np.reshape(self.pk['A'],-1), U256_BSELM, MOD_GROUP, 1)
 
       end = time.time()
       self.t_S['A'] = end - start
@@ -551,14 +618,13 @@ class GrothSetup(object):
       self.pk['B1'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point B1 to Affine coordinates')
       self.pk['B1'] = ec_jac2aff_h(self.pk['B1'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('B1', samples=ecbn128_samples)
+      self.assert_isoncurve('B1', samples=ecbn128_samples)
 
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B1'] = np.reshape(self.pk['B1'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['B1']=np.reshape(self.pk['B1'],(-1,NWORDS_256BIT))
       self.pk['B1_nWords'] = np.uint32(self.pk['B1'].shape[0] * NWORDS_256BIT)
-      #self.pk['B1_table'] = ec_inittable_h(np.reshape(self.pk['B1'],-1), U256_BSELM, MOD_GROUP, 1)
+
       infv = ec_isinf(np.reshape(self.pk['B1'],-1), ZField.get_field())
       self.pk['B1_density'] = 100.0  - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
@@ -573,14 +639,14 @@ class GrothSetup(object):
       self.pk['B2'],t1 = ec_sc1mul_cuda(self.ec2bn128, ec2bn128_samples, ZField.get_field(), ec2=True, batch_size=self.batch_size)
       logging.info(' Converting EC Point B2 to Affine coordinates')
       self.pk['B2'] = ec2_jac2aff_h(self.pk['B2'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('B2', samples = ec2bn128_samples)
+      self.assert_isoncurve('B2', samples = ec2bn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,4,NWORDS_256BIT))[unsorted_idx]
       #self.B2 = np.reshape(self.B2,(-1,6,NWORDS_256BIT))
       self.pk['B2'] = np.reshape(self.pk['B2'],(-1,NWORDS_256BIT))
       #ECC.from_uint256(self.B2.reshape((-1,2,8))[0:3],reduced=True, in_ectype=2, out_ectype=2,ec2=True)[0].extend().as_list()
       self.pk['B2_nWords'] = np.uint32(self.pk['B2'].shape[0] * NWORDS_256BIT)
+
       infv = ec2_isinf(np.reshape(self.pk['B2'],-1), ZField.get_field())
       self.pk['B2_density'] = 100.0 - 100 * np.count_nonzero(infv == 1) / len(infv)
 
@@ -604,14 +670,13 @@ class GrothSetup(object):
       self.pk['C'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point C to Affine coordinates')
       self.pk['C'] = ec_jac2aff_h(self.pk['C'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('C', samples=ecbn128_samples)
+      self.assert_isoncurve('C', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['C'] = np.reshape(self.pk['C'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       #ECC.from_uint256(self.C[12],reduced=True, in_ectype=2, out_ectype=2)[0].extend().as_list()
       self.pk['C']=np.concatenate((np.zeros(((int(self.pk['nPublic']+1)*2),NWORDS_256BIT),dtype=np.uint32),np.reshape(self.pk['C'],(-1,NWORDS_256BIT))))
       self.pk['C_nWords'] = np.uint32(self.pk['C'].shape[0] * NWORDS_256BIT)
-      #self.pk['C_table'] = ec_inittable_h(np.reshape(self.pk['C'],-1), U256_BSELM, MOD_GROUP, 1)
+
       infv = ec_isinf(np.reshape(self.pk['C'],-1), ZField.get_field())
       self.pk['C_density'] = 100.0 - 100.0 * np.count_nonzero(infv == 1) / len(infv)
 
@@ -638,8 +703,7 @@ class GrothSetup(object):
       self.pk['hExps'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point hExps to Affine coordinates')
       self.pk['hExps'] = ec_jac2aff_h(self.pk['hExps'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('hExps', samples=ecbn128_samples)
+      self.assert_isoncurve('hExps', samples=ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['hExps'] = np.reshape(self.pk['hExps'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['hExps']=np.reshape(self.pk['hExps'],(-1,NWORDS_256BIT))
@@ -648,6 +712,9 @@ class GrothSetup(object):
       end = time.time()
       self.t_S['hExps'] =end - start 
       self.t_S['hExps gpu'] = t1
+
+      infv = ec_isinf(np.reshape(self.pk['hExps'],-1), ZField.get_field())
+      self.pk['hExps_density'] = 100.0 - 100.0 *  np.count_nonzero(infv == 1) / len(infv)
 
       del eT_u256
 
@@ -665,8 +732,7 @@ class GrothSetup(object):
       self.pk['IC'],t1 = ec_sc1mul_cuda(self.ecbn128, ecbn128_samples, ZField.get_field(), batch_size=self.batch_size)
       logging.info(' Converting EC Point IC to Affine coordinates')
       self.pk['IC'] = ec_jac2aff_h(self.pk['IC'].reshape(-1),ZField.get_field(),1)
-      if self.test_f is not None:
-        self.assert_isoncurve('IC', samples = ecbn128_samples)
+      self.assert_isoncurve('IC', samples = ecbn128_samples)
       unsorted_idx = np.argsort(sorted_idx)
       self.pk['IC'] = np.reshape(self.pk['IC'],(-1,2,NWORDS_256BIT))[unsorted_idx]
       self.pk['IC'] = np.uint32(np.reshape(self.pk['IC'],(-1,NWORDS_256BIT)))
@@ -676,6 +742,9 @@ class GrothSetup(object):
       self.t_S['IC gpu'] = t1
 
     def assert_isoncurve(self, ec_str, max_fails=5, samples=None):
+      if self.test_f is None:
+          return
+
       dim2=2
       ec2=0
       if ec_str=='B2':
@@ -730,24 +799,150 @@ class GrothSetup(object):
                   'R1CSB_nWords' : self.cir['R1CSB_nWords'],
                   'R1CSC_nWords' : self.cir['R1CSC_nWords']}
 
-    def write_auxdata(self):
-        out_pk_aux_f =  self.out_pk_f.replace('.bin','dat') 
-        nWords = _64b232b(
-                    (pk_bin['A_table'].shape[0]  + pk_bin['B1_table'].shape[0] + pk_bin['C_table'].shape[0]) * NWORDS_256BIT)
+    def write_tables(self, all_tables=1):
+       logging.info('#################################### ')
+       logging.info('')
+       logging.info('Writing Table files')
 
-        nWords_A = _64b232b(pk_bin['A_table'].shape[0] * NWORDS_256BIT)
-        nWords_B1 = _64b232b(pk_bin['B1_table'].shape[0] * NWORDS_256BIT)
-        nWords_C = _64b232b(pk_bin['C_table'].shape[0] * NWORDS_256BIT)
+       domainSize   =  int(self.pk['domainSize'])
+       nPublic =  int(self.pk['nPublic'])
 
-        writeU256DataFile_h(nWords, out_pk_aux_f.encode("UTF-8"))
+       nWords_offset = ECTABLE_DATA_OFFSET_WORDS
+       nWords_offset_dw = dw2w(nWords_offset)
 
-        appendU256DataFile_h(nWords_A, out_pk_aux_f.encode("UTF-8"))
-        appendU256DataFile_h(np.reshape(pk_bin['A_table'],-1), out_pk_aux_f.encode("UTF-8"))
-        appendU256DataFile_h(nWords_B1, out_pk_aux_f.encode("UTF-8"))
-        appendU256DataFile_h(np.reshape(pk_bin['B1_table'],-1), out_pk_aux_f.encode("UTF-8"))
-        appendU256DataFile_h(nWords_C, out_pk_aux_f.encode("UTF-8"))
-        appendU256DataFile_h(np.reshape(pk_bin['C_table'],-1), out_pk_aux_f.encode("UTF-8"))
+       if all_tables:
+         nTables_A = int((self.pk['A'].shape[0] / ECP_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping) 
+         nWords1_A = (nTables_A << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords_offset
+         nWords1_A_dw = dw2w(nWords1_A)
+         nTables_B2 = int((self.pk['B2'].shape[0] / ECP2_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping) 
+         nWords1_B2 = (nTables_B2 << self.grouping ) * NWORDS_256BIT * ECP2_JAC_INDIMS + nWords1_A
+         nWords1_B2_dw = dw2w(nWords1_B2)
+         nTables_B1 = int((self.pk['B1'].shape[0] / ECP_JAC_INDIMS + 2 + self.grouping - 1)/self.grouping)
+         nWords1_B1 = (nTables_B1 << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_B2
+         nWords1_B1_dw = dw2w(nWords1_B1)
+         nTables_C = int((self.pk['C'][2*(nPublic+1):].shape[0] / ECP_JAC_INDIMS + self.grouping - 1)/self.grouping)
+         nWords1_C = (nTables_C << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_B1
+         nWords1_C_dw = dw2w(nWords1_C)
+       else:
+         nWords1_A_dw = dw2w(nWords_offset)
+         nWords1_B2_dw = dw2w(nWords_offset)
+         nWords1_B1_dw = dw2w(nWords_offset)
+         nWords1_C_dw = dw2w(nWords_offset)
+         nTables_A = 0
+         nTables_B2 = 0
+         nTables_B1 = 0
+         nTables_C = 0
+         nWords1_C = 0
 
+       nTables_hExps = int((domainSize + self.grouping - 1)/self.grouping) 
+       nWords1_hExps = (nTables_hExps << self.grouping ) * NWORDS_256BIT * ECP_JAC_INDIMS + nWords1_C
+       nWords1_hExps_dw = dw2w(nWords1_hExps)
+
+       nWords = np.concatenate(([np.uint32(self.grouping)], nWords_offset_dw, 
+                                nWords1_A_dw,  
+                                nWords1_B2_dw, 
+                                nWords1_B1_dw, 
+                                nWords1_C_dw,  nWords1_hExps_dw))
+
+       writeU256DataFile_h(nWords, self.write_table_f.encode("UTF-8"))
+       write_group_size = 1000
+
+       if all_tables == 1:
+         logging.info(' Computing EC Point A Tables')
+         super_group =  np.concatenate((
+                                             self.pk['A'],
+                                             self.pk['alfa_1'],
+                                             self.pk['delta_1'] 
+                                     ))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         
+         logging.info(' Done computing EC Point A Tables')
+  
+         logging.info(' Computing EC Point B2 Tables')
+         super_group =  np.concatenate((
+                                             self.pk['B2'],
+                                             self.pk['beta_2'],
+                                             self.pk['delta_2'] 
+                                     ))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP2_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec2_inittable_h(
+                              np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                   -1), self.grouping, MOD_GROUP, 1)
+           table = ec2_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         logging.info(' Done computing EC Point B2 Tables')
+
+         logging.info(' Computing EC Point B1 Tables')
+         super_group =  np.concatenate((
+                                             self.pk['B1'],
+                                             self.pk['beta_1'],
+                                             self.pk['delta_1'] 
+                                     ))
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         logging.info(' Done computing EC Point B1 Tables')
+
+         logging.info(' Computing EC Point C Tables')
+         super_group =  self.pk['C'][2*(nPublic+1):]
+
+         groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+         groups = np.append(groups, len(super_group)+1)
+         for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         logging.info(' Done computing EC Point C Tables')
+
+       logging.info(' Computing EC Point hExps Tables')
+       super_group =  np.concatenate((
+                                             self.pk['hExps'][:2*(domainSize-1)],
+                                             self.pk['delta_1'] 
+                                     ))
+
+       groups = np.arange(0,super_group.shape[0], self.grouping*write_group_size*ECP_JAC_INDIMS) 
+       groups = np.append(groups, len(super_group)+1)
+       for gidx in range(len(groups)-1):
+           table = ec_inittable_h(
+                                 np.reshape(super_group[groups[gidx]:groups[gidx+1]],
+                                             -1), self.grouping, MOD_GROUP, 1)
+           table = ec_jac2aff_h(np.reshape(table,-1),MOD_GROUP,1)
+           appendU256DataFile_h(np.reshape(table,-1), self.write_table_f.encode("UTF-8"))
+         
+       logging.info(' Done computing EC Point hExps Tables')
+
+       logging.info('')
+       if all_tables:
+         logging.info('Table1 A     : %s elements', nTables_A)
+         logging.info('Table1 B2    : %s elements', nTables_B2)
+         logging.info('Table1 B1    : %s elements', nTables_B1)
+         logging.info('Table1 C     : %s elements', nTables_C)
+       logging.info('Table1 hExps : %s elements', nTables_hExps)
+
+
+       logging.info('')
+       logging.info('')
+       logging.info('#################################### ')
+     
     def write_pk(self):
 
        logging.info('#################################### ')

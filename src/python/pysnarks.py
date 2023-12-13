@@ -25,7 +25,7 @@
 // ------------------------------------------------------------------
 // Author     : David Ruiz
 //
-// File name  : pysnarks
+// File name  : pysnasks: 
 //
 // Date       : 11/07/2019
 //
@@ -38,7 +38,6 @@
 # 
 
 """
-
 import argparse
 import os
 import sys
@@ -95,6 +94,13 @@ def init():
     opt['start_server'] = 1
     opt['reserved_cpus'] = 0
     opt['list'] = 1
+    opt['table_type'] = None
+    opt['table_f'] = None
+    opt['table_f1'] = None
+    opt['table_fall'] = None
+    opt['zero_knowledge']=1
+    opt['grouping'] = DEFAULT_U256_BSELM
+    opt['pippen_conf'] = DEFAULT_PIPPENGERS_CONF
 
     parser = argparse.ArgumentParser(
            description='Launch pysnarks')
@@ -222,7 +228,29 @@ def init():
     parser.add_argument(
        '-r_cpus', '--reserved_cpus', type=int, help=help_str, required=False)  
 
+    help_str = 'Output Table File (hExps only). Default : ' +str(opt['table_f1'])
+    parser.add_argument(
+       '-t1', '--table_f1', type=str, help=help_str, required=False)  
 
+    help_str = 'Output Table File (All EC points). Default : ' +str(opt['table_fall'])
+    parser.add_argument(
+       '-tall', '--table_fall', type=str, help=help_str, required=False)  
+
+    help_str = 'Input Table File (All EC points). Default : ' +str(opt['table_f'])
+    parser.add_argument(
+       '-t', '--table_f', type=str, help=help_str, required=False)  
+
+    help_str = 'Zero Knowledge Enabled. Default : ' + str(opt['zero_knowledge'])
+    parser.add_argument(
+       '-zk', '--zero_knowledge', type=int, help=help_str, required=False)  
+
+    help_str = 'Table Grouping. Default : ' + str(opt['grouping'])
+    parser.add_argument(
+       '-g', '--grouping', type=int, help=help_str, required=False)  
+
+    help_str = 'Pippengers Configuration. Default : ' + str(opt['pippen_conf'])
+    parser.add_argument(
+       '-pippenger', '--pippenger', type=int, help=help_str, required=False)  
     return opt, parser
 
 def run(opt, parser):
@@ -249,7 +277,6 @@ def run(opt, parser):
     if args.max_streams is not None:
        opt['max_streams'] = args.max_streams
     
-
     if args.data_folder is not None:
         opt['data_f'] = args.data_f
         if not opt['data_f'].endswith('\\'):
@@ -313,6 +340,22 @@ def run(opt, parser):
         else:
            opt['verification_key_f'] = opt['data_f'] + args.verification_key
 
+    if args.table_f1 is not None:
+        if '/' in args.table_f1:
+           opt['table_f1'] = args.table_f1
+        else:
+           opt['table_f1'] = opt['data_f'] + args.table_f1
+        opt['table_f'] =  opt['table_f1']
+        opt['table_type'] = 0
+
+    if args.table_fall is not None and args.table_f1 is None:
+        if '/' in args.table_fall:
+           opt['table_fall'] = args.table_fall
+        else:
+           opt['table_fall'] = opt['data_f'] + args.table_fall
+        opt['table_f'] =  opt['table_fall']
+        opt['table_type'] = 1
+
     if args.seed is not None:
          opt['seed'] = args.seed
 
@@ -326,6 +369,10 @@ def run(opt, parser):
 
     if args.reserved_cpus is not None:
          opt['reserved_cpus'] = args.reserved_cpus
+
+    if args.grouping is not None:
+         opt['grouping'] = args.grouping
+
 
 
     if args.mode == 's' or args.mode == 'setup':
@@ -370,7 +417,9 @@ def run(opt, parser):
                     out_circuit_format= opt['output_circuit_format'], out_pk_f=opt['proving_key_f'], 
                     out_vk_f=opt['verification_key_f'], out_k_binformat=opt['keys_format'],
                     out_k_ecformat=EC_T_AFFINE, test_f=opt['debug_f'], benchmark_f=opt['benchmark_f'], seed=opt['seed'],
-                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'])
+                    snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], batch_size=opt['batch_size'], reserved_cpus=opt['reserved_cpus'], 
+                    write_table_f=opt['table_f'], table_type=opt['table_type'],
+                    grouping=opt['grouping'])
       
       GS.setup()
 
@@ -410,15 +459,28 @@ def run(opt, parser):
       if args.out_proving_key_format is not None:
          opt['out_proving_key_format'] = args.out_proving_key_format
     
+      if args.zero_knowledge is not None:
+         opt['zero_knowledge'] = args.zero_knowledge
+
       if args.start_server is not None:
          opt['start_server'] = args.start_server
+
+      if args.pippenger is not None:
+          opt['pippen_conf'] = args.pippenger
+
+      if args.table_f is not None:
+        if '/' in args.table_f:
+           opt['table_f'] = args.table_f
+        else:
+           opt['table_f'] = opt['data_f'] + args.table_f
 
       if not is_port_in_use(PORT) :
           start = time.time()
           GP = GrothProver(opt['proving_key_f'], verification_key_f=opt['verification_key_f'], out_pk_f = opt['out_proving_key_f'],
                       out_pk_format = opt['out_proving_key_format'], test_f=opt['debug_f'], batch_size=opt['batch_size'],n_gpus=opt['max_gpus'],
                       n_streams=opt['max_streams'], start_server=opt['start_server'],
-                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'])
+                      benchmark_f=None, seed=opt['seed'], snarkjs=opt['snarkjs'], keep_f=opt['keep_f'], reserved_cpus=opt['reserved_cpus'],
+                      read_table_f=opt['table_f'], zk=opt['zero_knowledge'], grouping=opt['grouping'], pippen_conf=opt['pippen_conf'])
           end = time.time() - start
           print("GP init : "+str(end))
 

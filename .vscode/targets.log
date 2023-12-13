@@ -1,0 +1,648 @@
+make all --print-data-base --no-builtin-variables --no-builtin-rules --question
+# GNU Make 4.2.1
+# Built for x86_64-pc-linux-gnu
+# Copyright (C) 1988-2016 Free Software Foundation, Inc.
+# License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+# This is free software: you are free to change and redistribute it.
+# There is NO WARRANTY, to the extent permitted by law.
+
+# Make data base, printed on Wed Dec 13 08:37:18 2023
+
+# Variables
+
+# 'override' directive
+GNUMAKEFLAGS := 
+# makefile (from 'Makefile', line 49)
+CTSRC_PATH = $(CUSNARKS_PATH)/src/cython
+# automatic
+<D = $(patsubst %/,%,$(dir $<))
+# makefile (from 'Makefile', line 61)
+PCG_INCLUDE = $(AUX_PATH)/pcg-cpp/include
+# automatic
+ 
+?F = $(notdir $?)
+# environment
+DESKTOP_SESSION = ubuntu
+# default
+.SHELLFLAGS := -c
+# environment
+XDG_SESSION_CLASS = user
+# environment
+SNAP_COMMON = /var/snap/code/common
+# environment
+XDG_SESSION_TYPE = x11
+# makefile (from 'Makefile', line 132)
+DEFINES_DEBUG = -DPARALLEL_EN -DCU_ASM -D_CASM  
+# automatic
+?D = $(patsubst %/,%,$(dir $?))
+# makefile (from 'Makefile', line 77)
+CUBIN_NAME = cusnarks.cubin
+# makefile (from 'Makefile', line 52)
+CUSRC_PATH = $(CUSNARKS_PATH)/src/cuda
+# makefile (from 'Makefile', line 64)
+SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
+# automatic
+@D = $(patsubst %/,%,$(dir $@))
+# environment
+XAUTHORITY = /run/user/1000/gdm/Xauthority
+# environment
+GDMSESSION = ubuntu
+# environment
+XMODIFIERS = @im=ibus
+# makefile (from 'Makefile', line 87)
+aux_jsdirs = $(SNARKJS_PATH) 
+# makefile
+CURDIR := /home/david/iden3/cusnarks
+# makefile (from 'Makefile', line 38)
+SHELL = /bin/sh
+# environment
+SNAP_DATA = /var/snap/code/116
+# makefile (from 'Makefile', line 60)
+PCG_REPO = https://github.com/imneme/pcg-cpp.git
+# environment
+VTE_VERSION = 6003
+# environment
+VSCODE_NLS_CONFIG = {"locale":"en-us","availableLanguages":{},"_languagePackSupport":true}
+# makefile (from 'Makefile', line 73)
+CIRCOM_RUNTIME_PATH = $(AUX_PATH)/circom_runtime
+# environment
+JOURNAL_STREAM = 9:53059
+# makefile (from 'Makefile', line 76)
+CUSNARKS_LIB = libcusnarks.so
+# makefile (from 'Makefile', line 71)
+FFIASM_REPO = https://github.com/iden3/ffiasm.git
+# environment
+XDG_CONFIG_DIRS = /etc/xdg/xdg-ubuntu:/etc/xdg
+# environment
+SNAP_INSTANCE_NAME = code
+# environment
+SNAP_ARCH = amd64
+# makefile (from 'Makefile', line 1)
+MAKEFILE_LIST :=  Makefile
+# automatic
+@F = $(notdir $@)
+# environment
+IM_CONFIG_PHASE = 1
+# makefile (from 'Makefile', line 36)
+NPM = npm i
+# environment
+USERNAME = david
+# makefile (from 'Makefile', line 74)
+CIRCOM_RUNTIME_REPO = https://github.com/iden3/circom_runtime.git
+# environment
+MAKELEVEL := 0
+# environment
+MANDATORY_PATH = /usr/share/gconf/ubuntu.mandatory.path
+# environment
+XDG_DATA_DIRS = /usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop:/var/lib/snapd/desktop
+# makefile (from 'Makefile', line 104)
+TEST_SUBDIRS := /home/david/iden3/cusnarks/test/c /home/david/iden3/cusnarks/test/python 
+# environment
+DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus
+# environment
+MANAGERPID = 2459
+# environment
+LESSOPEN = | /usr/bin/lesspipe %s
+# makefile (from 'Makefile', line 63)
+SNARKJS_PATH = $(AUX_PATH)/snarkjs
+# environment
+LC_NAME = es_ES.UTF-8
+# environment
+VSCODE_CWD = /home/david/iden3/cusnarks/test
+# environment
+GSETTINGS_SCHEMA_DIR = /snap/code/116/usr/share/glib-2.0/schemas
+# default
+MAKE_HOST := x86_64-pc-linux-gnu
+# environment
+PATH = /home/david/.nvm/versions/node/v14.18.0/bin:/home/david/bin:/home/david/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/david/.vimpkg/bin:/usr/local/go/bin:/home/david/golib/bin
+# makefile (from 'Makefile', line 54)
+CTEST_IDEAS_PATH = $(CUSNARKS_PATH)/test/ideas
+# makefile (from 'Makefile', line 108)
+AUX_RSUBDIRS := /home/david/iden3/cusnarks/third_party_libs/za
+# environment
+ANDROID_NDK_HOME = /home/david/android/android-ndk/
+# environment
+GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
+# environment
+SESSION_MANAGER = local/david-Latitude-E7440:@/tmp/.ICE-unix/2693,unix/david-Latitude-E7440:/tmp/.ICE-unix/2693
+# makefile (from 'Makefile', line 107)
+AUX_JSSUBDIRS := /home/david/iden3/cusnarks/third_party_libs/snarkjs 
+# environment
+XDG_RUNTIME_DIR = /run/user/1000
+# environment
+GDK_PIXBUF_MODULE_FILE = /home/david/snap/code/common/.cache/gdk-pixbuf-loaders.cache
+# makefile (from 'Makefile', line 95)
+aux_repos = $(PCG_REPO) $(SNARKJS_REPO) $(CIRCOM_RUNTIME_REPO)
+# environment
+SNAP = /snap/code/116
+# environment
+GOPATH = /home/david/golib
+# environment
+NVM_BIN = /home/david/.nvm/versions/node/v14.18.0/bin
+# environment
+SNAP_VERSION = e8a3071e
+# environment
+XDG_MENU_PREFIX = gnome-
+# environment
+ELECTRON_RUN_AS_NODE = 1
+# environment
+INVOCATION_ID = 69ce39233044477b9978c1f781c5ceb9
+# environment
+GDK_PIXBUF_MODULEDIR = /snap/code/116/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders
+# default
+.FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
+# makefile (from 'Makefile', line 70)
+FFIASM_PATH = $(AUX_PATH)/ffiasm
+# environment
+LS_COLORS = rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:
+# environment
+XDG_SESSION_DESKTOP = ubuntu
+# environment
+SSH_AUTH_SOCK = /run/user/1000/keyring/ssh
+# automatic
+%F = $(notdir $%)
+# environment
+GOBIN = /home/david/golib/bin
+# environment
+DISPLAY = :0
+# makefile (from 'Makefile', line 82)
+dirs = $(CUSRC_PATH) $(CTSRC_PATH) 
+# environment
+SNAP_INSTANCE_KEY = 
+# environment
+PWD = /home/david/iden3/cusnarks
+# environment
+QT_QPA_PLATFORMTHEME = appmenu-qt5
+# default
+.LOADED := 
+# environment
+SSH_AGENT_PID = 2650
+# makefile (from 'Makefile', line 44)
+CUSNARKS_PATH := /home/david/iden3/cusnarks
+# environment
+ORIGINAL_XDG_CURRENT_DESKTOP = ubuntu:GNOME
+# environment
+GTK_MODULES = gail:atk-bridge
+# makefile (from 'Makefile', line 134)
+MYMAKEFLAGS = 'CUSNARKS_PATH=$(CUSNARKS_PATH)' 'INCLUDE_PATH=$(INCLUDE_PATH)' 'OBJECT_PATH=$(OBJECT_PATH)' 'LIB_PATH=$(LIB_PATH)' 'CTSRC_PATH=$(CTSRC_PATH)' 'PYSRC_PATH=$(PYSRC_PATH)' 'PYTST_PATH=$(PYTST_PATH)' 'CUSRC_PATH=$(CUSRC_PATH)' 'CTEST_PATH=$(CTEST_PATH)' 'CUSNARKS_LIB=$(CUSNARKS_LIB)' 'CUBIN_NAME=$(CUBIN_NAME)' 'AUX_INCLUDES=$(AUX_INCLUDES)' 'DEFINES=$(DEFINES)' 'DEFINES_DEBUG=$(DEFINES_DEBUG)' 'FORCE_CPU=$(FORCE_CPU)'  
+# environment
+VSCODE_AMD_ENTRYPOINT = vs/workbench/api/node/extensionHostProcess
+# environment
+HOME = /home/david
+# environment
+LD_LIBRARY_PATH = :/home/david/iden3/cusnarks/lib/
+# environment
+LESSCLOSE = /usr/bin/lesspipe %s %s
+# environment
+VSCODE_CLI = 1
+# makefile (from 'Makefile', line 131)
+DEFINES = -DPARALLEL_EN  -DCU_ASM  -D_CASM  
+# environment
+VSCODE_CODE_CACHE_PATH = /home/david/.config/Code/CachedData/e8a3071ea4344d9d48ef8a4df2c097372b0c5161
+# environment
+LOGNAME = david
+# environment
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
+# environment
+SNAP_LIBRARY_PATH = /var/lib/snapd/lib/gl:/var/lib/snapd/lib/gl32:/var/lib/snapd/void
+# environment
+SNAP_CONTEXT = hY5G9LJsj0Glit4BvWMSvfkT6i4-BsX-zqRpg4SdbaYVAq96ADon
+# environment
+NVM_CD_FLAGS = 
+# automatic
++F = $(notdir $+)
+# environment
+ELECTRON_NO_ATTACH_CONSOLE = 1
+# environment
+SNAP_USER_COMMON = /home/david/snap/code/common
+# environment
+VSCODE_HANDLES_UNCAUGHT_ERRORS = true
+# environment
+GNOME_DESKTOP_SESSION_ID = this-is-deprecated
+# automatic
+^D = $(patsubst %/,%,$(dir $^))
+# makefile (from 'Makefile', line 47)
+OBJECT_PATH = $(CUSNARKS_PATH)/build
+# environment
+LC_TIME = es_ES.UTF-8
+# environment
+SNAP_REAL_HOME = /home/david
+# environment
+COLORTERM = truecolor
+# makefile (from 'Makefile', line 35)
+MAKE = make
+# default
+MAKECMDGOALS := all
+# environment
+QT_IM_MODULE = ibus
+# environment
+SNAP_USER_DATA = /home/david/snap/code/116
+# environment
+SHLVL = 0
+# environment
+GNOME_SHELL_SESSION_MODE = ubuntu
+# default
+MAKE_VERSION := 4.2.1
+# environment
+USER = david
+# environment
+SNAP_REVISION = 116
+# environment
+LC_MONETARY = es_ES.UTF-8
+# makefile
+.DEFAULT_GOAL := build
+# makefile (from 'Makefile', line 57)
+AUX_PATH = $(CUSNARKS_PATH)/third_party_libs
+# environment
+XDG_CURRENT_DESKTOP = Unity
+# environment
+GOROOT = /usr/local/go
+# makefile (from 'Makefile', line 59)
+PCG_PATH = $(AUX_PATH)/pcg-cpp/test-high
+# automatic
+%D = $(patsubst %/,%,$(dir $%))
+# environment
+LC_TELEPHONE = es_ES.UTF-8
+# makefile (from 'Makefile', line 80)
+JSON_REPO = https://github.com/nlohmann/json.git
+# default
+MAKE_COMMAND := make
+# makefile (from 'Makefile', line 51)
+PYTST_PATH = $(CUSNARKS_PATH)/test/python
+# environment
+OLDPWD = /home/david/iden3/cusnarks/test/go
+# default
+.VARIABLES := 
+# automatic
+*F = $(notdir $*)
+# environment
+VSCODE_IPC_HOOK = /run/user/1000/vscode-10a394bb-1.74.2-main.sock
+# makefile (from 'Makefile', line 105)
+CONFIG_SUBDIRS := /home/david/iden3/cusnarks/config
+# makefile (from 'Makefile', line 37)
+CARGO = ~/.cargo/bin/cargo build --release
+# makefile
+MAKEFLAGS = pqrR
+# makefile (from 'Makefile', line 48)
+LIB_PATH = $(CUSNARKS_PATH)/lib
+# environment
+MFLAGS = -pqrR
+# automatic
+*D = $(patsubst %/,%,$(dir $*))
+# environment
+NVM_DIR = /home/david/.nvm
+# makefile (from 'Makefile', line 66)
+RUST_CIRCOM_PATH = $(AUX_PATH)/za
+# automatic
+ 
++D = $(patsubst %/,%,$(dir $+))
+# environment
+GDK_BACKEND = x11
+# environment
+LC_PAPER = es_ES.UTF-8
+# environment
+GTK2_MODULES = overlay-scrollbar
+# environment
+LC_IDENTIFICATION = es_ES.UTF-8
+# makefile (from 'Makefile', line 67)
+RUST_CIRCOM_REPO = https://github.com/iden3/za.git
+# makefile (from 'Makefile', line 46)
+INCLUDE_PATH = $(CUSNARKS_PATH)/src/cuda
+# environment
+QT_ACCESSIBILITY = 1
+# environment
+DEFAULTS_PATH = /usr/share/gconf/ubuntu.default.path
+# makefile (from 'Makefile', line 68)
+RUST_CIRCOM_BRANCH = feature/cusnarks
+# default
+MAKEFILES := 
+# environment
+SNAP_COOKIE = hY5G9LJsj0Glit4BvWMSvfkT6i4-BsX-zqRpg4SdbaYVAq96ADon
+# environment
+LC_NUMERIC = es_ES.UTF-8
+# makefile (from 'Makefile', line 55)
+CONFIG_PATH = $(CUSNARKS_PATH)/config
+# automatic
+<F = $(notdir $<)
+# environment
+LC_MEASUREMENT = es_ES.UTF-8
+# makefile (from 'Makefile', line 101)
+AUX_INCLUDES = $(PCG_INCLUDE)
+# environment
+SNAP_NAME = code
+# makefile (from 'Makefile', line 53)
+CTEST_PATH = $(CUSNARKS_PATH)/test/c
+# makefile (from 'Makefile', line 89)
+aux_rdirs = $(RUST_CIRCOM_PATH)
+# environment
+LC_ALL = C
+# environment
+GJS_DEBUG_TOPICS = JS ERROR;JS LOG
+# environment
+GNOME_TERMINAL_SCREEN = /org/gnome/Terminal/screen/cd6ef209_1128_437c_936f_83bbae3b3dbe
+# automatic
+^F = $(notdir $^)
+# makefile (from 'Makefile', line 99)
+config_dirs = $(CONFIG_PATH)
+# environment
+GNOME_TERMINAL_SERVICE = :1.8026
+# default
+SUFFIXES := 
+# environment
+SNAP_REEXEC = 
+# makefile (from 'Makefile', line 91)
+test_dirs = $(CTEST_PATH) $(PYTST_PATH) 
+# environment
+CHROME_DESKTOP = code-url-handler.desktop
+# environment
+WINDOWPATH = 2
+# default
+.INCLUDE_DIRS = /usr/include /usr/local/include /usr/include
+# environment
+GJS_DEBUG_OUTPUT = stderr
+# default
+.RECIPEPREFIX := 
+# environment
+LC_ADDRESS = es_ES.UTF-8
+# makefile (from 'Makefile', line 103)
+SUBDIRS := /home/david/iden3/cusnarks/src/cuda /home/david/iden3/cusnarks/src/cython 
+# environment
+LANG = C
+# environment
+TERM = xterm-256color
+# makefile (from 'Makefile', line 79)
+JSON_PATH = $(AUX_PATH)/json
+# environment
+ANDROID_HOME = /home/david/android/android-sdk/
+# environment
+VSCODE_PID = 1914069
+# makefile (from 'Makefile', line 109)
+AUX_REPOS := https://github.com/imneme/pcg-cpp.git https://github.com/druiz0992/snarkjs.git https://github.com/iden3/circom_runtime.git
+# makefile (from 'Makefile', line 85)
+aux_cdirs = $(PCG_PATH) 
+# makefile (from 'Makefile', line 106)
+AUX_CSUBDIRS := /home/david/iden3/cusnarks/third_party_libs/pcg-cpp/test-high 
+# makefile (from 'Makefile', line 50)
+PYSRC_PATH = $(CUSNARKS_PATH)/src/python
+# variable set hash-table stats:
+# Load=186/1024=18%, Rehash=0, Collisions=67/263=25%
+
+# Pattern-specific Variable Values
+
+# No pattern-specific variable values.
+
+# Directories
+
+# . (device 64769, inode 5507071): 32 files, no impossibilities.
+
+# 32 files, no impossibilities in 1 directories.
+
+# Implicit Rules
+
+# No implicit rules.
+
+# Files
+
+config:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 190):
+	     (cd ${CUSRC_PATH}; ./ff.sh $(CUSNARKS_CURVE); cd -;) 
+	make clean build 
+	@for i in $(CONFIG_SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
+
+all: reduced_third_party_libs third_party_libs config
+#  Phony target (prerequisite of .PHONY).
+#  Command line target.
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has been updated.
+#  Needs to be updated (-q is set).
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/17=0%
+
+.PHONY: config test build clean all force_all third_party_libs_clean third_party_libs test_unit test_system clib debug_gpu docker_all reduced_third_party_libs config_docker clean_docker
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+config_docker:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+ 
+#  recipe to execute (from 'Makefile', line 202):
+	     (cd ${CUSRC_PATH}; ./ff.sh $(CUSNARKS_CURVE); cd -;) 
+	make clean_docker build 
+	@for i in $(CONFIG_SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
+
+# Not a target:
+.SUFFIXES:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+# Not a target:
+Makefile:
+#  Implicit rule search has been done.
+#  Last modified 2021-05-25 11:43:12.108904116
+#  File has been updated.
+#  Successfully updated.
+
+reduced_third_party_libs:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  Implicit/static pattern stem: ''
+#  File does not exist.
+#  File has been updated.
+#  Needs to be updated (-q is set).
+# automatic
+# @ := reduced_third_party_libs
+# automatic
+# % := 
+# automatic
+# * := 
+# automatic
+# + := 
+# automatic
+# | := 
+# automatic
+# < := 
+# automatic
+# ^ := 
+# automatic
+# ? := 
+# variable set hash-table stats:
+# Load=8/32=25%, Rehash=0, Collisions=3/25=12%
+#  recipe to execute (from 'Makefile', line 223):
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(AUX_REPOS); do git clone $$j; done; cd $(CIRCOM_RUNTIME_PATH) && git checkout feature/server; fi
+	@for i in $(AUX_CSUBDIRS); do \
+		(cd $$i; $(MAKE)); done
+	@for i in $(AUX_JSSUBDIRS); do \
+		(cd $$i; $(NPM)); done
+
+test:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 166):
+	@for i in $(TEST_SUBDIRS); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
+build:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 152):
+	if ! test -d $(LIB_PATH); \
+		then mkdir $(LIB_PATH); fi
+	@for i in $(SUBDIRS); do \
+		echo "make build in $$i..."; \
+		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+
+third_party_libs_clean:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 257):
+	if test -d $(AUX_PATH); then rm -rf $(AUX_PATH); fi
+
+clib:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 243):
+	echo "checking third pary libs...";
+	if ! test -d $(AUX_PATH); \
+		then mkdir $(AUX_PATH); cd $(AUX_PATH); for j in $(PCG_REPO); do git clone $$j; done;  fi
+	@for i in $(AUX_CSUBDIRS); do \
+		(cd $$i; $(MAKE)); done
+	if ! test -d $(LIB_PATH); \
+		then mkdir $(LIB_PATH); fi
+	@for i in $(CUSRC_PATH); do \
+		echo "make build in $$i..."; \
+ 
+		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
+	
+
+# Not a target:
+.DEFAULT:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+cubin:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 220):
+	cd $(CUSRC_PATH); $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) cubin
+
+clean:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 210):
+	@for i in $(SUBDIRS) $(TEST_SUBDIRS) $(CTEST_IDEAS_PATH); do \
+	echo "clearing all in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
+
+force_all: clean third_party_libs_clean all
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+clean_docker:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 215):
+	@for i in $(SUBDIRS); do \
+	echo "clearing all in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean); done
+
+debug_gpu:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 181):
+	@for i in $(CTEST_IDEAS_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
+docker_all: reduced_third_party_libs config_docker
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+test_system:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 176):
+	@for i in $(PYTST_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
+
+test_unit:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 171):
+	@for i in $(CTEST_PATH); do \
+	echo "make test in $$i..."; \
+	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) clean test); done
+
+third_party_libs:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 232):
+	echo "checking third pary libs...";
+	if ! test -d $(RUST_CIRCOM_PATH); \
+		then mkdir -p $(RUST_CIRCOM_PATH); cd $(AUX_PATH); mkdir $(RUST_CIRCOM_PATH); for j in $(RUST_CIRCOM_REPO); do git clone $$j; done;  fi
+ 
+	if ! test -d /usr/local/include/nlohmann; \
+		then cd $(AUX_PATH); git clone $(JSON_REPO); cd $(JSON_PATH); mkdir build; cd build; cmake ..; make; sudo make install; fi
+	@for i in $(AUX_RSUBDIRS); do \
+		(cd $$i; git checkout feature/cusnarks; if ! $(CARGO); then echo "za compilation failed"; fi); done
+
+# files hash-table stats:
+# Load=21/1024=2%, Rehash=0, Collisions=4/63=6%
+# VPATH Search Paths
+
+# No 'vpath' search paths.
+
+# No general ('VPATH' variable) search path.
+
+# strcache buffers: 1 (0) / strings = 50 / storage = 499 B / avg = 9 B
+# current buf: size = 8162 B / used = 499 B / count = 50 / avg = 9 B
+
+# strcache performance: lookups = 102 / hit rate = 50%
+# hash-table stats:
+# Load=50/8192=1%, Rehash=0, Collisions=1/102=1%
+# Finished Make data base on Wed Dec 13 08:37:18 2023
+
+ 

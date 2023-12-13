@@ -50,7 +50,10 @@ import time
 import math
 from subprocess import call, Popen, PIPE
 import multiprocessing as mp
-import nvgpu
+try:
+  import nvgpu
+except ImportError:
+  pass
 
 
 from zutils import ZUtils
@@ -165,6 +168,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
        pysnark.streamDel(gpu_id,stream_id)
    
     else:
+      start = time.time()
       new_vector = np.zeros((batch_size  + indims, NWORDS_256BIT), dtype=np.uint32)
       result = np.zeros(((nsamples-indims) * outdims ,NWORDS_256BIT), dtype=np.uint32)
       t=0.0
@@ -181,14 +185,35 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
             [int((kernel_config['blockD'][0] +
                    min(batch_size-indims, nsamples-start_idx-indims)-1) /
                                          kernel_config['blockD'][0])]
-          result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
+
+          if pysnark is not None:
+            result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims], t1=\
                  pysnark.kernelLaunch(new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], kernel_config, kernel_params, gpu_id, stream_id, n_kernels=1 )
-          pysnark.streamDel(gpu_id,stream_id)
-          t+=t1
+            pysnark.streamDel(gpu_id,stream_id)
+            t+=t1
+          elif ec2:
+            result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims]= \
+                 ec2_jacsc1mul_h(
+                          np.reshape(
+                                   new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims], 
+                                   -1),
+                          fidx,
+                          1)
+          else:
+            result[start_idx*outdims:min(start_idx + batch_size - indims , nsamples-indims)*outdims]= \
+                 ec_jacsc1mul_h(
+                          np.reshape(
+                                 new_vector[:min(batch_size-indims, nsamples-indims-start_idx)+indims],
+                                 -1),
+                          fidx,
+                          1)
             
+    end = time.time()
+    if t == 0.0:
+      t = end - start
     return result,t
 
-def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0):
+def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream_id = 0, separate_k=0, grouping=DEFAULT_U256_BSELM):
    kernel_params={}
    kernel_config={}
    
@@ -205,28 +230,45 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
    nsamples = int(len(vector)/indims_e)
    
    #if shamir_en == 0 or nsamples < 32 * U256_BSELM :
-   if shamir_en == 0 :
-     kernel_config['blockD']    = get_shfl_blockD(nsamples)
-     shamir_en = 0
+   if shamir_en == False :
+     kernel_config['blockD']    = get_shfl_blockD(nsamples,8)
    else:
-     kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/U256_BSELM))
+     kernel_config['blockD']    = get_shfl_blockD(math.ceil(nsamples/grouping),8)
+
+   if separate_k:
+         kernel_config['blockD']    = np.concatenate([[128], kernel_config['blockD']])
 
    nkernels = len(kernel_config['blockD'])
    kernel_params['stride']    = [outdims] * nkernels
-   kernel_params['stride'][0]    =  indims_e
+   kernel_params['stride'][0]    =  indims_e * grouping
    kernel_params['premul']    = [0] * nkernels
-   kernel_params['premul'][0] = 1
    kernel_params['premod']    = [0] * nkernels
    kernel_params['midx']      = [fidx] * nkernels
-   kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
-   kernel_config['kernel_idx'] =[kernel] * nkernels
    kernel_params['in_length'] = [nsamples* indims_e]*nkernels
-   for l in xrange(1,nkernels):
-      kernel_params['in_length'][l] = outdims * (
+   kernel_params['out_length'] = 1 * outdims
+   kernel_params['padding_idx'] = [shamir_en] * nkernels
+   kernel_config['gridD'] = [0] * nkernels
+   kernel_config['gridD'][nkernels-1] = 1
+
+   if separate_k:
+         kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD'][1:]]
+         kernel_config['smemS'] = np.concatenate([[0], np.asarray(kernel_config['smemS'],dtype=np.uint32)])
+         kernel_params['in_length'][1] = int(nsamples* outdims/grouping)
+         kernel_config['gridD'][1:] = [int(np.product(kernel_config['blockD'][1+i:])/(kernel_config['blockD'][1+i])) for i in range(len(kernel_config['blockD'][1:]))]
+         kernel = [CB_EC_JAC_MUL_OPT, CB_EC_JAC_RED] 
+         kernel_config['kernel_idx'] =np.concatenate([[kernel[0]], np.ones(nkernels-1, dtype=np.uint32) * kernel[1]])
+         start_k = 2
+   else:
+     kernel_params['premul'][0] = 1
+     kernel_config['smemS']     = [int(blockD/32 * NWORDS_256BIT * outdims * 4) for blockD in kernel_config['blockD']]
+     kernel_config['kernel_idx'] =[kernel] * nkernels
+     kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
+     start_k = 1
+
+   for l in xrange(start_k,nkernels):
+        kernel_params['in_length'][l] = outdims * (
              int((kernel_params['in_length'][l-1]/outdims + (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / outdims) - 1) /
              (kernel_config['blockD'][l-1] * kernel_params['stride'][l-1] / (outdims))))
-
-   kernel_params['out_length'] = 1 * outdims
    """
    if not shamir_en:
      kernel_params['out_length'] = int(nsamples * outdims)
@@ -234,10 +276,6 @@ def ec_mad_cuda2(pysnark, vector, fidx, ec2=False, shamir_en=0, gpu_id=0, stream
      kernel_params['out_length'] = int(nsamples/8 * outdims)
    """
    #kernel_params['out_length'] = np.product(kernel_config['blockD'][1:]) * outdims
-   kernel_params['padding_idx'] = [shamir_en] * nkernels
-   kernel_config['gridD'] = [0] * nkernels
-   kernel_config['gridD'][0] = int(np.product(kernel_config['blockD'])/kernel_config['blockD'][0])
-   kernel_config['gridD'][nkernels-1] = 1
    #kernel_params['out_length'] = kernel_config['gridD'][0] * outdims
     
    result,t = pysnark.kernelLaunch(vector, kernel_config, kernel_params, gpu_id, stream_id, n_kernels=nkernels )
@@ -1529,12 +1567,11 @@ def zpoly_mad_cuda(pysnark, vectors, fidx, gpu_id=0, stream_id=0):
      return vector,t
      """
 
-def get_shfl_blockD(nsamples):
+def get_shfl_blockD(nsamples, max_block_size=8):
 
    l = max(math.ceil(math.log2(nsamples)),5)
-   nb = math.ceil(l/8)
+   nb = math.ceil(l/max_block_size)
    lpb = math.ceil(l/nb)
-
    blockD = [1<<lpb] 
    rsamples = l - lpb
    while rsamples > lpb:
@@ -1550,19 +1587,25 @@ def get_shfl_blockD(nsamples):
    return blockD[::-1]
     
 def get_gpu_affinity_cuda():
-   available_gpus = nvgpu.available_gpus()
-   n_cores = mp.cpu_count()
    gpu_affinity = {}
-   for gpu in available_gpus:
-     gpu_affinity[gpu] = []
-   for core in xrange(n_cores):
-      r = call(['nvidia-smi' , 'topo', '-c' , str(core)])
-      gpu_affinity[str(r)].append(core)
+   try:
+     available_gpus = nvgpu.available_gpus()
+     n_cores = mp.cpu_count()
+     for gpu in available_gpus:
+       gpu_affinity[gpu] = []
+     for core in xrange(n_cores):
+        r = call(['nvidia-smi' , 'topo', '-c' , str(core)])
+        gpu_affinity[str(r)].append(core)
+     return gpu_affinity
 
-   return gpu_affinity
+   except:
+     return gpu_affinity
 
 def get_ngpu(max_used_percent=20.):
-   return len(nvgpu.available_gpus(max_used_percent))
+   try:
+     return len(nvgpu.available_gpus(max_used_percent))
+   except :
+     return 0
 
 def get_nstreams():
     return (N_STREAMS_PER_GPU)

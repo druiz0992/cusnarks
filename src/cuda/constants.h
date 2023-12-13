@@ -36,11 +36,13 @@
 
 const uint32_t * CusnarksPGet(mod_t type);
 const uint32_t * CusnarksR2Get(mod_t type);
+const uint32_t * CusnarksR3Get(mod_t type);
 const uint32_t * CusnarksNPGet(mod_t type);
 const uint32_t * CusnarksIScalerGet(fmt_t type);
 const uint32_t * CusnarksZeroGet(void);
 const uint32_t * CusnarksOneGet(void);
 const uint32_t * CusnarksOneMontGet(uint32_t pidx);
+const uint32_t * CusnarksOneMont2Get(uint32_t pidx);
 const uint32_t * CusnarksEcbn128ParamsGet(void);
 const uint32_t * CusnarksModInfoGet(void);
 const uint32_t * CusnarksMiscKGet(void);
@@ -51,6 +53,7 @@ const uint32_t * CusnarksPrimitiveRootsFieldGet(uint32_t nbits);
 uint32_t CusnarksGetNRoots(void);
 void CusnarksGetFRoots(char *filename, uint32_t sizeof_f);
 const uint32_t * CusnarksTidxGet(void);
+void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots);
 
 #endif
 

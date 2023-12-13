@@ -1,11 +1,8 @@
 # Cusnarks Overview
 Cusnarks is an optimized CUDA implementation of ZK-SNARK setup and prover based on *Groth16* over curve [bn128][BN128].
-It has been designed with the objective of computing proofs for up to 2^27 constraints in less than 10 minutes in a platform consisting of
-4xGPUs and 32xCPU cores (we are not quite there though).
-CUSNARKS is expected to work with [circom][] for the generation and compilation of circuits, and with [snarkjs][] 
-for the computation witnesses, proof verification and parts of
- the trusted setup.  Additionally, cusnarks works with [rust-circom][], an optimized version of [circom][] that allows to compile and generate
-witnesses for very large circuits.
+It has been designed with the objective of computing proofs for up to 2^27 constraints in shortes time possible in a platform consisting of NxGPUs and MxCPU cores.
+CUSNARKS is expected to work with [circom][] for the generation and compilation of circuits, and with [snarkjs][] for the computation witnesses, proof verification and parts of
+ the trusted setup.  Additionally, cusnarks works with [circom2][], an optimized version of [circom][] that allows to compile and generate witnesses for very large circuits.
 
 
 Cusnarks has been developed in C/C++/CUDA-C and Python. Python is the driving language where proof and 
@@ -24,6 +21,8 @@ The current partition of GPU vs. CPU functionality on the prover side is shown i
 
 ![proof_block_diagram](doc/block_diagram.png)
 
+**NOTE:** Prover can be run entirely in CPU if no GPUs are available
+
 The trusted setup is currently very slow. Implementation has been done using a single CPU core, except for the multi-exponentiation stage where we use a non-optimized algorithm for a single GPU.
 
 
@@ -37,22 +36,32 @@ The trusted setup is currently very slow. Implementation has been done using a s
 * [Some Results][]
 * [File Formats][]
 * [Other Info](#Other-Info)
-* [Documentation][]
+* [References][]
 * [Next Steps][]
   
 ## Installation
 1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called *$CUSNARKS_HOME*
 
+2. Change to *$CUSNARKS_HOME* directory and execute cusnarks_build.sh (builds Cusnarks) and launch_cusnarks (launches a proof server and requests proofs) scripts
+```sh
+ cd $CUSNARKS_HOME
+ ./cusnarks_build.sh
+ ./launch_cusnarks.sh
+```
+
+Alternatively, you can install Cusnarks manually:
+
 2. Ensure that all [dependencies][] are installed. 
 
-Tested library versions provided for reference.
+Tested versions of required libraries and programs are provided below for reference.
 
     - Python3.6+
         - Cython (0.26.1)
         - numpy (1.17.1)
         - future (0.17.1)
-        - nvgpu (0.8.0)
+        - nvgpu (0.8.0) : If GPU needed
     - g++ compiler (7.4.0)
+    - nasm (2.13.02)
     - CUDA toolkit (10.1)
     - openmp (201511)
     - node (10.16.0)
@@ -93,9 +102,52 @@ make config
 ```sh
 CUDA_VISIBLE_DEVICES=1,2 make test
 ```
+**NOTE:** CUDA_VISIBLE_DEVICES is used to select the GPUs to be used. To get a numbered list of available GPUs type:
 
+```sh
+nvidia-smi
+```
+The output may look like this:
+
+	Thu Dec 19 12:57:34 2019       
+	+-----------------------------------------------------------------------------+
+	| NVIDIA-SMI 440.33.01    Driver Version: 440.33.01    CUDA Version: 10.2     |
+	|-------------------------------+----------------------+----------------------+
+	| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+	| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+	|===============================+======================+======================|
+	|   0  GeForce GTX 1080    Off  | 00000000:5E:00.0 Off |                  N/A |
+	| 42%   62C    P2   106W / 180W |   2693MiB /  8119MiB |    100%      Default |
+	+-------------------------------+----------------------+----------------------+
+	|   1  GeForce GTX 1080    Off  | 00000000:B1:00.0 Off |                  N/A |
+	| 27%   25C    P8     6W / 180W |   2687MiB /  8119MiB |      0%      Default |
+	+-------------------------------+----------------------+----------------------+
+	|   2  GeForce GTX 1080    Off  | 00000000:D9:00.0 Off |                  N/A |
+	|  0%   24C    P8     9W / 240W |   2687MiB /  8119MiB |      0%      Default |
+	+-------------------------------+----------------------+----------------------+
+                                                                               	
+	+-----------------------------------------------------------------------------+
+	| Processes:                                                       GPU Memory |
+	|  GPU       PID   Type   Process name                             Usage      |
+	|=============================================================================|
+	|    0     32195      C   python3                                     2683MiB |
+	|    1     32195      C   python3                                     2677MiB |
+	|    2     32195      C   python3                                     2677MiB |
+	+-----------------------------------------------------------------------------+
+
+In the example above, there are 3 GPUs numbered 0,1,2.
+
+To launch GPU tests on GPUS 1 and 2 you need the following command: 
+```sh
+CUDA_VISIBLE_DEVICES=1,2 make test_system
+```
+To launch unit tests on CPU you need the following command:
+
+```sh
+make test_unit
+```
 ## Launching Cusnarks
-Launch setup and proof generation by running pysnarks.py. 
+Launch setup and proof generation by running pysnarks.py. Following command displays help menu.
 
 ```sh
 cd src/python
@@ -116,9 +168,13 @@ Mandatory arguments:
 
 A detailed description of different file formats can be found [ħere](#file-formats).
 
-Note : if input or output files are placed in the *$CUSNARKS_HOME/circuits* directory, just provide file name. Cusnarks wil automatically search in this directory
+**Note** : if input or output files are placed in the *$CUSNARKS_HOME/circuits* directory, just provide file name. CUSNARKS wil automatically search in this directory
 
 Running the trusted setup requires [snarkjs][] being installed to compute parts of the verification key. Cusnarks automatically downloads it into *$CUSNARKS_HOME/third_party_libs/snarkjs*
+
+Optional arguments
+- **-v** : Enable verification. If value is 1, setup verification is enabled. After setup is generated, cusnarks will call [snarkjs][] to generate setup. Verification is done by comparing both outputs
+- **-t OUTPUT_TABLE_FILE.bin**: Precompute EC Tables and write them to OUTPUT_TABLE_FILE. 
 
 
 ### Prover
@@ -135,6 +191,10 @@ CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m p -pk <INPUT_
 
 Mandatory arguments:
 - **INPUT_PROVING_KEY file** : Input Proving Key file generated by trusted setup. Extension needs to be .json or .bin.
+- **INPUT_VERIFICATION_KEY file** : Input Verification file generated by trusted setup if verification is required when launching proof. Extension is .json
+
+Optinal arguments:
+- **-gpu** : Number of GPUs. Ex. -gpu 2 will use two GPUS. -gpu 0 will use 0 GPUs and tests will be run on CPU
 
 To request a proof: 
 
@@ -160,10 +220,12 @@ CUDA_VISIBLE_DEVICES=<ordered list of GPUs> python3 pysnarks.py -m -pk<INPUT_PRO
 ```
 
 ## Example
-In this section we will go through an example on how to compile a circuit using [rust-circom][] to obtain a valid set of R1CS constraints and a valid witness, and how to call cusnarks to compute the Trusted Setup and the Proof.
+In this section we will go through an example on how to compile a circuit using [circom2][] to obtain a valid set of R1CS constraints and a valid witness, and how to call cusnarks to compute the Trusted Setup and the Proof.
 
 ### Circuit Compilation
-Cusnarks provides a compiler [rust-circom][] to generate R1CS constraints and witness from a given circuit. [rust-circom][] is located in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/*. 
+Cusnarks provides a compiler [circom2][] to generate R1CS constraints and witness from a given circuit. [circom2][] is located in *$CUSNARKS_HOME/third_party_libs/za/*. 
+
+If you have followed the installation steps indicated in this manual rust compiler is already installed in your system. If this is the case, you can directly jumt to step 3. Otherwise, keep reading.
 
 Steps to follow :
 
@@ -175,7 +237,7 @@ sudo apt-get install clang build-essential libssl-dev
 source $HOME/.cargo/env
 ```
 
-2. Compile [rust-circom][]
+2. Compile [circom2][]
 
 From *$CUSNARKS_HOME/* type:
 
@@ -183,11 +245,11 @@ From *$CUSNARKS_HOME/* type:
 make all
 ```
 
-After this step is completed, cusnarks and [rust-circom][] are ready to use.
+After this step is completed, cusnarks and [circom2][] are ready to use.
 
 3. Review circuit
 
-[rust-circom][] provides a test circuit that can be used to generate test proofs with an arbitrary number of constraints. The circuit can be found in *$CUSNARKS_HOME/third_party_libs/rust-circom-experimental/interop/circuits/cuda/circuit.circom*. The circuit is shown below.
+[circom2][] provides a test circuit that can be used to generate test proofs with an arbitrary number of constraints. The circuit can be found in *$CUSNARKS_HOME/third_party_libs/za/interop/circuits/cuda/circuit.circom*. The circuit is shown below.
 
 	template T(N) {
 		signal private input p;
@@ -228,7 +290,7 @@ To modify the number of constraints, set the number *N* in T(N) to the desired n
 From the same directory where *circuit.circom* is placed, type:
 
 ```sh
-../../../target/release/za compile --cuda=r1cs4M_c.bin
+../../../target/release/circom2 compile --cuda=r1cs4M_c.bin
 ```
 
 Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin* located in the same folder as *circuit.circom*. The format of *r1cs4M_c.bin* is described in [constraints-circom-format][].
@@ -237,7 +299,7 @@ Wait a few minutes and the output will be a constraint file called *r1cs4M_c.bin
 From the same directory where *circuit.circom* is placed, type:
 
 ```sh
-../../../target/release/za test --skipcompile --outputwitness
+../../../target/release/circom2 test --skipcompile --outputwitness
 ```
 Wait a few minutes and the output will be a witness file called *test1.binwitness*. Unfortunately, this witness file is in big-endian format and we need to convert it to little-endian.
 
@@ -399,10 +461,10 @@ This section enumerates options that are either deprecated and its use may produ
 - wf <WITNESS_FORMAT> : Input witness format (Montgomery/Normal). Currently, only normal format is accepted.
 - df <DATA_FOLDER> :
 	
-### Generic
+### Generic mode
 * -h
 
-### Setup
+### Setup mode
 Setup is launched with the following command:
 
 ```sh
@@ -418,7 +480,7 @@ python3 pysnarks.py -m s [SETUP_OPTIONS]
 - d <DEBUG>
 - seed <SEED
 
-### Proof
+### Proof mode
 Proof is launched with the following command:
 
 ```sh
@@ -523,12 +585,20 @@ Additionally, there are some additional Python modules:
 
 ## Some Results
 This section provides some performance results generated with Dell T640 server with 2xIntel Xeon Silver 4110@2.1GHz (32 cores), 128GB of memory and 2XGPU GTX 1080.
-Maximum number of constraints achieved is 2^26 and took 1100 seconds. Proof performance for different number of constraints is shown below.
+Maximum number of constraints achieved is 2^26 and took 230 seconds. Proof performance for different number of constraints is shown below.
 
 ![Some Results-performance](doc/cusnarks_performance.png)
 
 Below it is displayed the relative performance per functional block (Mexp, FFT, Witness Read and Initialization).
 ![Some Results-block](doc/cusnarks_block_performance.png)
+
+|Log2 N constraints | Time Cusnarks [s] | Time Libsnarks [s] |
+|-------------------|-------------------|--------------------|
+| 22                | 18                |  50                |
+| 23                | 30                |  96                |
+| 24                | 69                |  176               |
+| 25                | 116               |  327               |
+| 26                | 234               |  675               |
 
 ## File Formats
 CUSNARKs requires and generates different files. The picture below shows a block diagram containing the three main actors (Setup, Proof Server and Prover) and how they relate to the 
@@ -541,13 +611,18 @@ formats.
 
 |File type        | Extensions|
 |-----------------|-----------|
-| Constraints     | .bin, .json, .rics|
+| Constraints     | .bin, .json, .r1cs|
 |Proving Key      | .json, .bin |
 |Verification Key | .json                   |
 |Witness          | .txt, .json, .dat, .bin |
+|EC Tables           | .bin |
 |Proof | .json    |
 |Public Data | .json |
 |Results | stdout |
+
+
+Trusted setup consumes constraint files and produces Proving Key and Verification ket. Proof server consumes the Proving Key. The Prover consumes Verification Key and
+generates the Proof, Public data and Results. Below there is a figure summarizing the structure of which block generates and consumes which file.
 
 ### Constraints
 Constraint files are generated by a SNARK compiler and consumed by cusnarks trusted setup.
@@ -557,63 +632,63 @@ Constraint system generated by [circom][].  JSON file includes the following key
 
 |Key | Description |
 |----|-------------|
-|constraints|set of constraints. Every set is  3xN list thatincludes the R1CSA, R1CSB and R1CSC as coeff, value tupple|
-|nPubInputs|Number of public inputs in the circuit|
-|nOutputs|Number of outpus in the circuit|
-|nVars|Number of wires|
-|cirformat| Representation of values in the constraint set. 0 is 256 number. 1 is Montgomery representation|
-|protocol| 'groth'|
+| constraints | set of constraints. Every set is  3xN list thatincludes the R1CSA, R1CSB and R1CSC as coeff, value tupple |
+| nPubInputs | Number of public inputs in the circuit |
+| nOutputs | Number of outpus in the circuit |
+| nVars|Number of wires|
+| cirformat | Representation of values in the constraint set. 0 is 256 number. 1 is Montgomery representation |
+| protocol | 'groth' |
 
 #### .bin
-Constraint system generated by [rust-circom][]. 32 bit words are represented as Little Endian.
+Constraint system generated by [circom2][]. 32 bit words are represented as Little Endian.
 
 |Key | Bit size | Description |
 |----|----------|-------------|
-|nWords| 64 bits | Length of file in 32 bit words |
-|nPubInputs|64 bits | Number of public inputs in the circuit |
-|nOutputs|64 bits| Number of outputs in the circuit|
-|nVars|64 bits|Number of wires in the circuit|
-|nConstraints|64 bits| Number of constraints|
-|cirformat|64 bits| Representation of values in the constraint set. 0 is 256 number. 1 is Montgomery representation|
-|R1CSA_nWords|64 bits|  Length of R1CSA constraints in 32 bit words|
-|R1CSB_nWords|64 bits| Length of R1CSB constraints in 32 bit words|
-|R1CSC_nWords|64 bits| Length of R1CSC constraints in 32 bit words|
-|R1CSA| RBCSA_nWords | R1CSA constraints|
-|R1CSB| R1CSB_nWords | R1CSB constraints|
-|R1CSC| R1CSC_nWords | R1CSC constraints|
+| nWordsa | 64 bits | Length of file in 32 bit words |
+| nPubInputs | 64 bits | Number of public inputs in the circuit |
+| nOutputs | 64 bits| Number of outputs in the circuit |
+| nVars|64 bits | Number of wires in the circuit |
+| nConstraints | 64 bits| Number of constraints |
+| cirformat | 64 bits | Representation of values in the constraint set. 0 is 256 number. 1 is Montgomery representation | 
+| R1CSA_nWords | 64 bits |  Length of R1CSA constraints in 32 bit words |
+| R1CSB_nWords | 64 bits | Length of R1CSB constraints in 32 bit words |
+| R1CSC_nWords | 64 bits | Length of R1CSC constraints in 32 bit words | 
+| R1CSA | RBCSA_nWords | R1CSA constraints |
+| R1CSB | R1CSB_nWords | R1CSB constraints |
+| R1CSC | R1CSC_nWords | R1CSC constraints |
 
 R1CS constraints are represented as follows:
 
 |Field | Bit size | Description |
 |------|----------|-------------|
-|nConstraints|32 bit| Total Number of constraints|
-|Number coefficients constraint_0|32 bits| | 
-|Cum. number coefficients constraint_1|32 bits| N coeff constraints_0 + N coeff constraints_1 1
-|...| 32 bit| ... |
-|Cum. number coefficients constraint_N-1|32 bits| N coeff constraints_0 + N coeff constraints_1 +...+ N constraints_N-1|
-|Coeff_0_0|32 bit| constraint 0, coefficient 0|
-| Coeff_0_1|32 bit| constraint 0, coefficient 1|
-| ...|32 bit |... |
-|Coeff_0_M-1|32 bit| constraint 0, coefficient M-1|
-|Value_0_0|256 bit| constraint 0, value 0|
-|Value_0_1|256 bit| constraint 0, value 1|
-|...|256 bit |...|
-|Value_0_M-1|256 bit|constraint 0, value M-1|
-|Coeff_1_0|32 bit| constraint 1, coefficient 0|
-|Coeff_1_1|32 bit| constraint 1, coefficient 1|
-|...|32 bit|...|
-|Coeff_N-1_0|32 bit|constraint N-1, coefficient 0|
-|Coeff_N-1_1|32 bit| constraint N-1, coefficient 1|
-|...|32 bit| |
-|Coeff_N-1_Mn-1|32 bit|constraint N-1, coefficient Mn-1|
-|Value_N-1_0|256 bit|constraint N-1, value 0|
-|Value_N-1_1|256 bit|constraint N-1, value 1|
+| nConstraints | 32 bit| Total Number of constraints |
+| Number coefficients constraint_0 | 32 bits |   |
+| Cum. number coefficients constraint_1 | 32 bits | N coeff constraints_0 + N coeff constraints_1 |
+|...| 32 bit | ... |
+| Cum. number coefficients constraint_N-1 | 32 bits | N coeff constraints_0 + N coeff constraints_1 +...+ N constraints_N-1|
+| Coeff_0_0 | 32 bit| constraint 0, coefficient 0|
+| Coeff_0_1 | 32 bit | constraint 0, coefficient 1|
+| ... | 32 bit |... |
+| Coeff_0_M-1 | 32 bit | constraint 0, coefficient M-1|
+| Value_0_0 | 256 bit | constraint 0, value 0|
+| Value_0_1 | 256 bit | constraint 0, value 1|
+|...| 256 bit |...|
+| Value_0_M-1 | 256 bit| constraint 0, value M-1|
+| Coeff_1_0 | 32 bit | constraint 1, coefficient 0|
+| Coeff_1_1 | 32 bit | constraint 1, coefficient 1|
+|...| 32 bit |...|
+| Coeff_N-1_0 | 32 bit | constraint N-1, coefficient 0|
+| Coeff_N-1_1 | 32 bit | constraint N-1, coefficient 1|
+|...| 32 bit | |
+| Coeff_N-1_Mn-1 | 32 bit | constraint N-1, coefficient Mn-1|
+| Value_N-1_0 |256 bit | constraint N-1, value 0|
+| Value_N-1_1 | 256 bit | constraint N-1, value 1|
 |...|256 bit|...|
-|Value_0_Mn-1|256 bit|constraint N-1, value Mn-1|
+| Value_0_Mn-1 | 256 bit | constraint N-1, value Mn-1|
 
 
 #### .r1cs
-Constraint system generated by [circom][]. See [r1cs][specification] for a detailed description.
+Constraint system generated by [circom][]. See [r1cs][] for a detailed description.
 
 ### Proving Key
 Trusted setup generated by cusnarks Trusted Setup and consumed by cusnarks Prover. 
@@ -623,32 +698,32 @@ JSON includes the following keys:
 
 |Key | Description |
 |----|-------------|
-|ftype|'PK_FILE'|
-|protocol|'groth'|
-|Rbitlen|Size of Field elements. For BN128 Rbit len is '256'|
-|k_binformat|Representation of field elements ('normal'/'montgomery')|
-|k_ecformat| Representation of group elements ('affine') |
-|nVars|  Number of wires in circuit|
-|nPublic| Number of public data in circuit (nPubInputs + nOutputs)|
-|domainBits|: Number of bits|
-|domainSize| Size (power(2,domainBits))|
-|field_r| Order of field (for BN128 field_r is "21888242871839275222246405745257275088548364400416034343698204186575808495617")|
-|group_q| Order of group (for BN128 group_1 is "21888242871839275222246405745257275088696311157297823662689037894645226208583")|
-|A|Set of elliptic curve points A in G1|
-|B1| Set of elliptic curve points B1 in G1|
-|B2| Set of elliptic curve points B2 in G2|
-|C| Set of elliptic curve points C in G1|
-|hExps| Set of elliptic curve points K[nInputs+1:nVars] in G1|
-|polsA| QAP A |
-|polsB| QAP B |
-|polsC| QAP C |
-|vk_alfa_1|Elliptic curve point alpha in G1|
-|vk_beta_1| Elliptic curve point beta in G1|
-|vk_beta_2| Elliptic curve point beta in G2|
-|vk_delta_1| Elliptic curve point delta in G1|
-|vk_delta_2| Elliptic curve point delta in G2|
+| ftype | 'PK_FILE' |
+| protocol |'groth' |
+| Rbitlen | Size of Field elements. For BN128 Rbit len is '256'|
+| k_binformat | Representation of field elements ('normal'/'montgomery')|
+| k_ecformat | Representation of group elements ('affine') |
+| nVars |  Number of wires in circuit|
+| nPublic | Number of public data in circuit (nPubInputs + nOutputs)|
+| domainBits |: Number of bits|
+| domainSize | Size (power(2,domainBits))|
+| field_r | Order of field (for BN128 field_r is "21888242871839275222246405745257275088548364400416034343698204186575808495617")|
+| group_q | Order of group (for BN128 group_1 is "21888242871839275222246405745257275088696311157297823662689037894645226208583")|
+| A | Set of elliptic curve points A in G1|
+| B1 | Set of elliptic curve points B1 in G1|
+| B2 | Set of elliptic curve points B2 in G2|
+| C | Set of elliptic curve points C in G1|
+| hExps | Set of elliptic curve points K[nInputs+1:nVars] in G1|
+| polsA | QAP A |
+| polsB | QAP B |
+| polsC | QAP C |
+| vk_alfa_1 |Elliptic curve point alpha in G1|
+| vk_beta_1 | Elliptic curve point beta in G1|
+| vk_beta_2 | Elliptic curve point beta in G2|
+| vk_delta_1 | Elliptic curve point delta in G1|
+| vk_delta_2 | Elliptic curve point delta in G2|
 
-Note : Elliptic curve points in G1 are represented with three coordinate system (X, Y, Z=1). Elliptic curve points in G2
+**Note** : Elliptic curve points in G1 are represented with three coordinate system (X, Y, Z=1). Elliptic curve points in G2
 are represented with three coordinate system (X, Y, Z = [1,0])
 
 #### .bin
@@ -656,57 +731,57 @@ are represented with three coordinate system (X, Y, Z = [1,0])
 
 |Field | Bit size | Description |
 |------|----------|-------------|
-|nWords|32 bit| Unused |
-|ftype|32 bit| File type (1) |
-|protocol|32 bit| Protocol type (Groth -> 1)|
-|Rbitlen|32 bit| Size of field/group (256)|
-|k_binformat|32 bit| Representation of field elements (1 -> montgomery)|
-|k_ecformat|32 bit| Representation of group elements (2 -> affine)|
-|nVars|32 bit| Number of wires in circuit|
-|nPublic|32 bit| Number of public inputs in circuit|
-|domainBits|32 bit| Number of bits |
-|domainSize|32 bit| Size (power(2,domainBits))|
-|field_r|32 bit| Field order |
-|group_q|32 bit| Group order |
-|polsA_nWords|64 bit| Number of 32 bit words in representation of polsA|
-|polsB_nWords|64 bit| Number of 32 bit words in representation of polsB|
-|polsC_nWords|64 bit| Number of 32 bit words in representation of polsC|
-|A_nWords|64 bit| Number of 32 bit workds in representation of EC point A|
-|B1_nWords|64 bit| Number of 32 bit workds in representation of EC point B1|
-|B2_nWords|64 bit| Number of 32 bit workds in representation of EC point B2|
-|C_nWords|64 bit| Number of 32 bit workds in representation of EC point C|
-|hExps_nWords|64 bit| Number of 32 bit words in representation of EC point K[nInputs+1:nVars]|
-|polsA|n bit|: QAP A|
-|polsB|n bit|: QAP B|
-|polsC|n bit|: QAP C|
-|alfa_1|512 bit| Elliptic curve point alpha in G1|
-|beta_1|512 bit| Elliptic curve point beta in G1|
-|beta_2|1024 bit| Elliptic curve point beta in G2|
-|delta_1|512 bit| Elliptic curve point delta in G1|
-|delta_2|1024 bit| Elliptic curve point delta in G2|
-|A|n bit| Set of elliptic curve points A in G1|
-|B1|n bit| set of elliptic curve points B1 in G1|
-|B2|n bit| set of elliptic curve points B2 in G2 |
-|C|n bit| set of elliptic curve points C in G1|
-|hExps|n bit| set of elliptic curve points K[nInputs+1:nVars] in G1|
+| nWords | 32 bit | Unused |
+| ftype |32 bit | File type (1) |
+| protocol |32 bit | Protocol type (Groth -> 1)|
+| Rbitlen |32 bit | Size of field/group (256)|
+| k_binformat | 32 bit | Representation of field elements (1 -> montgomery)|
+| k_ecformat | 32 bit | Representation of group elements (2 -> affine)|
+| nVars | 32 bit | Number of wires in circuit|
+| nPublic |32 bit| Number of public inputs in circuit|
+| domainBits |32 bit | Number of bits |
+| domainSize |32 bit | Size (power(2,domainBits))|
+| field_r | 32 bit | Field order |
+| group_q | 32 bit | Group order |
+| polsA_nWords | 64 bit | Number of 32 bit words in representation of polsA|
+| polsB_nWords | 64 bit | Number of 32 bit words in representation of polsB|
+| polsC_nWords | 64 bit | Number of 32 bit words in representation of polsC|
+| A_nWords | 64 bit| Number of 32 bit workds in representation of EC point A|
+| B1_nWords | 64 bit | Number of 32 bit workds in representation of EC point B1|
+| B2_nWords | 64 bit | Number of 32 bit workds in representation of EC point B2|
+| C_nWords | 64 bit | Number of 32 bit workds in representation of EC point C|
+| hExps_nWords | 64 bit | Number of 32 bit words in representation of EC point K[nInputs+1:nVars]|
+| polsA | n bit | QAP A |
+| polsB | n bit | QAP B |
+| polsC | n bit | QAP C |
+| alfa_1 | 512 bit | Elliptic curve point alpha in G1|
+| beta_1 | 512 bit | Elliptic curve point beta in G1|
+| beta_2 | 1024 bit | Elliptic curve point beta in G2|
+| delta_1 | 512 bit | Elliptic curve point delta in G1|
+| delta_2 | 1024 bit | Elliptic curve point delta in G2|
+| A | n bit | Set of elliptic curve points A in G1|
+| B1 | n bit | set of elliptic curve points B1 in G1|
+| B2 | n bit | set of elliptic curve points B2 in G2 |
+| C | n bit | set of elliptic curve points C in G1|
+| hExps | n bit | set of elliptic curve points K[nInputs+1:nVars] in G1|
 
-Note : Elliptic curve points in G1 are represented with two coordinate system (X, Y). Elliptic curve points in G2 are
+**Note** : Elliptic curve points in G1 are represented with two coordinate system (X, Y). Elliptic curve points in G2 are
 also represented with two coordinate system (X, Y)
 
 Formt of polsA, polsB and polsC is:
 
 |Field | Bit size | Description |
 |------|----------|-------------|
-| nVars|32 bit| Number of embedded polys|
-| nCoeff_0|32 bit| Number of coefficients in poly 0 |
-| nCoeff_1|32 bit| Number of coefficients in poly 1| 
-| ... |32 bit|...|
-| nCoeff_N-1|32 bit|Number of coefficients in poly N-1|
-| Value_0_0 |256 bit| Value 0, Poly 0|
-| Value_1_0|256 bit|  Value 1, Poly 0|
+| nVars | 32 bit | Number of embedded polys|
+| nCoeff_0 | 32 bit | Number of coefficients in poly 0 |
+| nCoeff_1 | 32 bit | Number of coefficients in poly 1| 
+| ... | 32 bit |...|
+| nCoeff_N-1 | 32 bit | Number of coefficients in poly N-1|
+| Value_0_0  | 256 bit | Value 0, Poly 0|
+| Value_1_0 | 256 bit |  Value 1, Poly 0|
 | ...| 256 bit|...|
-| Value M-1,0| 256 bit| Value M-1, Poly 0|
-| Value 0, 1|256 bit| Value 1, Poly 1|
+| Value M-1,0 | 256 bit| Value M-1, Poly 0|
+| Value 0, 1 | 256 bit| Value 1, Poly 1|
 | ... | 256 bit|...|
 | Value Mn-1, N-1|256 bit| Value Mn-1, Poly N-1|
 
@@ -718,22 +793,22 @@ JSON contains the following keys:
 
 |Key | Description |
 |----|-------------|
-|Rbitlen| Size of field/group (for BN128 Rbitlen is "256")|
-|binFormat| Format of field elements ('normal')|
-|domainBits| Number of bits|
-|domainSize| Size of FFT. (power(2,domainSize))|
-|ecFormat| Format of Elliptic curve elements ('affine')|
-|field_r|Order of field (for BN128 field_r is "21888242871839275222246405745257275088548364400416034343698204186575808495617")|
-|group_q|Order of group (for BN128 group_1 is "21888242871839275222246405745257275088696311157297823662689037894645226208583")|
-|nPublic|Number of public variables (Number of public input + number of output)|
-|nVars|Number of wires in the circuit|
-|protocol|'groth'|
-|vk_alfa_1|Elliptic curve element alpha in G1|
-|vk_beta_2|Elliptic curve element beta in G2|
-|vk_delta_2|Elliptic curve element delta in G2|
-|vk_gamma_2| Elliptic curve element gamma in G2|
-|vk_alfabeta_12| Pairing e(alpha, beta)|
-|IC| Elliptic curve elements K[0:nInputs] in G1|
+| Rbitlen | Size of field/group (for BN128 Rbitlen is "256")|
+| binFormat | Format of field elements ('normal')|
+| domainBits | Number of bits|
+| domainSize | Size of FFT. (power(2,domainSize))|
+| ecFormat | Format of Elliptic curve elements ('affine')|
+| field_r | Order of field (for BN128 field_r is "21888242871839275222246405745257275088548364400416034343698204186575808495617")|
+| group_q | Order of group (for BN128 group_1 is "21888242871839275222246405745257275088696311157297823662689037894645226208583")|
+| nPublic | Number of public variables (Number of public input + number of output)|
+| nVars | Number of wires in the circuit|
+| protocol | 'groth'|
+| vk_alfa_1 | Elliptic curve element alpha in G1|
+| vk_beta_2 | Elliptic curve element beta in G2|
+| vk_delta_2 | Elliptic curve element delta in G2|
+| vk_gamma_2 | Elliptic curve element gamma in G2|
+| vk_alfabeta_12 | Pairing e(alpha, beta)|
+| IC | Elliptic curve elements K[0:nInputs] in G1|
 
 
 ### Witness
@@ -751,26 +826,47 @@ Generated by [circom][]. Format is :
 
 |Field | Bit size | Description |
 |------|----------|-------------|
-|nWords|32 bit|  Number of witness input |
-|wSize|32 bit|  Size of witness in 32 bit words |
-|other|32 bit|  Empty |
-|witness_0|n bit| Witness 0 |
-|witness_1|n bit| Witness 1 |
-|...|n bit| ...|
-|witness_N-1|n bit| Witness N-1|
+| nWords | 32 bit |  Number of witness input |
+| wSize | 32 bit |  Size of witness in 32 bit words |
+| other | 32 bit |  Empty |
+| witness_0 | n bit | Witness 0 |
+| witness_1 | n bit | Witness 1 |
+| ... | n bit | ... |
+| witness_N-1 | n bit | Witness N-1|
 
 #### .dat
-Generated by [rust-circom][]. Format is :
+Generated by [circom2][]. Format is :
 
 |Field | Bit size | Description |
 |------|----------|-------------|
 |nWords|32 bit| Number of witness input |
 |wSize |32 bit| Size of witness in 32 bit words|
 | other |64 bit| Empty|
+| other |128 bit| Empty|
 | witness_0|n bit | Witness 0|
 | witness_1|n bit | Witness 1|
 | ...| n bit | ... |
 | witness_N-1[n bit] : Witness N-1 |
+
+### EC Tables
+OUtput from cusnarks Setup and consumed by cusnarks Prover.
+
+#### .bin
+Precomputed table binary file has the following format:
+
+|Field | Bit size | Description |
+|------|----------|-------------|
+|Order|32 bit| Table generation order. Tables will have 2^Order elements |
+|Offset T A|64 bit| Offset in 32 bit words of A Table 1 in file|
+|Offset T B2|64 bit| Offset in 32 bit words of B2 Table 1 in file|
+|Offset T B1|64 bit| Offset in 32 bit words of B1 Table 1 in file|
+|Offset T C|64 bit| Offset in 32 bit words  of C Table 1 in file|
+|Offset T hExps|64 bit| Offset in 32 bit words  of hExps Table 1 in file|
+|T1 A|Var| A Table  (from 0 to nVars) |
+|T1 B2|Var| B2 Table  (from 0 to nVars)|
+|T1 B1|Var| B1 Table 1 (from 0 to nVars)|
+|T1 C|Var| C Table 1 (from nPublic+1 to nVars)|
+|T1 hExps|Var| hhExps Table 1 (from 0 to domainSize-1)| 
 
 ### Proof
 Output from cusnarks Prover and consumed by verifier [snarkjs][]. 
@@ -780,10 +876,10 @@ JSON file contains the following keys:
 
 |Key | Description |
 |----|-------------|
-|pi_a|  Elliptic curve point in G1|
-|pi_b|  Elliptic curve point in G2|
-|pi_c|  Elliptic curve point in G1|
-|protocol| groth|
+| pi_a |  Elliptic curve point in G1|
+| pi_b |  Elliptic curve point in G2|
+| pi_c |  Elliptic curve point in G1|
+| protocol | groth|
 
 ### Public Data
 Public data 
@@ -796,14 +892,15 @@ Results are generated by the Prover. The format is  Python dictionary including 
 
 |Key | Description |
 |----|-------------|
-|Proof| Total proof time |
-|status | Result of proof verification. 0 -> Proof is incorrect. 1 -> Proof is correct, 2 -> No verification requested |
-|init| Prover initialization time list. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
-|read W| Time spent reading witness file. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
-|Mexp| Time spent computing multi-exponentiation in G1 and G2. First element in the list is the absolute time. Second element is the relative time with respect to the total |Eval| Time spent computing QAP from R1CS. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
-|H|Time spent computing H. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
+| Proof | Total proof time |
+| status | Result of proof verification. 0 -> Proof is incorrect. 1 -> Proof is correct, 2 -> No verification requested |
+| init | Prover initialization time list. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
+| read W | Time spent reading witness file. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
+| Mexp | Time spent cAomputing multi-exponentiation in G1 and G2. First element in the list is the absolute time. Second element is the relative time with respect to the total 
+| Eval | Time spent computing QAP from R1CS. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
+| H | Time spent computing H. First element in the list is the absolute time. Second element is the relative time with respect to the total proof time|
 
-Note that the sum of all the time spent in different submodules is less than the total proof time. This is because some
+**Note** : the sum of all the time spent in different submodules is less than the total proof time. This is because some
 things are done in parallel.
 
 
@@ -827,7 +924,7 @@ things are done in parallel.
 * **third_party_libs**\ : Exteral libraries used will be automatically downloaded here
    - *pcg-cpp*\  : implementation of PCG family of random number generators. Full details can be found at the [PCG-Random website].
    - *snarkjs*\  : snarkjs repository
-   - *rust-circom*\ : rust circom repository
+   - *za*\ : rust circom repository
 * **circuits**\   : Default location where circuits are processed by cusnarks.
    - *_SETUP*\    : Default location where Trusted setup files are copied.
    - *_PROOF*\    : Default location where Proof fils are copied.
@@ -851,8 +948,8 @@ After modifying *log.h* you will need to do a *make clean build* to recompile wi
 
 **NOTE:** if logging is disabled, logging function calls are not compiled and thus add no overhead.
 
-## Documentation
-The following a non-comprehensive list of interesting material:
+## References
+The following is a non-comprehensive list of interesting material:
 * [DIZK][] : Paper on distributed snarks
 * [Elliptic curve primer][] : elliptic curve crypto primer book
 * [snarkjs][]  : javascript implementation of zksnarks
@@ -870,7 +967,7 @@ Future direction of cusnarks will include:
 [dependencies]: #Requirements 
 [snarkjs]: https://www.github.com/iden3/snarkjs
 [circom]: https://www.github.com/iden3/circom
-[rust-circom]:https://www.github.com/adria0/rust-circom-experimental
+[circom2]:https://www.github.com/iden3/za
 [PCG-Random website]: http://www.pcg-random.org
 [unittest]: https://python.org/3/library/unittest.html
 [Architecture]: #Architecture
@@ -879,7 +976,7 @@ Future direction of cusnarks will include:
 [Using Cusnarks]: #Using-Cusnarks
 [Other Info]: #Other
 [File Formats]: ##File-Formats
-[r1cs]:https://hackmd.io/3epPqH4tSYqZbph2R9C5Mw 
+[r1cs]:https://github.com/iden3/circom/blob/c_build/doc/r1cs_bin_format.md
 [bn128]:https://github.com/ethereum/py_ecc/tree/master/py_ecc/bn128
 [Overview]: #Overview
 [Some Results]: #Some-Results
@@ -889,7 +986,7 @@ Future direction of cusnarks will include:
 [Example]: #Example
 [Cusnarks Options]: #Cusnarks-Options
 [Next Steps]: #Next-Steps
-[Documentation]: #Documentation
+[References]: #References
 [DIZK]: https://eprint.iacr.org/2018/691.pdf 
 [Elliptic curve primer]: http://tomlr.free.fr/Math%E9matiques/Math%20Complete/Cryptography/Guide%20to%20Elliptic%20Curve%20Cryptography%20-%20D.%20Hankerson,%20A.%20Menezes,%20S.%20Vanstone.pdf 
 [bellman]: https://github.com/zkcrypto/bellman

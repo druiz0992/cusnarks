@@ -35,6 +35,7 @@
 #define _TYPES_H_
 
 #define NWORDS_256BIT           (8)
+#define NBITS_254BIT           (254)
 #define NWORDS_256BIT_SHIFT     (3)
 #define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
 #define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
@@ -45,8 +46,15 @@
 #define MAX_R1CSPOLY_NWORDS  (10000000)
 #define MAX_R1CSPOLYTMP_NWORDS  (100000)
 
+#define TRANSPOSE_BLOCK_SIZE  (32)
+#define MAX_U256_BSELM  (12)
+#define DEFAULT_U256_BSELM  (6)
+#define DEFAULT_U256_BSELM_CUDA  (8)
+#define MAX_PIPPENGERS_CONF (20)
+#define DEFAULT_PIPPENGERS_CONF (0)
 #define NBITS_BYTE (8)
-#define EC_JACREDUCE_BATCH_SIZE (1<<5)
+#define EC_JACREDUCE_TABLE_LEN (256)
+#define EC_JACREDUCE_BATCH_SIZE (5)
 #define EC_JACREDUCE_FLAGS_INIT   (1)
 #define EC_JACREDUCE_FLAGS_FINISH (1<<1)
 #define EC_JACREDUCE_FLAGS_REDUCTION (1<<2)
@@ -54,6 +62,12 @@
 #define R1CS_HDR_MAGIC_NUMBER  (0x73633172)
 #define R1CS_HDR_V01           (1)
 #define R1CS_HDR_START_OFFSET_NWORDS (8)
+
+#define R1CS_SECTION_LEN_NBYTES (12)
+#define R1CS_HDR_SECTION_TYPE (1)
+#define R1CS_HDR_START_HDR_NBYTES (12)
+#define R1CS_HDR_FIELDDEFSIZE_OFFSET_NBYTES (R1CS_HDR_START_HDR_NBYTES + R1CS_SECTION_LEN_NBYTES)
+#define R1CS_CONST_START_OFFSET_NWORDS (R1CS_HDR_START_HDR_NBYTES/4)
 
 #define WITNESS_HEADER_N_OFFSET_NWORDS (0)
 #define WITNESS_HEADER_SIZE_OFFSET_NWORDS (2)
@@ -66,7 +80,8 @@
 
 #define WITNESS_HEADER_LEN_NWORDS (WITNESS_HEADER_W_OFFSET_NWORDS)
 
-#define U256_BSELM  (8)
+#define ECTABLE_DATA_OFFSET_WORDS (13) 
+
 #define WARP_SIZE  (32)
 #define WARP_HALF_SIZE (16)
 #define WARP_DOUBLE_SIZE_NBITS (6)
@@ -114,14 +129,32 @@
 #define ECBN128_BLOCK_DIM          (256)
 
 #define N_STREAMS_PER_GPU (1+4)
-#define MAX_NCORES_OMP        (32)
+
+#define SHMEM_WITNESS_KEY (123456)
 
 typedef unsigned int uint32_t;
 typedef int int32_t;
 typedef unsigned long long int t_uint64;
+typedef long long int t_int64;
 
 typedef unsigned int uint256_t[NWORDS_256BIT];
 typedef unsigned int uint512_t[2*NWORDS_256BIT];
+
+typedef void (*t_subm) (uint32_t *, const uint32_t *, const uint32_t *);
+typedef void (*t_addm) (uint32_t *, const uint32_t *, const uint32_t *);
+typedef void (*t_mulm) (uint32_t *, const uint32_t *, const uint32_t *);
+typedef void (*t_sqm)  (uint32_t *, const uint32_t *);
+typedef void (*t_tomont)  (uint32_t *, const uint32_t *);
+typedef void (*t_frommont)  (uint32_t *, const uint32_t *);
+typedef void (t_ntt) (uint32_t *, const uint32_t *roots, uint32_t, t_uint64, t_uint64, int32_t);
+
+typedef struct{
+  t_subm subm_cb;
+  t_addm addm_cb;
+  t_mulm mulm_cb;
+  t_sqm  sqm_cb;
+
+}t_ff;
 
 // prime number info for finite fields
 typedef struct {
@@ -225,6 +258,14 @@ typedef enum {
 }fmt_t;
 
 
+typedef enum{
+  SHMEM_T_WITNESS_32M = 0,
+  SHMEM_T_WITNESS_64M,
+  SHMEM_T_WITNESS_128M,
+
+  SHMEM_T_N
+}shmem_t;
+
 
 // data vector
 typedef struct{
@@ -297,6 +338,9 @@ typedef enum{
    CB_U256_ADDM_REDUCE_SHFL,
    CB_U256_SHR1,
    CB_U256_SHL1,
+   CB_U256_SHL,
+   CB_U256_ALMINV,
+   CB_U256_MULM2,
    CB_U256_N
 
 }u256_callback_t;
@@ -315,6 +359,9 @@ typedef enum{
    CB_EC_JAC_MUL1,
    CB_EC_JAC_MAD,
    CB_EC_JAC_MAD_SHFL,
+   CB_EC_JAC_MUL_OPT,
+   CB_EC_JAC_RED,
+   CB_EC_JAC_MUL_PRECOMP,
    CB_EC_N
 
 }ec_callback_t;
@@ -329,6 +376,8 @@ typedef enum{
    CB_EC2_JAC_MUL1,
    CB_EC2_JAC_MAD,
    CB_EC2_JAC_MAD_SHFL,
+   CB_EC2_JAC_MUL_OPT,
+   CB_EC2_JAC_RED,
    CB_EC2_N
 
 }ec2_callback_t;
@@ -501,13 +550,44 @@ typedef struct{
   uint32_t *scl;
   uint32_t *x;
   uint32_t n;
+  uint32_t ec2;
+  uint32_t compute_table;
+  uint32_t *ec_table;
   uint32_t pidx;
   uint32_t max_threads;
   uint32_t start_idx;
   uint32_t last_idx;
   uint32_t thread_id;
+  uint32_t pippen;
+  t_uint64 offset;
+  t_uint64 total_words;
+  uint32_t order;
+  char *filename;
 
 }jacadd_reduced_t;
+
+typedef struct{
+  char *filename;
+  t_uint64 offset;
+  t_uint64 total_words;
+  uint32_t *ec_table;
+  uint32_t *indata;
+  uint32_t pidx;
+  uint32_t order;
+  uint32_t ec2;
+
+}ec_table_desc_t;
+
+typedef struct{
+  uint32_t table_order;
+  t_uint64 woffset_A;
+  t_uint64 woffset_B2;
+  t_uint64 woffset_B1;
+  t_uint64 woffset_C;
+  t_uint64 woffset_hExps;
+  t_uint64 nwords_tdata;
+
+}ec_table_offset_t;
 
 typedef enum{
   KERNEL_T_ZPOLY = 0,
@@ -520,16 +600,20 @@ typedef enum{
 typedef struct {
   uint32_t magic_number;
   uint32_t version;
+  uint32_t nsections;
   uint32_t word_width_bytes;
   uint32_t nVars;
   uint32_t nPubOutputs;
   uint32_t nPubInputs;
   uint32_t nPrivInputs;
+  t_uint64 nLabels;
   uint32_t nConstraints;
 
   uint32_t R1CSA_nCoeff;
   uint32_t R1CSB_nCoeff;
   uint32_t R1CSC_nCoeff;
+  uint32_t constraintOffset;
+  t_int64  constraintLen;
 
 }r1csv1_t;
 
@@ -540,4 +624,22 @@ typedef enum{
   R1CS_N_IDX = 3
 
 }r1cs_idx_t;
+
+typedef enum{
+   R1CS_SECTION_HDR = 1,
+   R1CS_SECTION_CONSTRAINT = 2,
+   R1CS_SECTION_WIRE2LABELID = 3
+
+}r1cs_section_t;
+
+typedef enum{
+  ECP_T_A = 0,
+  ECP_T_B2,
+  ECP_T_B1,
+  ECP_T_C,
+  ECP_T_HEXPS,
+
+  ECP_T_N
+}ecp_t;
+
 #endif

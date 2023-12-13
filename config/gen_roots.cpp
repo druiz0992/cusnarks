@@ -36,19 +36,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cmath>
+
 #include "types.h"
-#include "constants.h"
-#include "utils_host.h"
+#include "file_utils.h"
+#include "ntt.h"
 
-
-static char roots_1M_filename[]="../data/zpoly_roots_1M.bin";
 
 void test_gen_roots(uint32_t nbits, char *filename)
 {
   uint32_t nsamples = (1<<nbits) * NWORDS_256BIT;
   uint32_t *roots = (uint32_t *)malloc( nsamples * sizeof(uint32_t));
 
-  field_roots_compute_h(roots,nbits);
+  computeRoots_h(roots,nbits);
 
   writeU256DataFile_h(roots, filename, nsamples);
 }

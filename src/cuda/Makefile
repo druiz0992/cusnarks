@@ -20,18 +20,27 @@ CUSNARKS_LIB=$(CUSNARKS_LIB)
 CUBIN_NAME=$(CUBIN_NAME)
 AUX_INCLUDES=$(AUX_INCLUDES)
 DEFINES=$(DEFINES)
+DEFINES_DEBUG=$(DEFINES_DEBUG)
 
 LOG_LEVEL=$(LOG_LEVEL)
 
 NVCC = nvcc
 CC  = g++
+ASM = nasm
 GENCODE_ARCH_COMPUTE=-gencode arch=compute_61,code=sm_61
-#CFLAGS=-c -g -O0 -DLINUXINTEL64  -DTEST_MODE -std=c++11 -I $(INCLUDE_PATH) -w
-CFLAGS=-c -O3 -DLINUXINTEL64  $(DEFINES) -std=c++11 -I $(INCLUDE_PATH) -w
+DEBUG=0
+ADX_SUPPORT=$(shell cat /proc/cpuinfo | grep -m1 -oP 'adx')
+ifeq ($(DEBUG),1)
+  CFLAGS=-c -g -DLINUXINTEL64  -DTEST_MODE $(DEFINES_DEBUG) -std=c++11 -I $(INCLUDE_PATH) -w
+  CUFLAGS=-rdc=true -G -O3 --source-in-ptx -keep --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v -Xptxas -maxrregcount=120 --cudart shared $(GENCODE_ARCH_COMPUTE)
+else
+  CFLAGS=-c -O3 -DLINUXINTEL64 -lineinfo $(DEFINES) -std=c++11 -I $(INCLUDE_PATH) -w
+  CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -Xptxas -v -Xptxas -maxrregcount=120 --cudart shared $(GENCODE_ARCH_COMPUTE)
+endif
+
+ASMFLAGS=-f elf64
 EXTRA_CFLAGS=-I $(AUX_INCLUDES)
-#EXTRA_CFLAGS2=-mbmi2 -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
 EXTRA_CFLAGS2=-march=native -fopenmp -I $(AUX_INCLUDES) -shared -fPIC
-CUFLAGS=-rdc=true --compiler-options '-fPIC -Wall -Wno-unused-but-set-variable -Wno-comment' -lineinfo -Xptxas -v --cudart shared $(GENCODE_ARCH_COMPUTE)
 CUBINFLAGS=-std=c++11 -cubin -dlink $(GENCODE_ARCH_COMPUTE) 
 LINKFLAGS= -arch=sm_61 --shared -o 
 LINKFLAGS2=--shared -o 
@@ -57,7 +66,24 @@ CUSRC = cusnarks_kernel.cu \
 CSRC = rng.cpp \
        utils_host.cpp \
        constants.cpp \
-       log.cpp
+       log.cpp \
+       bigint.cpp \
+       ff.cpp \
+       ntt.cpp \
+       ec.cpp \
+       file_utils.cpp \
+       mpoly.cpp \
+       transpose.cpp \
+       inplace_transpose_data.cpp \
+       init.cpp
+
+ifeq ($(ADX_SUPPORT),adx)
+CASMSRC = fr_adx.casm \
+          fq_adx.casm
+else
+CASMSRC = fr.casm \
+          fq.casm
+endif
 
 #Check if CUDA tools are installed.
 CUDA_INSTALLED = $(shell which $(NVCC))
@@ -68,14 +94,16 @@ CUOBJ_FILE:=$(CUBIN_NAME:.cubin=.cuobj)
 
 
 ifeq ($(CUDA_INSTALLED),)
-OBJ= $(CSRC:.cpp=.o)
+OBJ= $(CSRC:.cpp=.o) \
+     $(CASMSRC:.casm=.o)
 else
 OBJ=$(CUSRC:.cu=.o) \
-    $(CSRC:.cpp=.o) 
+    $(CSRC:.cpp=.o) \
+    $(CASMSRC:.casm=.o)
 endif
 
 clean:
-	rm -f *.o *.cubin *.asm *.cuobj
+	rm -f *.o *.cubin *.asm *.cuobj *.cpp1.ii *.cpp4.ii *.cudafe1.* *.fatbin* *.module_id *.ptx
 	echo "CUDA_INSTALLED : $(CUDA_INSTALLED)"
 	echo "CSRC : $(CSRC)"
 	echo "CUSRC : $(CUSRC)"
@@ -111,3 +139,7 @@ endif
 
 %.o : %.cpp
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS2) $*.cpp -o $*.o	
+
+%.o : %.casm
+	$(ASM) $(ASMFLAGS) $*.casm -o $*.o	
+
