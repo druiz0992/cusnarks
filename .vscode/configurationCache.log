@@ -1,0 +1,1 @@
+{"buildTargets":["all","build","clean","clean_docker","clib","config","config_docker","cubin","debug_gpu","docker_all","force_all","reduced_third_party_libs","test","test_system","test_unit","third_party_libs","third_party_libs_clean"],"launchTargets":[],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":[]},"fileIndex":[]}}

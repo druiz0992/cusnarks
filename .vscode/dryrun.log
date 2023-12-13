@@ -1,0 +1,27 @@
+make --dry-run --keep-going --print-directory
+make: Entering directory '/home/david/iden3/cusnarks'
+ 
+if ! test -d /home/david/iden3/cusnarks/lib; \
+	then mkdir /home/david/iden3/cusnarks/lib; fi
+ 
+for i in /home/david/iden3/cusnarks/src/cuda /home/david/iden3/cusnarks/src/cython ; do \
+	echo "make build in $i..."; \
+	(cd $i; make -knw 'CUSNARKS_PATH=/home/david/iden3/cusnarks' 'INCLUDE_PATH=/home/david/iden3/cusnarks/src/cuda' 'OBJECT_PATH=/home/david/iden3/cusnarks/build' 'LIB_PATH=/home/david/iden3/cusnarks/lib' 'CTSRC_PATH=/home/david/iden3/cusnarks/src/cython' 'PYSRC_PATH=/home/david/iden3/cusnarks/src/python' 'PYTST_PATH=/home/david/iden3/cusnarks/test/python' 'CUSRC_PATH=/home/david/iden3/cusnarks/src/cuda' 'CTEST_PATH=/home/david/iden3/cusnarks/test/c' 'CUSNARKS_LIB=libcusnarks.so' 'CUBIN_NAME=cusnarks.cubin' 'AUX_INCLUDES=/home/david/iden3/cusnarks/third_party_libs/pcg-cpp/include' 'DEFINES=-DPARALLEL_EN  -DCU_ASM  -D_CASM  ' 'DEFINES_DEBUG=-DPARALLEL_EN -DCU_ASM -D_CASM  ' 'FORCE_CPU='   build); done
+ 
+make build in /home/david/iden3/cusnarks/src/cuda...
+ 
+make[1]: Entering directory '/home/david/iden3/cusnarks/src/cuda'
+ 
+g++ --shared -o  /home/david/iden3/cusnarks/lib/libcusnarks.so rng.o utils_host.o constants.o log.o bigint.o ff.o ntt.o ec.o file_utils.o mpoly.o transpose.o inplace_transpose_data.o init.o fr.o fp.o -lm -lgomp
+make[1]: Leaving directory '/home/david/iden3/cusnarks/src/cuda'
+ 
+make build in /home/david/iden3/cusnarks/src/cython...
+ 
+make[1]: Entering directory '/home/david/iden3/cusnarks/src/cython'
+ 
+python3 setup.py build -b /home/david/iden3/cusnarks/build build_ext -b /home/david/iden3/cusnarks/lib --library-dirs=/home/david/iden3/cusnarks/lib
+ 
+make[1]: Leaving directory '/home/david/iden3/cusnarks/src/cython'
+ 
+make: Leaving directory '/home/david/iden3/cusnarks'
+ 
