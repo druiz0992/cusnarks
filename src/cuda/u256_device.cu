@@ -80,46 +80,6 @@ __global__ void addmu256_kernel(uint32_t *out_vector, uint32_t *in_vector, kerne
     Modular addition + reduction kernel 
       In : x[N]   
       Out :z[N/(blockDim * stride)] 
-      Ex:
-         N        = 512
-         stride   = 4
-         BlockDim = 128
-         Grid     = 1
-         
-         in sample    : x[0] x[1] x[2] x[3] ......................................................................................................... x[511]     
-         thread       |    0           |   1            |...|      8         |...|     16         |...|     32         |...|     64         |...|       127       |
-                      --------------------------------------------------------------------------------------------------------------------------------------------
-         1)           |    Z[0]        |   Z[1]         |   |     Z[8]       |   |    Z[16]       |   |    Z[32]       |   |    Z[64]       |   |      Z[127]     |
-                      -----------------------------------------------------------------------------------------------------------------------------------------
-                      | x[0]+x[1]      | x[4]+x[5]+     |...| x[32]+x[33]+   |...| x[64]+x[65]+   |...| x[128]+x[129]+ |...| x[256]+x[257]+ |...|  x[508]+x[509]+ |
-                      | x[2]+x[3]      | x[6]+x[7]      |...| x[34]+x[35]    |...| x[66]+x[67]    |...| x[130]+x[131]  |...| x[258]+x[259]  |...|  x[510]+x[511]  |  
-                      |                |                |...|                |...|                |...|                |...|                |...|                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         2)           | Z[64k]         |  Z[64k+1]      |...| Z[64k+8]       |...| Z[64k+16]      |...| Z[64k+32]      |...|  ->Z[0]        |   |   -> Z[63]      |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-                      | x[0]+x[1]+     | x[4]+x[5]+     |...| x[32]+x[33]+   |...| x[64]+x[65]+   |...| x[128]+x[129]+ |...|                |...|                 |
-                      | x[2]+x[3]+     | x[6]+x[7]+     |...| x[34]+x[35]+   |...| x[66]+x[67]+   |...| x[130]+x[131]+ |...|  ..........    |...| ..........      |
-                      | x[256]+x[257]+ | x[260]+x[261]+ |...| x[288]+x[289]+ |...| x[320]+x[321]+ |...| x[384]+x[385]+ |...|                |...|                 |
-                      | x[258]+x[259]  | x[262]+x[263]  |...| x[290]+x[291]  |...| x[322]+x[323]  |...| x[386]+x[387]+ |...|                |...|                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         3)           | Z[32k]         |  Z[32k+1]      |...| Z[32k+8]       |...| Z[32k+16]      |...|  ->Z[0]        |...|                |   |                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         4)           | Z[16k]         |  Z[16k+1]      |...| Z[16k+8]       |...|    -> Z[0]     |...|                |...|                |   |                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         5)           | Z[8k]          |  Z[8k+1]       |...|  ->Z[0]        |...| .........      |...|                |...|                |   |                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         6)           | Z[4k]          |  Z[4k+1]       |...| ..........     |...| .........      |...|                |...|                |   |                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         7)           | Z[2k]          |  Z[2k+1]       |...| ..........     |...| .........      |...|                |...|                |   |                 |
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-                      ---------------------------------------------------------------------------------------------------------------------------------------------
-         8)           | Z[k]           |  -> Z[0]       |...|                |...|                |...|                |...|                |...|                 |
-
-
 */
 __global__ void addmu256_reduce_kernel(uint32_t *out_vector, uint32_t *in_vector, kernel_params_t *params)
 {
@@ -628,8 +588,9 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
 
 #else
 
-     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
-     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+     uint32_t const __restrict__ *P_u256 = &N_ct[ModOffset_ct[midx]];
+     uint32_t const __restrict__ *PN_u256 = &NPrime_ct[ModOffset_ct[midx]];
+
 
      asm(ASM_MULG2_INIT
          ASM_MONTMULU256(tmulx,ax,bx)  
@@ -657,24 +618,6 @@ __device__ void mulmontu256_2(uint32_t __restrict__ *U, const uint32_t __restric
 */
 __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, mod_t midx)
 {
-#if 0
-    int tid = threadIdx.x + blockDim.x * blockIdx.x;
-    uint32_t const __restrict__ *nonres = mod_info_ct[midx].nonres;
-    uint32_t tmp1[NWORDS_256BIT],tmp2[NWORDS_256BIT],tmp3[NWORDS_256BIT];
-
-    /*
-    logInfoBigNumberTid(1,"X[0]:\n",(uint32_t *)A);
-    logInfoBigNumberTid(1,"X[1]:\n",(uint32_t *)&A[NWORDS_256BIT]);
-    */
-
-    mulmontu256(tmp1, A,&A[NWORDS_256BIT], midx);             // Z[1] = 2 * X[0] * X[1]
-
-    sqmontu256(tmp2, A, midx);
-    sqmontu256(tmp3, &A[NWORDS_256BIT], midx);
-
-    addmu256(&U[NWORDS_256BIT],tmp1,tmp1,midx);
-    submu256(U,tmp2, tmp3,midx);                                 // Z[0] = X[0] * X[0] - (X[1] * X[1])
-#else
 #ifndef CU_ASM
     uint32_t tmulx[NWORDS_256BIT],tmuly[NWORDS_256BIT],tmulz[NWORDS_256BIT];
 
@@ -689,17 +632,17 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
 
 #else
 
-#if 0
+  #if 0
      t_uint64 const __restrict__ *dP_u256 = (t_uint64 *)mod_info_ct[midx].p;
      t_uint64 const *dA = (t_uint64 *)A;
      t_uint64 const *dB = (t_uint64 *)A;
      t_uint64 const *dU = (t_uint64 *)U;
-#else
-     uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+  #else
+     uint32_t const __restrict__ *P_u256 = &N_ct[ModOffset_ct[midx]];
      uint32_t const *B = A;
-#endif
-     uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-
+  #endif
+     uint32_t const __restrict__ *PN_u256 = &NPrime_ct[ModOffset_ct[midx]];
+  
      asm(ASM_MULG2_INIT
          ASM_MONTMULU256(tmulx,ax,bx)  
          ASM_MODU256(tmulx)
@@ -712,7 +655,6 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
          ASM_MODU256(ry)
          ASM_SUBMU256(ry, ry, tmulx)
          ASM_MULG2_PACK);
-#endif
 #endif
     
 }
@@ -737,19 +679,17 @@ __device__ void sqmontu256_2(uint32_t __restrict__ *U, const uint32_t __restrict
 __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__ *A, const uint32_t __restrict__ *B, mod_t midx)
 { 
     //logInfoBigNumberTid(1,"B\n",(uint32_t *)B);
-    uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
+    uint32_t const __restrict__ *PN_u256 = &NPrime_ct[ModOffset_ct[midx]];
 
 #ifndef CU_ASM
     uint32_t i;
     uint32_t S, C=0, C1, C2,C3;
     uint32_t __restrict__ M, X[2];
     uint32_t __restrict__ __align__(16) T[]={0,0,0,0,0,0,0,0,0,0};
-    uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+    uint32_t const __restrict__ *P_u256 = &N_ct[ModOffset_ct[midx]];
 
     //logInfoBigNumberTid(1,"A\n",(uint32_t *)A);
 
-    //movu256(Ar,(uint32_t *)A);
-    //movu256(Br,(uint32_t *)B);
 
     int tid = threadIdx.x + blockDim.x * blockIdx.x;
     #pragma unroll
@@ -757,24 +697,15 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
     {
       // (C,S) = t[0] + a[0]*b[i], worst case 2 words
       madcu32(&C,&S,A[0],B[i],T[0]);
-      //logInfoTid("0 - C:%u\n",C);
-      //logInfoTid("0 - S:%u\n",S);
 
-      // ADD(t[1],C)
-      //propcu32(T, C, 1);
       addcu32(&C3, &T[1], T[1], C);
-      //logInfoTid("C3: %u\n",C3);
-      //logInfoBigNumberTid(1,"T\n",T);
 
       // m = S*n'[0] mod W, where W=2^32
       // Note: X[Upper,Lower] = S*n'[0], m=X[Lower]
       mulu32lo(&M, S, PN_u256[0]);
-      //logInfoTid("M[0]: %u\n", M);
 
       // (C,S) = S + m*n[0], worst case 2 words
       madcu32(&C,&S,M,P_u256[0],S);
-      //logInfoTid("1 - C: %u\n",C );
-      //logInfoTid("1 - S: %u\n", S);
   
       // FIRST IT
       // (C,S) = t[j] + a[j]*b[i] + C, worst case 2 words
@@ -784,8 +715,6 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
       addcu32(&X[0], &C, C1, X[1]);
       addcu32(&C1, &C, C, C2);
 
-      // ADD(t[2],C)
-      //C +=C3;
       addcu32(&C2, &C, C, C3);
       C1 +=C2;
       addcu32(&C2, &T[2], T[2], C);
@@ -802,8 +731,6 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
       addcu32(&X[0], &C, C1, X[1]);
       addcu32(&C1, &C, C, C2);
  
-      // ADD(t[j+1],C)
-      //C +=C3;
       addcu32(&C2, &C, C, C3);
       C1 +=C2;
       addcu32(&C2, &T[3], T[3], C);
@@ -820,8 +747,6 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
       addcu32(&X[0], &C, C1, X[1]);
       addcu32(&C1, &C, C, C2);
 
-      // ADD(t[j+1],C)
-      //C +=C3;
       addcu32(&C2, &C, C, C3);
       C1 +=C2;
       addcu32(&C2, &T[4], T[4], C);
@@ -902,7 +827,6 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
       // (C,S) = S + m*n[j]
       madcu32(&C,&T[6],M, P_u256[7],S);
 
-      //propcu32_extend(T,C3);
       // (C,S) = t[s] + C
       addcu32(&C,&T[7], T[NWORDS_256BIT], C);
       //logInfoTid("6 - C: %u\n",C );
@@ -922,11 +846,11 @@ __device__ void mulmontu256(uint32_t __restrict__ *U, const uint32_t __restrict_
    }
 
 #else
+ 
  t_uint64 *dA = (t_uint64 *) A;
  t_uint64 *dB = (t_uint64 *) B;
  t_uint64 *dU = (t_uint64 *) U;
- t_uint64 const __restrict__ *dP_u256 = (t_uint64 *) mod_info_ct[midx].p;
- //t_uint64 const __restrict__ *dPN_u256 = (t_uint64 *) mod_info_ct[midx].p_;
+ t_uint64 const __restrict__ *dP_u256 = &N64_ct[ModOffset_ct[midx]];
 
  asm(ASM_MUL_INIT_64 
      ASM_MONTMULU256(r,a,b)
@@ -952,11 +876,11 @@ __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__
    mulmontu256(U,A,A,midx);
 #else
 
- t_uint64 *dA = (t_uint64 *) A;
- t_uint64 *dB = (t_uint64 *) A;
- t_uint64 *dU = (t_uint64 *) U;
- t_uint64 const __restrict__ *dP_u256 = (t_uint64 *) mod_info_ct[midx].p;
- uint32_t const __restrict__ *PN_u256 =  mod_info_ct[midx].p_;
+ t_uint64  *dA = (t_uint64 *) A;
+ t_uint64  *dB = (t_uint64 *) A;
+ t_uint64  *dU = (t_uint64 *) U;
+ t_uint64 const __restrict__ *dP_u256 =  &N64_ct[ModOffset_ct[midx]];
+ uint32_t const __restrict__ *PN_u256 =  &NPrime_ct[ModOffset_ct[midx]];
 
 #if 1
  asm(ASM_MONTSQ_INIT_64 
@@ -975,7 +899,7 @@ __device__ void sqmontu256(uint32_t __restrict__ *U, const uint32_t __restrict__
 
 __device__ uint32_t almmontinvu256(uint32_t __restrict__ *y, const uint32_t __restrict__ *x, mod_t midx)
 {
-  const uint32_t __restrict__ *P = mod_info_ct[midx].p;
+  const uint32_t __restrict__ *P = &N_ct[ModOffset_ct[midx]];
 
   uint32_t u[NWORDS_256BIT], v[NWORDS_256BIT];
   uint32_t s[] = {1,0,0,0,0,0,0,0};
@@ -1079,8 +1003,8 @@ __device__ uint32_t invmontu256(uint32_t __restrict__ *y, const uint32_t __restr
    uint32_t t_idx;
 
    const uint32_t *R[2];
-   R[0] = mod_info_ct[midx].r2;
-   R[1] = mod_info_ct[midx].r2modp;
+   R[0] = &R2_ct[ModOffset_ct[midx]];
+   R[1] = &R2rdc_ct[ModOffset_ct[midx]];
    uint32_t shift[2];
 
    k = almmontinvu256(y, x, midx);
@@ -1122,7 +1046,7 @@ __device__ void div2u256(uint32_t __restrict__ *z, const uint32_t __restrict__ *
    */
 __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx)
 {
-   const uint32_t __restrict__ *p = mod_info_ct[midx].p;
+   const uint32_t __restrict__ *p = &N_ct[ModOffset_ct[midx]];
 
    movu256(z,(uint32_t *)x);
 
@@ -1166,7 +1090,7 @@ __device__ void modu256(uint32_t __restrict__ *z, const uint32_t __restrict__ *x
    */
 __device__ void modu255(uint32_t __restrict__ *z, const uint32_t __restrict__ *x, mod_t midx)
 {
-   const uint32_t __restrict__ *p = mod_info_ct[midx].p;
+   const uint32_t __restrict__ *p = &N_ct[ModOffset_ct[midx]];
 
    #if 1
    movu256(z,(uint32_t *)x);

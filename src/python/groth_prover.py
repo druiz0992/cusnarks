@@ -159,7 +159,6 @@ class GrothProver(object):
                                  self.n_gpu,
                                  len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
                               )
-
         if self.n_gpu == 0 :
           self.logger.info('No available GPUs')
           self.compute_ntt_gpu = False
@@ -198,9 +197,9 @@ class GrothProver(object):
         # Initialize Field 
         ZField.add_field(self.curve_data['prime_r'],self.curve_data['factor_data'])
         ECC.init(self.curve_data)
-        ZPoly.init(MOD_FIELD)
+        ZPoly.init(MOD_FR)
 
-        ZField.set_field(MOD_GROUP)
+        ZField.set_field(MOD_FP)
 
         self.pk = getPK()
         self.verify = 2
@@ -212,7 +211,7 @@ class GrothProver(object):
         self.snarkjs = snarkjs
         self.verify_en = None
 
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         self.t_GP = {}
 
         init_h()
@@ -317,6 +316,9 @@ class GrothProver(object):
                 np.frombuffer(
                         self.roots_rdc_u256_sh,
                         dtype=np.uint32).reshape(( (1<< nroots) + (1 << nroots2) + (1 << nroots3), NWORDS_256BIT))
+          if nroots > self.n_bits_roots:
+               print("Insufficient precomputed roots... Aborting")
+               sys.exit(1)
           np.copyto(
                 self.roots_rdc_u256[:1<<nroots],
                 readU256DataFile_h(
@@ -589,9 +591,9 @@ class GrothProver(object):
         pB = np.reshape(pk_bin[3][:m*NWORDS_256BIT],(m,NWORDS_256BIT))
 
         self.logger.info(' Process server - Evaluating Poly A...')
-        np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FIELD))
+        np.copyto(pA_T,self.evalPoly(w[:wnElems], pA, nVars, m, MOD_FR))
         self.logger.info(' Process server - Evaluating Poly B...')
-        np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FIELD))
+        np.copyto(pB_T,self.evalPoly(w[:wnElems], pB, nVars, m, MOD_FR))
         self.logger.info(' Process server - Completed Evaluating Poly B...')
         end = time.time()
 
@@ -607,7 +609,7 @@ class GrothProver(object):
                     -1
                                ),
                      2,
-                     MOD_FIELD)
+                     MOD_FR)
 
         end1 = time.time()
 
@@ -640,10 +642,11 @@ class GrothProver(object):
                             total_words,
                             self.grouping,
                             0,
-                            MOD_GROUP, 1, 1, 1,
+                            MOD_FP, 1, 1, 1,
                             self.pippen_conf))
 
           self.logger.info(' Process server - Mexp A Done... ')
+
           if not self.read_table_en or self.ec_table['woffset_B2'] == self.ec_table['woffset_B1']:
              ep_vector = pk_bin2[1][:(nVars+2)*NWORDS_256BIT*ECP2_JAC_INDIMS]
           else :
@@ -665,7 +668,7 @@ class GrothProver(object):
                             total_words,
                             self.grouping,
                             1,
-                            MOD_GROUP, 1, 1, 1, self.pippen_conf)
+                            MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
           self.logger.info(' Process server - Mexp B2 Done...')
 
@@ -687,7 +690,7 @@ class GrothProver(object):
                             total_words,
                             self.grouping,
                             0,
-                            MOD_GROUP, 1, 1, 1, self.pippen_conf)
+                            MOD_FP, 1, 1, 1, self.pippen_conf)
                     )
 
           self.logger.info(' Process server - Mexp C Done...')
@@ -716,7 +719,7 @@ class GrothProver(object):
                               total_words,
                               self.grouping,
                               0,
-                              MOD_GROUP, 1, 1, 1, 
+                              MOD_FP, 1, 1, 1, 
                               self.pippen_conf)
                     )
 
@@ -762,7 +765,7 @@ class GrothProver(object):
                          total_words,
                          self.grouping,
                          0,
-                         MOD_GROUP, 1, 1, 1, self.pippen_conf)
+                         MOD_FP, 1, 1, 1, self.pippen_conf)
                      )
           self.logger.info(' Process server - hExps Mexp common part completed ...')
 
@@ -1175,7 +1178,7 @@ class GrothProver(object):
         elif p_r:
           self.logger.info("Verification keys are different")
         elif pd_r:
-          self.logger.info("Proving keys are different")
+          self.logger.info("oroving keys are different")
         else:
           self.logger.info("Verification and Proving keys are different")
 
@@ -1268,12 +1271,12 @@ class GrothProver(object):
                 self.s_scl,
                 np.asarray([0,0,0,0,0,0,0,0],dtype=np.uint32) )
 
-        r_mont = to_montgomeryN_h(np.reshape(self.r_scl, -1), MOD_FIELD)
+        r_mont = to_montgomeryN_h(np.reshape(self.r_scl, -1), MOD_FR)
         np.copyto(
                  self.neg_rs_scl,
                   montmult_neg_h(
                              np.reshape(r_mont, -1),
-                             np.reshape(self.s_scl, -1), MOD_FIELD))
+                             np.reshape(self.s_scl, -1), MOD_FR))
 
         self.logger.info('#################################### ')
         self.logger.info(' Random numbers :')
@@ -1450,7 +1453,7 @@ class GrothProver(object):
                             0,
                             2,
                             0,
-                            MOD_GROUP, 1, 1, 1, self.pippen_conf))
+                            MOD_FP, 1, 1, 1, self.pippen_conf))
 
            self.logger.info(' Process server - hExps Mexp ZK part completed ...')
            if self.p_CPU is not None:
@@ -1471,7 +1474,7 @@ class GrothProver(object):
                        self.pi_a_eccf1,
                        ec_jacaddreduce_h(
                                        np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_A_idx],-1)),-1),
-                                       MOD_GROUP,
+                                       MOD_FP,
                                        1,   # to affine
                                        1,   # Add z coordinate to inout
                                        1)   # strip z coordinate from affine result
@@ -1481,7 +1484,7 @@ class GrothProver(object):
                       self.pi_b_eccf2,
                       ec2_jacaddreduce_h(
                                       np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_B2_idx],-1)),-1),
-                                      MOD_GROUP,
+                                      MOD_FP,
                                       1,   # to affine
                                       1,   # Add z coordinate to inout
                                       1)   # strip z coordinate from affine result
@@ -1491,7 +1494,7 @@ class GrothProver(object):
                       self.pi_b1_eccf1,
                       ec_jacaddreduce_h(
                                     np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_B1_idx],-1)),-1),
-                                    MOD_GROUP,
+                                    MOD_FP,
                                     1,   # to affine
                                     1,   # Add z coordinate to inout
                                     1)   # strip z coordinate from affine result
@@ -1501,21 +1504,21 @@ class GrothProver(object):
                       self.pi_c_eccf1,
                       ec_jacaddreduce_h(
                                       np.reshape(np.concatenate(np.reshape(self.init_ec_val[:,:,EC_C_idx],-1)),-1),
-                                      MOD_GROUP,
+                                      MOD_FP,
                                       1,   # to affine
                                       1,   # Add z coordinate to inout
                                       1)   # strip z coordinate from affine result
                                    )
 
     def compute_proof_ecp(self, pyCuOjb, ecbn128_samples, ec2, shamir_en=0, gpu_id=0, stream_id=0):
-            ZField.set_field(MOD_GROUP)
+            ZField.set_field(MOD_FP)
             #TODO : remove in_v
             #print(ecbn128_samples.shape, ec2, shamir_en, gpu_id, stream_id)
-            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_GROUP, ec2, shamir_en, gpu_id, stream_id,True, grouping=self.grouping_cuda)
+            in_v, ecp,t = ec_mad_cuda2(pyCuOjb, ecbn128_samples, MOD_FP, ec2, shamir_en, gpu_id, stream_id,True, grouping=self.grouping_cuda)
             if ec2 and stream_id == 0:
-              ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
+              ecp = ec2_jac2aff_h(ecp.reshape(-1),MOD_FP)
             elif stream_id == 0:
-              ecp = ec_jac2aff_h(ecp.reshape(-1),MOD_GROUP)
+              ecp = ec_jac2aff_h(ecp.reshape(-1),MOD_FP)
 
             if ec2:
               return ecp[0:6], t
@@ -1536,13 +1539,13 @@ class GrothProver(object):
              self.init_ec_val[gpu_id][stream_id][pidx] =\
                             ec2_jac2aff_h(
                              result.reshape(-1),
-                             MOD_GROUP,
+                             MOD_FP,
                              strip_last=1) 
           else:
              self.init_ec_val[gpu_id][stream_id][pidx] =\
                         ec_jac2aff_h(
                               result.reshape(-1),
-                              MOD_GROUP,
+                              MOD_FP,
                               strip_last=1) 
 
     def init_EC_P(self, batch_size):
@@ -1563,7 +1566,7 @@ class GrothProver(object):
     def findECPointsDispatch(self, dispatch_table, batch_size, last_batch_idx, pk_bin,
                              sort_idx=0, change_s_scl_idx=[-1], change_r_scl_idx=[-1], change_rs_scl_idx=[-1], sort_en=0):
 
-       ZField.set_field(MOD_GROUP)
+       ZField.set_field(MOD_FP)
        nsamples, EC_P, scl_start_idx, ec_start_idx = self.init_EC_P(batch_size)
        extra_samples = 0
 
@@ -1630,7 +1633,7 @@ class GrothProver(object):
           if EPidx==sort_idx:
               # Sort scl batch
               self.sorted_scl_array_idx[start_idx:end_idx] = \
-                   sortu256_idx_h(self.scl_array[start_idx:end_idx], sort_en)
+                   sortuBI_idx_h(self.scl_array[start_idx:end_idx], NWORDS_FR, sort_en)
               self.sorted_scl_array[start_idx:end_idx] = \
                    self.scl_array[start_idx:end_idx][self.sorted_scl_array_idx[start_idx:end_idx]]
               # Copy sorted scl batch
@@ -1690,7 +1693,7 @@ class GrothProver(object):
     def write_pdata(self):
         if self.out_public_f.endswith('.json'):
            # Write public file
-           ZField.set_field(MOD_FIELD)
+           ZField.set_field(MOD_FR)
            ps = [str(BigInt.from_uint256(el).as_long()) for el in self.public_signals]
            j = json.dumps(ps, indent=4)
            f = open(self.out_public_f, 'w')
@@ -1704,7 +1707,7 @@ class GrothProver(object):
 
     def write_proof(self):
         if self.out_proof_f.endswith('.json'):
-           ZField.set_field(MOD_GROUP)
+           ZField.set_field(MOD_FP)
            # write proof file
            P = ECC.from_uint256(
                             np.concatenate((
@@ -1737,9 +1740,9 @@ class GrothProver(object):
            print(j, file=f)
            f.close()
         elif self.out_proof_f.endswith('.bin'):
-           pi_a_eccf1 = from_montgomeryN_h(np.reshape(self.pi_a_eccf1,(-1)), MOD_GROUP)
-           pi_b_eccf2 = from_montgomeryN_h(np.reshape(self.pi_b_eccf2,(-1)), MOD_GROUP)
-           pi_c_eccf1 = from_montgomeryN_h(np.reshape(self.pi_c_eccf1,(-1)), MOD_GROUP)
+           pi_a_eccf1 = from_montgomeryN_h(np.reshape(self.pi_a_eccf1,(-1)), MOD_FP)
+           pi_b_eccf2 = from_montgomeryN_h(np.reshape(self.pi_b_eccf2,(-1)), MOD_FP)
+           pi_c_eccf1 = from_montgomeryN_h(np.reshape(self.pi_c_eccf1,(-1)), MOD_FP)
            proof_bin = np.concatenate((
                     pi_a_eccf1, 
                     pi_b_eccf2,
@@ -1749,13 +1752,15 @@ class GrothProver(object):
     def evalPoly(self,w, pX, nVars, m, pidx):
         # Convert witness to montgomery in zpoly_maddm_h
         #polA_T, polB_T, polC_T are montgomery -> polsA_sps_u256, polsB_sps_u256, polsC_sps_u256 are montgomery
-        reduce_coeff = 0  
-        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, mp.cpu_count(), pidx)
+        reduce_coeff = 0
+        egs = 1 << 17
+        polX_T = mpoly_eval_h(w[:nVars],np.reshape(pX,-1), reduce_coeff, m, 0, nVars, int((m + egs-1)/egs) , pidx)
         return polX_T
+    
 
     def calculateH(self):
 
-        ZField.set_field(MOD_FIELD)
+        ZField.set_field(MOD_FR)
         pk_bin = pkbin_get(self.pk,['nVars', 'domainSize', 'polsA', 'polsB'])
         nVars = pk_bin[0][0]
         m = pk_bin[1][0]

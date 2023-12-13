@@ -420,7 +420,7 @@ __forceinline__ __device__ void set0u256(uint32_t *d_out)
 template <typename T1, typename T2, typename T3>
 __device__ void addmu256(T1 *z, T2 *x, T3 *y, mod_t midx)
 {
-  uint32_t const __restrict__ *p = mod_info_ct[midx].p;
+  uint32_t const __restrict__ *p = &N_ct[ModOffset_ct[midx]];
 
    addu256(z,x,y);
     if (ltu256(p,z)){
@@ -440,7 +440,7 @@ template <typename T1, typename T2, typename T3>
 __device__ void submu256(T1 *z, T2 *x, T3 *y, mod_t midx)
 {
 
-  uint32_t const __restrict__ *p = mod_info_ct[midx].p;
+  uint32_t const __restrict__ *p = &N_ct[ModOffset_ct[midx]];
 
   //logInfoBigNumberTid(1,"y:\n",(uint32_t *)y);
   subu256(z,x,y);

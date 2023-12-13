@@ -42,14 +42,6 @@ The trusted setup is currently very slow. Implementation has been done using a s
 ## Installation
 1. Download repository www.github.com/iden3/cusnarks.git. From now on, the folder where cusnarks is downloaded will be called *$CUSNARKS_HOME*
 
-2. Change to *$CUSNARKS_HOME* directory and execute cusnarks_build.sh (builds Cusnarks) and launch_cusnarks (launches a proof server and requests proofs) scripts
-```sh
- cd $CUSNARKS_HOME
- ./cusnarks_build.sh
- ./launch_cusnarks.sh
-```
-
-Alternatively, you can install Cusnarks manually:
 
 2. Ensure that all [dependencies][] are installed. 
 
@@ -82,22 +74,20 @@ export LD_LIBRARY_PATH=$CUSNARKS_HOME/lib:$LD_LIBRARY_PATH
 4. Build cusnarks to generate shared libraries in *$CUSNARKS_HOME/lib*.
 
 ```sh
-make all
+CUSNARKS_NROOTS=20 CUSNARKS_CURVE="BN256" make all
 ```
+
+*CUSNARKS_NROOTS* limits the maximum number of constraints that can be proved. If *CUSNARKS_NROOTS = 20*, then the 
+maximum number of constraints is limited to 2<sup>CUSNARKS_NROOTS-1</sup> constraints.
+
+*CUSNARKS_CURVE* Defines the curve to be used. Options inclide **BN256** and **BLS12381**. For **BN256** 
+*CUSNARKS_NROOTS* is limited to 28, whereas for **BLS12381** *CUSNARKS_NROOTS* is limited to 32.
+
 Two libraries are generated upon compilation of cusnarks
 - *libcusnarks.so* : Cusnarks shared library
 - *pycusnarks.so* : Cusnarks shared library wrapped with Cython wrapper so that it can be used from Python
 
-5. Generate some metadata required for cusnarks, including :
-- Roots of unity for curve [bn128][BN128]. Default option generates 2^20, which allows processing circuits of 
-up to 2^19 constraints. When prompted, provide the desired number of roots to generate (maximum is 2^28).
-- Location of folder to place input/output data. By default, location is *$CUSNARKS_HOME/data*
-
-```sh
-make config
-```
-
-6. Launch units tests (optional)
+5. Launch units tests (optional)
 
 ```sh
 CUDA_VISIBLE_DEVICES=1,2 make test

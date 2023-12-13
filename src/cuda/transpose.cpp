@@ -60,9 +60,9 @@ void transpose_h(uint32_t *mout, const uint32_t *min, uint32_t in_nrows, uint32_
 
   for (i=0; i<in_nrows; i++){
     for(j=0; j<in_ncols; j++){
-      for (k=0; k<NWORDS_256BIT; k++){
-        //printf("OUT: %d, IN : %d\n",(j*in_nrows+i)*NWORDS_256BIT+k, (i*in_ncols+j)*NWORDS_256BIT+k);
-        mout[(j*in_nrows+i)*NWORDS_256BIT+k] = min[(i*in_ncols+j)*NWORDS_256BIT+k];
+      for (k=0; k<NWORDS_FR; k++){
+        //printf("OUT: %d, IN : %d\n",(j*in_nrows+i)*NWORDS_FR+k, (i*in_ncols+j)*NWORDS_FR+k);
+        mout[(j*in_nrows+i)*NWORDS_FR+k] = min[(i*in_ncols+j)*NWORDS_FR+k];
       }
     }
   }
@@ -73,9 +73,9 @@ void transpose_h(uint32_t *mout, const uint32_t *min,  uint32_t start_row, uint3
 
   for (i=start_row; i<last_row; i++){
     for(j=0; j<in_ncols; j++){
-      for (k=0; k<NWORDS_256BIT; k++){
-        //printf("OUT: %d, IN : %d\n",(j*in_nrows+i)*NWORDS_256BIT+k, (i*in_ncols+j)*NWORDS_256BIT+k);
-        mout[(j*in_nrows+i)*NWORDS_256BIT+k] = min[(i*in_ncols+j)*NWORDS_256BIT+k];
+      for (k=0; k<NWORDS_FR; k++){
+        //printf("OUT: %d, IN : %d\n",(j*in_nrows+i)*NWORDS_FR+k, (i*in_ncols+j)*NWORDS_FR+k);
+        mout[(j*in_nrows+i)*NWORDS_FR+k] = min[(i*in_ncols+j)*NWORDS_FR+k];
       }
     }
   }
@@ -97,23 +97,22 @@ void transpose_h(uint32_t *min, uint32_t in_nrows, uint32_t in_ncols)
    const uint32_t N_1 = (1 << n) - 1;
    const uint32_t NM_1 = nelems+1;
 
-   uint32_t val[NWORDS_256BIT];
+   uint32_t val[NWORDS_FR];
    uint32_t cur_pos = tt[idx++], trans_pos, step=tt[idx++];
    uint32_t max_count = tt[idx++], max_el = tt[idx++];
 
    while (nelems > 0){
-     memcpy(val, &min[cur_pos * NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
+     memcpy(val, &min[cur_pos * NWORDS_FR], sizeof(uint32_t)*NWORDS_FR);
      for (uint32_t ccount=0; ccount < max_count; ccount++){
        for (uint32_t elcount=0; elcount < max_el; elcount++){
           trans_pos = (cur_pos >> n) + ((cur_pos & N_1) << m);
-          swapu256_h(&min[trans_pos * NWORDS_256BIT], val);
+          swapuBI_h(&min[trans_pos * NWORDS_FR], val, NWORDS_FR);
           nelems--;
           //cur_pos = (trans_pos >> n ) + ((trans_pos & N_1) << m);
-          //swapu256_h(&min[cur_pos * NWORDS_256BIT], val);
           cur_pos = trans_pos;
        }
        cur_pos = (trans_pos + step) & NM_1;
-       memcpy(val, &min[cur_pos * NWORDS_256BIT], sizeof(uint32_t)*NWORDS_256BIT);
+       memcpy(val, &min[cur_pos * NWORDS_FR], sizeof(uint32_t)*NWORDS_FR);
      }
      cur_pos = tt[idx++];
      step = tt[idx++];
@@ -133,7 +132,7 @@ void transpose_square_h(uint32_t *min, uint32_t in_nrows)
     for(uint32_t j=i+1; j <in_nrows; j++){
         uint32_t cur_pos = (i << m) + j;
         uint32_t trans_pos = (j << m) + i;
-        swapu256_h(&min[trans_pos << NWORDS_256BIT_SHIFT], &min[cur_pos << NWORDS_256BIT_SHIFT]);
+        swapuBI_h(&min[trans_pos  * NWORDS_FR], &min[cur_pos * NWORDS_FR], NWORDS_FR);
     } 
   }
 }
@@ -143,8 +142,8 @@ void transposeBlock_h(uint32_t *mout, uint32_t *min, uint32_t in_nrows, uint32_t
     for (uint32_t i = 0; i < in_nrows; i += block_size) {
         for(uint32_t j = 0; j < in_ncols; ++j) {
             for(uint32_t b = 0; b < block_size && i + b < in_nrows; ++b) {
-               for (uint32_t k=0; k< NWORDS_256BIT; k++){
-                  mout[(j*in_nrows + i + b)*NWORDS_256BIT+k] = min[((i + b)*in_ncols + j)*NWORDS_256BIT + k];
+               for (uint32_t k=0; k< NWORDS_FR; k++){
+                  mout[(j*in_nrows + i + b)*NWORDS_FR+k] = min[((i + b)*in_ncols + j)*NWORDS_FR + k];
                }
             }
         }
@@ -155,21 +154,21 @@ void transposeBlock_h(uint32_t *mout, uint32_t *min, uint32_t start_row, uint32_
     for (uint32_t i = start_row; i < last_row; i += block_size) {
         for(uint32_t j = 0; j < in_ncols; ++j) {
             for(uint32_t b = 0; b < block_size && i + b < last_row; ++b) {
-               for (uint32_t k=0; k< NWORDS_256BIT; k++){
-                  mout[(j*in_nrows + i + b)*NWORDS_256BIT+k] = min[((i + b)*in_ncols + j)*NWORDS_256BIT + k];
+               for (uint32_t k=0; k< NWORDS_FR; k++){
+                  mout[(j*in_nrows + i + b)*NWORDS_FR+k] = min[((i + b)*in_ncols + j)*NWORDS_FR + k];
                }
             }
         }
     }
 }
 
-void printU256M(const uint32_t *x, uint32_t nrows, uint32_t ncols)
+void printUM(const uint32_t *x, uint32_t nrows, uint32_t ncols)
 {
   uint32_t i,j;
 
   for(i=0; i< nrows; i++){
     for (j=0; j< ncols; j++) {
-       printU256Number(&x[i * ncols * NWORDS_256BIT + j*NWORDS_256BIT]);
+       printUBINumber(&x[i * ncols * NWORDS_FR + j*NWORDS_FR], NWORDS_FR);
     }
   }
 }

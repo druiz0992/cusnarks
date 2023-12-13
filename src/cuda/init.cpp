@@ -35,6 +35,7 @@
 #include "bigint.h"
 #include "ec.h"
 #include "ntt.h"
+#include "mpoly.h"
 #include "init.h"
 
 
@@ -45,6 +46,7 @@ void init_h(void)
 {
   utils_init_h();
   ec_init_h();
+  //mpoly_init_h(1 << CusnarksGetNRoots());
   ntt_init_h(1<< CusnarksGetNRoots());
 }
 
@@ -55,6 +57,7 @@ void release_h(void)
 {
   utils_free_h();
   ec_free_h();
+  //mpoly_free_h();
   ntt_free_h();
 }
 

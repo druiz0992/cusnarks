@@ -44,7 +44,7 @@
 
 void test_gen_roots(uint32_t nbits, char *filename)
 {
-  uint32_t nsamples = (1<<nbits) * NWORDS_256BIT;
+  uint32_t nsamples = (1<<nbits) * NWORDS_FR;
   uint32_t *roots = (uint32_t *)malloc( nsamples * sizeof(uint32_t));
 
   computeRoots_h(roots,nbits);

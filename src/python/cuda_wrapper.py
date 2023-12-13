@@ -48,7 +48,7 @@ import os.path
 import numpy as np
 import time
 import math
-from subprocess import call, Popen, PIPE
+from subprocess import call, Popen, PIPE, run
 import multiprocessing as mp
 try:
   import nvgpu
@@ -78,7 +78,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = 0):
      nd = (1<<  int(math.ceil(math.log(n+1, 2))) )- 1 - n
      ne = n + nd
      nsamples = len(poly) + nd
-     zpoly_vector = np.zeros((nsamples,NWORDS_256BIT),dtype=np.uint32)
+     zpoly_vector = np.zeros((nsamples,NWORDS_FR),dtype=np.uint32)
      zpoly_vector[nd:] = poly
 
      kernel_config={}
@@ -102,7 +102,7 @@ def zpoly_div_cuda(pysnark, poly ,n, fidx, gpu_id=0, stream_id = 0):
 
      result_snarks,t = pysnark.kernelLaunch(zpoly_vector, kernel_config, kernel_params,gpu_id, stream_id, n_kernels=1)
 
-     result_snarks_complete = np.zeros((nsamples-ne,NWORDS_256BIT),dtype=np.uint32)
+     result_snarks_complete = np.zeros((nsamples-ne,NWORDS_FR),dtype=np.uint32)
      result_snarks_complete[:nsamples-2*ne+nd] = result_snarks
      result_snarks_complete[nsamples-2*ne+nd:] = zpoly_vector[-ne+nd:]
 
@@ -154,7 +154,7 @@ def ec_sc1mul_cuda(pysnark, vector, fidx, ec2=False, premul=False, batch_size=0,
     kernel_config['return_val']=[1]
 
     nsamples = len(vector)
-    if batch_size == 0:
+    if pysnark is not None and batch_size == 0:
 
        kernel_params['in_length'] = [nsamples]
        kernel_params['out_length'] = (nsamples-indims)*outdims
@@ -1605,7 +1605,14 @@ def get_ngpu(max_used_percent=20.):
    try:
      return len(nvgpu.available_gpus(max_used_percent))
    except :
-     return 0
+     try :
+        out = run(['nvl'],stdout=PIPE)
+        out = out.stdout.decode("utf-8")
+        return out.count('\n') - 2
+
+     except:
+ 
+        return 0
 
 def get_nstreams():
     return (N_STREAMS_PER_GPU)

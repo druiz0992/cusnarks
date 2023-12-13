@@ -1085,13 +1085,13 @@ class ZPoly(object):
 
     def as_uint256(self):
         if type(self.get_coeff()) is list:
-            return np.asarray([c.as_uint256() for c in self.get_coeff()])
+            return np.asarray([c.as_uint256(NW=NWORDS_FR) for c in self.get_coeff()])
         else :
             Val = []
             Coeff = []
             for k,v in self.zcoeff.items():
               Coeff.append(np.uint32(k ))
-              Val.append(v.as_uint256())
+              Val.append(v.as_uint256(NW=NWORDS_FR))
             Val = np.concatenate(Val)
             return len(self.zcoeff), np.concatenate((np.asarray(Coeff,dtype=np.uint32), Val))
             #return np.asarray([np.concatenate([(np.uint32(k )], v.as_uint256())) for k,v in self.zcoeff.items()], dtype=np.uint32)
@@ -1099,9 +1099,9 @@ class ZPoly(object):
     @staticmethod
     def from_uint256(x,reduced=False):
         if reduced:
-            P = ZPoly([ZFieldElRedc(BigInt.from_uint256(x_)) for x_ in x])
+            P = ZPoly([ZFieldElRedc(BigInt.from_uint256(x_, NW=NWORDS_FR)) for x_ in x])
         else:
-            P = ZPoly([ZFieldElExt(BigInt.from_uint256(x_)) for x_ in x])
+            P = ZPoly([ZFieldElExt(BigInt.from_uint256(x_, NW=NWORDS_FR)) for x_ in x])
 
         return P
 

@@ -34,17 +34,22 @@
 #ifndef _CONSTANTS_H_
 #define _CONSTANTS_H_
 
+const uint32_t * CusnarksOffsetGet();
+const uint32_t   CusnarksPSizeGet(mod_t type);
 const uint32_t * CusnarksPGet(mod_t type);
 const uint32_t * CusnarksR2Get(mod_t type);
-const uint32_t * CusnarksR3Get(mod_t type);
 const uint32_t * CusnarksNPGet(mod_t type);
+const uint32_t * CusnarksR2RedcGet(mod_t type);
 const uint32_t * CusnarksIScalerGet(fmt_t type);
-const uint32_t * CusnarksZeroGet(void);
-const uint32_t * CusnarksOneGet(void);
-const uint32_t * CusnarksOneMontGet(uint32_t pidx);
-const uint32_t * CusnarksOneMont2Get(uint32_t pidx);
+const uint32_t * CusnarksZeroGet(mod_t type);
+const uint32_t * CusnarksOneGet(mod_t type);
+const uint32_t * CusnarksOneMontGet(mod_t type);
+const uint32_t * CusnarksOneMont2Get(mod_t type);
+const uint32_t * CusnarksG1OneGet(void);
+const uint32_t * CusnarksG2OneGet(void);
+const uint32_t * CusnarksG1InfGet(void);
+const uint32_t * CusnarksG2InfGet(void);
 const uint32_t * CusnarksEcbn128ParamsGet(void);
-const uint32_t * CusnarksModInfoGet(void);
 const uint32_t * CusnarksMiscKGet(void);
 const uint32_t * CusnarksW32RootsGet(void);
 const uint32_t * CusnarksIW32RootsGet(void);

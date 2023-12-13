@@ -34,12 +34,10 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
+#include "_ff.h"
+
 #define NWORDS_256BIT           (8)
-#define NBITS_254BIT           (254)
-#define NWORDS_256BIT_SHIFT     (3)
-#define NWORDS_256BIT_FIOS (NWORDS_256BIT + 3)
-#define NWORDS_256BIT_SOS  ((NWORDS_256BIT) * 2 + 2)
-#define PRIME_BASE           (30)
+//TODO Check appearances of NWORDS_256BIT
 #define NBITS_WORD           (32)
 #define NBITS_WORD_LOG2      (5)
 #define NBITS_WORD_MOD       (0x1F)
@@ -53,7 +51,7 @@
 #define MAX_PIPPENGERS_CONF (20)
 #define DEFAULT_PIPPENGERS_CONF (0)
 #define NBITS_BYTE (8)
-#define EC_JACREDUCE_TABLE_LEN (256)
+#define EC_JACREDUCE_TABLE_LEN (NWORDS_FR * NBITS_WORD)
 #define EC_JACREDUCE_BATCH_SIZE (5)
 #define EC_JACREDUCE_FLAGS_INIT   (1)
 #define EC_JACREDUCE_FLAGS_FINISH (1<<1)
@@ -91,8 +89,8 @@
 #define U256_NDIMS              (1)
 #define U256K_OFFSET            (U256_NDIMS * NWORDS_256BIT)
 
-#define ECP_SCLOFFSET           (0 * NWORDS_256BIT)
-#define ECK_INDIMS               (3)
+#define ECP_SCLOFFSET           (0 * NWORDS_FR)
+#define ECK_INDIMS              (3)
 
 // Jacobian
 #define ECP_JAC_N256W                 (1)
@@ -101,13 +99,13 @@
 #define ECP_JAC_XOFFSET_BASE          (0)
 #define ECP_JAC_YOFFSET_BASE          (1)
 #define ECP_JAC_ZOFFSET_BASE          (2)
-#define ECP_JAC_INXOFFSET             (0 * NWORDS_256BIT)
-#define ECP_JAC_INYOFFSET             (1 * NWORDS_256BIT)
-#define ECP_JAC_OUTXOFFSET            (0 * NWORDS_256BIT)
-#define ECP_JAC_OUTYOFFSET            (1 * NWORDS_256BIT)
-#define ECP_JAC_OUTZOFFSET            (2 * NWORDS_256BIT)
-#define ECP_JAC_INOFFSET              (ECP_JAC_INDIMS * NWORDS_256BIT)
-#define ECP_JAC_OUTOFFSET             (ECP_JAC_OUTDIMS * NWORDS_256BIT)
+#define ECP_JAC_INXOFFSET             (0 * NWORDS_FP)
+#define ECP_JAC_INYOFFSET             (1 * NWORDS_FP)
+#define ECP_JAC_OUTXOFFSET            (0 * NWORDS_FP)
+#define ECP_JAC_OUTYOFFSET            (1 * NWORDS_FP)
+#define ECP_JAC_OUTZOFFSET            (2 * NWORDS_FP)
+#define ECP_JAC_INOFFSET              (ECP_JAC_INDIMS * NWORDS_FP)
+#define ECP_JAC_OUTOFFSET             (ECP_JAC_OUTDIMS * NWORDS_FP)
 
 #define ECP2_JAC_N256W                 (2)
 #define ECP2_JAC_INDIMS                (4) // X, Y
@@ -115,13 +113,13 @@
 #define ECP2_JAC_XOFFSET_BASE          (0)
 #define ECP2_JAC_YOFFSET_BASE          (1)
 #define ECP2_JAC_ZOFFSET_BASE          (2)
-#define ECP2_JAC_INXOFFSET             (0 * 2 * NWORDS_256BIT)
-#define ECP2_JAC_INYOFFSET             (1 * 2 * NWORDS_256BIT)
-#define ECP2_JAC_OUTXOFFSET            (0 * 2 * NWORDS_256BIT)
-#define ECP2_JAC_OUTYOFFSET            (1 * 2 * NWORDS_256BIT)
-#define ECP2_JAC_OUTZOFFSET            (2 * 2 * NWORDS_256BIT)
-#define ECP2_JAC_INOFFSET              (ECP2_JAC_INDIMS *  NWORDS_256BIT)
-#define ECP2_JAC_OUTOFFSET             (ECP2_JAC_OUTDIMS * NWORDS_256BIT)
+#define ECP2_JAC_INXOFFSET             (0 * 2 * NWORDS_FP)
+#define ECP2_JAC_INYOFFSET             (1 * 2 * NWORDS_FP)
+#define ECP2_JAC_OUTXOFFSET            (0 * 2 * NWORDS_FP)
+#define ECP2_JAC_OUTYOFFSET            (1 * 2 * NWORDS_FP)
+#define ECP2_JAC_OUTZOFFSET            (2 * 2 * NWORDS_FP)
+#define ECP2_JAC_INOFFSET              (ECP2_JAC_INDIMS *  NWORDS_FP)
+#define ECP2_JAC_OUTOFFSET             (ECP2_JAC_OUTDIMS * NWORDS_FP)
 
 #define CUSNARKS_BLOCK_DIM      (256)
 #define CUSNARKS_MAX_NCB        (32)
@@ -156,30 +154,17 @@ typedef struct{
 
 }t_ff;
 
-// prime number info for finite fields
-typedef struct {
-   uint32_t p[NWORDS_256BIT];
-   uint32_t p_[NWORDS_256BIT];
-   uint32_t r_[NWORDS_256BIT];
-   uint32_t nonres[NWORDS_256BIT];
-   uint32_t r2modp[NWORDS_256BIT];
-   uint32_t r2[NWORDS_256BIT];
-   // r =  1 << 256
-   // p * p_ - r * r_ = 1 
-
-}mod_info_t;
-
 // BN128 curve defition : Y^2 = X^3 + b
 // Generator point G=(gx, gy) is on the curve
 // gx = 1 -> I defined it as an array because i need to conver it to Montgomery??
 // gy = 2
 typedef struct {
-  uint32_t b[NWORDS_256BIT];
-  uint32_t b2[2*NWORDS_256BIT];
-  uint32_t g1x[NWORDS_256BIT];
-  uint32_t g1y[NWORDS_256BIT];
-  uint32_t g2x[2*NWORDS_256BIT];
-  uint32_t g2y[2*NWORDS_256BIT];
+  uint32_t b[NWORDS_FP];
+  uint32_t b2[2*NWORDS_FP];
+  uint32_t g1x[NWORDS_FP];
+  uint32_t g1y[NWORDS_FP];
+  uint32_t g2x[2*NWORDS_FP];
+  uint32_t g2y[2*NWORDS_FP];
 
 }ecbn128_t;
 
@@ -197,9 +182,9 @@ typedef enum{
 
 // additional constants required
 typedef struct {
-  uint32_t _1[2*NWORDS_256BIT];
-  uint32_t _inf[3*NWORDS_256BIT];
-  uint32_t _inf2[6*NWORDS_256BIT];
+  uint32_t _1[2*NWORDS_FP];
+  uint32_t _inf[3*NWORDS_FP];
+  uint32_t _inf2[6*NWORDS_FP];
 
 }misc_const_t;
 
@@ -226,8 +211,8 @@ typedef struct {
 
 // index to different primes used
 typedef enum{
-   MOD_GROUP = 0,
-   MOD_FIELD,
+   MOD_FP = 0,
+   MOD_FR,
    MOD_N
 
 }mod_t;
@@ -524,6 +509,7 @@ typedef struct{
   uint32_t max_threads;
   uint32_t thread_id;
   uint32_t pidx;
+  uint32_t ncoeff;
   
 }mpoly_eval_t;
 

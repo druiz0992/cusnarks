@@ -118,7 +118,9 @@ cd ${CUSNARKS_CONFIG_DIR}
 if [ "$arg1" = "force" ]; then
   [ -e ${CUSNARKS_CONFIG_F} ] && rm ${CUSNARKS_CONFIG_F}
 fi
-export NROOTS=20
+export CUSNARKS_NROOTS=20
+export CUSNARKS_CURVE="BN256"
+
 if [ ! -f ${CUSNARKS_CONFIG_F} ]; then
   cd ${CUSNARKS_HOME};
   echo "Building Roots"

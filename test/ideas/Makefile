@@ -42,5 +42,5 @@ clean:
 	rm -f *.o *.out *.cuobj *.cpp1.ii *.cpp4.ii *.cudafe1.* *.fatbin* *.module_id *.ptx
 
 test : $(CUSRC)
-	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS) $(LINKFLAGS)  test_multmont.cu -o test_multmont.out $(LDFLAGS)	
+	$(NVCC) $(CFLAGS) $(EXTRA_CFLAGS) $(CUFLAGS) $(LINKFLAGS)  test_sc1mul.cu -o test_sc1mul.out $(LDFLAGS)	
 

@@ -55,38 +55,38 @@ __device__ uint32_t * Z1_t::get2u256()
 
 __device__ uint32_t  * Z1_t::getu256(uint32_t offset)
 {
-    return &el[offset*NWORDS_256BIT];
+    return &el[offset*NWORDS_FP];
 }
 __device__ uint32_t  * Z1_t::getsingleu256(uint32_t offset)
 {
-    return &el[offset*NWORDS_256BIT];
+    return &el[offset*NWORDS_FP];
 }
 
 __device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
 { 
-   movu256(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT]);
-   movu256(&el[(xoffset+1)*NWORDS_256BIT],&y->el[(yoffset+1)*NWORDS_256BIT]);
-   movu256(&el[(xoffset+2)*NWORDS_256BIT],&y->el[(yoffset+2)*NWORDS_256BIT]);
-   //memcpy(&el[xoffset*NWORDS_256BIT],&y->el[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
+   movu256(&el[xoffset*NWORDS_FP],&y->el[yoffset*NWORDS_FP]);
+   movu256(&el[(xoffset+1)*NWORDS_FP],&y->el[(yoffset+1)*NWORDS_FP]);
+   movu256(&el[(xoffset+2)*NWORDS_FP],&y->el[(yoffset+2)*NWORDS_FP]);
+   //memcpy(&el[xoffset*NWORDS_FP],&y->el[yoffset*NWORDS_FP],ysize * NWORDS_FP * sizeof(uint32_t));
 }
 __device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset)
 { 
-    movu256(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT]);
-    movu256(&el[(xoffset+1)*NWORDS_256BIT],&y[(yoffset+1)*NWORDS_256BIT]);
-    movu256(&el[(xoffset+2)*NWORDS_256BIT],&y[(yoffset+2)*NWORDS_256BIT]);
-    //memcpy(&el[xoffset*NWORDS_256BIT],&y[yoffset*NWORDS_256BIT],ysize * NWORDS_256BIT * sizeof(uint32_t));
+    movu256(&el[xoffset*NWORDS_FP],&y[yoffset*NWORDS_FP]);
+    movu256(&el[(xoffset+1)*NWORDS_FP],&y[(yoffset+1)*NWORDS_FP]);
+    movu256(&el[(xoffset+2)*NWORDS_FP],&y[(yoffset+2)*NWORDS_FP]);
+    //memcpy(&el[xoffset*NWORDS_FP],&y[yoffset*NWORDS_FP],ysize * NWORDS_FP * sizeof(uint32_t));
 }
 __device__ void Z1_t::setu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*NWORDS_FP],&y->el[(yoffset)*NWORDS_FP]);
 }
 __device__ void Z1_t::setsingleu256(uint32_t xoffset, Z1_t *y, uint32_t yoffset)
 { 
-   movu256(&el[(xoffset)*NWORDS_256BIT],&y->el[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*NWORDS_FP],&y->el[(yoffset)*NWORDS_FP]);
 }
 __device__ void  Z1_t::setu256(uint32_t xoffset, uint32_t *y, uint32_t yoffset, uint32_t ysize)
 { 
-   movu256(&el[(xoffset)*NWORDS_256BIT],&y[(yoffset)*NWORDS_256BIT]);
+   movu256(&el[(xoffset)*NWORDS_FP],&y[(yoffset)*NWORDS_FP]);
 }
 __device__ void Z1_t::assign(uint32_t *y)
 { 
@@ -184,8 +184,8 @@ __device__ void movz(uint32_t *y, uint32_t yoffset, Z1_t *x, uint32_t xoffset, u
   #pragma unroll
   for (i=0; i< size; i++){
     movu256(&y[yoffset],x->getu256(xoffset));
-    xoffset += NWORDS_256BIT;
-    yoffset += NWORDS_256BIT;
+    xoffset += NWORDS_FP;
+    yoffset += NWORDS_FP;
   }
 }
 
@@ -208,15 +208,15 @@ __device__ void zeccz(Z1_t *z, Z1_t *x)
 
 __device__ void infz(Z1_t *z, mod_t midx)
 {
-  z->assign(misc_const_ct[midx]._inf);
+  z->assign(G1Inf_ct);
 }
 
 __device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1offset, Z1_t *zx2, uint32_t x2offset, mod_t midx)
 {
   uint32_t *xr, *x1, *x2;
-  uint32_t *_1 = misc_const_ct[midx]._1;
-  uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-  uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
+  uint32_t *_1 = G1One_ct;
+  uint32_t const __restrict__ *P_u256 = &N_ct[ModOffset_ct[midx]];
+  uint32_t const __restrict__ *PN_u256 = &NPrime_ct[ModOffset_ct[midx]];
 
   xr = zxr->getu256(zoffset);
   x1 = zx1->getu256(x1offset);
@@ -229,20 +229,3 @@ __device__ void addecjacz(Z1_t *zxr, uint32_t zoffset, Z1_t *zx1, uint32_t x1off
 
   return;
 }
-
-#if 0
-__device__ void scmulec_stepz(Z1_t *Q,Z1_t *N, uint32_t *scl, uint32_t msb,  mod_t midx )
-{
-  uint32_t *xr, *x1, *x2;
-  uint32_t *_1 = misc_const_ct[midx]._1;
-  uint32_t const __restrict__ *PN_u256 = mod_info_ct[midx].p_;
-  uint32_t const __restrict__ *P_u256 = mod_info_ct[midx].p;
-
-  xr = Q->getu256(0);
-  x2 = Q->getu256(0);
-  x1 = N->getu256(0);
-
-  asm(ASM_ADDECJAC_INIT
-      ASM_ECJACADD);
-}
-#endif

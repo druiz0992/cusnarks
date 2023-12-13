@@ -1,0 +1,375 @@
+/*
+    Copyright 2018 0kims association.
+
+    This file is part of cusnarks.
+
+    cusnarks is a free software: you can redistribute it and/or
+    modify it under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your option)
+    any later version.
+
+    cusnarks is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+    more details.
+
+    You should have received a copy of the GNU General Public License along with
+    cusnarks. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+// ------------------------------------------------------------------
+// Author     : David Ruiz
+//
+// File name  : constants.cpp
+//
+// Date       : 5/09/2019
+//
+// ------------------------------------------------------------------
+//
+// Description:
+//   Definition of constants used in Cusnarks
+//
+// ------------------------------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "types.h"
+#include "utils_host.h"
+#include "file_utils.h"
+#include "bigint.h"
+#include "constants.h"
+
+#ifdef PARALLEL_EN
+static  uint32_t parallelism_enabled =  1;
+#else
+static  uint32_t parallelism_enabled =  0;
+#endif
+
+
+// N * NP - R * RP = 1
+// R = 1 << 256 
+// R*RP = 1 mod N => RP is modular inverse of R mod N
+
+// Prime numbers
+static uint32_t N[] = {
+           <FP>, 
+           <FR>  
+};
+
+// R = 1<< 256
+// R2 = (R * R) mod N
+static uint32_t R2[] = {
+   <FP_R2>,   
+   <FR_R2>   
+};
+
+static uint32_t R2rdc[] = {
+   <FP_R2_rdc>,   
+   <FR_R2_rdc>   
+};
+static uint32_t NPrime[] = {
+   <FP_NP>,    
+   <FR_NP>    
+};
+
+
+static uint32_t IScalerExt[] = {
+<FR_IScaler>
+};
+
+static uint32_t IScalerMont[] = {
+<FR_IScalerMont>
+};
+
+static const uint32_t Zero[] = {
+  <FP_Zero>,
+  <FR_Zero>
+};
+ 
+static const uint32_t One[]  = {
+ <FP_One>,
+ <FR_One>
+};
+
+static const uint32_t OneMont[] = {
+         <FP_One_rdc>,
+         <FR_One_rdc>
+};
+static const uint32_t OneMont2[] = {
+         <FP_One2_rdc>,
+         <FR_One2_rdc>
+};
+
+
+static uint32_t ecbn128_params_init [] = {
+    //B
+    <FP_B_rdc>,                
+    //BX - G2
+    <FP_B2_1_rdc>,
+    //BY - G2
+    <FP_B2_2_rdc>,
+    // G1x
+    <FP_G1x_rdc>,
+    // G1y
+    <FP_G1y_rdc>,
+    // G2x1
+    <FP_G2x1_rdc>,
+    // G2x2
+    <FP_G2x2_rdc>,
+    // G2y1
+    <FP_G2y1_rdc>,
+    // G2y1
+    <FP_G2y2_rdc>
+};
+
+static uint32_t  mod_offset[] {
+  0,
+  NWORDS_FP,
+  NWORDS_FP + NWORDS_FR
+};
+
+static uint32_t  Psize[] {
+  NWORDS_FP,
+  NWORDS_FR
+};
+
+static uint32_t misc_const_init[] = {
+  //One G2 Reduced
+  <FP_One2_rdc>,
+  //Inf G1
+  <FP_G1_inf_rdc>,
+  //Inf G2
+  <FP_G2_inf_rdc>
+};
+
+static char roots_1M_filename[]="../../data/zpoly_roots_16M.bin";
+static char config_roots_filename[]="../../config/.root_f";
+static char config_nroots_filename[]="../../config/.nroots";
+
+// 32 roots of unitity of field prime (only first 16)
+static uint32_t W32_roots[32*NWORDS_FR];
+// 32 inverse roots of unitity of field prime (only first 16)
+static uint32_t IW32_roots[32*NWORDS_FR];
+
+static uint32_t IW32_nroots[] = { 
+    536870910, 2017203416,  210575069, 2945986415, 4244459333, 2405397650, 1033682860,  523723546,   // inv 2
+    268435455, 3156085356, 2252771182, 3620476855, 2122229666, 1202698825,  516841430,  261861773,   // inv 4
+            0,          0,          0,          0,          0,          0,          0,  0x20000000,   // inv 8             
+            0,          0,          0,          0,          0,          0,          0,  0x10000000,   // inv 16
+            0,          0,          0,          0,          0,          0,          0,  0x08000000,   // inv 32
+            0,          0,          0,          0,          0,          0,          0,  4194304,       // inv 1024
+            0,          0,          0,          0,          0,          0,          0,  4096         // inv 1024**2
+};   
+
+
+static uint32_t proots_field[] = {
+  <FR_FrRoots_rdc>
+};
+
+/*
+  Compute inverse roots of unity
+*/
+void computeIRoots_h(uint32_t *iroots, uint32_t *roots, uint32_t nroots)
+{
+  uint32_t i;
+
+  if (roots == iroots){
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
+    for(i=1; i<nroots/2; i++){
+      swapuBI_h(&iroots[i*NWORDS_FR], &roots[(nroots-i)*NWORDS_FR], NWORDS_FR);
+    }
+  } else {
+    memcpy(iroots, roots,NWORDS_FR*sizeof(uint32_t));
+    #ifndef TEST_MODE
+      #pragma omp parallel for if(parallelism_enabled)
+    #endif
+    for (i=1; i<nroots; i++){
+      memcpy(&iroots[i*NWORDS_FR], &roots[(nroots-i)*NWORDS_FR],NWORDS_FR*sizeof(uint32_t));
+    }
+  }
+}
+
+
+const uint32_t *CusnarksOffsetGet()
+{
+  return mod_offset;
+}
+
+const uint32_t CusnarksPSizeGet(mod_t type)
+{
+  return Psize[type];
+}
+
+const uint32_t * CusnarksPGet(mod_t type)
+{
+  return &N[mod_offset[type]];
+}
+const uint32_t * CusnarksR2Get(mod_t type)
+{
+  return &R2[mod_offset[type]];
+}
+const uint32_t * CusnarksR2RedcGet(mod_t type)
+{
+  return &R2rdc[mod_offset[type]];
+}
+const uint32_t * CusnarksNPGet(mod_t type)
+{
+  return &NPrime[mod_offset[type]];
+}
+
+const uint32_t * CusnarksIScalerGet(fmt_t type)
+{
+  if (type == FMT_EXT) {
+    return IScalerExt;
+  } else if (type == FMT_MONT){
+    return IScalerMont;
+  }
+}
+
+const uint32_t * CusnarksZeroGet(mod_t type)
+{
+  return &Zero[mod_offset[type]];
+}
+const uint32_t * CusnarksOneGet(mod_t type)
+{
+  return &One[mod_offset[type]];
+}
+const uint32_t * CusnarksOneMontGet(mod_t type)
+{
+  return &OneMont[mod_offset[type]];
+}
+
+const uint32_t * CusnarksOneMont2Get(mod_t type)
+{
+  return &OneMont2[mod_offset[type]];
+}
+const uint32_t * CusnarksEcbn128ParamsGet(void)
+{
+  return ecbn128_params_init;
+}
+
+const uint32_t * CusnarksMiscKGet(void)
+{
+  return misc_const_init;
+}
+
+const uint32_t *CusnarksG1OneGet(void)
+{  
+   return &misc_const_init[MISC_K_1*NWORDS_FP];
+}
+const uint32_t *CusnarksG2OneGet(void)
+{
+   return &misc_const_init[MISC_K_1*NWORDS_FP];
+}
+const uint32_t *CusnarksG1InfGet(void)
+{
+   return &misc_const_init[MISC_K_INF*NWORDS_FP];
+}
+const uint32_t *CusnarksG2InfGet(void)
+{
+   return &misc_const_init[MISC_K_INF2*NWORDS_FP];
+}
+
+const uint32_t * CusnarksW32RootsGet(void)
+{
+  //TODO Retrieve root file name and number of roots from config file
+  FILE *ifp;
+  char roots_f[1000];
+  char n_roots_c[1000];
+  char *end;
+  uint32_t n_roots;
+ 
+  ifp = fopen(config_roots_filename,"r");
+  
+  fgets(roots_f,sizeof(roots_f) , ifp);
+
+  fclose(ifp);
+
+  if( (end = strchr(roots_f, '\n')) != NULL)
+    *end = '\0';
+
+  ifp = fopen(config_nroots_filename,"r");
+
+  fgets(n_roots_c, sizeof(n_roots_c), ifp);
+
+  fclose(ifp);
+
+  n_roots = strtol(n_roots_c, &end, 10);
+
+  readU256DataFile_h(W32_roots,roots_f,1<<n_roots,32);
+
+  return W32_roots;
+}
+
+const uint32_t * CusnarksIW32RootsGet(void)
+{
+  //TODO Retrieve root file name and number of roots from config file
+  FILE *ifp;
+  char roots_f[1000];
+  char n_roots_c[1000];
+  char *end;
+  uint32_t n_roots;
+ 
+  ifp = fopen(config_roots_filename,"r");
+  
+  fgets(roots_f,sizeof(roots_f) , ifp);
+
+  fclose(ifp);
+
+  if( (end = strchr(roots_f, '\n')) != NULL)
+    *end = '\0';
+
+  ifp = fopen(config_nroots_filename,"r");
+
+  fgets(n_roots_c, sizeof(n_roots_c), ifp);
+
+  fclose(ifp);
+
+  n_roots = strtol(n_roots_c, &end, 10);
+
+  readU256DataFile_h(IW32_roots,roots_f,1<<n_roots,32);
+
+  computeIRoots_h(IW32_roots, IW32_roots, 32);
+  return IW32_roots;
+}
+const uint32_t * CusnarksIW32NRootsGet(void)
+{
+  return IW32_nroots;
+}
+
+const uint32_t *CusnarksPrimitiveRootsFieldGet(uint32_t nbits)
+{
+  return &proots_field[nbits*NWORDS_FR];
+}
+
+uint32_t CusnarksGetNRoots(void)
+{
+  FILE *ifp;
+  char n_roots_c[1000];
+  uint32_t n_roots;
+  char *end;
+
+  ifp = fopen(config_nroots_filename,"r");
+  fgets(n_roots_c, sizeof(n_roots_c), ifp);
+  n_roots = strtol(n_roots_c, &end, 10);
+  fclose(ifp);
+
+  return n_roots;
+}
+
+void CusnarksGetFRoots(char *filename, uint32_t sizeof_f)
+{
+  FILE *ifp;
+  char *end;
+
+  ifp = fopen(config_roots_filename,"r");
+  fgets(filename, sizeof_f, ifp);
+  fclose(ifp);
+
+  if( (end = strchr(filename, '\n')) != NULL)
+    *end = '\0';
+
+}

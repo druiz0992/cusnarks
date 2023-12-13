@@ -236,7 +236,7 @@ class CUEC2Test(unittest.TestCase):
         ec2bn128 = EC2BN128(nsamples*2, seed=1)
 
         kernel_config = {'blockD': [ECBN128_BLOCK_DIM]}
-        kernel_params = {'midx': [MOD_GROUP], 'premod': [0], 'in_length': [nsamples], 'stride': [1],
+        kernel_params = {'midx': [MOD_FP], 'premod': [0], 'in_length': [nsamples], 'stride': [1],
                          'out_length': nsamples}
 
         # Test add jacff
@@ -249,7 +249,7 @@ class CUEC2Test(unittest.TestCase):
         kernel_config['kernel_idx'] = [CB_EC2_JACAFF_ADD]
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
-        kernel_params['midx'] = [MOD_GROUP]
+        kernel_params['midx'] = [MOD_FP]
         kernel_config['gridD'] = [0]
 
         result, _ = ec2bn128.kernelLaunch(ec2bn128_vector, kernel_config, kernel_params)
@@ -266,7 +266,7 @@ class CUEC2Test(unittest.TestCase):
         kernel_config['kernel_idx'] = [CB_EC2_JAC_ADD]
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
-        kernel_params['midx'] = [MOD_GROUP]
+        kernel_params['midx'] = [MOD_FP]
         kernel_config['gridD'] = [0]
 
         ec2bn128_vector_ext = np.zeros((int(nsamples * ECP2_JAC_OUTDIMS), 8), dtype=np.uint32)
@@ -291,7 +291,7 @@ class CUEC2Test(unittest.TestCase):
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
         kernel_config['gridD'] = [0]
-        kernel_params['midx'] = [MOD_GROUP]
+        kernel_params['midx'] = [MOD_FP]
 
         """
         ec2bn128_vector[::3] = ec2bn128_vector[1::3]
@@ -312,7 +312,7 @@ class CUEC2Test(unittest.TestCase):
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
         kernel_config['gridD'] = [0]
-        kernel_params['midx'] = [MOD_GROUP]
+        kernel_params['midx'] = [MOD_FP]
 
         ec2bn128_vector_ext = np.zeros((nsamples * ECP2_JAC_OUTDIMS, 8), dtype=np.uint32)
         ec2bn128_vector_ext[::6] = ec2bn128_vector[::4]
@@ -335,7 +335,7 @@ class CUEC2Test(unittest.TestCase):
         kernel_config['kernel_idx'] = [CB_EC2_JAC_MUL]
         kernel_params['padding_idx'] = [0]
         kernel_params['premod'] = [0]
-        kernel_params['midx'] = [MOD_GROUP]
+        kernel_params['midx'] = [MOD_FP]
         kernel_config['gridD'] = [0]
 
         result, _ = ec2bn128.kernelLaunch(ec2bn128_vector_full, kernel_config, kernel_params)
@@ -362,7 +362,7 @@ class CUEC2Test(unittest.TestCase):
             tmp_v = np.reshape(ec2bn128_vector_full[nsamples:],(-1,4,8))
             sorted_ecc_vector = np.reshape(tmp_v[idx_v],(-1,8))
             sorted_ec2bn128_vector_mad = np.concatenate((sorted_scl_vector,sorted_ecc_vector))
-            result, _ = ec_mad_cuda(ec2bn128, sorted_ec2bn128_vector_mad, MOD_GROUP, ec2=True)
+            result, _ = ec_mad_cuda(ec2bn128, sorted_ec2bn128_vector_mad, MOD_FP, ec2=True)
 
             result2 = 0
             #debugReducedECCAddShfl(r_mul, result, result2)

@@ -78,7 +78,7 @@ class CUU256Test(unittest.TestCase):
         ntest_points = CUU256Test.ntest_points
         u256_p = CUU256Test.u256_p
         kernel_config = {'blockD' : [U256_BLOCK_DIM] }
-        kernel_params = {'midx' : [MOD_FIELD] ,'premod' : [1], 'in_length' : [CUU256Test.nsamples], 'stride' : [1], 'out_length' : CUU256Test.nsamples}
+        kernel_params = {'midx' : [MOD_FR] ,'premod' : [1], 'in_length' : [CUU256Test.nsamples], 'stride' : [1], 'out_length' : CUU256Test.nsamples}
         for niter in xrange(CUU256Test.TEST_ITER):
             #if iter%CUU256Test.TEST_ITER == 0:
 
@@ -209,7 +209,7 @@ class CUU256Test(unittest.TestCase):
    
         
             """
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
+            kernel_params['midx'] = [MOD_FR, MOD_FR] 
             kernel_params['premod'] = [1, 0]
             kernel_params['stride'] = [4, 2]
             kernel_config['blockD'] = [64, 256]
@@ -229,7 +229,7 @@ class CUU256Test(unittest.TestCase):
 
             result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,n_kernels=2 )
 
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['premod'] = [1]
             kernel_params['stride'] = [4]
             kernel_config['blockD'] = [64]
@@ -241,7 +241,7 @@ class CUU256Test(unittest.TestCase):
             result,_ = u256.kernelLaunch(u256_vector, kernel_config, kernel_params,n_kernels=1 )
 
 
-            kernel_params['midx'] = [MOD_FIELD]
+            kernel_params['midx'] = [MOD_FR]
             kernel_params['premod'] = [0]
             kernel_params['stride'] = [2]
             kernel_config['blockD'] = [256]
@@ -262,7 +262,7 @@ class CUU256Test(unittest.TestCase):
             """
            
 
-            kernel_params['midx'] = [MOD_FIELD, MOD_FIELD] 
+            kernel_params['midx'] = [MOD_FR, MOD_FR] 
             kernel_params['premod'] = [1, 0]
             kernel_params['premul'] = [1, 0]
             kernel_params['stride'] = [1, 1]

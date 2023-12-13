@@ -52,8 +52,6 @@ __device__ void mulu32(uint32_t __restrict__ *z, uint32_t x, uint32_t y);
 __device__ void mulu32lo(uint32_t __restrict__ *z, uint32_t x, uint32_t y);
 __device__ void madcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y, uint32_t a);
 __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, uint32_t y);
-__device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit);
-__device__ void propcu32_extend(uint32_t *x, uint32_t c);
 
 
 /*
@@ -136,40 +134,6 @@ __forceinline__ __device__ void addcu32(uint32_t *c, uint32_t *s, uint32_t x, ui
        "}                               \n\t"
        : "=r"(s[0]), "=r"(c[0]) 
        : "r"(x), "r"(y));
-}
-/*
-   Propagate carry bit across a 256 bit number starting in 32 bit word indexed by digit
-*/
-__forceinline__ __device__ void propcu32(uint32_t *x, uint32_t c, uint32_t digit)
-{
-   #pragma unroll
-   for (; digit < NWORDS_256BIT_FIOS-1 ; digit++)
-   {
-     asm("{                                   \n\t"
-         "add.cc.u32      %0,   %3, %2;   \n\t"
-         "set.lt.u32.u32  %1,   %0, %2;   \n\t"
-         "and.b32         %1,   %1,  1;      \n\t"
-         "}                                   \n\t"
-         : "=r"(x[digit]), "=r"(c) 
-         : "r"(x[digit]), "r"(c));
-   }
-}
-/*
-   Propagate carry bit across a 256 bit number starting in 32 bit word indexed by digit
-*/
-__forceinline__ __device__ void propcu32_extend(uint32_t *x, uint32_t c)
-{
-   #pragma unroll
-   for (uint32_t digit = NWORDS_256BIT; digit < NWORDS_256BIT_FIOS-1 ; digit++)
-   {
-     asm("{                                   \n\t"
-         "add.cc.u32      %0,   %3, %2;   \n\t"
-         "set.lt.u32.u32  %1,   %0, %2;   \n\t"
-         "and.b32         %1,   %1,  1;      \n\t"
-         "}                                   \n\t"
-         : "=r"(x[digit]), "=r"(c) 
-         : "r"(x[digit]), "r"(c));
-   }
 }
 
 #endif

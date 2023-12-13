@@ -36,12 +36,21 @@
 #define _CUDA_H_
 
 // Prime information for Finite fields is declared in constant memory
-extern __constant__ mod_info_t mod_info_ct[MOD_N];
-extern __constant__ ecbn128_t ecbn128_params_ct[MOD_N];
-extern __constant__ misc_const_t misc_const_ct[MOD_N];
-extern __constant__ uint32_t W32_ct[NWORDS_256BIT * 16];
-extern __constant__ uint32_t IW32_ct[NWORDS_256BIT * 16];
-extern __constant__ uint32_t IW32_nroots_ct[NWORDS_256BIT * (FFT_SIZE_N - 1)];
+extern __constant__ uint32_t ModOffset_ct[3];
+extern __constant__ uint32_t N_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ t_uint64 N64_ct[(NWORDS_FR + NWORDS_FP)/2];
+extern __constant__ uint32_t NPrime_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ uint32_t R2_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ uint32_t R2rdc_ct[NWORDS_FR + NWORDS_FP];
+extern __constant__ uint32_t __align__ (16) G1One_ct[NWORDS_FP];
+extern __constant__ uint32_t __align__(16) G2One_ct[NWORDS_FP*2];
+extern __constant__ uint32_t __align__(16) G1Inf_ct[NWORDS_FP*3];
+extern __constant__ uint32_t __align__(16) G2Inf_ct[NWORDS_FP*6];
+//extern __constant__ ecbn128_t ecbn128_params_ct;
+//extern __constant__ misc_const_t misc_const_ct[1];
+extern __constant__ uint32_t W32_ct[NWORDS_FR * 16];
+extern __constant__ uint32_t IW32_ct[NWORDS_FR * 16];
+extern __constant__ uint32_t IW32_nroots_ct[NWORDS_FR * (FFT_SIZE_N - 1)];
 
 #ifndef assert
 #define assert(X)         \

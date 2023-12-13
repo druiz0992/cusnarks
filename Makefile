@@ -64,6 +64,9 @@ SNARKJS_REPO = https://github.com/druiz0992/snarkjs.git
 RUST_CIRCOM_PATH = $(AUX_PATH)/za
 RUST_CIRCOM_REPO = http://github.com/iden3/za.git
 
+FFIASM_PATH = $(AUX_PATH)/ffiasm
+FFIASM_REPO = http://github.com/iden3/ffiasm.git
+
 CUSNARKS_LIB = libcusnarks.so
 CUBIN_NAME = cusnarks.cubin
 
@@ -71,7 +74,8 @@ dirs= $(CUSRC_PATH) \
       $(CTSRC_PATH) 
 
 aux_cdirs  = $(PCG_PATH) 
-aux_jsdirs = $(SNARKJS_PATH)
+aux_jsdirs = $(SNARKJS_PATH) \
+             $(FFIASM_PATH)
 aux_rdirs  = $(RUST_CIRCOM_PATH)
 
 test_dirs = $(CTEST_PATH) \
@@ -80,6 +84,7 @@ test_dirs = $(CTEST_PATH) \
 
 aux_repos = $(PCG_REPO) \
             $(SNARKJS_REPO) \
+            $(FFIASM_REPO) \
             $(RUST_CIRCOM_REPO)
 
 config_dirs = $(CONFIG_PATH)
@@ -140,7 +145,7 @@ build:
 		(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) build); done
 
 
-all: third_party_libs build
+all: third_party_libs config
 
 force_all: clean third_party_libs_clean all
 
@@ -163,7 +168,15 @@ debug_gpu:
 	@for i in $(CTEST_IDEAS_PATH); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) test); done
-config:   
+
+config:  
+ifeq ($(CUSNARKS_CURVE),"") 
+	     read -p "Enter Curve <BN256 | BLS12381> " CURVE; \
+	     (cd ${CUSRC_PATH}; ./ff.sh $$CURVE; cd -;) 
+else
+	     (cd ${CUSRC_PATH}; ./ff.sh $(CUSNARKS_CURVE); cd -;) 
+endif
+	make clean build 
 	@for i in $(CONFIG_SUBDIRS); do \
 	echo "make test in $$i..."; \
 	(cd $$i; $(MAKE) $(MFLAGS) $(MYMAKEFLAGS) config); done
