@@ -73,3 +73,8 @@ docker/auxdata/circuits/hermez_pk.zkey
 docker/server_config.yaml
 docker/cusnarks
 docker/go-cusnarks
+
+data/*
+docker/circuits
+inputs*.json
+test/c/aux_data
